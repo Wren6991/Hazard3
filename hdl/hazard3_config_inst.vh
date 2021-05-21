@@ -1,4 +1,4 @@
-// Pass-through of parameters defined in hazard5_config.vh, so that these can
+// Pass-through of parameters defined in hazard3_config.vh, so that these can
 // be set at instantiation rather than editing the config file, and will flow
 // correctly down through the hierarchy.
 

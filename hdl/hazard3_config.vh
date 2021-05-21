@@ -1,8 +1,8 @@
-// Hazard5 CPU configuration parameters
+// Hazard3 CPU configuration parameters
 
-// To configure Hazard5 you can either edit this file, or set parameters on
+// To configure Hazard3 you can either edit this file, or set parameters on
 // your top-level instantiation, it's up to you. These parameters are all
-// plumbed through Hazard5's internal hierarchy to the appropriate places.
+// plumbed through Hazard3's internal hierarchy to the appropriate places.
 
 // ----------------------------------------------------------------------------
 // Reset state configuration

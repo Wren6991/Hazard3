@@ -50,7 +50,7 @@ end
 // Device Under Test
 // ----------------------------------------------------------------------------
 
-hazard5_cpu #(
+hazard3_cpu #(
 	.RESET_VECTOR (0),
 	.EXTENSION_C  (1),
 	.EXTENSION_M  (1)

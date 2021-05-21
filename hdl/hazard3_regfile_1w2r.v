@@ -23,7 +23,7 @@
 // This allows BRAM inference on FPGAs with single-read-port BRAMs.
 // (Looking at you iCE40)
 
-module hazard5_regfile_1w2r #(
+module hazard3_regfile_1w2r #(
 	parameter FAKE_DUALPORT = 0,
 	parameter RESET_REGS = 0,	// Unsupported for FAKE_DUALPORT
 	parameter N_REGS = 16,

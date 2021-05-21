@@ -15,12 +15,12 @@
  *                                                                    *
  *********************************************************************/
 
-// Single-ported top level file for Hazard5 CPU. This file instantiates the
-// Hazard5 core, and arbitrates its instruction fetch and load/store signals
+// Single-ported top level file for Hazard3 CPU. This file instantiates the
+// Hazard3 core, and arbitrates its instruction fetch and load/store signals
 // down to a single AHB-Lite master port.
 
-module hazard5_cpu_1port #(
-`include "hazard5_config.vh"
+module hazard3_cpu_1port #(
+`include "hazard3_config.vh"
 ) (
 	// Global signals
 	input wire               clk,
@@ -75,8 +75,8 @@ wire [W_DATA-1:0] core_wdata_d;
 wire [W_DATA-1:0] core_rdata_d;
 
 
-hazard5_core #(
-`include "hazard5_config_inst.vh"
+hazard3_core #(
+`include "hazard3_config_inst.vh"
 ) core (
 	.clk             (clk),
 	.rst_n           (rst_n),

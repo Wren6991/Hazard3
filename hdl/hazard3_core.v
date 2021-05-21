@@ -15,10 +15,10 @@
  *                                                                    *
  *********************************************************************/
 
-module hazard5_core #(
-`include "hazard5_config.vh"
+module hazard3_core #(
+`include "hazard3_config.vh"
 ,
-`include "hazard5_width_const.vh"
+`include "hazard3_width_const.vh"
 ) (
 	// Global signals
 	input wire               clk,
@@ -55,7 +55,7 @@ module hazard5_core #(
 	input wire [15:0]        irq
 );
 
-`include "hazard5_ops.vh"
+`include "hazard3_ops.vh"
 
 `ifdef FORMAL
 // Only yosys-smtbmc seems to support immediate assertions
@@ -108,9 +108,9 @@ assign bus_aph_panic_i = m_jump_req;
 wire f_mem_size;
 assign bus_hsize_i = f_mem_size ? HSIZE_WORD : HSIZE_HWORD;
 
-hazard5_frontend #(
+hazard3_frontend #(
 	.FIFO_DEPTH(2),
-`include "hazard5_config_inst.vh"
+`include "hazard3_config_inst.vh"
 ) frontend (
 	.clk             (clk),
 	.rst_n           (rst_n),
@@ -183,9 +183,9 @@ wire                 dx_csr_wen;
 wire [1:0]           dx_csr_wtype;
 wire                 dx_csr_w_imm;
 
-hazard5_decode #(
-`include "hazard5_config_inst.vh"
-) inst_hazard5_decode (
+hazard3_decode #(
+`include "hazard3_config_inst.vh"
+) inst_hazard3_decode (
 	.clk                   (clk),
 	.rst_n                 (rst_n),
 
@@ -385,10 +385,10 @@ wire [W_DATA-1:0] x_csr_wdata = dx_csr_w_imm ?
 
 wire [W_DATA-1:0] x_csr_rdata;
 
-hazard5_csr #(
+hazard3_csr #(
 	.XLEN            (W_DATA),
-`include "hazard5_config_inst.vh"
-) inst_hazard5_csr (
+`include "hazard3_config_inst.vh"
+) inst_hazard3_csr (
 	.clk                     (clk),
 	.rst_n                   (rst_n),
 	// CSR access port
@@ -452,7 +452,7 @@ if (EXTENSION_M) begin: has_muldiv
 	assign x_muldiv_op_vld = (dx_aluop == ALUOP_MULDIV && !x_use_fast_mul)
 		&& !(x_muldiv_posted || x_stall_raw || x_muldiv_kill);
 
-	hazard5_muldiv_seq #(
+	hazard3_muldiv_seq #(
 		.XLEN   (W_DATA),
 		.UNROLL (MULDIV_UNROLL)
 	) muldiv (
@@ -484,9 +484,9 @@ if (EXTENSION_M) begin: has_muldiv
 
 		wire x_issue_fast_mul = x_use_fast_mul && |dx_rd && !(x_stall || flush_d_x);
 
-		hazard5_mul_fast #(
+		hazard3_mul_fast #(
 			.XLEN(W_DATA)
-		) inst_hazard5_mul_fast (
+		) inst_hazard3_mul_fast (
 			.clk        (clk),
 			.rst_n      (rst_n),
 
@@ -566,7 +566,7 @@ always @ (posedge clk)
 		xm_jump_target <= x_jump_target;
 	end
 
-hazard5_alu alu (
+hazard3_alu alu (
 	.aluop      (dx_aluop),
 	.op_a       (x_op_a),
 	.op_b       (x_op_b),
@@ -672,7 +672,7 @@ always @ (posedge clk) begin
 end
 //synthesis translate_on
 
-hazard5_regfile_1w2r #(
+hazard3_regfile_1w2r #(
 	.FAKE_DUALPORT(0),
 `ifdef SIM
 	.RESET_REGS(1),
@@ -699,12 +699,12 @@ hazard5_regfile_1w2r #(
 );
 
 `ifdef RISCV_FORMAL
-`include "hazard5_rvfi_monitor.vh"
+`include "hazard3_rvfi_monitor.vh"
 `endif
 
-`ifdef HAZARD5_FORMAL_REGRESSION
+`ifdef HAZARD3_FORMAL_REGRESSION
 // Each formal regression provides its own file with the below name:
-`include "hazard5_formal_regression.vh"
+`include "hazard3_formal_regression.vh"
 `endif
 
 endmodule

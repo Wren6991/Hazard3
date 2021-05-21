@@ -15,7 +15,7 @@
  *                                                                    *
  *********************************************************************/
 
-module hazard5_mul_fast #(
+module hazard3_mul_fast #(
 	parameter XLEN = 32
 ) (
 	input  wire              clk,

@@ -1,6 +1,6 @@
-module hazard5_frontend #(
+module hazard3_frontend #(
 	parameter FIFO_DEPTH = 2,  // power of 2, >= 1
-`include "hazard5_config.vh"
+`include "hazard3_config.vh"
 ) (
 	input wire clk,
 	input wire rst_n,
@@ -44,8 +44,8 @@ module hazard5_frontend #(
 );
 
 `undef ASSERT
-`ifdef HAZARD5_FRONTEND_ASSERTIONS
-`define ASSERT(x) assert(x)
+`ifdef HAZARD3_FRONTEND_ASSERTIONS
+`define ASSERT(x) assert(x);
 `else
 `define ASSERT(x)
 `endif
@@ -126,10 +126,10 @@ always @ (posedge clk or negedge rst_n) begin
 		pending_fetches <= 2'h0;
 		ctr_flush_pending <= 2'h0;
 	end else begin
-		`ASSERT(ctr_flush_pending <= pending_fetches);
-		`ASSERT(pending_fetches < 2'd3);
-		`ASSERT(!(mem_data_vld && !pending_fetches));
-		// `ASSERT(!($past(mem_addr_hold) && $past(mem_addr_vld) && !$stable(mem_addr)));
+		`ASSERT(ctr_flush_pending <= pending_fetches)
+		`ASSERT(pending_fetches < 2'd3)
+		`ASSERT(!(mem_data_vld && !pending_fetches))
+		// `ASSERT(!($past(mem_addr_hold) && $past(mem_addr_vld) && !$stable(mem_addr)))
 		mem_addr_hold <= mem_addr_vld && !mem_addr_rdy;
 		pending_fetches <= pending_fetches_next;
 		if (jump_now) begin
@@ -177,9 +177,9 @@ always @ (posedge clk or negedge rst_n) begin
 		unaligned_jump_aph <= 1'b0;
 		unaligned_jump_dph <= 1'b0;
 	end else if (EXTENSION_C) begin
-		`ASSERT(!(unaligned_jump_aph && !unaligned_jump_dph));
-		`ASSERT(!($past(jump_now && !jump_target[1]) && unaligned_jump_aph));
-		`ASSERT(!($past(jump_now && !jump_target[1]) && unaligned_jump_dph));
+		`ASSERT(!(unaligned_jump_aph && !unaligned_jump_dph))
+		`ASSERT(!($past(jump_now && !jump_target[1]) && unaligned_jump_aph))
+		`ASSERT(!($past(jump_now && !jump_target[1]) && unaligned_jump_dph))
 		if (mem_addr_rdy || (jump_now && !unaligned_jump_now)) begin
 			unaligned_jump_aph <= 1'b0;
 		end
@@ -281,10 +281,10 @@ always @ (posedge clk or negedge rst_n) begin
 		hwbuf_vld <= 1'b0;
 		cir_vld <= 2'h0;
 	end else begin
-		`ASSERT(cir_vld <= 2);
-		`ASSERT(cir_use <= 2);
-		`ASSERT(cir_use <= cir_vld);
-		`ASSERT(cir_vld <= buf_level || $past(cir_lock));
+		`ASSERT(cir_vld <= 2)
+		`ASSERT(cir_use <= 2)
+		`ASSERT(cir_use <= cir_vld)
+		`ASSERT(cir_vld <= buf_level || $past(cir_lock))
 		// Update CIR flags
 		buf_level <= buf_level_next;
 		hwbuf_vld <= &buf_level_next;

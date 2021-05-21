@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // RVFI Instrumentation
 // ----------------------------------------------------------------------------
-// To be included into hazard5_cpu.v for use with riscv-formal.
+// To be included into hazard3_cpu.v for use with riscv-formal.
 // Contains some state modelling to diagnose exactly what the core is doing,
 // and report this in a way RVFI understands.
 // We consider instructions to "retire" as they cross the M/W pipe register.
@@ -77,7 +77,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// Hazard5 is an in-order core:
+// Hazard3 is an in-order core:
 reg [63:0] rvfm_retire_ctr;
 assign rvfi_order = rvfm_retire_ctr;
 always @ (posedge clk or negedge rst_n)

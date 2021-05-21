@@ -15,7 +15,7 @@
  *                                                                    *
  *********************************************************************/
 
-module hazard5_alu #(
+module hazard3_alu #(
 	parameter W_DATA = 32
 ) (
 	input  wire [3:0]        aluop,
@@ -26,7 +26,7 @@ module hazard5_alu #(
 	output wire              cmp
 );
 
-`include "hazard5_ops.vh"
+`include "hazard3_ops.vh"
 
 function msb;
 input [W_DATA-1:0] x;
@@ -51,7 +51,7 @@ wire [W_DATA-1:0] shift_dout;
 reg shift_right_nleft;
 reg shift_arith;
 
-hazard5_shift_barrel #(
+hazard3_shift_barrel #(
 	.W_DATA(W_DATA),
 	.W_SHAMT(5)
 ) shifter (

@@ -19,7 +19,7 @@
 // using a single log-type barrel shifter. Around 240 LUTs for 32 bits.
 // (7 layers of 32 2-input muxes, some extra LUTs and LUT inputs used for arith)
 
-module hazard5_shift_barrel #(
+module hazard3_shift_barrel #(
 	parameter W_DATA = 32,
 	parameter W_SHAMT = 5
 ) (

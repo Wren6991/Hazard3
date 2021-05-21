@@ -27,11 +27,11 @@
 // The actual multiply/divide hardware is unsigned. We handle signedness at
 // input/output.
 
-module hazard5_muldiv_seq #(
+module hazard3_muldiv_seq #(
 	parameter XLEN = 32,
 	parameter UNROLL = 1,
 	parameter W_CTR = $clog2(XLEN + 1), // do not modify
-`include "hazard5_width_const.vh"
+`include "hazard3_width_const.vh"
 ) (
 	input  wire               clk,
 	input  wire               rst_n,
@@ -47,7 +47,7 @@ module hazard5_muldiv_seq #(
 	output wire               result_vld
 );
 
-`include "hazard5_ops.vh"
+`include "hazard3_ops.vh"
 
 //synthesis translate_off
 generate if (UNROLL & (UNROLL - 1) || ~|UNROLL)

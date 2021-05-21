@@ -15,10 +15,10 @@
  *                                                                            *
  *****************************************************************************/
 
-module hazard5_decode #(
-`include "hazard5_config.vh"
+module hazard3_decode #(
+`include "hazard3_config.vh"
 ,
-`include "hazard5_width_const.vh"
+`include "hazard3_width_const.vh"
 ) (
 	input wire clk,
 	input wire rst_n,
@@ -64,7 +64,7 @@ module hazard5_decode #(
 );
 
 `include "rv_opcodes.vh"
-`include "hazard5_ops.vh"
+`include "hazard3_ops.vh"
 
 localparam HAVE_CSR = CSR_M_MANDATORY || CSR_M_TRAP || CSR_COUNTER;
 
@@ -77,7 +77,7 @@ wire        d_invalid_16bit;
 reg         d_invalid_32bit;
 wire        d_invalid = d_invalid_16bit || d_invalid_32bit;
 
-hazard5_instr_decompress #(
+hazard3_instr_decompress #(
 	.PASSTHROUGH(!EXTENSION_C)
 ) decomp (
 	.instr_in       (fd_cir),

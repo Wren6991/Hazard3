@@ -19,12 +19,12 @@
 // Also includes CSR-related logic like interrupt enable/masking,
 // trap vector calculation.
 
-module hazard5_csr #(
+module hazard3_csr #(
 	parameter XLEN            = 32,   // Must be 32
 	parameter W_COUNTER       = 64,   // This *should* be 64, but can be reduced to save gates.
 	                                  // The full 64 bits is writeable, so high-word increment can
 	                                  // be implemented in software, and a narrower hw counter used
-`include "hazard5_config.vh"
+`include "hazard3_config.vh"
 ) (
 	input  wire            clk,
 	input  wire            rst_n,
@@ -88,7 +88,7 @@ module hazard5_csr #(
 
 // TODO block CSR access when entering trap?
 
-`include "hazard5_ops.vh"
+`include "hazard3_ops.vh"
 
 localparam X0 = {XLEN{1'b0}};
 
@@ -694,7 +694,7 @@ wire [15:0] exception_req = {
 wire exception_req_any = |exception_req && !in_trap;
 wire [3:0] exception_req_num;
 
-hazard5_priority_encode #(
+hazard3_priority_encode #(
 	.W_REQ(16)
 ) except_priority (
 	.req (exception_req),
@@ -727,7 +727,7 @@ wire [31:0] mip_no_global = mip & 32'hffff_f7ff;
 wire        irq_any = |(mip_no_global & {{16{mie_meie}}, {16{1'b1}}}) && mstatus_mie;
 wire [4:0]  irq_num;
 
-hazard5_priority_encode #(
+hazard3_priority_encode #(
 	.W_REQ(32)
 ) irq_priority (
 	.req (mip_no_global),

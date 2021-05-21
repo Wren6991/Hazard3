@@ -73,9 +73,9 @@ int main(int argc, char **argv) {
 	}
 
 #ifdef DUAL_PORT
-	cxxrtl_design::p_hazard5__cpu__2port top;
+	cxxrtl_design::p_hazard3__cpu__2port top;
 #else
-	cxxrtl_design::p_hazard5__cpu__1port top;
+	cxxrtl_design::p_hazard3__cpu__1port top;
 #endif
 
 	std::fill(std::begin(mem), std::end(mem), 0);
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 #endif
 			if (bus_addr <= MEM_SIZE) {
 				unsigned int n_bytes = 1u << bus_size;
-				// Note we are relying on hazard5's byte lane replication
+				// Note we are relying on hazard3's byte lane replication
 				for (unsigned int i = 0; i < n_bytes; ++i) {
 					mem[bus_addr + i] = wdata >> (8 * i) & 0xffu;
 				}

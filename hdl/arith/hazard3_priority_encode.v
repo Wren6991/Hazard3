@@ -16,9 +16,9 @@
  *****************************************************************************/
 
 // Really something like this should be in a utility library (or the language!),
-// but Hazard5 is supposed to be self-contained
+// but Hazard3 is supposed to be self-contained
 
-module hazard5_priority_encode #(
+module hazard3_priority_encode #(
 	parameter W_REQ = 16,
 	parameter W_GNT = $clog2(W_REQ) // do not modify
 ) (
