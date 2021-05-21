@@ -1,9 +1,4 @@
 
-localparam W_ALUOP = 4;
-localparam W_ALUSRC = 2;
-localparam W_MEMOP = 4;
-localparam W_BCOND = 2;
-
 // ALU operation selectors
 
 localparam ALUOP_ADD     = 4'h0; 
@@ -52,7 +47,6 @@ localparam CSR_WTYPE_C    = 2'h2;
 // instructions in the pipeline. These are speculative and can be flushed
 // on e.g. branch mispredict
 
-localparam W_EXCEPT              = 3;
 localparam EXCEPT_NONE           = 3'h0;
 localparam EXCEPT_ECALL          = 3'h1;
 localparam EXCEPT_EBREAK         = 3'h2;
@@ -63,7 +57,6 @@ localparam EXCEPT_INSTR_FAULT    = 3'h6;
 
 // Operations for M extension (these are just instr[14:12])
 
-localparam W_MULOP     = 3;
 localparam M_OP_MUL    = 3'h0;
 localparam M_OP_MULH   = 3'h1;
 localparam M_OP_MULHSU = 3'h2;

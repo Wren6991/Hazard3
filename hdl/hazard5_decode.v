@@ -16,13 +16,9 @@
  *****************************************************************************/
 
 module hazard5_decode #(
-	parameter EXTENSION_C = 1,   // compressed instruction extension
-	parameter EXTENSION_M = 1,   // mul/div/mod instruction extension
-	parameter HAVE_CSR = 0,
-	parameter W_ADDR = 32,
-	parameter W_DATA = 32,
-	parameter RESET_VECTOR = 32'h0,
-	parameter W_REGADDR = 5
+`include "hazard5_config.vh"
+,
+`include "hazard5_width_const.vh"
 ) (
 	input wire clk,
 	input wire rst_n,
@@ -67,15 +63,39 @@ module hazard5_decode #(
 	output reg  [2:0]           dx_except
 );
 
-
-// TODO TODO factor this out in a cleaner way, e.g. separate out registers and stall logic.
-
 `include "rv_opcodes.vh"
 `include "hazard5_ops.vh"
 
-// ============================================================================
+localparam HAVE_CSR = CSR_M_MANDATORY || CSR_M_TRAP || CSR_COUNTER;
+
+// ----------------------------------------------------------------------------
+// Expand compressed instructions
+
+wire [31:0] d_instr;
+wire        d_instr_is_32bit;
+wire        d_invalid_16bit;
+reg         d_invalid_32bit;
+wire        d_invalid = d_invalid_16bit || d_invalid_32bit;
+
+hazard5_instr_decompress #(
+	.PASSTHROUGH(!EXTENSION_C)
+) decomp (
+	.instr_in       (fd_cir),
+	.instr_is_32bit (d_instr_is_32bit),
+	.instr_out      (d_instr),
+	.invalid        (d_invalid_16bit)
+);
+
+// Decode various immmediate formats
+wire [31:0] d_imm_i = {{21{d_instr[31]}}, d_instr[30:20]};
+wire [31:0] d_imm_s = {{21{d_instr[31]}}, d_instr[30:25], d_instr[11:7]};
+wire [31:0] d_imm_b = {{20{d_instr[31]}}, d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
+wire [31:0] d_imm_u = {d_instr[31:12], {12{1'b0}}};
+wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
+
+
+// ----------------------------------------------------------------------------
 // PC/CIR control
-// ============================================================================
 
 wire d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
 assign d_stall = x_stall ||
@@ -131,7 +151,6 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // If the current CIR is there due to locking, it is a jump which has already had primary effect.
-wire d_invalid;
 wire jump_enable = !d_starved && !cir_lock_prev && !d_invalid;
 reg [W_ADDR-1:0] d_jump_offs;
 
@@ -158,35 +177,8 @@ always @ (*) begin
 	endcase
 end
 
-// ============================================================================
-// Expand compressed instructions
-// ============================================================================
-
-wire [31:0] d_instr;
-wire        d_instr_is_32bit;
-wire        d_invalid_16bit;
-reg         d_invalid_32bit;
-assign      d_invalid = d_invalid_16bit || d_invalid_32bit;
-
-hazard5_instr_decompress #(
-	.PASSTHROUGH(!EXTENSION_C)
-) decomp (
-	.instr_in       (fd_cir),
-	.instr_is_32bit (d_instr_is_32bit),
-	.instr_out      (d_instr),
-	.invalid        (d_invalid_16bit)
-);
-
-// ============================================================================
+// ----------------------------------------------------------------------------
 // Decode X controls
-// ============================================================================
-
-// Decode various immmediate formats
-wire [31:0] d_imm_i = {{21{d_instr[31]}}, d_instr[30:20]};
-wire [31:0] d_imm_s = {{21{d_instr[31]}}, d_instr[30:25], d_instr[11:7]};
-wire [31:0] d_imm_b = {{20{d_instr[31]}}, d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
-wire [31:0] d_imm_u = {d_instr[31:12], {12{1'b0}}};
-wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
 
 // Combinatorials:
 reg  [W_REGADDR-1:0] d_rd;

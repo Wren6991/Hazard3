@@ -21,16 +21,10 @@
 
 module hazard5_csr #(
 	parameter XLEN            = 32,   // Must be 32
-	parameter CSR_M_MANDATORY = 1,    // Include mandatory M-mode CSRs e.g. misa, marchid
-	parameter CSR_M_TRAP      = 1,    // Include M-mode trap setup/handling CSRs
-	parameter CSR_COUNTER     = 1,    // Include counter/timer CSRs
-	parameter EXTENSION_C     = 0,    // For misa
-	parameter EXTENSION_M     = 0,    // For misa
-	parameter MTVEC_WMASK     = 32'hfffff000, // Save gates by making trap vector base partially fixed (legal, as it's WARL)
-	parameter MTVEC_INIT      = 32'h0,// Initial value of trap vector base
-	parameter W_COUNTER       = 64    // This *should* be 64, but can be reduced to save gates.
+	parameter W_COUNTER       = 64,   // This *should* be 64, but can be reduced to save gates.
 	                                  // The full 64 bits is writeable, so high-word increment can
 	                                  // be implemented in software, and a narrower hw counter used
+`include "hazard5_config.vh"
 ) (
 	input  wire            clk,
 	input  wire            rst_n,

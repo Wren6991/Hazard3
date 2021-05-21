@@ -30,20 +30,21 @@
 module hazard5_muldiv_seq #(
 	parameter XLEN = 32,
 	parameter UNROLL = 1,
-	parameter W_CTR = $clog2(XLEN + 1) // do not modify
+	parameter W_CTR = $clog2(XLEN + 1), // do not modify
+`include "hazard5_width_const.vh"
 ) (
-	input  wire              clk,
-	input  wire              rst_n,
-	input  wire [2:0]        op,
-	input  wire              op_vld,
-	output wire              op_rdy,
-	input  wire              op_kill,
-	input  wire [XLEN-1:0]   op_a,
-	input  wire [XLEN-1:0]   op_b,
+	input  wire               clk,
+	input  wire               rst_n,
+	input  wire [W_MULOP-1:0] op,
+	input  wire               op_vld,
+	output wire               op_rdy,
+	input  wire               op_kill,
+	input  wire [XLEN-1:0]    op_a,
+	input  wire [XLEN-1:0]    op_b,
 
-	output wire [XLEN-1:0]   result_h, // mulh* or rem*
-	output wire [XLEN-1:0]   result_l, // mul   or div*
-	output wire              result_vld
+	output wire [XLEN-1:0]    result_h, // mulh* or rem*
+	output wire [XLEN-1:0]    result_l, // mul   or div*
+	output wire               result_vld
 );
 
 `include "hazard5_ops.vh"

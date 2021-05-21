@@ -1,9 +1,6 @@
 module hazard5_frontend #(
-	parameter EXTENSION_C = 1,
-	parameter W_ADDR = 32,     // other sizes currently unsupported
-	parameter W_DATA = 32,     // other sizes currently unsupported
 	parameter FIFO_DEPTH = 2,  // power of 2, >= 1
-	parameter RESET_VECTOR = 0
+`include "hazard5_config.vh"
 ) (
 	input wire clk,
 	input wire rst_n,
@@ -71,19 +68,31 @@ parameter W_FIFO_LEVEL = $clog2(FIFO_DEPTH + 1);
 
 wire jump_now = jump_target_vld && jump_target_rdy;
 
-reg [W_DATA-1:0]     fifo_mem [0:FIFO_DEPTH];
-reg [FIFO_DEPTH-1:0] fifo_valid;
+// mem has an extra entry which is equal to next-but-last entry, and valid has
+// an extra entry which is constant-0. These are just there to handle loop
+// boundary conditions.
+
+reg [W_DATA-1:0]   fifo_mem [0:FIFO_DEPTH];
+reg [FIFO_DEPTH:0] fifo_valid;
+
+wire [W_DATA-1:0] fifo_wdata = mem_data;
+wire [W_DATA-1:0] fifo_rdata = fifo_mem[0];
+always @ (*) fifo_mem[FIFO_DEPTH] = fifo_wdata;
+
+wire fifo_full = fifo_valid[FIFO_DEPTH - 1];
+wire fifo_empty = !fifo_valid[0];
+wire fifo_almost_full = FIFO_DEPTH == 1 || (!fifo_valid[FIFO_DEPTH - 1] && fifo_valid[FIFO_DEPTH - 2]);
 
 wire fifo_push;
 wire fifo_pop;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		fifo_valid <= {FIFO_DEPTH{1'b0}};
+		fifo_valid <= {FIFO_DEPTH+1{1'b0}};
 	end else if (jump_now) begin
-		fifo_valid <= {FIFO_DEPTH{1'b0}};
+		fifo_valid[FIFO_DEPTH-1:0] <= {FIFO_DEPTH{1'b0}};
 	end else if (fifo_push || fifo_pop) begin
-		fifo_valid <= ~(~fifo_valid << fifo_push) >> fifo_pop;
+		fifo_valid[FIFO_DEPTH-1:0] <= ~(~fifo_valid << fifo_push) >> fifo_pop;
 	end
 end
 
@@ -95,14 +104,6 @@ always @ (posedge clk) begin: fifo_data_shift
 		end
 	end
 end
-
-wire [W_DATA-1:0] fifo_wdata = mem_data;
-wire [W_DATA-1:0] fifo_rdata = fifo_mem[0];
-always @ (*) fifo_mem[FIFO_DEPTH] = fifo_wdata;
-
-wire fifo_full = fifo_valid[FIFO_DEPTH - 1];
-wire fifo_empty = !fifo_valid[0];
-wire fifo_almost_full = FIFO_DEPTH == 1 || (!fifo_valid[FIFO_DEPTH - 1] && fifo_valid[FIFO_DEPTH - 2]);
 
 // ============================================================================
 // Fetch Request + State Logic

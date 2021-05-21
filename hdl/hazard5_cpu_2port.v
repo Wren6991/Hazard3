@@ -89,17 +89,7 @@ wire [W_DATA-1:0] core_rdata_d;
 
 
 hazard5_core #(
-	.RESET_VECTOR    (RESET_VECTOR),
-	.EXTENSION_C     (EXTENSION_C),
-	.EXTENSION_M     (EXTENSION_M),
-	.MULDIV_UNROLL   (MULDIV_UNROLL),
-	.MUL_FAST        (MUL_FAST),
-	.CSR_M_MANDATORY (CSR_M_MANDATORY),
-	.CSR_M_TRAP      (CSR_M_TRAP),
-	.CSR_COUNTER     (CSR_COUNTER),
-	.MTVEC_WMASK     (MTVEC_WMASK),
-	.MTVEC_INIT      (MTVEC_INIT),
-	.REDUCED_BYPASS  (REDUCED_BYPASS)
+`include "hazard5_config_inst.vh"
 ) core (
 	.clk             (clk),
 	.rst_n           (rst_n),

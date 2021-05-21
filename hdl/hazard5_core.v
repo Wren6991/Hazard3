@@ -17,6 +17,8 @@
 
 module hazard5_core #(
 `include "hazard5_config.vh"
+,
+`include "hazard5_width_const.vh"
 ) (
 	// Global signals
 	input wire               clk,
@@ -70,11 +72,6 @@ module hazard5_core #(
 //synthesis translate_on
 `endif
 
-localparam N_REGS = 32;
-// should be localparam but ISIM can't cope
-parameter W_REGADDR = $clog2(N_REGS);
-localparam NOP_INSTR = 32'h13;	// addi x0, x0, 0
-
 wire flush_d_x;
 
 wire d_stall;
@@ -112,11 +109,8 @@ wire f_mem_size;
 assign bus_hsize_i = f_mem_size ? HSIZE_WORD : HSIZE_HWORD;
 
 hazard5_frontend #(
-	.EXTENSION_C(EXTENSION_C),
-	.W_ADDR(W_ADDR),
-	.W_DATA(32),
 	.FIFO_DEPTH(2),
-	.RESET_VECTOR(RESET_VECTOR)
+`include "hazard5_config_inst.vh"
 ) frontend (
 	.clk             (clk),
 	.rst_n           (rst_n),
@@ -190,13 +184,7 @@ wire [1:0]           dx_csr_wtype;
 wire                 dx_csr_w_imm;
 
 hazard5_decode #(
-	.EXTENSION_C  (EXTENSION_C),
-	.EXTENSION_M  (EXTENSION_M),
-	.HAVE_CSR     (CSR_M_MANDATORY || CSR_M_TRAP || CSR_COUNTER),
-	.W_ADDR       (W_ADDR),
-	.W_DATA       (W_DATA),
-	.RESET_VECTOR (RESET_VECTOR),
-	.W_REGADDR    (W_REGADDR)
+`include "hazard5_config_inst.vh"
 ) inst_hazard5_decode (
 	.clk                   (clk),
 	.rst_n                 (rst_n),
@@ -399,13 +387,7 @@ wire [W_DATA-1:0] x_csr_rdata;
 
 hazard5_csr #(
 	.XLEN            (W_DATA),
-	.CSR_M_MANDATORY (CSR_M_MANDATORY),
-	.CSR_M_TRAP      (CSR_M_TRAP),
-	.CSR_COUNTER     (CSR_COUNTER),
-	.EXTENSION_C     (EXTENSION_C),
-	.EXTENSION_M     (EXTENSION_M),
-	.MTVEC_WMASK     (MTVEC_WMASK),
-	.MTVEC_INIT      (MTVEC_INIT)
+`include "hazard5_config_inst.vh"
 ) inst_hazard5_csr (
 	.clk                     (clk),
 	.rst_n                   (rst_n),
@@ -699,7 +681,7 @@ hazard5_regfile_1w2r #(
 `else
 	.RESET_REGS(0),
 `endif
-	.N_REGS(N_REGS),
+	.N_REGS(32),
 	.W_DATA(W_DATA)
 ) inst_regfile_1w2r (
 	.clk    (clk),
