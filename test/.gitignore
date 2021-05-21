@@ -1,0 +1,7 @@
+*.o
+*.out
+*.bin
+*.vcd
+*.elf
+*.dis
+*.log

@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+import sys
+
+gold = []
+model = []
+
+model_bytes = []
+in_testdata = False
+for l in open(sys.argv[1]):
+	if l.startswith("Dumping memory"):
+		in_testdata = True
+		continue
+	if in_testdata:
+		try:
+			model_bytes.extend(int(x, 16) for x in l.split(" "))
+		except ValueError:
+			break
+for i in range(len(model_bytes) // 4):
+	model.append(model_bytes[i * 4] | model_bytes[i * 4 + 1] << 8 | model_bytes[i * 4 + 2] << 16 | model_bytes[i * 4 + 3] << 24)
+
+for l in open(sys.argv[2]):
+	line_contents = []
+	for index in range(0, len(l.strip()), 8):
+		line_contents.append(int(l[index:index + 8], 16))
+	gold.extend(reversed(line_contents))
+
+all_match = True
+for i, g in enumerate(gold):
+	if g == model[i]:
+		eq_str = "\033[1;32m==\033[0;0m"
+	else:
+		eq_str = "\033[1;31m!=\033[0;0m"
+		all_match = False
+	print("{:03x}: {:08x} (gate) {} {:08x} (gold)".format(i * 4, model[i], eq_str, g))
+
+if all_match:
+	print("Test PASSED.")
+else:
+	print("Test FAILED.")
