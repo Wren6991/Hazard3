@@ -36,11 +36,17 @@ module hazard3_frontend #(
 	output reg  [1:0]        cir_vld, // number of valid halfwords in CIR
 	input wire  [1:0]        cir_use, // number of halfwords D intends to consume
 	                                  // *may* be a function of hready
-	input wire               cir_lock // Lock-in current contents and level of CIR.
+	input wire               cir_lock,// Lock-in current contents and level of CIR.
 	                                  // Assert simultaneously with a jump request,
 	                                  // if decode is going to stall. This stops the CIR
 	                                  // from being trashed by incoming fetch data;
 	                                  // jump instructions have other side effects besides jumping!
+
+    // Provide the rs1/rs2 register numbers which will be in CIR on the next
+    // cycle. These go straight to the register file read ports.
+	output wire [4:0]        next_regs_rs1,
+	output wire [4:0]        next_regs_rs2,
+	output wire              next_regs_vld
 );
 
 `undef ASSERT
@@ -50,19 +56,12 @@ module hazard3_frontend #(
 `define ASSERT(x)
 `endif
 
-// ISIM doesn't support some of this:
-// //synthesis translate_off
-// initial if (W_DATA != 32) begin $error("Frontend requires 32-bit databus"); end
-// initial if ((1 << $clog2(FIFO_DEPTH)) != FIFO_DEPTH) begin $error("Frontend FIFO depth must be power of 2"); end
-// initial if (~|FIFO_DEPTH) begin $error("Frontend FIFO depth must be > 0"); end
-// //synthesis translate_on
-
 localparam W_BUNDLE = W_DATA / 2;
 parameter W_FIFO_LEVEL = $clog2(FIFO_DEPTH + 1);
 
-// ============================================================================
+// ----------------------------------------------------------------------------
 // Fetch Queue (FIFO)
-// ============================================================================
+//
 // This is a little different from either a normal sync fifo or sync fwft fifo
 // so it's worth implementing from scratch
 
@@ -105,9 +104,8 @@ always @ (posedge clk) begin: fifo_data_shift
 	end
 end
 
-// ============================================================================
+// ----------------------------------------------------------------------------
 // Fetch Request + State Logic
-// ============================================================================
 
 // Keep track of some useful state of the memory interface
 
@@ -230,10 +228,8 @@ end
 
 assign jump_target_rdy = !mem_addr_hold;
 
-
-// ============================================================================
+// ----------------------------------------------------------------------------
 // Instruction assembly yard
-// ============================================================================
 
 // buf_level is the number of valid halfwords in {hwbuf, cir}.
 // cir_vld and hwbuf_vld are functions of this.
@@ -297,5 +293,22 @@ end
 // No need to reset these as they will be written before first use
 always @ (posedge clk)
 	{hwbuf, cir} <= instr_data_plus_fetch;
+
+
+// ----------------------------------------------------------------------------
+// Register number predecode
+
+wire [31:0] next_instr = instr_data_plus_fetch[31:0];
+wire next_instr_is_32bit = next_instr[1:0] == 2'b11;
+
+assign next_regs_vld = next_instr_is_32bit ? buf_level_next[1] : |buf_level_next;
+
+assign next_regs_rs1 =
+	next_instr_is_32bit      ? next_instr[19:15] :
+	next_instr[1:0] == 2'b10 ? next_instr[11:7]  : {2'b01, next_instr[9:7]};
+
+assign next_regs_rs2 =
+	next_instr_is_32bit      ? next_instr[24:20] :
+	next_instr[1:0] == 2'b10 ? next_instr[6:2]   : {2'b01, next_instr[4:2]};
 
 endmodule

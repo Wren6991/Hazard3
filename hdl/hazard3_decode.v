@@ -29,7 +29,7 @@ module hazard3_decode #(
 	output wire                 df_cir_lock,
 	output reg                  d_jump_req,
 	output reg  [W_ADDR-1:0]    d_jump_target,
-	output wire [W_ADDR-1:0]    d_pc, // FIXME only added for riscv-formal
+	output wire [W_ADDR-1:0]    d_pc,
 
 	output wire                 d_stall,
 	input wire                  x_stall,
@@ -38,29 +38,26 @@ module hazard3_decode #(
 	input wire                  f_jump_now,
 	input wire  [W_ADDR-1:0]    f_jump_target,
 
-	output reg  [W_REGADDR-1:0] d_rs1, // combinatorial
-	output reg  [W_REGADDR-1:0] d_rs2, // combinatorial
-
-	output reg  [W_DATA-1:0]    dx_imm,
-	output reg  [W_REGADDR-1:0] dx_rs1,
-	output reg  [W_REGADDR-1:0] dx_rs2,
-	output reg  [W_REGADDR-1:0] dx_rd,
-	output reg  [W_ALUSRC-1:0]  dx_alusrc_a,
-	output reg  [W_ALUSRC-1:0]  dx_alusrc_b,
-	output reg  [W_ALUOP-1:0]   dx_aluop,
-	output reg  [W_MEMOP-1:0]   dx_memop,
-	output reg  [W_MULOP-1:0]   dx_mulop,
-	output reg                  dx_csr_ren,
-	output reg                  dx_csr_wen,
-	output reg  [1:0]           dx_csr_wtype,
-	output reg                  dx_csr_w_imm,
-	output reg  [W_BCOND-1:0]   dx_branchcond,
-	output reg  [W_ADDR-1:0]    dx_jump_target,
-	output reg                  dx_jump_is_regoffs,
-	output reg                  dx_result_is_linkaddr,
-	output reg  [W_ADDR-1:0]    dx_pc,
-	output reg  [W_ADDR-1:0]    dx_mispredict_addr,
-	output reg  [2:0]           dx_except
+	output reg  [W_DATA-1:0]    d_imm,
+	output reg  [W_REGADDR-1:0] d_rs1,
+	output reg  [W_REGADDR-1:0] d_rs2,
+	output reg  [W_REGADDR-1:0] d_rd,
+	output reg  [W_ALUSRC-1:0]  d_alusrc_a,
+	output reg  [W_ALUSRC-1:0]  d_alusrc_b,
+	output reg  [W_ALUOP-1:0]   d_aluop,
+	output reg  [W_MEMOP-1:0]   d_memop,
+	output reg  [W_MULOP-1:0]   d_mulop,
+	output reg                  d_csr_ren,
+	output reg                  d_csr_wen,
+	output reg  [1:0]           d_csr_wtype,
+	output reg                  d_csr_w_imm,
+	output reg  [W_BCOND-1:0]   d_branchcond,
+	output reg  [W_ADDR-1:0]    d_jump_target,
+	output reg                  d_jump_is_regoffs,
+	output reg                  d_result_is_linkaddr,
+	output reg  [W_ADDR-1:0]    d_pc,
+	output reg  [W_ADDR-1:0]    d_mispredict_addr,
+	output reg  [2:0]           d_except
 );
 
 `include "rv_opcodes.vh"
@@ -165,38 +162,16 @@ always @ (*) begin
 
 	d_jump_target = pc + d_jump_offs;
 
-	casez ({d_instr[31], d_instr})
-	{1'b1, RV_BEQ }: d_jump_req = jump_enable;
-	{1'b1, RV_BNE }: d_jump_req = jump_enable;
-	{1'b1, RV_BLT }: d_jump_req = jump_enable;
-	{1'b1, RV_BGE }: d_jump_req = jump_enable;
-	{1'b1, RV_BLTU}: d_jump_req = jump_enable;
-	{1'b1, RV_BGEU}: d_jump_req = jump_enable;
-	{1'bz, RV_JAL }: d_jump_req = jump_enable;
+	casez (d_instr)
+	RV_JAL:  d_jump_req = jump_enable;
 	default: d_jump_req = 1'b0;
 	endcase
+
+	d_mispredict_addr = pc_next;
 end
 
 // ----------------------------------------------------------------------------
 // Decode X controls
-
-// Combinatorials:
-reg  [W_REGADDR-1:0] d_rd;
-reg  [W_DATA-1:0]    d_imm;
-reg  [W_DATA-1:0]    d_branchoffs;
-reg  [W_ALUSRC-1:0]  d_alusrc_a;
-reg  [W_ALUSRC-1:0]  d_alusrc_b;
-reg  [W_ALUOP-1:0]   d_aluop;
-reg  [W_MEMOP-1:0]   d_memop;
-reg  [W_MULOP-1:0]   d_mulop;
-reg  [W_BCOND-1:0]   d_branchcond;
-reg                  d_jump_is_regoffs;
-reg                  d_result_is_linkaddr;
-reg                  d_csr_ren;
-reg                  d_csr_wen;
-reg  [1:0]           d_csr_wtype;
-reg                  d_csr_w_imm;
-reg  [W_EXCEPT-1:0]  d_except;
 
 localparam X0 = {W_REGADDR{1'b0}};
 
@@ -206,7 +181,6 @@ always @ (*) begin
 	d_rs2 = d_instr[24:20];
 	d_rd  = d_instr[11: 7];
 	d_imm = d_imm_i;
-	d_branchoffs = d_imm_i;
 	d_alusrc_a = ALUSRCA_RS1;
 	d_alusrc_b = ALUSRCB_RS2;
 	d_aluop = ALUOP_ADD;
@@ -281,87 +255,20 @@ always @ (*) begin
 	RV_MRET:    if (HAVE_CSR) begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	default:    begin d_invalid_32bit = 1'b1; end
 	endcase
-end
 
-
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		{dx_rs1, dx_rs2, dx_rd} <= {(3 * W_REGADDR){1'b0}};
-		dx_alusrc_a <= ALUSRCA_RS1;
-		dx_alusrc_b <= ALUSRCB_RS2;
-		dx_aluop <= ALUOP_ADD;
-		dx_memop <= MEMOP_NONE;
-		dx_mulop <= M_OP_MUL;
-		dx_csr_ren <= 1'b0;
-		dx_csr_wen <= 1'b0;
-		dx_csr_wtype <= CSR_WTYPE_W;
-		dx_csr_w_imm <= 1'b0;
-		dx_branchcond <= BCOND_NEVER;
-		dx_jump_is_regoffs <= 1'b0;
-		dx_result_is_linkaddr <= 1'b0;
-		dx_except <= EXCEPT_NONE;
-	end else if (flush_d_x || (d_stall && !x_stall)) begin
-		// Bubble insertion
-		dx_branchcond <= BCOND_NEVER;
-		dx_memop <= MEMOP_NONE;
-		dx_rd <= 5'h0;
-		dx_except <= EXCEPT_NONE;
-		dx_csr_ren <= 1'b0;
-		dx_csr_wen <= 1'b0;
-		// Don't start a multiply in a pipe bubble
+	if (d_invalid || d_starved) begin
+		d_rs1        = {W_REGADDR{1'b0}};
+		d_rs2        = {W_REGADDR{1'b0}};
+		d_rd         = {W_REGADDR{1'b0}};
+		d_memop      = MEMOP_NONE;
+		d_branchcond = BCOND_NEVER;
+		d_csr_ren    = 1'b0;
+		d_csr_wen    = 1'b0;
 		if (EXTENSION_M)
-			dx_aluop <= ALUOP_ADD;
-		// Also need to clear rs1, rs2, due to a nasty sequence of events:
-		// Suppose we have a load, followed by a dependent branch, which is predicted taken
-		// - branch will stall in D until AHB master becomes free
-		// - on next cycle, prediction causes jump, and bubble is in X
-		// - if X gets branch's rs1, rs2, it will cause spurious RAW stall
-		// - on next cycle, branch will not progress into X due to RAW stall, but *will* be replaced in D due to jump
-		// - branch mispredict now cannot be corrected
-		dx_rs1 <= 5'h0;
-		dx_rs2 <= 5'h0;
-	end else if (!x_stall) begin
-		// These ones can have side effects
-		dx_rs1        <= d_invalid ? {W_REGADDR{1'b0}}    : d_rs1;
-		dx_rs2        <= d_invalid ? {W_REGADDR{1'b0}}    : d_rs2;
-		dx_rd         <= d_invalid ? {W_REGADDR{1'b0}}    : d_rd;
-		dx_memop      <= d_invalid ? MEMOP_NONE           : d_memop;
-		dx_branchcond <= d_invalid ? BCOND_NEVER          : d_branchcond;
-		dx_csr_ren    <= d_invalid ? 1'b0                 : d_csr_ren;
-		dx_csr_wen    <= d_invalid ? 1'b0                 : d_csr_wen;
-		dx_except     <= d_invalid ? EXCEPT_INSTR_ILLEGAL : d_except;
-		dx_aluop      <= d_invalid && EXTENSION_M ? ALUOP_ADD : d_aluop;
+			d_aluop = ALUOP_ADD;
 
-		// These can't
-		dx_alusrc_a <= d_alusrc_a;
-		dx_alusrc_b <= d_alusrc_b;
-		dx_mulop <= d_mulop;
-		dx_jump_is_regoffs <= d_jump_is_regoffs;
-		dx_result_is_linkaddr <= d_result_is_linkaddr;
-		dx_csr_wtype <= d_csr_wtype;
-		dx_csr_w_imm <= d_csr_w_imm;
-	end
-end
-
-// No reset required on these; will be masked by the resettable pipeline controls until they're valid
-always @ (posedge clk) begin
-	if (!x_stall) begin
-		dx_imm <= d_imm;
-		dx_jump_target <= d_jump_target;
-		dx_mispredict_addr <= pc_next;
-		dx_pc <= pc;
-	end
-	if (flush_d_x) begin
-		// The target of a late jump must be propagated *immediately* to X PC, as
-		// mepc may sample X PC at any time due to IRQ, and must not capture
-		// misprediction.
-		// Also required for flush while X stalled (e.g. if a muldiv enters X while
-		// a 1 cycle bus stall holds off the jump request in M)
-		dx_pc <= f_jump_target;
-		`ifdef FORMAL
-		// This should only be caused by late jumps
-		assert(f_jump_now);
-		`endif
+		if (d_invalid && !d_starved)
+			d_except = EXCEPT_INSTR_ILLEGAL;
 	end
 end
 

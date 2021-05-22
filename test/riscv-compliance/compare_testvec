@@ -37,4 +37,4 @@ for i, g in enumerate(gold):
 if all_match:
 	print("Test PASSED.")
 else:
-	print("Test FAILED.")
+	sys.exit("Test FAILED.")

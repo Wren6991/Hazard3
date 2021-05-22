@@ -1,6 +1,6 @@
 MEMORY
   {
-    RAM   (wx) : ORIGIN = 0x0, LENGTH = 64k
+    RAM   (wx) : ORIGIN = 0x0, LENGTH = 4M
     RESULT (w) : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), LENGTH = 64k
   }
 
@@ -11,9 +11,6 @@ ENTRY(_start)
 SECTIONS
 {
   .text : {
-    /* Padding in place of vector table (by default CPU reset vector points to
-       immediately after vector table */
-    . = ORIGIN(RAM) + 0xc0;
     PROVIDE (_start = .);
     *(.text*)
     . = ALIGN(4);

@@ -84,24 +84,24 @@ localparam HSIZE_BYTE  = 3'd0;
 
 
 
-// ============================================================================
-//                               Pipe Stage F
-// ============================================================================
+// ----------------------------------------------------------------------------
+// Pipe Stage F
 
-wire              m_jump_req;
-wire [W_ADDR-1:0] m_jump_target;
-wire              d_jump_req;
-wire [W_ADDR-1:0] d_jump_target;
 
-wire              f_jump_req = d_jump_req || m_jump_req;
-wire [W_ADDR-1:0] f_jump_target = m_jump_req ? m_jump_target : d_jump_target;
-wire              f_jump_rdy;
-wire              f_jump_now = f_jump_req && f_jump_rdy;
+wire                 f_jump_req;
+wire [W_ADDR-1:0]    f_jump_target;
+wire                 f_jump_rdy;
+wire                 f_jump_now = f_jump_req && f_jump_rdy;
 
-wire [31:0] fd_cir;
-wire [1:0]  fd_cir_vld;
-wire [1:0]  df_cir_use;
-wire        df_cir_lock;
+// Predecoded register numbers, for register file access
+wire                 f_regnum_vld;
+wire [W_REGADDR-1:0] f_rs1;
+wire [W_REGADDR-1:0] f_rs2;
+
+wire [31:0]          fd_cir;
+wire [1:0]           fd_cir_vld;
+wire [1:0]           df_cir_use;
+wire                 df_cir_lock;
 
 assign bus_aph_panic_i = m_jump_req;
 
@@ -130,14 +130,17 @@ hazard3_frontend #(
 	.cir             (fd_cir),
 	.cir_vld         (fd_cir_vld),
 	.cir_use         (df_cir_use),
-	.cir_lock        (df_cir_lock)
+	.cir_lock        (df_cir_lock),
+
+	.next_regs_rs1   (f_rs1),
+	.next_regs_rs2   (f_rs2),
+	.next_regs_vld   (f_regnum_vld)
 );
 
 assign flush_d_x = m_jump_req && f_jump_rdy;
 
-// ============================================================================
-//                               Pipe Stage D
-// ============================================================================
+// ----------------------------------------------------------------------------
+// Pipe Stage X (Decode Logic)
 
 // X-check on pieces of instruction which frontend claims are valid
 //synthesis translate_off
@@ -155,82 +158,75 @@ always @ (posedge clk) begin
 end
 //synthesis translate_on
 
-wire [W_ADDR-1:0]    d_pc; // FIXME only used for riscv-formal
-
-// To register file
+// To X
+wire                 d_jump_req;
+wire [W_ADDR-1:0]    d_jump_target;
+wire [W_DATA-1:0]    d_imm;
 wire [W_REGADDR-1:0] d_rs1;
 wire [W_REGADDR-1:0] d_rs2;
+wire [W_REGADDR-1:0] d_rd;
+wire [W_ALUSRC-1:0]  d_alusrc_a;
+wire [W_ALUSRC-1:0]  d_alusrc_b;
+wire [W_ALUOP-1:0]   d_aluop;
+wire [W_MEMOP-1:0]   d_memop;
+wire [W_MULOP-1:0]   d_mulop;
+wire [W_BCOND-1:0]   d_branchcond;
+wire                 d_jump_is_regoffs;
+wire                 d_result_is_linkaddr;
+wire [W_ADDR-1:0]    d_pc;
+wire [W_ADDR-1:0]    d_mispredict_addr;
+wire [W_EXCEPT-1:0]  d_except;
+wire                 d_csr_ren;
+wire                 d_csr_wen;
+wire [1:0]           d_csr_wtype;
+wire                 d_csr_w_imm;
 
-// To X
-wire [W_DATA-1:0]    dx_imm;
-wire [W_REGADDR-1:0] dx_rs1;
-wire [W_REGADDR-1:0] dx_rs2;
-wire [W_REGADDR-1:0] dx_rd;
-wire [W_ALUSRC-1:0]  dx_alusrc_a;
-wire [W_ALUSRC-1:0]  dx_alusrc_b;
-wire [W_ALUOP-1:0]   dx_aluop;
-wire [W_MEMOP-1:0]   dx_memop;
-wire [W_MULOP-1:0]   dx_mulop;
-wire [W_BCOND-1:0]   dx_branchcond;
-wire [W_ADDR-1:0]    dx_jump_target;
-wire                 dx_jump_is_regoffs;
-wire                 dx_result_is_linkaddr;
-wire [W_ADDR-1:0]    dx_pc;
-wire [W_ADDR-1:0]    dx_mispredict_addr;
-wire [W_EXCEPT-1:0]  dx_except;
-wire                 dx_csr_ren;
-wire                 dx_csr_wen;
-wire [1:0]           dx_csr_wtype;
-wire                 dx_csr_w_imm;
 
 hazard3_decode #(
 `include "hazard3_config_inst.vh"
 ) inst_hazard3_decode (
-	.clk                   (clk),
-	.rst_n                 (rst_n),
+	.clk                  (clk),
+	.rst_n                (rst_n),
 
-	.fd_cir                (fd_cir),
-	.fd_cir_vld            (fd_cir_vld),
-	.df_cir_use            (df_cir_use),
-	.df_cir_lock           (df_cir_lock),
-	.d_jump_req            (d_jump_req),
-	.d_jump_target         (d_jump_target),
-	.d_pc                  (d_pc),
+	.fd_cir               (fd_cir),
+	.fd_cir_vld           (fd_cir_vld),
+	.df_cir_use           (df_cir_use),
+	.df_cir_lock          (df_cir_lock),
+	.d_jump_req           (d_jump_req),
+	.d_jump_target        (d_jump_target),
+	.d_pc                 (d_pc),
 
-	.d_stall               (d_stall),
-	.x_stall               (x_stall),
-	.flush_d_x             (flush_d_x),
-	.f_jump_rdy            (f_jump_rdy),
-	.f_jump_now            (f_jump_now),
-	.f_jump_target         (f_jump_target),
+	.d_stall              (d_stall),
+	.x_stall              (x_stall),
+	.flush_d_x            (flush_d_x),
+	.f_jump_rdy           (f_jump_rdy),
+	.f_jump_now           (f_jump_now),
+	.f_jump_target        (f_jump_target),
 
-	.d_rs1                 (d_rs1),
-	.d_rs2                 (d_rs2),
-	.dx_imm                (dx_imm),
-	.dx_rs1                (dx_rs1),
-	.dx_rs2                (dx_rs2),
-	.dx_rd                 (dx_rd),
-	.dx_alusrc_a           (dx_alusrc_a),
-	.dx_alusrc_b           (dx_alusrc_b),
-	.dx_aluop              (dx_aluop),
-	.dx_memop              (dx_memop),
-	.dx_mulop              (dx_mulop),
-	.dx_csr_ren            (dx_csr_ren),
-	.dx_csr_wen            (dx_csr_wen),
-	.dx_csr_wtype          (dx_csr_wtype),
-	.dx_csr_w_imm          (dx_csr_w_imm),
-	.dx_branchcond         (dx_branchcond),
-	.dx_jump_target        (dx_jump_target),
-	.dx_jump_is_regoffs    (dx_jump_is_regoffs),
-	.dx_result_is_linkaddr (dx_result_is_linkaddr),
-	.dx_pc                 (dx_pc),
-	.dx_mispredict_addr    (dx_mispredict_addr),
-	.dx_except             (dx_except)
+	.d_imm                (d_imm),
+	.d_rs1                (d_rs1),
+	.d_rs2                (d_rs2),
+	.d_rd                 (d_rd),
+	.d_alusrc_a           (d_alusrc_a),
+	.d_alusrc_b           (d_alusrc_b),
+	.d_aluop              (d_aluop),
+	.d_memop              (d_memop),
+	.d_mulop              (d_mulop),
+	.d_csr_ren            (d_csr_ren),
+	.d_csr_wen            (d_csr_wen),
+	.d_csr_wtype          (d_csr_wtype),
+	.d_csr_w_imm          (d_csr_w_imm),
+	.d_branchcond         (d_branchcond),
+	.d_jump_target        (d_jump_target),
+	.d_jump_is_regoffs    (d_jump_is_regoffs),
+	.d_result_is_linkaddr (d_result_is_linkaddr),
+	.d_pc                 (d_pc),
+	.d_mispredict_addr    (d_mispredict_addr),
+	.d_except             (d_except)
 );
 
-// ============================================================================
-//                               Pipe Stage X
-// ============================================================================
+// ----------------------------------------------------------------------------
+// Pipe Stage X (Execution Logic)
 
 // Register the write which took place to the regfile on previous cycle, and bypass.
 // This is an alternative to a write -> read bypass in the regfile,
@@ -239,8 +235,8 @@ reg  [W_REGADDR-1:0] mw_rd;
 reg  [W_DATA-1:0]    mw_result;
 
 // From register file:
-wire [W_DATA-1:0]    dx_rdata1;
-wire [W_DATA-1:0]    dx_rdata2;
+wire [W_DATA-1:0]    x_rdata1;
+wire [W_DATA-1:0]    x_rdata2;
 
 // Combinational regs for muxing
 reg   [W_DATA-1:0]   x_rs1_bypass;
@@ -260,18 +256,8 @@ reg  [W_REGADDR-1:0] xm_rs1;
 reg  [W_REGADDR-1:0] xm_rs2;
 reg  [W_REGADDR-1:0] xm_rd;
 reg  [W_DATA-1:0]    xm_result;
-reg  [W_ADDR-1:0]    xm_jump_target;
 reg  [W_DATA-1:0]    xm_store_data;
-reg                  xm_jump;
 reg  [W_MEMOP-1:0]   xm_memop;
-
-// For JALR, the LSB of the result must be cleared by hardware
-wire [W_ADDR-1:0] x_taken_jump_target = dx_jump_is_regoffs ? x_alu_add & ~32'h1 : dx_jump_target;
-wire [W_ADDR-1:0] x_jump_target =
-	x_trap_exit                                 ? x_mepc             : // Note precedence -- it's possible to have enter && exit, but in this case enter_rdy is false.
-	x_trap_enter                                ? x_trap_addr        :
-	dx_imm[31] && dx_branchcond != BCOND_ALWAYS ? dx_mispredict_addr :
-	                                              x_taken_jump_target;
 
 reg x_stall_raw;
 wire x_stall_muldiv;
@@ -287,24 +273,24 @@ always @ (*) begin
 	x_stall_raw = 1'b0;
 	if (REDUCED_BYPASS) begin
 		x_stall_raw =
-			|xm_rd && (xm_rd == dx_rs1 || xm_rd == dx_rs2) ||
-			|mw_rd && (mw_rd == dx_rs1 || mw_rd == dx_rs2);
+			|xm_rd && (xm_rd == d_rs1 || xm_rd == d_rs2) ||
+			|mw_rd && (mw_rd == d_rs1 || mw_rd == d_rs2);
 	end else if (m_generating_result) begin
 		// With the full bypass network, load-use (or fast multiply-use) is the only RAW stall
-		if (|xm_rd && xm_rd == dx_rs1) begin
+		if (|xm_rd && xm_rd == d_rs1) begin
 			// Store addresses cannot be bypassed later, so there is no exception here.
 			x_stall_raw = 1'b1;
-		end else if (|xm_rd && xm_rd == dx_rs2) begin
+		end else if (|xm_rd && xm_rd == d_rs2) begin
 			// Store data can be bypassed in M. Any other instructions must stall.
-			x_stall_raw = !(dx_memop == MEMOP_SW || dx_memop == MEMOP_SH || dx_memop == MEMOP_SB);
+			x_stall_raw = !(d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB);
 		end
 	end
 end
 
 // AHB transaction request
 
-wire x_memop_vld = !dx_memop[3];
-wire x_memop_write = dx_memop == MEMOP_SW || dx_memop == MEMOP_SH || dx_memop == MEMOP_SB;
+wire x_memop_vld = !d_memop[3];
+wire x_memop_write = d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB;
 wire x_unaligned_addr =
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
 	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0];
@@ -316,7 +302,7 @@ always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
 	bus_haddr_d = x_alu_add;
 	bus_hwrite_d = x_memop_write;
-	case (dx_memop)
+	case (d_memop)
 		MEMOP_LW:  bus_hsize_d = HSIZE_WORD;
 		MEMOP_SW:  bus_hsize_d = HSIZE_WORD;
 		MEMOP_LH:  bus_hsize_d = HSIZE_HWORD;
@@ -332,42 +318,42 @@ end
 
 // ALU operand muxes and bypass
 always @ (*) begin
-	if (~|dx_rs1) begin
+	if (~|d_rs1) begin
 		x_rs1_bypass = {W_DATA{1'b0}};
-	end else if (xm_rd == dx_rs1) begin
+	end else if (xm_rd == d_rs1) begin
 		x_rs1_bypass = xm_result;
-	end else if (mw_rd == dx_rs1 && !REDUCED_BYPASS) begin
+	end else if (mw_rd == d_rs1 && !REDUCED_BYPASS) begin
 		x_rs1_bypass = mw_result;
 	end else begin
-		x_rs1_bypass = dx_rdata1;
+		x_rs1_bypass = x_rdata1;
 	end
-	if (~|dx_rs2) begin
+	if (~|d_rs2) begin
 		x_rs2_bypass = {W_DATA{1'b0}};
-	end else if (xm_rd == dx_rs2) begin
+	end else if (xm_rd == d_rs2) begin
 		x_rs2_bypass = xm_result;
-	end else if (mw_rd == dx_rs2 && !REDUCED_BYPASS) begin
+	end else if (mw_rd == d_rs2 && !REDUCED_BYPASS) begin
 		x_rs2_bypass = mw_result;
 	end else begin
-		x_rs2_bypass = dx_rdata2;
+		x_rs2_bypass = x_rdata2;
 	end
 
-	if (|dx_alusrc_a)
-		x_op_a = dx_pc;
+	if (|d_alusrc_a)
+		x_op_a = d_pc;
 	else
 		x_op_a = x_rs1_bypass;
 
-	if (|dx_alusrc_b)
-		x_op_b = dx_imm;
+	if (|d_alusrc_b)
+		x_op_b = d_imm;
 	else
 		x_op_b = x_rs2_bypass;
 end
 
 // CSRs and Trap Handling
 
-wire   x_except_ecall         = dx_except == EXCEPT_ECALL;
-wire   x_except_breakpoint    = dx_except == EXCEPT_EBREAK;
-wire   x_except_invalid_instr = dx_except == EXCEPT_INSTR_ILLEGAL;
-assign x_trap_exit            = dx_except == EXCEPT_MRET && !(x_stall || m_jump_req);
+wire   x_except_ecall         = d_except == EXCEPT_ECALL;
+wire   x_except_breakpoint    = d_except == EXCEPT_EBREAK;
+wire   x_except_invalid_instr = d_except == EXCEPT_INSTR_ILLEGAL;
+assign x_trap_exit            = d_except == EXCEPT_MRET && !(x_stall || m_jump_req);
 wire   x_trap_enter_rdy       = !(x_stall || m_jump_req || x_trap_exit);
 wire   x_trap_is_exception; // diagnostic
 
@@ -380,8 +366,8 @@ always @ (posedge clk) begin
 end
 `endif
 
-wire [W_DATA-1:0] x_csr_wdata = dx_csr_w_imm ?
-	{{W_DATA-5{1'b0}}, dx_rs1} : x_rs1_bypass;
+wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
+	{{W_DATA-5{1'b0}}, d_rs1} : x_rs1_bypass;
 
 wire [W_DATA-1:0] x_csr_rdata;
 
@@ -394,21 +380,21 @@ hazard3_csr #(
 	// CSR access port
 	// *en_soon are early access strobes which are not a function of bus stall.
 	// Can generate access faults (hence traps), but do not actually perform access.
-	.addr                    (dx_imm[11:0]),
+	.addr                    (d_imm[11:0]), // todo could just connect this to the instruction bits
 	.wdata                   (x_csr_wdata),
-	.wen_soon                (dx_csr_wen),
-	.wen                     (dx_csr_wen && !(x_stall || flush_d_x)),
-	.wtype                   (dx_csr_wtype),
+	.wen_soon                (d_csr_wen),
+	.wen                     (d_csr_wen && !(x_stall || flush_d_x)),
+	.wtype                   (d_csr_wtype),
 	.rdata                   (x_csr_rdata),
-	.ren_soon                (dx_csr_ren),
-	.ren                     (dx_csr_ren && !(x_stall || flush_d_x)),
+	.ren_soon                (d_csr_ren),
+	.ren                     (d_csr_ren && !(x_stall || flush_d_x)),
 	// Trap signalling
 	.trap_addr               (x_trap_addr),
 	.trap_enter_vld          (x_trap_enter),
 	.trap_enter_rdy          (x_trap_enter_rdy),
 	.trap_exit               (x_trap_exit),
 	.trap_is_exception       (x_trap_is_exception),
-	.mepc_in                 (dx_pc),
+	.mepc_in                 (d_pc),
 	.mepc_out                (x_mepc),
 	// IRQ and exception requests
 	.irq                     (irq),
@@ -447,9 +433,9 @@ if (EXTENSION_M) begin: has_muldiv
 
 	wire x_muldiv_kill = flush_d_x || x_trap_enter; // TODO this takes an extra cycle to kill muldiv before trap entry
 
-	wire x_use_fast_mul = MUL_FAST && dx_aluop == ALUOP_MULDIV && dx_mulop == M_OP_MUL;
+	wire x_use_fast_mul = MUL_FAST && d_aluop == ALUOP_MULDIV && d_mulop == M_OP_MUL;
 
-	assign x_muldiv_op_vld = (dx_aluop == ALUOP_MULDIV && !x_use_fast_mul)
+	assign x_muldiv_op_vld = (d_aluop == ALUOP_MULDIV && !x_use_fast_mul)
 		&& !(x_muldiv_posted || x_stall_raw || x_muldiv_kill);
 
 	hazard3_muldiv_seq #(
@@ -458,7 +444,7 @@ if (EXTENSION_M) begin: has_muldiv
 	) muldiv (
 		.clk        (clk),
 		.rst_n      (rst_n),
-		.op         (dx_mulop),
+		.op         (d_mulop),
 		.op_vld     (x_muldiv_op_vld),
 		.op_rdy     (x_muldiv_op_rdy),
 		.op_kill    (x_muldiv_kill),
@@ -472,17 +458,17 @@ if (EXTENSION_M) begin: has_muldiv
 
 	// TODO fusion of MULHx->MUL and DIVy->REMy sequences
 	wire x_muldiv_result_is_high =
-		dx_mulop == M_OP_MULH ||
-		dx_mulop == M_OP_MULHSU ||
-		dx_mulop == M_OP_MULHU ||
-		dx_mulop == M_OP_REM ||
-		dx_mulop == M_OP_REMU;
+		d_mulop == M_OP_MULH ||
+		d_mulop == M_OP_MULHSU ||
+		d_mulop == M_OP_MULHU ||
+		d_mulop == M_OP_REM ||
+		d_mulop == M_OP_REMU;
 	assign x_muldiv_result = x_muldiv_result_is_high ? x_muldiv_result_h : x_muldiv_result_l;
 	assign x_stall_muldiv = x_muldiv_op_vld || !x_muldiv_result_vld;
 
 	if (MUL_FAST) begin: has_fast_mul
 
-		wire x_issue_fast_mul = x_use_fast_mul && |dx_rd && !(x_stall || flush_d_x);
+		wire x_issue_fast_mul = x_use_fast_mul && |d_rd && !(x_stall || flush_d_x);
 
 		hazard3_mul_fast #(
 			.XLEN(W_DATA)
@@ -506,7 +492,7 @@ if (EXTENSION_M) begin: has_muldiv
 	end
 
 `ifdef FORMAL
-	always @ (posedge clk) if (dx_aluop != ALUOP_MULDIV) assert(!x_stall_muldiv);
+	always @ (posedge clk) if (d_aluop != ALUOP_MULDIV) assert(!x_stall_muldiv);
 `endif
 
 end else begin: no_muldiv
@@ -519,36 +505,22 @@ end else begin: no_muldiv
 end
 endgenerate
 
-// State machine and branch detection
+// State machine
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		xm_jump <= 1'b0;
 		xm_memop <= MEMOP_NONE;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
 		// TODO: this assertion may become untrue depending on how we handle exceptions/IRQs when stalled?
 		//`ASSERT(!(m_stall && flush_d_x));// bubble insertion logic below is broken otherwise
 		if (!m_stall) begin
-			{xm_rs1, xm_rs2, xm_rd} <= {dx_rs1, dx_rs2, dx_rd};
+			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
-			xm_memop <= dx_memop | {x_unaligned_addr, 3'h0};
+			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
 			if (x_stall || flush_d_x || x_trap_enter) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
-				xm_jump <= 1'b0;
 				xm_memop <= MEMOP_NONE;
-			end
-			if (!(x_stall || flush_d_x)) begin
-				case (dx_branchcond)
-					BCOND_ALWAYS: xm_jump <= 1'b1;
-					// For branches, we are either taking a branch late, or recovering from
-					// an incorrectly taken branch, depending on sign of branch offset.
-					BCOND_ZERO: xm_jump <= !x_alu_cmp ^ dx_imm[31];
-					BCOND_NZERO: xm_jump <= x_alu_cmp ^ dx_imm[31];
-					default xm_jump <= 1'b0;
-				endcase
-				if (x_trap_enter || x_trap_exit)
-					xm_jump <= 1'b1;
 			end
 		end
 	end
@@ -558,16 +530,34 @@ end
 always @ (posedge clk)
 	if (!m_stall) begin
 		xm_result <=
-			dx_result_is_linkaddr                   ? dx_mispredict_addr :
-			dx_csr_ren                              ? x_csr_rdata :
-			EXTENSION_M && dx_aluop == ALUOP_MULDIV ? x_muldiv_result :
-			                                          x_alu_result;
+			d_result_is_linkaddr                   ? d_mispredict_addr :
+			d_csr_ren                              ? x_csr_rdata :
+			EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
+			                                         x_alu_result;
 		xm_store_data <= x_rs2_bypass;
-		xm_jump_target <= x_jump_target;
 	end
 
+// Branch handling
+
+// For JALR, the LSB of the result must be cleared by hardware
+wire [W_ADDR-1:0] x_taken_jump_target = d_jump_is_regoffs ? x_alu_add & ~32'h1 : d_jump_target;
+wire [W_ADDR-1:0] x_jump_target =
+	x_trap_exit                                 ? x_mepc             : // Note precedence -- it's possible to have enter && exit, but in this case enter_rdy is false.
+	x_trap_enter                                ? x_trap_addr        :
+	                                              x_taken_jump_target;
+
+wire x_jump_req =
+	x_trap_enter || x_trap_exit ||
+	d_branchcond == BCOND_ALWAYS ||
+	d_branchcond == BCOND_ZERO && !x_alu_cmp ||
+	d_branchcond == BCOND_NZERO && x_alu_cmp;
+
+assign f_jump_req = d_jump_req || x_jump_req;
+assign f_jump_target = x_jump_target;
+
+
 hazard3_alu alu (
-	.aluop      (dx_aluop),
+	.aluop      (d_aluop),
 	.op_a       (x_op_a),
 	.op_b       (x_op_b),
 	.result     (x_alu_result),
@@ -575,15 +565,12 @@ hazard3_alu alu (
 	.cmp        (x_alu_cmp)
 );
 
-// ============================================================================
+// ----------------------------------------------------------------------------
 //                               Pipe Stage M
-// ============================================================================
 
 reg [W_DATA-1:0] m_rdata_shift;
 reg [W_DATA-1:0] m_wdata;
 reg [W_DATA-1:0] m_result;
-assign m_jump_req = xm_jump;
-assign m_jump_target = xm_jump_target;
 
 assign m_stall = (!xm_memop[3] && !bus_dph_ready_d) || (m_jump_req && !f_jump_rdy);
 
@@ -652,9 +639,8 @@ always @ (posedge clk)
 	if (!m_stall)
 		mw_result <= m_result;
 
-// ============================================================================
+// ----------------------------------------------------------------------------
 //                               Pipe Stage W
-// ============================================================================
 
 // mw_result and mw_rd register the most recent write to the register file,
 // so that X can bypass them in.
@@ -686,12 +672,12 @@ hazard3_regfile_1w2r #(
 ) inst_regfile_1w2r (
 	.clk    (clk),
 	.rst_n  (rst_n),
-	// On stall, we feed X's addresses back into regfile
+	// On downstream stall, we feed D's addresses back into regfile
 	// so that output does not change.
-	.raddr1 (x_stall ? dx_rs1 : d_rs1),
-	.rdata1 (dx_rdata1),
-	.raddr2 (x_stall ? dx_rs2 : d_rs2),
-	.rdata2 (dx_rdata2),
+	.raddr1 (x_stall ? d_rs1 : f_rs1),
+	.rdata1 (x_rdata1),
+	.raddr2 (x_stall ? d_rs2 : f_rs2),
+	.rdata2 (x_rdata2),
 
 	.waddr  (xm_rd),
 	.wdata  (m_result),
