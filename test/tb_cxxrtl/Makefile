@@ -4,8 +4,8 @@ CDEFINES         := DUAL_PORT
 CPU_RESET_VECTOR := 32'hc0
 EXTENSION_C      := 1
 EXTENSION_M      := 1
-MULDIV_UNROLL    := 1
-MUL_FAST         := 0
+MULDIV_UNROLL    := 2
+MUL_FAST         := 1
 REDUCED_BYPASS   := 0
 
 .PHONY: clean tb all
