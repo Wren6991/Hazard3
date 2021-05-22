@@ -546,11 +546,12 @@ wire [W_ADDR-1:0] x_jump_target =
 	x_trap_enter                                ? x_trap_addr        :
 	                                              x_taken_jump_target;
 
+// Be careful not to take branches whose comparisons depend on a load result
 wire x_jump_req =
 	x_trap_enter || x_trap_exit ||
 	d_branchcond == BCOND_ALWAYS ||
-	d_branchcond == BCOND_ZERO && !x_alu_cmp ||
-	d_branchcond == BCOND_NZERO && x_alu_cmp;
+	d_branchcond == BCOND_ZERO && !x_alu_cmp && !x_stall_raw ||
+	d_branchcond == BCOND_NZERO && x_alu_cmp && !x_stall_raw;
 
 assign f_jump_req = d_jump_req || x_jump_req;
 assign f_jump_target = x_jump_target;
