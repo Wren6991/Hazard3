@@ -72,8 +72,6 @@ module hazard3_core #(
 //synthesis translate_on
 `endif
 
-wire flush_d_x;
-
 wire d_stall;
 wire x_stall;
 wire m_stall;
@@ -81,8 +79,6 @@ wire m_stall;
 localparam HSIZE_WORD  = 3'd2;
 localparam HSIZE_HWORD = 3'd1;
 localparam HSIZE_BYTE  = 3'd0;
-
-
 
 // ----------------------------------------------------------------------------
 // Pipe Stage F
@@ -103,7 +99,7 @@ wire [1:0]           fd_cir_vld;
 wire [1:0]           df_cir_use;
 wire                 df_cir_lock;
 
-assign bus_aph_panic_i = m_jump_req;
+assign bus_aph_panic_i = 1'b0;
 
 wire f_mem_size;
 assign bus_hsize_i = f_mem_size ? HSIZE_WORD : HSIZE_HWORD;
@@ -136,8 +132,6 @@ hazard3_frontend #(
 	.next_regs_rs2   (f_rs2),
 	.next_regs_vld   (f_regnum_vld)
 );
-
-assign flush_d_x = m_jump_req && f_jump_rdy;
 
 // ----------------------------------------------------------------------------
 // Pipe Stage X (Decode Logic)
@@ -198,7 +192,6 @@ hazard3_decode #(
 
 	.d_stall              (d_stall),
 	.x_stall              (x_stall),
-	.flush_d_x            (flush_d_x),
 	.f_jump_rdy           (f_jump_rdy),
 	.f_jump_now           (f_jump_now),
 	.f_jump_target        (f_jump_target),
@@ -262,8 +255,11 @@ reg  [W_MEMOP-1:0]   xm_memop;
 reg x_stall_raw;
 wire x_stall_muldiv;
 
-assign x_stall = m_stall ||
-	x_stall_raw || x_stall_muldiv || bus_aph_req_d && !bus_aph_ready_d;
+assign x_stall =
+	m_stall ||
+	x_stall_raw || x_stall_muldiv ||
+	bus_aph_req_d && !bus_aph_ready_d ||
+	f_jump_req && !f_jump_rdy;
 
 wire m_fast_mul_result_vld;
 wire m_generating_result = xm_memop < MEMOP_SW || m_fast_mul_result_vld;
@@ -310,10 +306,7 @@ always @ (*) begin
 		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
 		default:   bus_hsize_d = HSIZE_BYTE;
 	endcase
-	// m_jump_req implies flush_d_x is coming. Can't use flush_d_x because it's
-	// possible for a mispredicted load/store to go through whilst a late jump
-	// request is stalled, if there are two bus masters.
-	bus_aph_req_d = x_memop_vld && !(x_stall_raw || m_jump_req || x_trap_enter);
+	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_trap_enter);
 end
 
 // ALU operand muxes and bypass
@@ -353,14 +346,12 @@ end
 wire   x_except_ecall         = d_except == EXCEPT_ECALL;
 wire   x_except_breakpoint    = d_except == EXCEPT_EBREAK;
 wire   x_except_invalid_instr = d_except == EXCEPT_INSTR_ILLEGAL;
-assign x_trap_exit            = d_except == EXCEPT_MRET && !(x_stall || m_jump_req);
-wire   x_trap_enter_rdy       = !(x_stall || m_jump_req || x_trap_exit);
+assign x_trap_exit            = d_except == EXCEPT_MRET;
+wire   x_trap_enter_rdy       = !(x_stall || x_trap_exit);
 wire   x_trap_is_exception; // diagnostic
 
 `ifdef FORMAL
 always @ (posedge clk) begin
-	if (flush_d_x)
-		assert(!x_trap_enter_rdy);
 	if (x_trap_exit)
 		assert(!bus_aph_req_d);
 end
@@ -383,11 +374,11 @@ hazard3_csr #(
 	.addr                    (d_imm[11:0]), // todo could just connect this to the instruction bits
 	.wdata                   (x_csr_wdata),
 	.wen_soon                (d_csr_wen),
-	.wen                     (d_csr_wen && !(x_stall || flush_d_x)),
+	.wen                     (d_csr_wen && !x_stall),
 	.wtype                   (d_csr_wtype),
 	.rdata                   (x_csr_rdata),
 	.ren_soon                (d_csr_ren),
-	.ren                     (d_csr_ren && !(x_stall || flush_d_x)),
+	.ren                     (d_csr_ren && !x_stall),
 	// Trap signalling
 	.trap_addr               (x_trap_addr),
 	.trap_enter_vld          (x_trap_enter),
@@ -431,7 +422,7 @@ if (EXTENSION_M) begin: has_muldiv
 		else
 			x_muldiv_posted <= (x_muldiv_posted || (x_muldiv_op_vld && x_muldiv_op_rdy)) && x_stall;
 
-	wire x_muldiv_kill = flush_d_x || x_trap_enter; // TODO this takes an extra cycle to kill muldiv before trap entry
+	wire x_muldiv_kill = x_trap_enter; // TODO this takes an extra cycle to kill muldiv before trap entry
 
 	wire x_use_fast_mul = MUL_FAST && d_aluop == ALUOP_MULDIV && d_mulop == M_OP_MUL;
 
@@ -468,7 +459,7 @@ if (EXTENSION_M) begin: has_muldiv
 
 	if (MUL_FAST) begin: has_fast_mul
 
-		wire x_issue_fast_mul = x_use_fast_mul && |d_rd && !(x_stall || flush_d_x);
+		wire x_issue_fast_mul = x_use_fast_mul && |d_rd && !x_stall;
 
 		hazard3_mul_fast #(
 			.XLEN(W_DATA)
@@ -511,13 +502,11 @@ always @ (posedge clk or negedge rst_n) begin
 		xm_memop <= MEMOP_NONE;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
-		// TODO: this assertion may become untrue depending on how we handle exceptions/IRQs when stalled?
-		//`ASSERT(!(m_stall && flush_d_x));// bubble insertion logic below is broken otherwise
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
-			if (x_stall || flush_d_x || x_trap_enter) begin
+			if (x_stall || x_trap_enter) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
@@ -573,7 +562,7 @@ reg [W_DATA-1:0] m_rdata_shift;
 reg [W_DATA-1:0] m_wdata;
 reg [W_DATA-1:0] m_result;
 
-assign m_stall = (!xm_memop[3] && !bus_dph_ready_d) || (m_jump_req && !f_jump_rdy);
+assign m_stall = !xm_memop[3] && !bus_dph_ready_d;
 
 wire m_except_bus_fault = bus_dph_err_d; // TODO: handle differently for LSU/ifetch?
 

@@ -33,7 +33,6 @@ module hazard3_decode #(
 
 	output wire                 d_stall,
 	input wire                  x_stall,
-	input wire                  flush_d_x,
 	input wire                  f_jump_rdy,
 	input wire                  f_jump_now,
 	input wire  [W_ADDR-1:0]    f_jump_target,
@@ -55,7 +54,6 @@ module hazard3_decode #(
 	output reg  [W_ADDR-1:0]    d_jump_target,
 	output reg                  d_jump_is_regoffs,
 	output reg                  d_result_is_linkaddr,
-	output reg  [W_ADDR-1:0]    d_pc,
 	output reg  [W_ADDR-1:0]    d_mispredict_addr,
 	output reg  [2:0]           d_except
 );
@@ -113,7 +111,7 @@ assign df_cir_use =
 
 // Note it is possible for d_jump_req and m_jump_req to be asserted
 // simultaneously, hence checking flush:
-wire jump_caused_by_d = d_jump_req && f_jump_rdy && !flush_d_x;
+wire jump_caused_by_d = d_jump_req && f_jump_rdy;                 /// FIXME what about JALR?
 wire assert_cir_lock = jump_caused_by_d && d_stall;
 wire deassert_cir_lock = !d_stall;
 reg cir_lock_prev;
