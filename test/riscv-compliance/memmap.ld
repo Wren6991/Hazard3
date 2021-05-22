@@ -11,6 +11,7 @@ ENTRY(_start)
 SECTIONS
 {
   .text : {
+    . = ORIGIN(RAM) + 0xc0;
     PROVIDE (_start = .);
     *(.text*)
     . = ALIGN(4);

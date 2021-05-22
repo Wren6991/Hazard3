@@ -44,7 +44,7 @@
 #define LOCAL_IO_WRITE_STR(_STR) RVMODEL_IO_WRITE_STR(x31, _STR)
 
 // Shut up
-#define RVMODEL_IO_WRITE_STR(_STR)
+#define RVMODEL_IO_WRITE_STR(_STR, ...)
 
 // #define RVMODEL_IO_WRITE_STR(_SP, _STR)                                 \
 //     .section .data.string;                                              \

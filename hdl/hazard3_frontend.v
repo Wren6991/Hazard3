@@ -304,8 +304,14 @@ wire next_instr_is_32bit = next_instr[1:0] == 2'b11;
 assign next_regs_vld = next_instr_is_32bit ? buf_level_next[1] : |buf_level_next;
 
 assign next_regs_rs1 =
-	next_instr_is_32bit      ? next_instr[19:15] :
-	next_instr[1:0] == 2'b10 ? next_instr[11:7]  : {2'b01, next_instr[9:7]};
+	next_instr_is_32bit                                     ? next_instr[19:15]       : // 32-bit R, S, B formats
+	next_instr[1:0] == 2'b00 && next_instr[15:13] == 3'b000 ? 5'd2                    : // c.addi4spn
+	next_instr[1:0] == 2'b01 && next_instr[15:13] == 3'b011 ? 5'd2                    : // c.addi16sp
+	next_instr[1:0] == 2'b10 && next_instr[15:13] == 3'b010 ? 5'd2                    : // c.lwsp
+	next_instr[1:0] == 2'b10 && next_instr[15:13] == 3'b110 ? 5'd2                    : // c.swsp
+	next_instr[1:0] == 2'b01 && next_instr[15:13] == 3'b000 ? next_instr[11:7]        : // c.addi
+	next_instr[1:0] == 2'b10                                ? next_instr[11:7]        :
+	                                                          {2'b01, next_instr[9:7]};
 
 assign next_regs_rs2 =
 	next_instr_is_32bit      ? next_instr[24:20] :
