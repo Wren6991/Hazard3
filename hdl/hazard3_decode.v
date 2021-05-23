@@ -27,8 +27,6 @@ module hazard3_decode #(
 	input wire  [1:0]           fd_cir_vld,
 	output wire [1:0]           df_cir_use,
 	output wire                 df_cir_lock,
-	output reg                  d_jump_req,
-	output reg  [W_ADDR-1:0]    d_jump_target,
 	output wire [W_ADDR-1:0]    d_pc,
 
 	output wire                 d_stall,
@@ -36,6 +34,7 @@ module hazard3_decode #(
 	input wire                  f_jump_rdy,
 	input wire                  f_jump_now,
 	input wire  [W_ADDR-1:0]    f_jump_target,
+	input wire                  x_jump_not_except,
 
 	output reg  [W_DATA-1:0]    d_imm,
 	output reg  [W_REGADDR-1:0] d_rs1,
@@ -51,10 +50,8 @@ module hazard3_decode #(
 	output reg  [1:0]           d_csr_wtype,
 	output reg                  d_csr_w_imm,
 	output reg  [W_BCOND-1:0]   d_branchcond,
-	output reg  [W_ADDR-1:0]    d_jump_target,
+	output reg  [W_ADDR-1:0]    d_jump_offs,
 	output reg                  d_jump_is_regoffs,
-	output reg                  d_result_is_linkaddr,
-	output reg  [W_ADDR-1:0]    d_mispredict_addr,
 	output reg  [2:0]           d_except
 );
 
@@ -93,8 +90,8 @@ wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[3
 // PC/CIR control
 
 wire d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
-assign d_stall = x_stall ||
-	d_starved || (d_jump_req && !f_jump_rdy);
+assign d_stall = x_stall || d_starved;
+
 assign df_cir_use =
 	d_starved || d_stall ? 2'h0 :
 	d_instr_is_32bit ? 2'h2 : 2'h1;
@@ -109,9 +106,7 @@ assign df_cir_use =
 // Note that it is not possible to simply gate the jump request based on X stalling,
 // because X stall is a function of hready, and jump request feeds haddr htrans etc.
 
-// Note it is possible for d_jump_req and m_jump_req to be asserted
-// simultaneously, hence checking flush:
-wire jump_caused_by_d = d_jump_req && f_jump_rdy;                 /// FIXME what about JALR?
+wire jump_caused_by_d = f_jump_now && x_jump_from_instr;
 wire assert_cir_lock = jump_caused_by_d && d_stall;
 wire deassert_cir_lock = !d_stall;
 reg cir_lock_prev;
@@ -154,25 +149,17 @@ end
 
 // If the current CIR is there due to locking, it is a jump which has already had primary effect.
 wire jump_enable = !d_starved && !cir_lock_prev && !d_invalid;
-reg [W_ADDR-1:0] d_jump_offs;
 
 
 always @ (*) begin
 	// JAL is major opcode 1101111,
+	// JALR is             1100111,
 	// branches are        1100011.
-	case (d_instr[3])
-	1'b1:    d_jump_offs = d_imm_j;
+	casez (d_instr[3:2])
+	2'b1z:   d_jump_offs = d_imm_j;
+	2'b01:   d_jump_offs = d_imm_i;
 	default: d_jump_offs = d_imm_b;
 	endcase
-
-	d_jump_target = pc + d_jump_offs;
-
-	casez (d_instr)
-	RV_JAL:  d_jump_req = jump_enable;
-	default: d_jump_req = 1'b0;
-	endcase
-
-	d_mispredict_addr = pc_next;
 end
 
 // ----------------------------------------------------------------------------
@@ -197,7 +184,6 @@ always @ (*) begin
 	d_csr_w_imm = 1'b0;
 	d_branchcond = BCOND_NEVER;
 	d_jump_is_regoffs = 1'b0;
-	d_result_is_linkaddr = 1'b0;
 	d_invalid_32bit = 1'b0;
 	d_except = EXCEPT_NONE;
 
@@ -208,8 +194,8 @@ always @ (*) begin
 	RV_BGE:     begin d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_ZERO; end
 	RV_BLTU:    begin d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_NZERO; end
 	RV_BGEU:    begin d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_ZERO; end
-	RV_JALR:    begin d_result_is_linkaddr = 1'b1; d_jump_is_regoffs = 1'b1; d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_branchcond = BCOND_ALWAYS; end
-	RV_JAL:     begin d_result_is_linkaddr = 1'b1; d_rs2 = X0; d_rs1 = X0; end
+	RV_JALR:    begin d_branchcond = BCOND_ALWAYS; d_jump_is_regoffs = 1'b1; d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
+	RV_JAL:     begin d_branchcond = BCOND_ALWAYS; d_rs1 = X0;               d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
 	RV_LUI:     begin d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_rs1 = X0; end
 	RV_AUIPC:   begin d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_alusrc_a = ALUSRCA_PC;  d_rs1 = X0; end
 	RV_ADDI:    begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
@@ -248,7 +234,7 @@ always @ (*) begin
 	RV_REM:     if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
 	RV_REMU:    if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
 	RV_FENCE:   begin d_rd = X0; end  // NOP
-	RV_FENCE_I: begin d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // Pretend we are recovering from a mispredicted-taken backward branch. Mispredict recovery flushes frontend.
+	RV_FENCE_I: begin d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // FIXME this is probably busted now. Maybe implement as an exception?
 	RV_CSRRW:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRS:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRC:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end

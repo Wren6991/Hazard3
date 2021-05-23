@@ -153,8 +153,6 @@ end
 //synthesis translate_on
 
 // To X
-wire                 d_jump_req;
-wire [W_ADDR-1:0]    d_jump_target;
 wire [W_DATA-1:0]    d_imm;
 wire [W_REGADDR-1:0] d_rs1;
 wire [W_REGADDR-1:0] d_rs2;
@@ -165,16 +163,16 @@ wire [W_ALUOP-1:0]   d_aluop;
 wire [W_MEMOP-1:0]   d_memop;
 wire [W_MULOP-1:0]   d_mulop;
 wire [W_BCOND-1:0]   d_branchcond;
+wire [W_ADDR-1:0]    d_jump_offs;
 wire                 d_jump_is_regoffs;
-wire                 d_result_is_linkaddr;
 wire [W_ADDR-1:0]    d_pc;
-wire [W_ADDR-1:0]    d_mispredict_addr;
 wire [W_EXCEPT-1:0]  d_except;
 wire                 d_csr_ren;
 wire                 d_csr_wen;
 wire [1:0]           d_csr_wtype;
 wire                 d_csr_w_imm;
 
+wire x_jump_not_except;
 
 hazard3_decode #(
 `include "hazard3_config_inst.vh"
@@ -186,9 +184,8 @@ hazard3_decode #(
 	.fd_cir_vld           (fd_cir_vld),
 	.df_cir_use           (df_cir_use),
 	.df_cir_lock          (df_cir_lock),
-	.d_jump_req           (d_jump_req),
-	.d_jump_target        (d_jump_target),
 	.d_pc                 (d_pc),
+	.x_jump_not_except    (x_jump_not_except),
 
 	.d_stall              (d_stall),
 	.x_stall              (x_stall),
@@ -210,11 +207,9 @@ hazard3_decode #(
 	.d_csr_wtype          (d_csr_wtype),
 	.d_csr_w_imm          (d_csr_w_imm),
 	.d_branchcond         (d_branchcond),
-	.d_jump_target        (d_jump_target),
+	.d_jump_offs          (d_jump_offs),
 	.d_jump_is_regoffs    (d_jump_is_regoffs),
-	.d_result_is_linkaddr (d_result_is_linkaddr),
 	.d_pc                 (d_pc),
-	.d_mispredict_addr    (d_mispredict_addr),
 	.d_except             (d_except)
 );
 
@@ -283,33 +278,8 @@ always @ (*) begin
 	end
 end
 
-// AHB transaction request
+// ALU, operand muxes and bypass
 
-wire x_memop_vld = !d_memop[3];
-wire x_memop_write = d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB;
-wire x_unaligned_addr =
-	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
-	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0];
-
-wire x_except_load_misaligned = x_memop_vld && x_unaligned_addr && !x_memop_write;
-wire x_except_store_misaligned = x_memop_vld && x_unaligned_addr && x_memop_write;
-
-always @ (*) begin
-	// Need to be careful not to use anything hready-sourced to gate htrans!
-	bus_haddr_d = x_alu_add;
-	bus_hwrite_d = x_memop_write;
-	case (d_memop)
-		MEMOP_LW:  bus_hsize_d = HSIZE_WORD;
-		MEMOP_SW:  bus_hsize_d = HSIZE_WORD;
-		MEMOP_LH:  bus_hsize_d = HSIZE_HWORD;
-		MEMOP_LHU: bus_hsize_d = HSIZE_HWORD;
-		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
-		default:   bus_hsize_d = HSIZE_BYTE;
-	endcase
-	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_trap_enter);
-end
-
-// ALU operand muxes and bypass
 always @ (*) begin
 	if (~|d_rs1) begin
 		x_rs1_bypass = {W_DATA{1'b0}};
@@ -339,6 +309,41 @@ always @ (*) begin
 		x_op_b = d_imm;
 	else
 		x_op_b = x_rs2_bypass;
+end
+
+hazard3_alu alu (
+	.aluop      (d_aluop),
+	.op_a       (x_op_a),
+	.op_b       (x_op_b),
+	.result     (x_alu_result),
+	.result_add (x_alu_add),
+	.cmp        (x_alu_cmp)
+);
+
+// AHB transaction request
+
+wire x_memop_vld = !d_memop[3];
+wire x_memop_write = d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB;
+wire x_unaligned_addr =
+	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
+	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0];
+
+wire x_except_load_misaligned = x_memop_vld && x_unaligned_addr && !x_memop_write;
+wire x_except_store_misaligned = x_memop_vld && x_unaligned_addr && x_memop_write;
+
+always @ (*) begin
+	// Need to be careful not to use anything hready-sourced to gate htrans!
+	bus_haddr_d = x_alu_add;
+	bus_hwrite_d = x_memop_write;
+	case (d_memop)
+		MEMOP_LW:  bus_hsize_d = HSIZE_WORD;
+		MEMOP_SW:  bus_hsize_d = HSIZE_WORD;
+		MEMOP_LH:  bus_hsize_d = HSIZE_HWORD;
+		MEMOP_LHU: bus_hsize_d = HSIZE_HWORD;
+		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
+		default:   bus_hsize_d = HSIZE_BYTE;
+	endcase
+	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_trap_enter);
 end
 
 // CSRs and Trap Handling
@@ -519,7 +524,6 @@ end
 always @ (posedge clk)
 	if (!m_stall) begin
 		xm_result <=
-			d_result_is_linkaddr                   ? d_mispredict_addr :
 			d_csr_ren                              ? x_csr_rdata :
 			EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
 			                                         x_alu_result;
@@ -529,7 +533,8 @@ always @ (posedge clk)
 // Branch handling
 
 // For JALR, the LSB of the result must be cleared by hardware
-wire [W_ADDR-1:0] x_taken_jump_target = d_jump_is_regoffs ? x_alu_add & ~32'h1 : d_jump_target;
+wire [W_ADDR-1:0] x_taken_jump_target = ((d_jump_is_regoffs ? x_rs1_bypass : d_pc) + d_jump_offs) & ~32'h1;
+
 wire [W_ADDR-1:0] x_jump_target =
 	x_trap_exit                                 ? x_mepc             : // Note precedence -- it's possible to have enter && exit, but in this case enter_rdy is false.
 	x_trap_enter                                ? x_trap_addr        :
@@ -542,18 +547,10 @@ wire x_jump_req = x_trap_enter || x_trap_exit || !x_stall_raw && (
 	d_branchcond == BCOND_NZERO && x_alu_cmp
 );
 
-assign f_jump_req = d_jump_req || x_jump_req;
+assign f_jump_req = x_jump_req;
 assign f_jump_target = x_jump_target;
+assign x_jump_not_except = !(x_trap_enter || x_trap_exit);
 
-
-hazard3_alu alu (
-	.aluop      (d_aluop),
-	.op_a       (x_op_a),
-	.op_b       (x_op_b),
-	.result     (x_alu_result),
-	.result_add (x_alu_add),
-	.cmp        (x_alu_cmp)
-);
 
 // ----------------------------------------------------------------------------
 //                               Pipe Stage M
