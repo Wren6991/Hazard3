@@ -46,14 +46,20 @@ localparam CSR_WTYPE_C    = 2'h2;
 // Exceptional condition signals which travel alongside (or instead of)
 // instructions in the pipeline. These are speculative and can be flushed
 // on e.g. branch mispredict
+// These mostly align with mcause values.
 
-localparam EXCEPT_NONE           = 3'h0;
-localparam EXCEPT_ECALL          = 3'h1;
-localparam EXCEPT_EBREAK         = 3'h2;
-localparam EXCEPT_MRET           = 3'h3; // separate, but handled similarly
-localparam EXCEPT_INSTR_ILLEGAL  = 3'h4;
-localparam EXCEPT_INSTR_MISALIGN = 3'h5;
-localparam EXCEPT_INSTR_FAULT    = 3'h6;
+localparam EXCEPT_NONE           = 4'hf;
+
+localparam EXCEPT_INSTR_MISALIGN = 4'h0;
+localparam EXCEPT_INSTR_FAULT    = 4'h1;
+localparam EXCEPT_INSTR_ILLEGAL  = 4'h2;
+localparam EXCEPT_EBREAK         = 4'h3;
+localparam EXCEPT_LOAD_ALIGN     = 4'h4;
+localparam EXCEPT_LOAD_FAULT     = 4'h5;
+localparam EXCEPT_STORE_ALIGN    = 4'h6;
+localparam EXCEPT_STORE_FAULT    = 4'h7;
+localparam EXCEPT_MRET           = 4'ha; // Not really an exception, but handled like one
+localparam EXCEPT_ECALL          = 4'hb;
 
 // Operations for M extension (these are just instr[14:12])
 

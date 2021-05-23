@@ -10,5 +10,5 @@ parameter W_ALUSRC  = 2,
 parameter W_MEMOP   = 4,
 parameter W_BCOND   = 2,
 
-parameter W_EXCEPT  = 3,
+parameter W_EXCEPT  = 4,
 parameter W_MULOP   = 3

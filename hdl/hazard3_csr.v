@@ -25,6 +25,8 @@ module hazard3_csr #(
 	                                  // The full 64 bits is writeable, so high-word increment can
 	                                  // be implemented in software, and a narrower hw counter used
 `include "hazard3_config.vh"
+,
+`include "hazard3_width_const.vh"
 ) (
 	input  wire            clk,
 	input  wire            rst_n,
@@ -37,14 +39,15 @@ module hazard3_csr #(
 	// - Illegal CSR accesses produce trap entry
 	// - Trap entry (not necessarily caused by CSR access) gates outgoing bus accesses
 	// - Through-paths from e.g. hready to htrans are problematic for timing/implementation
-	input  wire [11:0]     addr,
-	input  wire [XLEN-1:0] wdata,
-	input  wire            wen,
-	input  wire            wen_soon, // wen will be asserted once some stall condition clears
-	input  wire [1:0]      wtype,
-	output reg  [XLEN-1:0] rdata,
-	input  wire            ren,
-	input  wire            ren_soon, // ren will be asserted once some stall condition clears
+	input  wire [11:0]        addr,
+	input  wire [XLEN-1:0]    wdata,
+	input  wire               wen,
+	input  wire               wen_soon, // wen will be asserted once some stall condition clears
+	input  wire [1:0]         wtype,
+	output reg  [XLEN-1:0]    rdata,
+	input  wire               ren,
+	input  wire               ren_soon, // ren will be asserted once some stall condition clears
+	output wire               illegal,
 
 	// Trap signalling
 	// *We* tell the core that we are taking a trap, and where to, based on:
@@ -58,32 +61,17 @@ module hazard3_csr #(
 	//
 	// Note that an exception input can go away, e.g. if the pipe gets flushed. In this
 	// case we lower trap_enter_vld.
-	//
-	// The core tells *us* that we are leaving the trap, by putting a 1-clock pulse on
-	// trap_exit. The core will simultaneously produce a jump (specifically a mispredict)
-	// to mepc_out.
-	output wire [XLEN-1:0] trap_addr,
-	output wire            trap_enter_vld,
-	input  wire            trap_enter_rdy,
-	input  wire            trap_exit,
-	output wire            trap_is_exception, // diagnostic
-	input  wire [XLEN-1:0] mepc_in,
-	output wire [XLEN-1:0] mepc_out,
+	output wire [XLEN-1:0]     trap_addr,
+	output wire                trap_enter_vld,
+	input  wire                trap_enter_rdy,
+	input  wire [XLEN-1:0]     mepc_in,
 
 	// Exceptions must *not* be a function of bus stall.
-	input wire  [15:0]     irq,
-	input wire             except_instr_misaligned,
-	input wire             except_instr_fault,
-	input wire             except_instr_invalid,
-	input wire             except_breakpoint,
-	input wire             except_load_misaligned,
-	input wire             except_load_fault,
-	input wire             except_store_misaligned,
-	input wire             except_store_fault,
-	input wire             except_ecall,
+	input  wire [15:0]         irq,
+	input  wire [W_EXCEPT-1:0] except,
 
 	// Other CSR-specific signalling
-	input  wire            instr_ret
+	input  wire                instr_ret
 );
 
 // TODO block CSR access when entering trap?
@@ -262,11 +250,13 @@ always @ (posedge clk or negedge rst_n) begin
 		mstatus_mie <= 1'b0;
 	end else if (CSR_M_TRAP) begin
 		if (trap_enter_vld && trap_enter_rdy) begin
-			mstatus_mpie <= mstatus_mie;
-			mstatus_mie <= 1'b0;
-		end else if (trap_exit) begin
-			mstatus_mpie <= 1'b1;
-			mstatus_mie <= mstatus_mpie;
+			if (except == EXCEPT_MRET) begin
+				mstatus_mpie <= 1'b1;
+				mstatus_mie <= mstatus_mpie;
+			end else begin
+				mstatus_mpie <= mstatus_mie;
+				mstatus_mie <= 1'b0;
+			end
 		end else if (wen && addr == MSTATUS) begin
 			{mstatus_mpie, mstatus_mie} <=
 				wtype == CSR_WTYPE_C ? {mstatus_mpie, mstatus_mie} & ~{wdata[7], wdata[3]} :
@@ -310,7 +300,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mepc <= X0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy) begin
+		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET) begin
 			mepc <= mepc_in & MEPC_MASK;
 		end else if (wen && addr == MEPC) begin
 			mepc <= update(mepc) & MEPC_MASK;
@@ -354,7 +344,7 @@ always @ (posedge clk or negedge rst_n) begin
 		mcause_irq <= 1'b0;
 		mcause_code <= 5'h0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy) begin
+		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET) begin
 			mcause_irq <= mcause_irq_next;
 			mcause_code <= mcause_code_next;
 		end else if (wen && addr == MCAUSE) begin
@@ -657,49 +647,13 @@ always @ (*) begin
 	endcase
 end
 
-wire csr_access_error = (wen_soon || ren_soon) && !decode_match;
+assign illegal = (wen_soon || ren_soon) && !decode_match;
 
 // ----------------------------------------------------------------------------
 // Trap request generation
 // ----------------------------------------------------------------------------
 
-// Keep track of whether we are in a trap; we do not permit exception nesting.
-// TODO lockup condition?
-reg in_trap;
-
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
-		in_trap <= 1'b0;
-	else
-		in_trap <= (in_trap || (trap_enter_vld && trap_enter_rdy)) && !trap_exit;
-
-// Exception selection
-
-// Most-significant is lowest priority
-// FIXME: this is different from the priority order given in the spec, but will get us off the ground
-wire [15:0] exception_req = {
-	4'h0, // reserved by spec
-	except_ecall,
-	3'h0, // nonimplemented privileges
-	except_store_fault,
-	except_store_misaligned,
-	except_load_fault,
-	except_load_misaligned,
-	except_breakpoint,
-	except_instr_invalid || csr_access_error,
-	except_instr_fault,
-	except_instr_misaligned
-};
-
-wire exception_req_any = |exception_req && !in_trap;
-wire [3:0] exception_req_num;
-
-hazard3_priority_encode #(
-	.W_REQ(16)
-) except_priority (
-	.req (exception_req),
-	.gnt (exception_req_num)
-);
+wire exception_req_any = except != EXCEPT_NONE;
 
 // Interrupt masking and selection
 
@@ -735,13 +689,12 @@ hazard3_priority_encode #(
 );
 
 wire [11:0] mtvec_offs = (exception_req_any ?
-	{8'h0, exception_req_num} :
+	{8'h0, except} :
 	12'h10 + {7'h0, irq_num}
 ) << 2;
 
-assign trap_addr = mtvec | {20'h0, mtvec_offs};
+assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {20'h0, mtvec_offs};
 assign trap_enter_vld = CSR_M_TRAP && (exception_req_any || irq_any);
-assign trap_is_exception = exception_req_any;
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? exception_req_num : {1'b0, irq_num};
@@ -749,22 +702,33 @@ assign mcause_code_next = exception_req_any ? exception_req_num : {1'b0, irq_num
 // ----------------------------------------------------------------------------
 
 `ifdef RISCV_FORMAL
+
+// Keep track of whether we are in a trap (only for formal property purposes)
+reg in_trap;
+
+always @ (posedge clk or negedge rst_n)
+	if (!rst_n)
+		in_trap <= 1'b0;
+	else
+		in_trap <= (in_trap || (trap_enter_vld && trap_enter_rdy))
+			&& !(trap_enter_vld && trap_enter_rdy && except == EXCEPT_MRET);
+
 always @ (posedge clk) begin
-	// We disallow double exceptions -- this causes riscv-formal to complain that
-	// loads/stores don't trap inside of traps. Therefore assume this doesn't happen
+	// Assume there are no nested exceptions, to stop risc-formal from doing
+	// annoying things like stopping instructions from retiring by repeatedly
+	// feeding in invalid instructions
+
 	if (in_trap)
-		assume(!(except_load_misaligned || except_store_misaligned));
+		assume(except == EXCEPT_NONE);
 
 	// Something is screwed up if this happens
 	if ($past(trap_enter_vld && trap_enter_rdy))
 		assert(!wen);
-	// Don't do this
-	assert(!(trap_enter_vld && trap_enter_rdy && trap_exit));
 	// Should be impossible to get into the trap and exit it so quickly:
 	if (in_trap && !$past(in_trap))
-		assert(!trap_exit);
+		assert(except != EXCEPT_MRET);
 	// Should be impossible to get to another mret so soon after exiting:
-	assert(!(trap_exit && $past(trap_exit)));
+	assert(!(except == EXCEPT_MRET && $past(except == EXCEPT_MRET)));
 end
 
 `endif

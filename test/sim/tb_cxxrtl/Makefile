@@ -12,7 +12,7 @@ REDUCED_BYPASS   := 0
 
 all: tb
 
-SYNTH_CMD += read_verilog -I ../../hdl $(shell listfiles ../../hdl/hazard3.f);
+SYNTH_CMD += read_verilog -I ../../../hdl $(shell listfiles ../../../hdl/hazard3.f);
 SYNTH_CMD += chparam -set EXTENSION_C $(EXTENSION_C) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_M $(EXTENSION_M) $(TOP);
 SYNTH_CMD += chparam -set CSR_COUNTER 1 $(TOP);

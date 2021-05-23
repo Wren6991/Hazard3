@@ -1,0 +1,89 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Sat May 22 07:37:18 2021
+[*]
+[dumpfile] "/home/luke/proj/hazard3/test/ecall_simple/ecall_simple_run.vcd"
+[dumpfile_mtime] "Sat May 22 07:33:26 2021"
+[dumpfile_size] 1269546
+[savefile] "/home/luke/proj/hazard3/test/ecall_simple/ecall_simple_run.gtkw"
+[timestart] 314
+[size] 2560 1403
+[pos] -1 -1
+*-2.000000 330 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] core.
+[sst_width] 593
+[signals_width] 214
+[sst_expanded] 1
+[sst_vpaned_height] 423
+@200
+-I Bus
+@22
+i_haddr[31:0]
+@28
+i_htrans[1:0]
+i_hsize[2:0]
+i_hready
+@22
+i_hrdata[31:0]
+@200
+-
+-Frontend
+@28
+core.f_jump_req
+core.f_jump_rdy
+@22
+core.frontend.jump_target[31:0]
+@200
+-
+-PC/CIR
+@28
+core.inst_hazard3_decode.d_starved
+@22
+core.inst_hazard3_decode.pc[31:0]
+core.frontend.cir[31:0]
+@200
+-
+-Exceptions
+@28
+core.inst_hazard3_csr.except_breakpoint
+core.inst_hazard3_csr.except_ecall
+core.inst_hazard3_csr.except_instr_invalid
+core.inst_hazard3_csr.except_load_misaligned
+core.inst_hazard3_csr.except_store_misaligned
+core.inst_hazard3_csr.exception_req_any
+@22
+core.inst_hazard3_csr.exception_req_num[3:0]
+@29
+core.inst_hazard3_csr.trap_enter_rdy
+core.inst_hazard3_csr.trap_enter_vld
+@200
+-
+-Reg Read
+@22
+core.f_rs1[4:0]
+core.f_rs2[4:0]
+core.d_rs1[4:0]
+core.d_rs2[4:0]
+core.inst_regfile_1w2r.rdata1[31:0]
+core.inst_regfile_1w2r.rdata2[31:0]
+@200
+-
+-Reg Write
+@22
+core.xm_rd[4:0]
+core.xm_result[31:0]
+@200
+-
+-D Bus
+@22
+d_haddr[31:0]
+@28
+d_htrans[1:0]
+d_hsize[2:0]
+d_hwrite
+d_hready
+@22
+d_hwdata[31:0]
+d_hrdata[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

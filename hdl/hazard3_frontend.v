@@ -49,13 +49,6 @@ module hazard3_frontend #(
 	output wire              next_regs_vld
 );
 
-`undef ASSERT
-`ifdef HAZARD3_FRONTEND_ASSERTIONS
-`define ASSERT(x) assert(x);
-`else
-`define ASSERT(x)
-`endif
-
 localparam W_BUNDLE = W_DATA / 2;
 parameter W_FIFO_LEVEL = $clog2(FIFO_DEPTH + 1);
 
@@ -124,10 +117,12 @@ always @ (posedge clk or negedge rst_n) begin
 		pending_fetches <= 2'h0;
 		ctr_flush_pending <= 2'h0;
 	end else begin
-		`ASSERT(ctr_flush_pending <= pending_fetches)
-		`ASSERT(pending_fetches < 2'd3)
-		`ASSERT(!(mem_data_vld && !pending_fetches))
-		// `ASSERT(!($past(mem_addr_hold) && $past(mem_addr_vld) && !$stable(mem_addr)))
+`ifdef FORMAL
+		assert(ctr_flush_pending <= pending_fetches);
+		assert(pending_fetches < 2'd3);
+		assert(!(mem_data_vld && !pending_fetches));
+		// assert(!($past(mem_addr_hold) && $past(mem_addr_vld) && !$stable(mem_addr)));
+`endif
 		mem_addr_hold <= mem_addr_vld && !mem_addr_rdy;
 		pending_fetches <= pending_fetches_next;
 		if (jump_now) begin
@@ -175,9 +170,11 @@ always @ (posedge clk or negedge rst_n) begin
 		unaligned_jump_aph <= 1'b0;
 		unaligned_jump_dph <= 1'b0;
 	end else if (EXTENSION_C) begin
-		`ASSERT(!(unaligned_jump_aph && !unaligned_jump_dph))
-		`ASSERT(!($past(jump_now && !jump_target[1]) && unaligned_jump_aph))
-		`ASSERT(!($past(jump_now && !jump_target[1]) && unaligned_jump_dph))
+`ifdef FORMAL
+		assert(!(unaligned_jump_aph && !unaligned_jump_dph));
+		assert(!($past(jump_now && !jump_target[1]) && unaligned_jump_aph));
+		assert(!($past(jump_now && !jump_target[1]) && unaligned_jump_dph));
+`endif
 		if (mem_addr_rdy || (jump_now && !unaligned_jump_now)) begin
 			unaligned_jump_aph <= 1'b0;
 		end
@@ -277,10 +274,12 @@ always @ (posedge clk or negedge rst_n) begin
 		hwbuf_vld <= 1'b0;
 		cir_vld <= 2'h0;
 	end else begin
-		`ASSERT(cir_vld <= 2)
-		`ASSERT(cir_use <= 2)
-		`ASSERT(cir_use <= cir_vld)
-		`ASSERT(cir_vld <= buf_level || $past(cir_lock))
+`ifdef FORMAL
+		assert(cir_vld <= 2);
+		assert(cir_use <= 2);
+		assert(cir_use <= cir_vld);
+		assert(cir_vld <= buf_level || $past(cir_lock));
+`endif
 		// Update CIR flags
 		buf_level <= buf_level_next;
 		hwbuf_vld <= &buf_level_next;

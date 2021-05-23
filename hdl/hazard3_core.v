@@ -57,21 +57,6 @@ module hazard3_core #(
 
 `include "hazard3_ops.vh"
 
-`ifdef FORMAL
-// Only yosys-smtbmc seems to support immediate assertions
-`ifdef RISCV_FORMAL
-`define ASSERT(x)
-`else
-`define ASSERT(x) assert(x)
-`endif
-`else
-`define ASSERT(x)
-//synthesis translate_off
-`undef ASSERT
-`define ASSERT(x) if (!x) begin $display("Assertion failed!"); $finish(1); end
-//synthesis translate_on
-`endif
-
 wire d_stall;
 wire x_stall;
 wire m_stall;
@@ -235,10 +220,9 @@ wire  [W_DATA-1:0]   x_alu_result;
 wire  [W_DATA-1:0]   x_alu_add;
 wire                 x_alu_cmp;
 
-wire [W_DATA-1:0]    x_trap_addr;
-wire [W_DATA-1:0]    x_mepc;
-wire                 x_trap_enter;
-wire                 x_trap_exit;
+wire [W_DATA-1:0]    m_trap_addr;
+wire                 m_trap_enter_vld;
+wire                 m_trap_enter_rdy = f_jump_rdy;
 
 reg  [W_REGADDR-1:0] xm_rs1;
 reg  [W_REGADDR-1:0] xm_rs2;
@@ -246,15 +230,17 @@ reg  [W_REGADDR-1:0] xm_rd;
 reg  [W_DATA-1:0]    xm_result;
 reg  [W_DATA-1:0]    xm_store_data;
 reg  [W_MEMOP-1:0]   xm_memop;
+reg  [W_EXCEPT-1:0]  xm_except;
 
 reg x_stall_raw;
 wire x_stall_muldiv;
+wire x_jump_req;
 
 assign x_stall =
 	m_stall ||
 	x_stall_raw || x_stall_muldiv ||
 	bus_aph_req_d && !bus_aph_ready_d ||
-	f_jump_req && !f_jump_rdy;
+	x_jump_req && !f_jump_rdy;
 
 wire m_fast_mul_result_vld;
 wire m_generating_result = xm_memop < MEMOP_SW || m_fast_mul_result_vld;
@@ -328,9 +314,6 @@ wire x_unaligned_addr =
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
 	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0];
 
-wire x_except_load_misaligned = x_memop_vld && x_unaligned_addr && !x_memop_write;
-wire x_except_store_misaligned = x_memop_vld && x_unaligned_addr && x_memop_write;
-
 always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
 	bus_haddr_d = x_alu_add;
@@ -343,69 +326,8 @@ always @ (*) begin
 		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
 		default:   bus_hsize_d = HSIZE_BYTE;
 	endcase
-	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_trap_enter);
+	bus_aph_req_d = x_memop_vld && !(x_stall_raw || m_trap_enter_vld);
 end
-
-// CSRs and Trap Handling
-
-wire   x_except_ecall         = d_except == EXCEPT_ECALL;
-wire   x_except_breakpoint    = d_except == EXCEPT_EBREAK;
-wire   x_except_invalid_instr = d_except == EXCEPT_INSTR_ILLEGAL;
-assign x_trap_exit            = d_except == EXCEPT_MRET;
-wire   x_trap_enter_rdy       = !(x_stall || x_trap_exit);
-wire   x_trap_is_exception; // diagnostic
-
-`ifdef FORMAL
-always @ (posedge clk) begin
-	if (x_trap_exit)
-		assert(!bus_aph_req_d);
-end
-`endif
-
-wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
-	{{W_DATA-5{1'b0}}, d_rs1} : x_rs1_bypass;
-
-wire [W_DATA-1:0] x_csr_rdata;
-
-hazard3_csr #(
-	.XLEN            (W_DATA),
-`include "hazard3_config_inst.vh"
-) inst_hazard3_csr (
-	.clk                     (clk),
-	.rst_n                   (rst_n),
-	// CSR access port
-	// *en_soon are early access strobes which are not a function of bus stall.
-	// Can generate access faults (hence traps), but do not actually perform access.
-	.addr                    (d_imm[11:0]), // todo could just connect this to the instruction bits
-	.wdata                   (x_csr_wdata),
-	.wen_soon                (d_csr_wen),
-	.wen                     (d_csr_wen && !x_stall),
-	.wtype                   (d_csr_wtype),
-	.rdata                   (x_csr_rdata),
-	.ren_soon                (d_csr_ren),
-	.ren                     (d_csr_ren && !x_stall),
-	// Trap signalling
-	.trap_addr               (x_trap_addr),
-	.trap_enter_vld          (x_trap_enter),
-	.trap_enter_rdy          (x_trap_enter_rdy),
-	.trap_exit               (x_trap_exit && !x_stall),
-	.trap_is_exception       (x_trap_is_exception),
-	.mepc_in                 (d_pc),
-	.mepc_out                (x_mepc),
-	// IRQ and exception requests
-	.irq                     (irq),
-	.except_instr_misaligned (1'b0), // TODO
-	.except_instr_fault      (1'b0), // TODO
-	.except_instr_invalid    (x_except_invalid_instr),
-	.except_breakpoint       (x_except_breakpoint),
-	.except_load_misaligned  (x_except_load_misaligned),
-	.except_load_fault       (1'b0), // TODO
-	.except_store_misaligned (x_except_store_misaligned),
-	.except_store_fault      (1'b0), // TODO
-	.except_ecall            (x_except_ecall),
-	// Other CSR-specific signalling
-	.instr_ret               (1'b0)  // TODO
-);
 
 // Multiply/divide
 
@@ -427,7 +349,7 @@ if (EXTENSION_M) begin: has_muldiv
 		else
 			x_muldiv_posted <= (x_muldiv_posted || (x_muldiv_op_vld && x_muldiv_op_rdy)) && x_stall;
 
-	wire x_muldiv_kill = x_trap_enter; // TODO this takes an extra cycle to kill muldiv before trap entry
+	wire x_muldiv_kill = m_trap_enter_vld;
 
 	wire x_use_fast_mul = MUL_FAST && d_aluop == ALUOP_MULDIV && d_mulop == M_OP_MUL;
 
@@ -501,21 +423,86 @@ end else begin: no_muldiv
 end
 endgenerate
 
-// State machine
+// CSRs and Trap Handling
+
+wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
+	{{W_DATA-5{1'b0}}, d_rs1} : x_rs1_bypass;
+
+wire [W_DATA-1:0] x_csr_rdata;
+wire              x_csr_illegal_access;
+
+reg prev_instr_was_32_bit;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		prev_instr_was_32_bit <= 1'b0;
+	end else if (!x_stall) begin
+		prev_instr_was_32_bit <= df_cir_use == 2'd2;
+	end
+end
+
+hazard3_csr #(
+	.XLEN            (W_DATA),
+`include "hazard3_config_inst.vh"
+) inst_hazard3_csr (
+	.clk                     (clk),
+	.rst_n                   (rst_n),
+	// CSR access port
+	// *en_soon are early access strobes which are not a function of bus stall.
+	// Can generate access faults (hence traps), but do not actually perform access.
+	.addr                    (d_imm[11:0]), // todo could just connect this to the instruction bits
+	.wdata                   (x_csr_wdata),
+	.wen_soon                (d_csr_wen && !m_trap_enter_vld),
+	.wen                     (d_csr_wen && !m_trap_enter_vld && !x_stall),
+	.wtype                   (d_csr_wtype),
+	.rdata                   (x_csr_rdata),
+	.ren_soon                (d_csr_ren && !m_trap_enter_vld),
+	.ren                     (d_csr_ren && !m_trap_enter_vld && !x_stall),
+	.illegal                 (x_csr_illegal_access),
+	// Trap signalling
+	.trap_addr               (m_trap_addr),
+	.trap_enter_vld          (m_trap_enter_vld),
+	.trap_enter_rdy          (m_trap_enter_rdy),
+	.mepc_in                 (d_pc - (prev_instr_was_32_bit ? 32'h4 : 32'h2)),
+	// IRQ and exception requests
+	.irq                     (irq),
+	.except                  (xm_except),
+	// Other CSR-specific signalling
+	.instr_ret               (|df_cir_use)
+);
+
+wire [W_EXCEPT-1:0] x_except =
+	x_csr_illegal_access               ? EXCEPT_INSTR_ILLEGAL :
+	x_unaligned_addr &&  x_memop_write ? EXCEPT_STORE_ALIGN   :
+	x_unaligned_addr && !x_memop_write ? EXCEPT_LOAD_ALIGN    : d_except;
+
+// Pipe register
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_memop <= MEMOP_NONE;
+		xm_except <= EXCEPT_NONE;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
-			if (x_stall || x_trap_enter) begin
+			if (x_stall || m_trap_enter_vld) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
+				xm_except <= EXCEPT_NONE;
 			end
+			xm_except <= x_except;
+		end else if (bus_dph_err_d) begin
+			// First phase of 2-phase AHBL error response. Pass the exception along on
+			// this cycle, and on the next cycle the trap entry will be asserted,
+			// suppressing any load/store that may currently be in stage X.
+`ifdef FORMAL
+			assert(!xm_memop[3]); // Not NONE
+`endif
+			xm_except <= xm_memop <= MEMOP_LBU ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
 		end
 	end
 end
@@ -533,24 +520,14 @@ always @ (posedge clk)
 // Branch handling
 
 // For JALR, the LSB of the result must be cleared by hardware
-wire [W_ADDR-1:0] x_taken_jump_target = ((d_jump_is_regoffs ? x_rs1_bypass : d_pc) + d_jump_offs) & ~32'h1;
-
-wire [W_ADDR-1:0] x_jump_target =
-	x_trap_exit                                 ? x_mepc             : // Note precedence -- it's possible to have enter && exit, but in this case enter_rdy is false.
-	x_trap_enter                                ? x_trap_addr        :
-	                                              x_taken_jump_target;
+wire [W_ADDR-1:0] x_jump_target = ((d_jump_is_regoffs ? x_rs1_bypass : d_pc) + d_jump_offs) & ~32'h1;
 
 // Be careful not to take branches whose comparisons depend on a load result
-wire x_jump_req = x_trap_enter || x_trap_exit || !x_stall_raw && (
+assign x_jump_req = !x_stall_raw && (
 	d_branchcond == BCOND_ALWAYS ||
 	d_branchcond == BCOND_ZERO && !x_alu_cmp ||
 	d_branchcond == BCOND_NZERO && x_alu_cmp
 );
-
-assign f_jump_req = x_jump_req;
-assign f_jump_target = x_jump_target;
-assign x_jump_not_except = !(x_trap_enter || x_trap_exit);
-
 
 // ----------------------------------------------------------------------------
 //                               Pipe Stage M
@@ -559,9 +536,11 @@ reg [W_DATA-1:0] m_rdata_shift;
 reg [W_DATA-1:0] m_wdata;
 reg [W_DATA-1:0] m_result;
 
-assign m_stall = !xm_memop[3] && !bus_dph_ready_d;
+assign f_jump_req = x_jump_req || m_trap_enter_vld;
+assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
+assign x_jump_not_except = !m_trap_enter_vld;
 
-wire m_except_bus_fault = bus_dph_err_d; // TODO: handle differently for LSU/ifetch?
+assign m_stall = (!xm_memop[3] && !bus_dph_ready_d) || (m_trap_enter_vld && !m_trap_enter_rdy);
 
 always @ (*) begin
 	// Local forwarding of store data
@@ -607,11 +586,6 @@ always @ (posedge clk or negedge rst_n) begin
 		mw_rd <= {W_REGADDR{1'b0}};
 	end else if (!m_stall) begin
 		//synthesis translate_off
-		// TODO: proper exception support
-		if (m_except_bus_fault) begin
-			$display("Bus fault!");
-			$finish;
-		end
 		if (^bus_wdata_d === 1'bX) begin
 			$display("Writing Xs to memory!");
 			$finish;
@@ -632,7 +606,7 @@ always @ (posedge clk)
 // mw_result and mw_rd register the most recent write to the register file,
 // so that X can bypass them in.
 
-wire w_reg_wen = |xm_rd && !m_stall;
+wire w_reg_wen = |xm_rd && !m_stall && xm_except == EXCEPT_NONE;
 
 //synthesis translate_off
 always @ (posedge clk) begin

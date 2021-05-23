@@ -52,7 +52,7 @@ module hazard3_decode #(
 	output reg  [W_BCOND-1:0]   d_branchcond,
 	output reg  [W_ADDR-1:0]    d_jump_offs,
 	output reg                  d_jump_is_regoffs,
-	output reg  [2:0]           d_except
+	output reg  [W_EXCEPT-1:0]  d_except
 );
 
 `include "rv_opcodes.vh"
