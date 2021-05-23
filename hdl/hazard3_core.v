@@ -383,7 +383,7 @@ hazard3_csr #(
 	.trap_addr               (x_trap_addr),
 	.trap_enter_vld          (x_trap_enter),
 	.trap_enter_rdy          (x_trap_enter_rdy),
-	.trap_exit               (x_trap_exit),
+	.trap_exit               (x_trap_exit && !x_stall),
 	.trap_is_exception       (x_trap_is_exception),
 	.mepc_in                 (d_pc),
 	.mepc_out                (x_mepc),

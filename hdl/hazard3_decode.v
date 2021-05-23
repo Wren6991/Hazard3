@@ -262,6 +262,7 @@ always @ (*) begin
 		d_branchcond = BCOND_NEVER;
 		d_csr_ren    = 1'b0;
 		d_csr_wen    = 1'b0;
+		d_except     = EXCEPT_NONE;
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;
 

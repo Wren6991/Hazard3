@@ -8,11 +8,6 @@
 //
 // All modelling signals prefixed with rvfm (riscv-formal monitor)
 
-// FIXME!!!!!
-always assume(!(x_trap_enter || x_trap_exit));
-
-
-
 // ----------------------------------------------------------------------------
 // Instruction monitor
 
