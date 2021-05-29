@@ -31,6 +31,7 @@ module hazard3_decode #(
 	output wire                 df_cir_lock,
 	output wire [W_ADDR-1:0]    d_pc,
 
+	output wire                 d_starved,
 	output wire                 d_stall,
 	input wire                  x_stall,
 	input wire                  f_jump_rdy,
@@ -91,7 +92,7 @@ wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[3
 // ----------------------------------------------------------------------------
 // PC/CIR control
 
-wire d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
+assign d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
 assign d_stall = x_stall || d_starved;
 
 assign df_cir_use =

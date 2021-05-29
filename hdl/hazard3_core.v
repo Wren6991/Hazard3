@@ -140,6 +140,7 @@ end
 //synthesis translate_on
 
 // To X
+wire                 d_starved;
 wire [W_DATA-1:0]    d_imm;
 wire [W_REGADDR-1:0] d_rs1;
 wire [W_REGADDR-1:0] d_rs2;
@@ -174,6 +175,7 @@ hazard3_decode #(
 	.d_pc                 (d_pc),
 	.x_jump_not_except    (x_jump_not_except),
 
+	.d_starved            (d_starved),
 	.d_stall              (d_stall),
 	.x_stall              (x_stall),
 	.f_jump_rdy           (f_jump_rdy),
@@ -674,9 +676,9 @@ hazard3_regfile_1w2r #(
 	.rst_n  (rst_n),
 	// On downstream stall, we feed D's addresses back into regfile
 	// so that output does not change.
-	.raddr1 (x_stall ? d_rs1 : f_rs1),
+	.raddr1 (x_stall && !d_starved ? d_rs1 : f_rs1),
 	.rdata1 (x_rdata1),
-	.raddr2 (x_stall ? d_rs2 : f_rs2),
+	.raddr2 (x_stall && !d_starved ? d_rs2 : f_rs2),
 	.rdata2 (x_rdata2),
 
 	.waddr  (xm_rd),
