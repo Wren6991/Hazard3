@@ -2,7 +2,7 @@
  *     DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE         *
  *                        Version 3, April 2008                               *
  *                                                                            *
- *     Copyright (C) 2019 Luke Wren                                           *
+ *     Copyright (C) 2021 Luke Wren                                           *
  *                                                                            *
  *     Everyone is permitted to copy and distribute verbatim or modified      *
  *     copies of this license document and accompanying software, and         *
@@ -14,6 +14,8 @@
  *     1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.                 *
  *                                                                            *
  *****************************************************************************/
+
+`default_nettype none
 
 // Control and Status Registers (CSRs)
 // Also includes CSR-related logic like interrupt enable/masking,
@@ -62,11 +64,13 @@ module hazard3_csr #(
 	// Note that an exception input can go away, e.g. if the pipe gets flushed. In this
 	// case we lower trap_enter_vld.
 	output wire [XLEN-1:0]     trap_addr,
+	output wire                trap_is_irq,
 	output wire                trap_enter_vld,
 	input  wire                trap_enter_rdy,
 	input  wire [XLEN-1:0]     mepc_in,
 
 	// Exceptions must *not* be a function of bus stall.
+	input  wire                delay_irq_entry,
 	input  wire [15:0]         irq,
 	input  wire [W_EXCEPT-1:0] except,
 
@@ -292,7 +296,6 @@ end
 
 // Exception program counter
 reg [XLEN-1:0] mepc;
-assign mepc_out = mepc;
 // LSB is always 0
 localparam MEPC_MASK = {{XLEN-1{1'b1}}, 1'b0};
 
@@ -678,7 +681,7 @@ assign mip = {
 
 // We don't actually trap the aggregate IRQ, just provide it for software info
 wire [31:0] mip_no_global = mip & 32'hffff_f7ff;
-wire        irq_any = |(mip_no_global & {{16{mie_meie}}, {16{1'b1}}}) && mstatus_mie;
+wire        irq_any = |(mip_no_global & {{16{mie_meie}}, {16{1'b1}}}) && mstatus_mie && !delay_irq_entry;
 wire [4:0]  irq_num;
 
 hazard3_priority_encode #(
@@ -694,10 +697,11 @@ wire [11:0] mtvec_offs = (exception_req_any ?
 ) << 2;
 
 assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {20'h0, mtvec_offs};
+assign trap_is_irq = !exception_req_any;
 assign trap_enter_vld = CSR_M_TRAP && (exception_req_any || irq_any);
 
 assign mcause_irq_next = !exception_req_any;
-assign mcause_code_next = exception_req_any ? exception_req_num : {1'b0, irq_num};
+assign mcause_code_next = exception_req_any ? except : {1'b0, irq_num};
 
 // ----------------------------------------------------------------------------
 

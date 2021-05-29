@@ -15,6 +15,8 @@
  *                                                                            *
  *****************************************************************************/
 
+`default_nettype none
+
 module hazard3_decode #(
 `include "hazard3_config.vh"
 ,
@@ -106,7 +108,7 @@ assign df_cir_use =
 // Note that it is not possible to simply gate the jump request based on X stalling,
 // because X stall is a function of hready, and jump request feeds haddr htrans etc.
 
-wire jump_caused_by_d = f_jump_now && x_jump_from_instr;
+wire jump_caused_by_d = f_jump_now && x_jump_not_except;
 wire assert_cir_lock = jump_caused_by_d && d_stall;
 wire deassert_cir_lock = !d_stall;
 reg cir_lock_prev;

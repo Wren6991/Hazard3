@@ -1,3 +1,22 @@
+/******************************************************************************
+ *     DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE         *
+ *                        Version 3, April 2008                               *
+ *                                                                            *
+ *     Copyright (C) 2021 Luke Wren                                           *
+ *                                                                            *
+ *     Everyone is permitted to copy and distribute verbatim or modified      *
+ *     copies of this license document and accompanying software, and         *
+ *     changing either is allowed.                                            *
+ *                                                                            *
+ *       TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION      *
+ *                                                                            *
+ *     0. You just DO WHAT THE FUCK YOU WANT TO.                              *
+ *     1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.                 *
+ *                                                                            *
+ *****************************************************************************/
+
+`default_nettype none
+
 module hazard3_frontend #(
 	parameter FIFO_DEPTH = 2,  // power of 2, >= 1
 `include "hazard3_config.vh"
@@ -170,7 +189,7 @@ always @ (posedge clk or negedge rst_n) begin
 		unaligned_jump_aph <= 1'b0;
 		unaligned_jump_dph <= 1'b0;
 	end else if (EXTENSION_C) begin
-`ifdef FORMAL
+`ifdef FORMAL_FIXMEEEE
 		assert(!(unaligned_jump_aph && !unaligned_jump_dph));
 		assert(!($past(jump_now && !jump_target[1]) && unaligned_jump_aph));
 		assert(!($past(jump_now && !jump_target[1]) && unaligned_jump_dph));
@@ -276,9 +295,8 @@ always @ (posedge clk or negedge rst_n) begin
 	end else begin
 `ifdef FORMAL
 		assert(cir_vld <= 2);
-		assert(cir_use <= 2);
 		assert(cir_use <= cir_vld);
-		assert(cir_vld <= buf_level || $past(cir_lock));
+		// assert(cir_vld <= buf_level || $past(cir_lock));
 `endif
 		// Update CIR flags
 		buf_level <= buf_level_next;

@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // RVFI Instrumentation
 // ----------------------------------------------------------------------------
-// To be included into hazard3_cpu.v for use with riscv-formal.
+// To be included into hazard3_core.v for use with riscv-formal.
 // Contains some state modelling to diagnose exactly what the core is doing,
 // and report this in a way RVFI understands.
 // We consider instructions to "retire" as they cross the M/W pipe register.
@@ -21,8 +21,7 @@ wire rvfm_x_valid = fd_cir_vld >= 2 || (fd_cir_vld >= 1 && fd_cir[1:0] != 2'b11)
 reg rvfm_m_valid;
 reg [31:0] rvfm_m_instr;
 
-wire rvfm_x_trap = x_trap_is_exception && x_trap_enter;
-reg rvfm_m_trap;
+wire rvfm_m_trap = xm_except != EXCEPT_NONE && xm_except != EXCEPT_MRET && m_trap_enter_rdy;
 reg rvfm_entered_intr;
 
 reg        rvfi_valid_r;
@@ -36,21 +35,21 @@ assign rvfi_trap = rvfi_trap_r;
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		rvfm_m_valid <= 1'b0;
-		rvfm_m_trap <= 1'b0;
 		rvfm_entered_intr <= 1'b0;
 		rvfi_valid_r <= 1'b0;
 		rvfi_trap_r <= 1'b0;
 		rvfi_insn_r <= 32'h0;
 	end else begin
 		if (!x_stall) begin
-			// Squash X instrs on IRQ entry -- these instructions will be reexecuted on return.
-			rvfm_m_valid <= |df_cir_use && !(x_trap_enter && x_trap_enter_rdy && !rvfm_x_trap);
+			// X instruction squashed by any trap, as it's in the branch shadow
+			rvfm_m_valid <= |df_cir_use && !m_trap_enter_vld;
 			rvfm_m_instr <= {fd_cir[31:16] & {16{df_cir_use[1]}}, fd_cir[15:0]};
-			rvfm_m_trap <= rvfm_x_trap;
 		end else if (!m_stall) begin
 			rvfm_m_valid <= 1'b0;
 		end
-		rvfi_valid_r <= rvfm_m_valid && !m_stall;
+		// Squash instructions where an IRQ is taken (but keep instructions which
+		// cause an exception... which is really what the rvfi_trap signal refers to)
+		rvfi_valid_r <= rvfm_m_valid && !m_stall && !(m_trap_enter_vld && !rvfm_m_trap);
 		rvfi_insn_r <= rvfm_m_instr;
 		rvfi_trap_r <= rvfm_m_trap;
 
@@ -93,13 +92,12 @@ always @ (posedge clk or negedge rst_n)
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		rvfm_dx_have_jumped <= 0;
 		rvfm_xm_pc <= 0;
 		rvfm_xm_pc_next <= 0;
 	end else begin
 		if (!x_stall) begin
 			rvfm_xm_pc <= d_pc;
-			rvfm_xm_pc_next <= f_jump_now || rvfm_past_df_cir_lock ? x_jump_target : d_mispredict_addr;
+			rvfm_xm_pc_next <= f_jump_now || rvfm_past_df_cir_lock ? x_jump_target : d_pc + (fd_cir[1:0] == 2'b11 ? 32'h4 : 32'h2);
 		end
 	end
 end

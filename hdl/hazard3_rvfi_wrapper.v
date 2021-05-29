@@ -16,7 +16,7 @@ module rvfi_wrapper (
 (* keep *) wire               [3:0]   i_hprot;
 (* keep *) wire                       i_hmastlock;
 (* keep *) `rvformal_rand_reg         i_hready;
-(* keep *) wire                       i_hresp;
+(* keep *) `rvformal_rand_reg         i_hresp;
 (* keep *) wire               [31:0]  i_hwdata;
 (* keep *) `rvformal_rand_reg [31:0]  i_hrdata;
 
@@ -28,7 +28,7 @@ module rvfi_wrapper (
 (* keep *) wire               [3:0]   d_hprot;
 (* keep *) wire                       d_hmastlock;
 (* keep *) `rvformal_rand_reg         d_hready;
-(* keep *) wire                       d_hresp;
+(* keep *) `rvformal_rand_reg         d_hresp;
 (* keep *) wire               [31:0]  d_hwdata;
 (* keep *) `rvformal_rand_reg [31:0]  d_hrdata;
 

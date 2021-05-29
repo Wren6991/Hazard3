@@ -2,7 +2,7 @@
  * DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE     *
  *                    Version 3, April 2008                           *
  *                                                                    *
- * Copyright (C) 2018 Luke Wren                                       *
+ * Copyright (C) 2021 Luke Wren                                       *
  *                                                                    *
  * Everyone is permitted to copy and distribute verbatim or modified  *
  * copies of this license document and accompanying software, and     *
@@ -14,6 +14,8 @@
  * 1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.             *
  *                                                                    *
  *********************************************************************/
+
+`default_nettype none
 
 module hazard3_core #(
 `include "hazard3_config.vh"
@@ -221,6 +223,7 @@ wire  [W_DATA-1:0]   x_alu_add;
 wire                 x_alu_cmp;
 
 wire [W_DATA-1:0]    m_trap_addr;
+wire                 m_trap_is_irq;
 wire                 m_trap_enter_vld;
 wire                 m_trap_enter_rdy = f_jump_rdy;
 
@@ -231,6 +234,8 @@ reg  [W_DATA-1:0]    xm_result;
 reg  [W_DATA-1:0]    xm_store_data;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
+reg                  xm_delay_irq_entry;
+
 
 reg x_stall_raw;
 wire x_stall_muldiv;
@@ -326,7 +331,7 @@ always @ (*) begin
 		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
 		default:   bus_hsize_d = HSIZE_BYTE;
 	endcase
-	bus_aph_req_d = x_memop_vld && !(x_stall_raw || m_trap_enter_vld);
+	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_unaligned_addr || m_trap_enter_vld);
 end
 
 // Multiply/divide
@@ -435,9 +440,17 @@ reg prev_instr_was_32_bit;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
+		xm_delay_irq_entry <= 1'b0;
 		prev_instr_was_32_bit <= 1'b0;
-	end else if (!x_stall) begin
-		prev_instr_was_32_bit <= df_cir_use == 2'd2;
+	end else begin
+		// Must hold off IRQ if we are in the second cycle of an address phase or
+		// later, since at that point the load/store can't be revoked. The IRQ is
+		// taken once this load/store moves to the next stage: if another load/store
+		// is chasing down the pipeline then this is immediately suppressed by the
+		// IRQ entry, before its address phase can begin.
+		xm_delay_irq_entry <= bus_aph_req_d && !bus_aph_ready_d;
+		if (!x_stall)
+			prev_instr_was_32_bit <= df_cir_use == 2'd2;
 	end
 end
 
@@ -447,6 +460,7 @@ hazard3_csr #(
 ) inst_hazard3_csr (
 	.clk                     (clk),
 	.rst_n                   (rst_n),
+
 	// CSR access port
 	// *en_soon are early access strobes which are not a function of bus stall.
 	// Can generate access faults (hence traps), but do not actually perform access.
@@ -459,14 +473,19 @@ hazard3_csr #(
 	.ren_soon                (d_csr_ren && !m_trap_enter_vld),
 	.ren                     (d_csr_ren && !m_trap_enter_vld && !x_stall),
 	.illegal                 (x_csr_illegal_access),
+
 	// Trap signalling
 	.trap_addr               (m_trap_addr),
+	.trap_is_irq             (m_trap_is_irq),
 	.trap_enter_vld          (m_trap_enter_vld),
 	.trap_enter_rdy          (m_trap_enter_rdy),
 	.mepc_in                 (d_pc - (prev_instr_was_32_bit ? 32'h4 : 32'h2)),
+
 	// IRQ and exception requests
+	.delay_irq_entry         (xm_delay_irq_entry),
 	.irq                     (irq),
 	.except                  (xm_except),
+
 	// Other CSR-specific signalling
 	.instr_ret               (|df_cir_use)
 );
@@ -488,7 +507,7 @@ always @ (posedge clk or negedge rst_n) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
-			if (x_stall || m_trap_enter_vld) begin
+			if (x_stall || m_trap_enter_vld && () begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
