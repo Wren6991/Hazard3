@@ -516,13 +516,13 @@ always @ (posedge clk or negedge rst_n) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
+			xm_except <= x_except;
 			if (x_stall || m_trap_enter_vld) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
 				xm_except <= EXCEPT_NONE;
 			end
-			xm_except <= x_except;
 		end else if (bus_dph_err_d) begin
 			// First phase of 2-phase AHBL error response. Pass the exception along on
 			// this cycle, and on the next cycle the trap entry will be asserted,
