@@ -96,3 +96,5 @@ always @ (posedge clk) if (rst_n) begin: dst_ahbl_req_properties
 			assert($stable(src_hwdata));
 	end
 end
+
+endmodule
