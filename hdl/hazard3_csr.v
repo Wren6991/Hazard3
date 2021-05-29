@@ -725,6 +725,12 @@ always @ (posedge clk) begin
 	if (in_trap)
 		assume(except == EXCEPT_NONE);
 
+	// Assume IRQs are not deasserted on cycles where exception entry does not
+	// take place
+
+	if (!trap_enter_rdy)
+		assume(~|(irq_r & ~irq));
+
 	// Something is screwed up if this happens
 	if ($past(trap_enter_vld && trap_enter_rdy))
 		assert(!wen);
@@ -733,6 +739,7 @@ always @ (posedge clk) begin
 		assert(except != EXCEPT_MRET);
 	// Should be impossible to get to another mret so soon after exiting:
 	assert(!(except == EXCEPT_MRET && $past(except == EXCEPT_MRET)));
+
 end
 
 `endif

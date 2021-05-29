@@ -241,8 +241,13 @@ reg x_stall_raw;
 wire x_stall_muldiv;
 wire x_jump_req;
 
+// IRQs squeeze in between the instructions in X and M, so in this case X
+// stalls but M can continue. -> X always stalls on M trap, M *may* stall.
+wire x_stall_on_trap = m_trap_enter_vld && !m_trap_enter_rdy;
+
 assign x_stall =
 	m_stall ||
+	x_stall_on_trap ||
 	x_stall_raw || x_stall_muldiv ||
 	bus_aph_req_d && !bus_aph_ready_d ||
 	x_jump_req && !f_jump_rdy;
@@ -454,6 +459,8 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+wire [W_ADDR-1:0] m_exception_return_addr;
+
 hazard3_csr #(
 	.XLEN            (W_DATA),
 `include "hazard3_config_inst.vh"
@@ -479,7 +486,7 @@ hazard3_csr #(
 	.trap_is_irq             (m_trap_is_irq),
 	.trap_enter_vld          (m_trap_enter_vld),
 	.trap_enter_rdy          (m_trap_enter_rdy),
-	.mepc_in                 (d_pc - (prev_instr_was_32_bit ? 32'h4 : 32'h2)),
+	.mepc_in                 (m_exception_return_addr),
 
 	// IRQ and exception requests
 	.delay_irq_entry         (xm_delay_irq_entry),
@@ -507,7 +514,7 @@ always @ (posedge clk or negedge rst_n) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
-			if (x_stall || m_trap_enter_vld && () begin
+			if (x_stall || m_trap_enter_vld) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
@@ -559,7 +566,18 @@ assign f_jump_req = x_jump_req || m_trap_enter_vld;
 assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign x_jump_not_except = !m_trap_enter_vld;
 
-assign m_stall = (!xm_memop[3] && !bus_dph_ready_d) || (m_trap_enter_vld && !m_trap_enter_rdy);
+wire m_bus_stall = !xm_memop[3] && !bus_dph_ready_d; 
+assign m_stall = m_bus_stall || (m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq);
+
+// Exception is taken against the instruction currently in M, so walk the PC
+// back. IRQ is taken "in between" the instruction in M and the instruction
+// in X, so set return to X program counter. Note that, if taking an
+// exception, we know that the previous instruction to be in X (now in M)
+// was *not* a branch, which is why we can just walk back the PC.
+assign m_exception_return_addr = d_pc - (
+	m_trap_is_irq         ? 32'h0 :
+	prev_instr_was_32_bit ? 32'h4 : 32'h2
+);
 
 always @ (*) begin
 	// Local forwarding of store data
@@ -600,43 +618,45 @@ always @ (*) begin
 	endcase
 end
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mw_rd <= {W_REGADDR{1'b0}};
-	end else if (!m_stall) begin
-		//synthesis translate_off
-		if (^bus_wdata_d === 1'bX) begin
-			$display("Writing Xs to memory!");
-			$finish;
-		end
-		//synthesis translate_on
-		mw_rd <= xm_rd;
-	end
-end
 
-// No need to reset result register, as reset on mw_rd protects register file from it
-always @ (posedge clk)
-	if (!m_stall)
-		mw_result <= m_result;
-
-// ----------------------------------------------------------------------------
-//                               Pipe Stage W
-
-// mw_result and mw_rd register the most recent write to the register file,
-// so that X can bypass them in.
-
-wire w_reg_wen = |xm_rd && !m_stall && xm_except == EXCEPT_NONE;
+// Note that exception entry prevents writeback, because the exception entry
+// replaces the instruction in M. Interrupt entry does not prevent writeback,
+// because the interrupt is notionally inserted in between the instruction in
+// M and the instruction in X.
+wire m_reg_wen_if_nonzero = !m_bus_stall && xm_except == EXCEPT_NONE;
+wire m_reg_wen = |xm_rd && m_reg_wen_if_nonzero;
 
 //synthesis translate_off
 always @ (posedge clk) begin
 	if (rst_n) begin
-		if (w_reg_wen && (^m_result === 1'bX)) begin
+		if (m_reg_wen && (^m_result === 1'bX)) begin
 			$display("Writing X to register file!");
 			$finish;
 		end
 	end
 end
 //synthesis translate_on
+
+// No need to reset result register, as reset on mw_rd protects register file from it
+always @ (posedge clk)
+	if (m_reg_wen_if_nonzero)
+		mw_result <= m_result;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		mw_rd <= {W_REGADDR{1'b0}};
+	end else begin
+		//synthesis translate_off
+		if (!m_stall && ^bus_wdata_d === 1'bX) begin
+			$display("Writing Xs to memory!");
+			$finish;
+		end
+		//synthesis translate_on
+		if (m_reg_wen_if_nonzero)
+			mw_rd <= xm_rd;
+	end
+end
+
 
 hazard3_regfile_1w2r #(
 	.FAKE_DUALPORT(0),
@@ -661,7 +681,7 @@ hazard3_regfile_1w2r #(
 
 	.waddr  (xm_rd),
 	.wdata  (m_result),
-	.wen    (w_reg_wen)
+	.wen    (m_reg_wen)
 );
 
 `ifdef RISCV_FORMAL
