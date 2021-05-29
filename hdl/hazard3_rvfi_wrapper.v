@@ -33,37 +33,55 @@ module rvfi_wrapper (
 (* keep *) `rvformal_rand_reg [31:0]  d_hrdata;
 
 
-// AHB-lite requires: data phase of IDLE has no wait states
-always @ (posedge clock) begin
-	if ($past(i_htrans) == 2'b00 && $past(i_hready))
-		assume(i_hready);
-	if ($past(d_htrans) == 2'b00 && $past(d_hready))
-		assume(d_hready);
-end
+
 
 `ifdef RISCV_FORMAL_FAIRNESS
-
-reg [7:0] i_bus_fairness_ctr;
-reg [7:0] d_bus_fairness_ctr;
-localparam MAX_STALL_LENGTH = 8;
-
-always @ (posedge clock) begin
-	if (reset) begin
-		i_bus_fairness_ctr <= 8'h0;
-		d_bus_fairness_ctr <= 8'h0;
-	end else begin
-		i_bus_fairness_ctr <= i_bus_fairness_ctr + ~&i_bus_fairness_ctr;
-		d_bus_fairness_ctr <= d_bus_fairness_ctr + ~&d_bus_fairness_ctr;
-		if (i_hready)
-			i_bus_fairness_ctr <= 8'h0;
-		if (d_hready)
-			d_bus_fairness_ctr <= 8'h0;
-	end
-	assume(i_bus_fairness_ctr <= MAX_STALL_LENGTH);
-	assume(d_bus_fairness_ctr <= MAX_STALL_LENGTH);
-end
-
+localparam MAX_BUS_STALL = 8;
+`else
+localparam MAX_BUS_STALL = -1;
 `endif
+
+ahbl_slave_assumptions #(
+	.MAX_BUS_STALL (MAX_BUS_STALL)
+) i_slave_assumptions (
+	.clk             (clock),
+	.rst_n           (!reset),
+
+	.dst_hready_resp (i_hready),
+	.dst_hready      (i_hready),
+	.dst_hresp       (i_hresp),
+	.dst_haddr       (i_haddr),
+	.dst_hwrite      (i_hwrite),
+	.dst_htrans      (i_htrans),
+	.dst_hsize       (i_hsize),
+	.dst_hburst      (i_hburst),
+	.dst_hprot       (i_hprot),
+	.dst_hmastlock   (i_hmastlock),
+	.dst_hwdata      (i_hwdata),
+	.dst_hrdata      (i_hrdata)
+);
+
+
+ahbl_slave_assumptions #(
+	.MAX_BUS_STALL (MAX_BUS_STALL)
+) d_slave_assumptions (
+	.clk             (clock),
+	.rst_n           (!reset),
+
+	.dst_hready_resp (d_hready),
+	.dst_hready      (d_hready),
+	.dst_hresp       (d_hresp),
+	.dst_haddr       (d_haddr),
+	.dst_hwrite      (d_hwrite),
+	.dst_htrans      (d_htrans),
+	.dst_hsize       (d_hsize),
+	.dst_hburst      (d_hburst),
+	.dst_hprot       (d_hprot),
+	.dst_hmastlock   (d_hmastlock),
+	.dst_hwdata      (d_hwdata),
+	.dst_hrdata      (d_hrdata)
+);
+
 
 // ----------------------------------------------------------------------------
 // Device Under Test

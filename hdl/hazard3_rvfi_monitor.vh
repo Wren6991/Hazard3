@@ -47,9 +47,7 @@ always @ (posedge clk or negedge rst_n) begin
 		end else if (!m_stall) begin
 			rvfm_m_valid <= 1'b0;
 		end
-		// Squash instructions where an IRQ is taken (but keep instructions which
-		// cause an exception... which is really what the rvfi_trap signal refers to)
-		rvfi_valid_r <= rvfm_m_valid && !m_stall && !(m_trap_enter_vld && !rvfm_m_trap);
+		rvfi_valid_r <= rvfm_m_valid && !m_stall;
 		rvfi_insn_r <= rvfm_m_instr;
 		rvfi_trap_r <= rvfm_m_trap;
 
@@ -111,7 +109,7 @@ assign rvfi_pc_wdata = rvfi_pc_wdata_r;
 always @ (posedge clk) begin
 	if (!m_stall) begin
 		rvfi_pc_rdata_r <= rvfm_xm_pc;
-		rvfi_pc_wdata_r <= rvfm_xm_pc_next;
+		rvfi_pc_wdata_r <= m_trap_enter_vld && m_trap_enter_rdy ? m_trap_addr : rvfm_xm_pc_next;
 	end
 end
 
