@@ -36,6 +36,20 @@ parameter CSR_M_TRAP      = 1,
 parameter CSR_COUNTER     = 0,
 
 // ----------------------------------------------------------------------------
+// ID registers
+
+// JEDEC JEP106-compliant vendor ID, can be left at 0 if "not implemented or
+// that this is a non-commercial implementation" (RISC-V spec).
+// 31:7 is continuation code count, 6:0 is ID. Parity bit is not stored.
+parameter MVENDORID_VAL = 32'h0,
+
+// Architecture ID for Hazard3, currently 0 because unregistered. (TODO)
+parameter MARCHID_VAL = 32'h0,
+
+// Implementation ID for this specific version of Hazard3. Git hash is perfect.
+parameter MIMPID_VAL = 32'h0,
+
+// ----------------------------------------------------------------------------
 // Performance/size options
 
 // REDUCED_BYPASS: Remove all forwarding paths except X->X (so back-to-back

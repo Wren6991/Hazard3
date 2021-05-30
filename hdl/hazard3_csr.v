@@ -419,7 +419,7 @@ always @ (*) begin
 		decode_match = 1'b1;
 		rdata = {
 			2'h1,              // MXL: 32-bit
-			{XLEN-28{1'b0}}, // WLRL
+			{XLEN-28{1'b0}},   // WLRL
 
 			13'd0,             // Z...N, no
 			|EXTENSION_M,
@@ -432,18 +432,15 @@ always @ (*) begin
 	end
 	MVENDORID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
-		// I don't have a JEDEC ID. It is legal to tie this to 0 if non-commercial.
-		rdata = {XLEN{1'b0}};
+		rdata = MVENDORID_VAL;
 	end
 	MARCHID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
-		// I don't have a RV foundation ID. It is legal to tie this to 0.
-		rdata = {XLEN{1'b0}};
+		rdata = MARCHID_VAL;
 	end
 	MIMPID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
-		// TODO put git SHA or something here
-		rdata = {XLEN{1'b0}};
+		rdata = MIMPID_VAL;
 	end
 	MHARTID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
@@ -472,6 +469,10 @@ always @ (*) begin
 			3'd0     // No S, U
 		};
 	end
+
+	// MSTATUSH is not implemented (permitted when all fields would be tied to
+	// zero -- those fields being MBE and SBE, which are zero because we are
+	// pure little-endian.)
 
 	// MEDELEG, MIDELEG should not exist for M-only implementations. Will raise
 	// illegal instruction exception if accessed.
