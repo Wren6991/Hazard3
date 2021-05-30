@@ -1,0 +1,6 @@
+DOTF=tb.f
+TOP=tb
+YOSYS_SMT_SOLVER=boolector
+DEFINES=HAZARD3_FORMAL_REGRESSION
+
+include $(SCRIPTS)/formal.mk
