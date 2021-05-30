@@ -21,35 +21,19 @@ j \name
 .endm
 
 // ----------------------------------------------------------------------------
-// Vector table
-// Hazard5 requires 4k alignment of mtvec
+// Vector table (must be at least aligned to its size rounded up to power of 2)
 
-.p2align 12
+.p2align 8
 .vector_table:
 
-// Exceptions
+// Single exception vector, also takes IRQs if vectoring is disabled
 
-	VEC handle_instr_misalign
-	VEC handle_instr_fault
-	VEC handle_instr_illegal
-	VEC handle_breakpoint
-	VEC handle_load_misalign
-	VEC handle_load_fault
-	VEC handle_store_misalign
-	VEC handle_store_fault
-	VEC .halt
-	VEC .halt
-	VEC .halt
-	VEC handle_ecall
-	VEC .halt
-	VEC .halt
-	VEC .halt
-	VEC .halt
+	VEC handle_exception
 
-// Standard interrupts
+// Standard interrupts, if vectoring is enabled
 // Note: global EIRQ does not fire. Instead we have 16 separate vectors
 
-	VEC .halt
+	// handle_exception ^^^ takes the slot where U-mode softirq would be
 	VEC .halt
 	VEC .halt
 	VEC isr_machine_softirq
@@ -66,7 +50,7 @@ j \name
 	VEC .halt
 	VEC .halt
 
-// External interrupts
+// External interrupts, if vectoring is enabled
 
 	VEC isr_irq0
 	VEC isr_irq1
@@ -93,6 +77,8 @@ j \name
 .reset_handler:
 	la sp, __stack_top
 	la t0, .vector_table
+	// Set mtvec LSB to enable vectoring
+	ori t0, t0, 1
 	csrw mtvec, t0
 
 	// newlib _start expects argc, argv on the stack. Leave stack 16-byte aligned.
@@ -209,15 +195,7 @@ _str_\name:
 	.asciz "\name"
 .endm
 
-weak_handler handle_instr_misalign
-weak_handler handle_instr_fault
-weak_handler handle_instr_illegal
-weak_handler handle_breakpoint
-weak_handler handle_load_misalign
-weak_handler handle_load_fault
-weak_handler handle_store_misalign
-weak_handler handle_store_fault
-weak_handler handle_ecall
+weak_handler handle_exception
 weak_handler isr_machine_softirq
 weak_handler isr_machine_timer
 weak_handler isr_irq0

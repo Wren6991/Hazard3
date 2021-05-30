@@ -273,7 +273,8 @@ end
 
 // Trap vector base
 reg  [XLEN-1:0] mtvec_reg;
-wire [XLEN-1:0] mtvec = (mtvec_reg & MTVEC_WMASK) | (MTVEC_INIT & ~MTVEC_WMASK);
+wire [XLEN-1:0] mtvec = ((mtvec_reg & MTVEC_WMASK) | (MTVEC_INIT & ~MTVEC_WMASK)) & ({XLEN{1'b1}} << 2);
+wire            irq_vector_enable = mtvec_reg[0];
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -524,7 +525,8 @@ always @ (*) begin
 		decode_match = 1'b1;
 		rdata = {
 			mtvec[XLEN-1:2],  // BASE
-			2'h1              // MODE = Vectored (Direct is useless, and we don't have CLIC)
+			1'b0,             // Reserved mode bit gets WARL'd to 0
+			irq_vector_enable // MODE is vectored (2'h1) or direct (2'h0)
 		};
 	end
 
@@ -679,7 +681,7 @@ assign mip = {
 	3'h0,   // Reserved
 	1'b0,   // Timer (FIXME)
 	3'h0,   // Reserved
-	1'b0,   // Software interrupt
+	1'b0,   // Software interrupt (FIXME)
 	3'h0    // Reserved
 };
 
@@ -695,9 +697,8 @@ hazard3_priority_encode #(
 	.gnt (irq_num)
 );
 
-wire [11:0] mtvec_offs = (exception_req_any ?
-	{8'h0, except} :
-	12'h10 + {7'h0, irq_num}
+wire [11:0] mtvec_offs = (
+	exception_req_any || !irq_vector_enable ? 12'h0 : {7'h0, irq_num}
 ) << 2;
 
 assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {20'h0, mtvec_offs};
@@ -722,7 +723,7 @@ always @ (posedge clk or negedge rst_n)
 			&& !(trap_enter_vld && trap_enter_rdy && except == EXCEPT_MRET);
 
 always @ (posedge clk) begin
-	// Assume there are no nested exceptions, to stop risc-formal from doing
+	// Assume there are no nested exceptions, to stop riscv-formal from doing
 	// annoying things like stopping instructions from retiring by repeatedly
 	// feeding in invalid instructions
 

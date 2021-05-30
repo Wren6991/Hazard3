@@ -12,8 +12,16 @@ parameter RESET_VECTOR    = 32'h0,
 
 // MTVEC_INIT: Initial value of trap vector base. Bits clear in MTVEC_WMASK
 // will never change from this initial value. Bits set in MTVEC_WMASK can be
-// written/set/cleared as normal. Note that, if CSR_M_TRAP is set, MTVEC_INIT
-// should probably have a different value from RESET_VECTOR.
+// written/set/cleared as normal.
+//
+// Note that, if CSR_M_TRAP is set, MTVEC_INIT should probably have a
+// different value from RESET_VECTOR.
+//
+// Note that mtvec bits 1:0 do not affect the trap base (as per RISC-V spec).
+// Bit 1 is don't care, bit 0 selects the vectoring mode: unvectored if == 0
+// (all traps go to mtvec), vectored if == 1 (exceptions go to mtvec, IRQs to
+// mtvec + mcause * 4). This means MTVEC_INIT also sets the initial vectoring
+// mode.
 parameter MTVEC_INIT      = 32'h00000000,
 
 // ----------------------------------------------------------------------------
@@ -66,10 +74,13 @@ parameter MULDIV_UNROLL   = 1,
 parameter MUL_FAST        = 0,
 
 // MTVEC_WMASK: Mask of which bits in MTVEC are modifiable. Save gates by
-// making trap vector base partly fixed (legal, as it's WARL). Note the entire
-// vector table must always be aligned to its size, rounded up to a power of
-// two, so careful with the low-order bits.
-parameter MTVEC_WMASK     = 32'hfffff000,
+// making trap vector base partly fixed (legal, as it's WARL).
+//
+// - The vectoring mode can be made fixed by clearing the LSB of MTVEC_WMASK
+//
+// - Note the entire vector table must always be aligned to its size, rounded
+//   up to a power of two, so careful with the low-order bits.
+parameter MTVEC_WMASK     = 32'hffffffff,
 
 // ----------------------------------------------------------------------------
 // Port size parameters (do not modify)
