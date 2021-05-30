@@ -8,5 +8,5 @@
 	path = scripts
 	url = https://github.com/Wren6991/fpgascripts
 [submodule "test/formal/riscv-formal"]
-	path = test/formal/riscv-formal
+	path = test/formal/riscv-formal/riscv-formal
 	url = https://github.com/Wren6991/riscv-formal.git
