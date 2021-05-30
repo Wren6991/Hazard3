@@ -22,22 +22,21 @@ module ahbl_slave_assumptions #(
 	parameter W_DATA = 32,
 	parameter MAX_BUS_STALL = -1 // set >= 0 to constrain max stall length
 ) (
-	input wire                clk,
-	input wire                rst_n,
+	input wire               clk,
+	input wire               rst_n,
 
-	// Downstream AHB-Lite master port
-	input  wire               dst_hready_resp,
-	output wire               dst_hready,
-	input  wire               dst_hresp,
-	output wire [W_ADDR-1:0]  dst_haddr,
-	output wire               dst_hwrite,
-	output wire [1:0]         dst_htrans,
-	output wire [2:0]         dst_hsize,
-	output wire [2:0]         dst_hburst,
-	output wire [3:0]         dst_hprot,
-	output wire               dst_hmastlock,
-	output wire [W_DATA-1:0]  dst_hwdata,
-	input  wire [W_DATA-1:0]  dst_hrdata
+	input wire               dst_hready_resp,
+	input wire               dst_hready,
+	input wire               dst_hresp,
+	input wire [W_ADDR-1:0]  dst_haddr,
+	input wire               dst_hwrite,
+	input wire [1:0]         dst_htrans,
+	input wire [2:0]         dst_hsize,
+	input wire [2:0]         dst_hburst,
+	input wire [3:0]         dst_hprot,
+	input wire               dst_hmastlock,
+	input wire [W_DATA-1:0]  dst_hwdata,
+	input wire [W_DATA-1:0]  dst_hrdata
 );
 
 reg              dst_active_dph;
