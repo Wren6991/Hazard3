@@ -121,7 +121,6 @@ localparam PMPADDR1       = 12'h3b1; // Physical memory protection address regis
 
 // Performance counters (RW)
 localparam MCYCLE         = 12'hb00; // Raw cycles since start of day
-localparam MTIME          = 12'hb01; // "Wall clock", can be aliased to MCYCLE
 localparam MINSTRET       = 12'hb02; // Instruction retire count since start of day
 localparam MHPMCOUNTER3   = 12'hb03; // WARL (we tie to 0)
 localparam MHPMCOUNTER4   = 12'hb04; // WARL (we tie to 0)
@@ -154,7 +153,6 @@ localparam MHPMCOUNTER30  = 12'hb1e; // WARL (we tie to 0)
 localparam MHPMCOUNTER31  = 12'hb1f; // WARL (we tie to 0)
 
 localparam MCYCLEH        = 12'hb80; // High halves of each counter
-localparam MTIMEH         = 12'hb81;
 localparam MINSTRETH      = 12'hb82;
 localparam MHPMCOUNTER3H  = 12'hb83;
 localparam MHPMCOUNTER4H  = 12'hb84;
@@ -186,7 +184,7 @@ localparam MHPMCOUNTER29H = 12'hb9d;
 localparam MHPMCOUNTER30H = 12'hb9e;
 localparam MHPMCOUNTER31H = 12'hb9f;
 
-localparam MCOUNTINHIBIT  = 12'h302; // WARL (we must tie 0 as CYCLE and TIME are aliased)
+localparam MCOUNTINHIBIT  = 12'h302; // Count inhibit register for mcycle/minstret
 localparam MHPMEVENT3     = 12'h323; // WARL (we tie to 0)
 localparam MHPMEVENT4     = 12'h324; // WARL (we tie to 0)
 localparam MHPMEVENT5     = 12'h325; // WARL (we tie to 0)
@@ -216,14 +214,6 @@ localparam MHPMEVENT28    = 12'h33c; // WARL (we tie to 0)
 localparam MHPMEVENT29    = 12'h33d; // WARL (we tie to 0)
 localparam MHPMEVENT30    = 12'h33e; // WARL (we tie to 0)
 localparam MHPMEVENT31    = 12'h33f; // WARL (we tie to 0)
-
-// TODO
-// Decoding all these damn HPMs bloats the logic. If we don't decode them, we
-// can still trap the illegal opcode and emulate them. This is ugly and
-// contravenes the standard, but why on earth would they mandate 100 useless
-// registers with no defined operation?
-// If you really want them, set this to 1:
-localparam DECODE_HPM = 0;
 
 // ----------------------------------------------------------------------------
 // CSR state + update logic
@@ -361,7 +351,10 @@ end
 
 // ----------------------------------------------------------------------------
 // Counters
-// MCYCLE and MTIME are aliased (fine as long as MCOUNTINHIBIT[0] is tied low)
+
+reg mcountinhibit_cy;
+reg mcountinhibit_ir;
+
 reg [XLEN-1:0] mcycleh;
 reg [XLEN-1:0] mcycle;
 reg [XLEN-1:0] minstreth;
@@ -380,11 +373,16 @@ always @ (posedge clk or negedge rst_n) begin
 		mcycle <= X0;
 		minstreth <= X0;
 		minstret <= X0;
+		// Counters inhibited by default to save energy
+		mcountinhibit_cy <= 1'b0;
+		mcountinhibit_ir <= 1'b0;
 	end else if (CSR_COUNTER) begin
-		// Hold the top (2 * XLEN - W_COUNTER) bits constant to save gates:
-		{mcycleh, mcycle} <= (({mcycleh, mcycle} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
-			| ({mcycleh, mcycle} & ({2*XLEN{1'b1}} << W_COUNTER));
-		if (instr_ret)
+		// Optionally hold the top (2 * XLEN - W_COUNTER) bits constant to
+		// save gates (noncompliant if enabled)
+		if (!mcountinhibit_cy)
+			{mcycleh, mcycle} <= (({mcycleh, mcycle} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
+				| ({mcycleh, mcycle} & ({2*XLEN{1'b1}} << W_COUNTER));
+		if (!mcountinhibit_ir && instr_ret)
 			{minstreth, minstret} <= (({minstreth, minstret} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
 				| ({minstreth, minstret} & ({2*XLEN{1'b1}} << W_COUNTER));
 		if (wen) begin
@@ -396,6 +394,12 @@ always @ (posedge clk or negedge rst_n) begin
 				minstreth <= ctr_update;
 			if (addr == MINSTRET)
 				minstret <= ctr_update;
+			if (addr == MCOUNTINHIBIT) begin
+				{mcountinhibit_ir, mcountinhibit_cy} <=
+					wtype == CSR_WTYPE_C ? {mcountinhibit_ir, mcountinhibit_cy} & ~{wdata[2], wdata[0]} :
+					wtype == CSR_WTYPE_S ? {mcountinhibit_ir, mcountinhibit_cy} |  {wdata[2], wdata[0]} :
+					                                                               {wdata[2], wdata[0]} ;
+			end
 		end
 	end
 end
@@ -528,106 +532,109 @@ always @ (*) begin
 	// Counter CSRs
 
 	// Get the tied WARLs out the way first
-	MHPMCOUNTER3:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER4:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER5:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER6:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER7:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER8:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER9:   if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER10:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER11:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER12:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER13:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER14:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER15:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER16:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER17:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER18:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER19:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER20:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER21:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER22:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER23:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER24:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER25:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER26:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER27:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER28:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER29:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER30:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER31:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER3:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER4:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER5:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER6:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER7:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER8:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER9:   if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER10:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER11:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER12:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER13:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER14:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER15:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER16:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER17:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER18:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER19:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER20:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER21:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER22:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER23:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER24:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER25:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER26:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER27:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER28:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER29:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER30:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER31:  if (CSR_COUNTER) begin decode_match = 1'b1; end
 
-	MHPMCOUNTER3H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER4H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER5H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER6H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER7H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER8H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER9H:  if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER10H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER11H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER12H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER13H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER14H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER15H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER16H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER17H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER18H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER19H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER20H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER21H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER22H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER23H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER24H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER25H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER26H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER27H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER28H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER29H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER30H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER31H: if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER3H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER4H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER5H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER6H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER7H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER8H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER9H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER10H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER11H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER12H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER13H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER14H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER15H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER16H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER17H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER18H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER19H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER20H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER21H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER22H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER23H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER24H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER25H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER26H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER27H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER28H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER29H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER30H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER31H: if (CSR_COUNTER) begin decode_match = 1'b1; end
 
-	MHPMEVENT3:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT4:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT5:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT6:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT7:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT8:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT9:     if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT10:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT11:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT12:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT13:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT14:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT15:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT16:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT17:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT18:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT19:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT20:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT21:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT22:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT23:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT24:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT25:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT26:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT27:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT28:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT29:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT30:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT31:    if (DECODE_HPM && CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT3:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT4:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT5:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT6:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT7:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT8:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT9:     if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT10:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT11:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT12:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT13:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT14:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT15:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT16:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT17:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT18:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT19:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT20:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT21:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT22:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT23:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT24:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT25:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT26:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT27:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT28:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT29:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT30:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT31:    if (CSR_COUNTER) begin decode_match = 1'b1; end
 
-	MCOUNTINHIBIT:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	// Phew...
+	MCOUNTINHIBIT:  if (CSR_COUNTER) begin
+		decode_match = 1'b1;
+		rdata = {
+			29'd0,
+			mcountinhibit_ir,
+			1'b0,
+			mcountinhibit_cy
+		};
+	end
 
 	MCYCLE: if (CSR_COUNTER) begin
 		decode_match = 1'b1;
 		rdata = mcycle;
-	end
-	MTIME: if (CSR_COUNTER) begin
-		decode_match = 1'b1;
-		rdata = mcycle; // Can be aliased as long as we tie MCOUNTINHIBIT[0] to 0
 	end
 	MINSTRET: if (CSR_COUNTER) begin
 		decode_match = 1'b1;
@@ -637,10 +644,6 @@ always @ (*) begin
 	MCYCLEH: if (CSR_COUNTER) begin
 		decode_match = 1'b1;
 		rdata = mcycleh;
-	end
-	MTIMEH: if (CSR_COUNTER) begin
-		decode_match = 1'b1;
-		rdata = mcycleh; // Can be aliased as long as we tie MCOUNTINHIBIT[0] to 0
 	end
 	MINSTRETH: if (CSR_COUNTER) begin
 		decode_match = 1'b1;
