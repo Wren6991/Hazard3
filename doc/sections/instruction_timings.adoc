@@ -1,0 +1,96 @@
+== Instruction Cycle Counts
+
+All timings are given assuming perfect bus behaviour (no stalls). Stalling of the `I` bus can delay execution indefinitely, as can stalling of the `D` bus during a load or store.
+
+=== RV32I
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+3+| Integer Register-register
+| `add rd, rs1, rs2` | 1 |
+| `sub rd, rs1, rs2` | 1 |
+| `slt rd, rs1, rs2` | 1 |
+| `sltu rd, rs1, rs2` | 1 |
+| `and rd, rs1, rs2` | 1 |
+| `or rd, rs1, rs2` | 1 |
+| `xor rd, rs1, rs2` | 1 |
+| `sll rd, rs1, rs2` | 1 |
+| `srl rd, rs1, rs2` | 1 |
+| `sra rd, rs1, rs2` | 1 |
+3+| Integer Register-immediate
+| `addi rd, rs1, imm` | 1 | `nop` is a pseudo-op for `addi x0, x0, 0`
+| `slti rd, rs1, imm` | 1 |
+| `sltiu rd, rs1, imm` | 1 |
+| `andi rd, rs1, imm` | 1 |
+| `ori rd, rs1, imm` | 1 |
+| `xori rd, rs1, imm` | 1 |
+| `slli rd, rs1, imm` | 1 |
+| `srli rd, rs1, imm` | 1 |
+| `srai rd, rs1, imm` | 1 |
+3+| Large Immediate
+| `lui rd, imm` | 1 |
+| `auipc rd, imm` | 1 |
+3+| Control Transfer
+| `jal rd, label` | 2footnote:unaligned_branch[A branch to a 32-bit instruction which is not 32-bit-aligned requires one additional cycle, because two naturally-aligned bus cycles are required to fetch the target instruction.]|
+| `jalr rd, rs1, imm` | 2footnote:unaligned_branch[] |
+| `beq rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+| `bne rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+| `blt rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+| `bge rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+| `bltu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+| `bgeu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+3+| Load and Store
+| `lw rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[If an instruction uses load data (from stage 3) in stage 2, a 1-cycle bubble is inserted after the load. Load-data to store-data dependency does not experience this, because the store data is used in stage 3. However, load-data to store-address (or e.g. load-to-add) does qualify.]
+| `lh rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
+| `lhu rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
+| `lb rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
+| `lbu rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
+| `sw rs2, imm(rs1)` | 1 |
+| `sh rs2, imm(rs1)` | 1 |
+| `sb rs2, imm(rs1)` | 1 |
+|===
+
+=== M Extension
+
+Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1`. I.e. the sequential multiply/divide circuit processes two bits per cycle, and a separate dedicated multiplier is present for the `mul` instruction.
+
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+3+| 32 {times} 32 -> 32 Multiply
+| `mul rd, rs1, rs2` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.
+3+| 32 {times} 32 -> 64 Multiply, Upper Half
+| `mulh rd, rs1, rs2` | 18 to 20 | Depending on sign correction
+| `mulhsu rd, rs1, rs2` | 18 to 20 | Depending on sign correction
+| `mulhu rd, rs1, rs2` | 18 |
+3+| Divide and Remainder
+| `div` | 18 or 19 | Depending on sign correction
+| `divu` | 18 |
+| `rem` | 18 or 19 | Depending on sign correction
+| `remu` | 18 |
+|===
+
+=== C Extension
+
+All C extension 16-bit instructions on Hazard3 are aliases of base RV32I instructions. They perform identically to their 32-bit counterparts.
+
+A consequence of the C extension is that 32-bit instructions can be non-naturally-aligned. This has no penalty during sequential execution, but branching to a 32-bit instruction that is not 32-bit-aligned carries a 1 cycle penalty, because the instruction fetch is cracked into two naturally-aligned bus accesses.
+
+=== Privileged Instructions (including Zicsr)
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+3+| CSR Access
+| `csrrw rd, csr, rs1` | 1 |
+| `csrrc rd, csr, rs1` | 1 |
+| `csrrs rd, csr, rs1` | 1 |
+| `csrrwi rd, csr, imm` | 1 |
+| `csrrci rd, csr, imm` | 1 |
+| `csrrsi rd, csr, imm` | 1 |
+3+| Trap Request
+| `ecall` | 3 | Time given is for jumping to `mtvec`
+| `ebreak` | 3 | Time given is for jumping to `mtvec`
+|===

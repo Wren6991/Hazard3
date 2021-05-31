@@ -1,0 +1,14 @@
+:sectnums:
+:toc:
+:toclevels: 3
+:doctype: book
+
+:times: ×
+
+= Hazard3
+
+include::sections/introduction.adoc[]
+
+include::sections/instruction_timings.adoc[]
+
+include::sections/csr.adoc[]

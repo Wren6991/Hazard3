@@ -1,0 +1,19 @@
+== Introduction
+
+Hazard3 is a 3-stage RISC-V processor, providing the following architectural support:
+
+* `RV32I`: 32-bit base instruction set
+* `M` extension: integer multiply/divide/modulo
+* `C` extension: compressed instructions
+* `Zicsr` extension: CSR access
+* M-mode privileged instructions `ECALL`, `EBREAK`, `MRET`
+* The machine-mode (M-mode) privilege state, and standard M-mode CSRs
+
+The following are planned for future implementation:
+
+* Support for `WFI` instruction
+* Debug support
+* `A` extension: atomic memory access
+** `LR`/`SC` fully supported
+** AMONone PMA on all of memory (AMOs are decoded but unconditionally trigger access fault without attempting memory access)
+* Some nonstandard M-mode CSRs for interrupt control etc

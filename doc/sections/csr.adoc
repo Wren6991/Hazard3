@@ -1,0 +1,105 @@
+== CSRs
+
+The RISC-V privileged specification affords flexibility as to which CSRs are implemented, and how they behave. This section documents the concrete behaviour of Hazard3's standard and nonstandard M-mode CSRs, as implemented.
+
+=== Standard CSRs
+
+==== mvendorid
+
+Address: `0xf11`
+
+Read-only, constant. Value is configured when the processor is instantiated. Should contain either all-zeroes, or a valid JEDEC JEP106 vendor ID.
+
+==== marchid
+
+Address: `0xf12`
+
+Read-only, constant. Architecture identifier for Hazard3, value can be altered when the processor is instantiated. Default is currently all zeroes as unregistered.
+
+==== mimpid
+
+Address: `0xf12`
+
+Read-only, constant. Value is configured when the processor is instantiated. Should contain either all-zeroes, or some number specifiying a version of Hazard3 (e.g. git hash).
+
+==== mstatus
+
+blah blah
+
+==== misa
+
+Read-only, constant. Value depends on which ISA extensions Hazard5 is configured with.
+
+=== Custom CSRs
+
+These are all allocated in the space `0xbc0` through `0xbff` which is available for custom read/write M-mode CSRs, and `0xfc0` through `0xfff` which is available for custom read-only M-mode CSRs.
+
+==== midcr
+
+Address: `0xbc0`
+
+Implementation-defined control register. Miscellaneous nonstandard controls.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:1 | - | RES0
+| 0 | `eivect` | Modified external interrupt vectoring. If 0, use standard behaviour: all external interrupts set interrupt `mcause` of 11 and vector to `mtvec + 0x2c`. If 1, external interrupts use distinct interrupt `mcause` numbers 16 upward, and distinct vectors `mtvec + (irq + 16) * 4`. Resets to 0. Has no effect when `mtvec[0]` is 0.
+|===
+
+==== meie0
+
+Address: `0xbe0`
+
+External interrupt enable register 0. Contains a read-write bit for each external interrupt request IRQ0 through IRQ31. A `1` bit indicates that interrupt is currently enabled.
+
+Addresses `0xbe1` through `0xbe3` are reserved for further `meie` registers, supporting up to 128 external interrupts.
+
+An external interrupt is taken when all of the following are true:
+
+* The interrupt is currently asserted in `meip0`
+* The matching interrupt enable bit is set in `meie0`
+* The standard M-mode interrupt enable `mstatus.mie` is set
+* The standard M-mode global external interrupt enable `mie.meie` is set
+
+`meie0` resets to *all-ones*, for compatibility with software which is only aware of `mstatus` and `mie`. Because `mstatus.mie` and `mie.meie` are both initially clear, the core will not take interrupts straight out of reset, but it is strongly recommended to configure `meie0` before setting the global interrupt enable, to avoid interrupts from unexpected sources.
+
+==== meip0
+
+Address: `0xfe0`
+
+External IRQ pending register 0. Contains a read-only bit for each external interrupt request IRQ0 through IRQ31. A `1` bit indicates that interrupt is currently asserted. IRQs are assumed to be level-sensitive, and the relevant `meip0` bit is cleared by servicing the requestor so that it deasserts its interrupt request.
+
+Addresses `0xfe1` through `0xfe3` are reserved for further `meip` registers, supporting up to 128 external interrupts.
+
+When any bit is set in `meip0`, the standard external interrupt pending bit `mip.meip` is also set. An external interrupt is taken when all of the following are true:
+
+* The interrupt is currently asserted in `meip0`
+* The matching interrupt enable bit is set in `meie0`
+* The standard M-mode interrupt enable `mstatus.mie` is set
+* The standard M-mode global external interrupt enable `mie.meie` is set
+
+In this case, the processor jumps to either:
+
+* `mtvec` directly, if vectoring is disabled (`mtvec[0]` is 0)
+* `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1) and modified external IRQ vectoring is disabled (`midcr.eivect` is 0)
+* `mtvect + (mlei + 16) * 4`, if vectoring is enabled (`mtvec[0]` is 1) and modified external IRQ vectoring is enabled (`midcr.eivect` is 1). `
+** `mlei` is a read-only CSR containing the lowest-numbered
+
+==== mlei
+
+Address: `0xfe4`
+
+Lowest external interrupt. Contains the index of the lowest-numbered external interrupt which is both asserted in `meip0` and enabled in `meie0`. Can be used for faster software vectoring when modified external interrupt vectoring (`midcr.eivect = 1`) is not in use.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:5 | - | RES0
+| 4:0 | - | Index of the lowest-numbered active external interrupt. A LSB-first priority encode of `meip0 & meie0`. Zero when no external interrupts are both pending and enabled.
+|===
+
+
+==== Maybe-adds
+
+An option to clear a bit in `meie0` when that interrupt is taken, and set it when an `mret` has a matching `mcause` for that interrupt. Makes preemption support easier.
