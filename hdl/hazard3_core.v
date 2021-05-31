@@ -53,8 +53,10 @@ module hazard3_core #(
 	output reg  [W_DATA-1:0] bus_wdata_d,
 	input  wire [W_DATA-1:0] bus_rdata_d,
 
-	// External level-sensitive interrupt sources (tie 0 if unused)
-	input wire [15:0]        irq
+	// Level-sensitive interrupt sources
+	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
+	input wire               soft_irq,  // -> mip.msip
+	input wire               timer_irq  // -> mip.mtip
 );
 
 `include "hazard3_ops.vh"
@@ -493,6 +495,8 @@ hazard3_csr #(
 	// IRQ and exception requests
 	.delay_irq_entry         (xm_delay_irq_entry),
 	.irq                     (irq),
+	.irq_software            (soft_irq),
+	.irq_timer               (timer_irq),
 	.except                  (xm_except),
 
 	// Other CSR-specific signalling

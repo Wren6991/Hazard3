@@ -72,9 +72,9 @@ External IRQ pending register 0. Contains a read-only bit for each external inte
 
 Addresses `0xfe1` through `0xfe3` are reserved for further `meip` registers, supporting up to 128 external interrupts.
 
-When any bit is set in `meip0`, the standard external interrupt pending bit `mip.meip` is also set. An external interrupt is taken when all of the following are true:
+When any bit is set in both `meip0` and `meie0`, the standard external interrupt pending bit `mip.meip` is also set. In other words, `meip0` is filtered by `meie0` to generate the standard `mip.meip` flag. So, an external interrupt is taken when _all_ of the following are true:
 
-* The interrupt is currently asserted in `meip0`
+* An interrupt is currently asserted in `meip0`
 * The matching interrupt enable bit is set in `meie0`
 * The standard M-mode interrupt enable `mstatus.mie` is set
 * The standard M-mode global external interrupt enable `mie.meie` is set
@@ -84,7 +84,7 @@ In this case, the processor jumps to either:
 * `mtvec` directly, if vectoring is disabled (`mtvec[0]` is 0)
 * `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1) and modified external IRQ vectoring is disabled (`midcr.eivect` is 0)
 * `mtvect + (mlei + 16) * 4`, if vectoring is enabled (`mtvec[0]` is 1) and modified external IRQ vectoring is enabled (`midcr.eivect` is 1). `
-** `mlei` is a read-only CSR containing the lowest-numbered
+** `mlei` is a read-only CSR containing the lowest-numbered pending-and-enabled external interrupt.
 
 ==== mlei
 

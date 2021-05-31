@@ -4,6 +4,10 @@
 // your top-level instantiation, it's up to you. These parameters are all
 // plumbed through Hazard3's internal hierarchy to the appropriate places.
 
+// If you add a parameter here, you should add a matching line to
+// hazard3_config_inst.vh to propagate the parameter through module
+// instantiations.
+
 // ----------------------------------------------------------------------------
 // Reset state configuration
 
@@ -41,7 +45,11 @@ parameter CSR_M_MANDATORY = 1,
 parameter CSR_M_TRAP      = 1,
 
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
-parameter CSR_COUNTER     = 0,
+parameter CSR_COUNTER     = 1,
+
+// NUM_IRQ: Number of external IRQs implemented in meie0 and meip0.
+// Minimum 1 (if CSR_M_TRAP = 1), maximum 32.
+parameter NUM_IRQ         = 32,
 
 // ----------------------------------------------------------------------------
 // ID registers

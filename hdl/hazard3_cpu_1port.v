@@ -43,8 +43,10 @@ module hazard3_cpu_1port #(
 	output wire [W_DATA-1:0] ahblm_hwdata,
 	input  wire [W_DATA-1:0] ahblm_hrdata,
 
-	// External level-sensitive interrupt sources (tie 0 if unused)
-	input wire [15:0]        irq
+	// Level-sensitive interrupt sources
+	input wire [NUM_IRQ-1:0] irq,          // -> mip.meip
+	input wire               irq_software, // -> mip.msip
+	input wire               irq_timer     // -> mip.mtip
 );
 
 // ----------------------------------------------------------------------------
@@ -104,7 +106,9 @@ hazard3_core #(
 	.bus_wdata_d     (core_wdata_d),
 	.bus_rdata_d     (core_rdata_d),
 
-	.irq             (irq)
+	.irq             (irq),
+	.soft_irq        (soft_irq),
+	.timer_irq       (timer_irq)
 );
 
 

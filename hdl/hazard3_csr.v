@@ -70,9 +70,13 @@ module hazard3_csr #(
 	input  wire [XLEN-1:0]     mepc_in,
 
 	// Exceptions must *not* be a function of bus stall.
-	input  wire                delay_irq_entry,
-	input  wire [15:0]         irq,
 	input  wire [W_EXCEPT-1:0] except,
+
+	// Level-sensitive interrupt sources
+	input  wire                delay_irq_entry,
+	input  wire [NUM_IRQ-1:0]  irq,
+	input  wire                irq_software,
+	input  wire                irq_timer,
 
 	// Other CSR-specific signalling
 	input  wire                instr_ret
@@ -215,6 +219,12 @@ localparam MHPMEVENT29    = 12'h33d; // WARL (we tie to 0)
 localparam MHPMEVENT30    = 12'h33e; // WARL (we tie to 0)
 localparam MHPMEVENT31    = 12'h33f; // WARL (we tie to 0)
 
+// Custom M-mode CSRs:
+localparam MIDCR          = 12'hbc0; // Implementation-defined control register (bag of bits)
+localparam MEIE0          = 12'hbe0; // External interrupt enable register 0
+localparam MEIP0          = 12'hfe0; // External interrupt pending register 0
+localparam MLEI           = 12'hfe4; // Lowest external interrupt number
+
 // ----------------------------------------------------------------------------
 // CSR state + update logic
 // ----------------------------------------------------------------------------
@@ -231,8 +241,38 @@ begin
 end
 endfunction
 
+function [XLEN-1:0] update_nonconst;
+	input [XLEN-1:0] prev;
+	input [XLEN-1:0] nonconst;
+begin
+	update_nonconst = ((
+		wtype == CSR_WTYPE_C ? prev & ~wdata :
+		wtype == CSR_WTYPE_S ? prev | wdata :
+		wdata) & nonconst) | (prev & ~nonconst) ;
+end
+endfunction
+
 // ----------------------------------------------------------------------------
-// Trap-handling
+// Implementation-defined control register
+
+localparam MIDCR_INIT = X0;
+localparam MIDCR_WMASK = 32'h00000001;
+
+reg [XLEN-1:0] midcr;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		midcr <= MIDCR_INIT;
+	end else if (wen && addr == MIDCR) begin
+		midcr <= update_nonconst(midcr, MIDCR_WMASK);
+	end
+end
+
+// Modified external interrupt vectoring
+wire midcr_eivect = midcr[0];
+
+// ----------------------------------------------------------------------------
+// Trap-handling CSRs
 
 // Two-level interrupt enable stack, shuffled on entry/exit:
 reg mstatus_mpie;
@@ -273,7 +313,7 @@ end
 
 // Trap vector base
 reg  [XLEN-1:0] mtvec_reg;
-wire [XLEN-1:0] mtvec = ((mtvec_reg & MTVEC_WMASK) | (MTVEC_INIT & ~MTVEC_WMASK)) & ({XLEN{1'b1}} << 2);
+wire [XLEN-1:0] mtvec = mtvec_reg & ({XLEN{1'b1}} << 2);
 wire            irq_vector_enable = mtvec_reg[0];
 
 always @ (posedge clk or negedge rst_n) begin
@@ -281,7 +321,7 @@ always @ (posedge clk or negedge rst_n) begin
 		mtvec_reg <= MTVEC_INIT;
 	end else if (CSR_M_TRAP) begin
 		if (wen && addr == MTVEC)
-			mtvec_reg <= update(mtvec_reg);
+			mtvec_reg <= update_nonconst(mtvec_reg, MTVEC_WMASK);
 	end
 end
 
@@ -304,21 +344,18 @@ end
 
 // Interrupt enable (reserved bits are tied to 0)
 reg [XLEN-1:0] mie;
-localparam MIE_CONST_MASK = 32'h0000f777;
+localparam MIE_WMASK = 32'h00000888; // meie, mtip, msip
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mie <= X0;
 	end else if (CSR_M_TRAP) begin
 		if (wen && addr == MIE)
-			mie <= update(mie) & ~MIE_CONST_MASK;
+			mie <= update_nonconst(mie, MIE_WMASK);
 	end
 end
 
-wire [15:0] mie_irq  = mie[31:16]; // Per-IRQ mask. Nonstandard, but legal.
-wire        mie_meie = mie[11];   // Global external IRQ enable. This is ANDed over our per-IRQ mask
-wire        mie_mtie = mie[7];    // Timer interrupt enable
-wire        mie_msie = mie[3];    // Software interrupt enable
+wire mie_meie = mie[11];
 
 // Interrupt status ("pending") register, handled later
 wire [XLEN-1:0] mip;
@@ -329,26 +366,46 @@ wire [XLEN-1:0] mip;
 // Trap cause registers. The non-constant bits can be written by software,
 // and update automatically on trap entry. (bits 30:0 are WLRL, so we tie most off)
 reg        mcause_irq;
-reg  [4:0] mcause_code;
+reg  [5:0] mcause_code;
 wire       mcause_irq_next;
-wire [4:0] mcause_code_next;
+wire [5:0] mcause_code_next;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mcause_irq <= 1'b0;
-		mcause_code <= 5'h0;
+		mcause_code <= 6'h0;
 	end else if (CSR_M_TRAP) begin
 		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET) begin
 			mcause_irq <= mcause_irq_next;
 			mcause_code <= mcause_code_next;
 		end else if (wen && addr == MCAUSE) begin
 			{mcause_irq, mcause_code} <=
-				wtype == CSR_WTYPE_C ? {mcause_irq, mcause_code} & ~{wdata[31], wdata[4:0]} :
-				wtype == CSR_WTYPE_S ? {mcause_irq, mcause_code} |  {wdata[31], wdata[4:0]} :
-				                                                    {wdata[31], wdata[4:0]} ;
+				wtype == CSR_WTYPE_C ? {mcause_irq, mcause_code} & ~{wdata[31], wdata[5:0]} :
+				wtype == CSR_WTYPE_S ? {mcause_irq, mcause_code} |  {wdata[31], wdata[5:0]} :
+				                                                    {wdata[31], wdata[5:0]} ;
 		end
 	end
 end
+
+// Custom external interrupt enable register (would be at top of mie, but that
+// only leaves room for 16 external interrupts)
+
+localparam MEIE0_WMASK = ~({XLEN{1'b1}} << NUM_IRQ);
+
+reg [XLEN-1:0] meie0;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		// All-ones for implemented IRQs
+		meie0 <= MEIE0_WMASK;
+	end else if (wen && addr == MEIE0) begin
+		meie0 <= update_nonconst(meie0, MEIE0_WMASK);
+	end
+end
+
+// Assigned later:
+wire [XLEN-1:0] meip0;
+wire [4:0] mlei;
 
 // ----------------------------------------------------------------------------
 // Counters
@@ -517,6 +574,7 @@ always @ (*) begin
 	end
 
 	MIP: if (CSR_M_TRAP) begin
+		// Writes are permitted, but ignored.
 		decode_match = 1'b1;
 		rdata = mip;
 	end
@@ -652,6 +710,29 @@ always @ (*) begin
 		rdata = minstreth;
 	end
 
+    // ------------------------------------------------------------------------
+	// Custom CSRs
+
+	MIDCR: if (CSR_M_TRAP) begin
+		decode_match = 1'b1;
+		rdata = midcr;
+	end
+
+	MEIE0: if (CSR_M_TRAP) begin
+		decode_match = 1'b1;
+		rdata = meie0;
+	end
+
+	MEIP0: if (CSR_M_TRAP) begin
+		decode_match = !wen_soon;
+		rdata = meip0;
+	end
+
+	MLEI: if (CSR_M_TRAP) begin
+		decode_match = !wen_soon;
+		rdata = {{XLEN-5{1'b0}}, mlei};
+	end
+
 	default: begin end
 	endcase
 end
@@ -660,53 +741,74 @@ assign illegal = (wen_soon || ren_soon) && !decode_match;
 
 // ----------------------------------------------------------------------------
 // Trap request generation
-// ----------------------------------------------------------------------------
+
+reg [NUM_IRQ-1:0] irq_r;
+reg irq_software_r;
+reg irq_timer_r;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		irq_r <= {NUM_IRQ{1'b0}};
+		irq_software_r <= 1'b0;
+		irq_timer_r <= 1'b0;
+	end else begin
+		irq_r <= irq;
+		irq_software_r <= irq_software;
+		irq_timer_r <= irq_timer;
+	end
+end
+
+assign meip0 = {{XLEN-NUM_IRQ{1'b0}}, irq_r};
+wire external_irq_pending = |(meie0 & meip0);
+
+assign mip = {
+	20'h0,                // Reserved
+	external_irq_pending, // meip, Global pending bit for external IRQs
+	3'h0,                 // Reserved
+	irq_timer_r,          // mtip, interrupt from memory-mapped timer peripheral
+	3'h0,                 // Reserved
+	irq_software_r,       // msip, software interrupt from memory-mapped register
+	3'h0                  // Reserved
+};
+
+// When eivect = 1, mip.meip is masked from the standard IRQs, so that the
+// platform-specific causes and vectors are used instead.
+wire [31:0] mip_no_global = mip & ~(32'h800 & ~{XLEN{midcr_eivect}});
+wire standard_irq_active = |(mip_no_global & mie) && mstatus_mie;
+wire external_irq_active = external_irq_pending && mstatus_mie && mie_meie;
+
+wire [4:0] external_irq_num;
+wire [3:0] standard_irq_num;
+assign mlei = external_irq_num;
+
+hazard3_priority_encode #(
+	.W_REQ (32)
+) mlei_priority_encode (
+	.req (meie0 & meip0),
+	.gnt (external_irq_num)
+);
+
+hazard3_priority_encode #(
+	.W_REQ (16)
+) irq_priority (
+	.req (mip_no_global[15:0] & mie[15:0]),
+	.gnt (standard_irq_num)
+);
 
 wire exception_req_any = except != EXCEPT_NONE;
 
-// Interrupt masking and selection
+wire [5:0] vector_sel = 
+	exception_req_any || !irq_vector_enable ? 6'd0                     :
+	standard_irq_active                     ? standard_irq_num         :
+	external_irq_active                     ? 6'd16 + external_irq_num : 6'd0;
 
-reg [15:0] irq_r;
-
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
-		irq_r <= 16'h0;
-	else
-		irq_r <= irq;
-
-assign mip = {
-	irq_r,  // Our nonstandard bits for per-IRQ status
-	4'h0,   // Reserved
-	|irq_r, // Global pending bit for external IRQs
-	3'h0,   // Reserved
-	1'b0,   // Timer (FIXME)
-	3'h0,   // Reserved
-	1'b0,   // Software interrupt (FIXME)
-	3'h0    // Reserved
-};
-
-// We don't actually trap the aggregate IRQ, just provide it for software info
-wire [31:0] mip_no_global = mip & 32'hffff_f7ff;
-wire        irq_any = |(mip_no_global & {{16{mie_meie}}, {16{1'b1}}}) && mstatus_mie && !delay_irq_entry;
-wire [4:0]  irq_num;
-
-hazard3_priority_encode #(
-	.W_REQ(32)
-) irq_priority (
-	.req (mip_no_global),
-	.gnt (irq_num)
-);
-
-wire [11:0] mtvec_offs = (
-	exception_req_any || !irq_vector_enable ? 12'h0 : {7'h0, irq_num}
-) << 2;
-
-assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {20'h0, mtvec_offs};
+assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {24'h0, vector_sel, 2'h0};
 assign trap_is_irq = !exception_req_any;
-assign trap_enter_vld = CSR_M_TRAP && (exception_req_any || irq_any);
+assign trap_enter_vld = CSR_M_TRAP && (exception_req_any ||
+	!delay_irq_entry && (standard_irq_active || external_irq_active));
 
 assign mcause_irq_next = !exception_req_any;
-assign mcause_code_next = exception_req_any ? except : {1'b0, irq_num};
+assign mcause_code_next = exception_req_any ? {2'h0, except} : vector_sel;
 
 // ----------------------------------------------------------------------------
 
@@ -736,6 +838,9 @@ always @ (posedge clk) begin
 	if (!trap_enter_rdy)
 		assume(~|(irq_r & ~irq));
 
+	// Make sure CSR accesses are flushed
+	if (trap_enter_vld && trap_enter_rdy)
+		assert(!(wen || ren));
 	// Something is screwed up if this happens
 	if ($past(trap_enter_vld && trap_enter_rdy))
 		assert(!wen);
