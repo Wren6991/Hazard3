@@ -64,12 +64,11 @@ end else if (RESET_REGS) begin: real_dualport_reset
 	integer i;
 	always @ (posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
-			// It's best to ask nicely:
-			// synthesis please_on
 			for (i = 0; i < N_REGS; i = i + 1) begin
 				mem[i] <= {W_DATA{1'b0}};
 			end
-			// synthesis please_off
+			rdata1 <= {W_DATA{1'b0}};
+			rdata2 <= {W_DATA{1'b0}};
 		end else begin
 			if (wen) begin
 				mem[waddr] <= wdata;

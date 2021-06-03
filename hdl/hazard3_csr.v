@@ -798,9 +798,9 @@ hazard3_priority_encode #(
 wire exception_req_any = except != EXCEPT_NONE;
 
 wire [5:0] vector_sel = 
-	exception_req_any || !irq_vector_enable ? 6'd0                     :
-	standard_irq_active                     ? standard_irq_num         :
-	external_irq_active                     ? 6'd16 + external_irq_num : 6'd0;
+	exception_req_any || !irq_vector_enable ? 6'd0                             :
+	standard_irq_active                     ? {2'h0, standard_irq_num}         :
+	external_irq_active                     ? {1'h0, external_irq_num} + 6'd16 : 6'd0;
 
 assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {24'h0, vector_sel, 2'h0};
 assign trap_is_irq = !exception_req_any;

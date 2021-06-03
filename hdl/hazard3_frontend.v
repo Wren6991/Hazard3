@@ -248,10 +248,8 @@ assign jump_target_rdy = !mem_addr_hold;
 // Instruction assembly yard
 
 // buf_level is the number of valid halfwords in {hwbuf, cir}.
-// cir_vld and hwbuf_vld are functions of this.
 reg [1:0] buf_level;
 reg [W_BUNDLE-1:0] hwbuf;
-reg hwbuf_vld;
 
 wire [W_DATA-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
 wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending);
@@ -290,7 +288,6 @@ wire [1:0] buf_level_next =
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		buf_level <= 2'h0;
-		hwbuf_vld <= 1'b0;
 		cir_vld <= 2'h0;
 	end else begin
 `ifdef FORMAL
@@ -300,7 +297,6 @@ always @ (posedge clk or negedge rst_n) begin
 `endif
 		// Update CIR flags
 		buf_level <= buf_level_next;
-		hwbuf_vld <= &buf_level_next;
 		if (!cir_lock)
 			cir_vld <= buf_level_next & ~(buf_level_next >> 1'b1);
 		// Update CIR contents

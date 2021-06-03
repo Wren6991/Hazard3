@@ -61,7 +61,6 @@ module hazard3_core #(
 
 `include "hazard3_ops.vh"
 
-wire d_stall;
 wire x_stall;
 wire m_stall;
 
@@ -178,9 +177,7 @@ hazard3_decode #(
 	.x_jump_not_except    (x_jump_not_except),
 
 	.d_starved            (d_starved),
-	.d_stall              (d_stall),
 	.x_stall              (x_stall),
-	.f_jump_rdy           (f_jump_rdy),
 	.f_jump_now           (f_jump_now),
 	.f_jump_target        (f_jump_target),
 
@@ -200,7 +197,6 @@ hazard3_decode #(
 	.d_branchcond         (d_branchcond),
 	.d_jump_offs          (d_jump_offs),
 	.d_jump_is_regoffs    (d_jump_is_regoffs),
-	.d_pc                 (d_pc),
 	.d_except             (d_except)
 );
 
@@ -671,7 +667,7 @@ hazard3_regfile_1w2r #(
 `elsif FORMAL
 	.RESET_REGS(1),
 `else
-	.RESET_REGS(0),
+	.RESET_REGS(1),
 `endif
 	.N_REGS(32),
 	.W_DATA(W_DATA)

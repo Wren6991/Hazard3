@@ -45,7 +45,7 @@ wire [W_REQ-1:0] gnt_onehot = req & ~deny;
 reg [W_GNT-1:0] gnt_accum;
 
 always @ (*) begin: encode
-	integer i;
+	reg [W_GNT:0] i;
 	gnt_accum = {W_GNT{1'b0}};
 	for (i = 0; i < W_REQ; i = i + 1) begin
 		gnt_accum = gnt_accum | ({W_GNT{gnt_onehot[i]}} & i[W_GNT-1:0]);

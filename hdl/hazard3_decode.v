@@ -32,9 +32,7 @@ module hazard3_decode #(
 	output wire [W_ADDR-1:0]    d_pc,
 
 	output wire                 d_starved,
-	output wire                 d_stall,
 	input wire                  x_stall,
-	input wire                  f_jump_rdy,
 	input wire                  f_jump_now,
 	input wire  [W_ADDR-1:0]    f_jump_target,
 	input wire                  x_jump_not_except,
@@ -93,7 +91,7 @@ wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[3
 // PC/CIR control
 
 assign d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
-assign d_stall = x_stall || d_starved;
+wire d_stall = x_stall || d_starved;
 
 assign df_cir_use =
 	d_starved || d_stall ? 2'h0 :
@@ -149,10 +147,6 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
-
-// If the current CIR is there due to locking, it is a jump which has already had primary effect.
-wire jump_enable = !d_starved && !cir_lock_prev && !d_invalid;
-
 
 always @ (*) begin
 	// JAL is major opcode 1101111,
@@ -264,6 +258,9 @@ always @ (*) begin
 
 		if (d_invalid && !d_starved)
 			d_except = EXCEPT_INSTR_ILLEGAL;
+	end
+	if (cir_lock_prev) begin
+		d_branchcond = BCOND_NEVER;
 	end
 end
 
