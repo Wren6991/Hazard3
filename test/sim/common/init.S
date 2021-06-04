@@ -22,7 +22,7 @@ j \name
 // ----------------------------------------------------------------------------
 // Vector table (must be at least aligned to its size rounded up to power of 2)
 
-.p2align 8
+.p2align 12
 .vector_table:
 
 // Single exception vector, also takes IRQs if vectoring is disabled
