@@ -397,7 +397,7 @@ reg [XLEN-1:0] meie0;
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		// All-ones for implemented IRQs
-		meie0 <= MEIE0_WMASK;
+		meie0 <= X0;
 	end else if (wen && addr == MEIE0) begin
 		meie0 <= update_nonconst(meie0, MEIE0_WMASK);
 	end
