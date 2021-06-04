@@ -1,4 +1,4 @@
-#define COLLAPSE_WEAK_HANDLERS
+#include "hazard3_csr.h"
 
 #define IO_BASE 0x80000000
 #define IO_PRINT_CHAR (IO_BASE + 0x0)
@@ -11,7 +11,6 @@
 
 .option push
 .option norelax
-.option norvc
 
 .section .vectors
 
@@ -44,13 +43,18 @@ j \name
 	VEC .halt
 	VEC .halt
 	VEC .halt
-	VEC .halt
+	VEC isr_external_irq
 	VEC .halt
 	VEC .halt
 	VEC .halt
 	VEC .halt
 
-// External interrupts, if vectoring is enabled
+// When midcr.eivect is 1, hardware vectors IRQs directly to the
+// platform-specific part of the vector table. Otherwise, software indexes
+// this table in the prologue of a shared external IRQ handler.
+
+.p2align 2
+platform_vectors:
 
 	VEC isr_irq0
 	VEC isr_irq1
@@ -68,6 +72,22 @@ j \name
 	VEC isr_irq13
 	VEC isr_irq14
 	VEC isr_irq15
+	VEC isr_irq16
+	VEC isr_irq17
+	VEC isr_irq18
+	VEC isr_irq19
+	VEC isr_irq20
+	VEC isr_irq21
+	VEC isr_irq22
+	VEC isr_irq23
+	VEC isr_irq24
+	VEC isr_irq25
+	VEC isr_irq26
+	VEC isr_irq27
+	VEC isr_irq28
+	VEC isr_irq29
+	VEC isr_irq30
+	VEC isr_irq31
 
 
 // ----------------------------------------------------------------------------
@@ -76,9 +96,8 @@ j \name
 
 .reset_handler:
 	la sp, __stack_top
-	la t0, .vector_table
-	// Set mtvec LSB to enable vectoring
-	ori t0, t0, 1
+	// mtvec LSB enables vectoring
+	la t0, .vector_table + 1
 	csrw mtvec, t0
 
 	// newlib _start expects argc, argv on the stack. Leave stack 16-byte aligned.
@@ -114,6 +133,91 @@ heap_ptr:
 
 progname:
 	.asciz "hazard5-testbench"
+
+// ----------------------------------------------------------------------------
+// Soft external IRQ dispatch
+
+// Vector isr_external_irq to the relevant ISR, based on mcause. The ISR can
+// be a standard C-ABI function. This method also leaves the possibility of
+// using addresses in the IRQ vector table, rather than jump instructions.
+
+.global isr_external_irq
+.weak isr_external_irq
+isr_external_irq:
+	// Save all caller-saves, plus three callee saves for CSR saving
+	addi sp, sp, -80
+	sw ra,  0(sp)
+	sw t0,  4(sp)
+	sw t1,  8(sp)
+	sw t2, 12(sp)
+	sw t3, 16(sp)
+	sw t4, 20(sp)
+	sw t5, 24(sp)
+	sw t6, 28(sp)
+	sw a0, 32(sp)
+	sw a1, 36(sp)
+	sw a2, 40(sp)
+	sw a3, 44(sp)
+	sw a4, 48(sp)
+	sw a5, 52(sp)
+	sw a6, 56(sp)
+	sw a7, 60(sp)
+	sw s0, 64(sp)
+	sw s1, 68(sp)
+	sw s2, 72(sp)
+
+	// Save exception state to callee-saves so we can use it for return
+	csrr s0, mepc
+	csrr s1, mstatus
+	csrr s2, hazard3_csr_meie0
+
+	// Calculate IRQ entry point
+	csrr a0, mcause
+	slli a0, a0, 2
+	csrr a1, mtvec
+	andi a1, a1, -4
+	add a1, a1, a0
+
+	// Mask off higher-numbered IRQs (and this IRQ), then re-enable IRQs so we
+	// can be preempted. Could have some other priority scheme here.
+	srli a0, a0, 2
+	addi a0, a0, -16
+	li a2, -1
+	sll a2, a2, a0
+	csrc hazard3_csr_meie0, a2
+	csrsi mstatus, 8
+
+	// Enter IRQ
+	jalr a1
+trap_return:
+	// No more preemption until we mret.
+	csrci mstatus, 8
+	
+	csrw mepc, s0
+	csrw mstatus, s1
+	csrw hazard3_csr_meie0, s2
+	lw ra,  0(sp)
+	lw t0,  4(sp)
+	lw t1,  8(sp)
+	lw t2, 12(sp)
+	lw t3, 16(sp)
+	lw t4, 20(sp)
+	lw t5, 24(sp)
+	lw t6, 28(sp)
+	lw a0, 32(sp)
+	lw a1, 36(sp)
+	lw a2, 40(sp)
+	lw a3, 44(sp)
+	lw a4, 48(sp)
+	lw a5, 52(sp)
+	lw a6, 56(sp)
+	lw a7, 60(sp)
+	lw s0, 64(sp)
+	lw s1, 68(sp)
+	lw s2, 72(sp)
+	addi sp, sp, 80
+	mret
+
 
 // ----------------------------------------------------------------------------
 // Weak handler/ISR symbols
@@ -186,7 +290,6 @@ _str_sp:             .asciz "sp: "
 .macro weak_handler name:req
 .p2align 2
 .global \name
-.type \name,%function
 .weak \name
 \name:
 	la x31, _str_\name
@@ -214,6 +317,22 @@ weak_handler isr_irq12
 weak_handler isr_irq13
 weak_handler isr_irq14
 weak_handler isr_irq15
+weak_handler isr_irq16
+weak_handler isr_irq17
+weak_handler isr_irq18
+weak_handler isr_irq19
+weak_handler isr_irq20
+weak_handler isr_irq21
+weak_handler isr_irq22
+weak_handler isr_irq23
+weak_handler isr_irq24
+weak_handler isr_irq25
+weak_handler isr_irq26
+weak_handler isr_irq27
+weak_handler isr_irq28
+weak_handler isr_irq29
+weak_handler isr_irq30
+weak_handler isr_irq31
 
 // You can relax now
 .option pop
