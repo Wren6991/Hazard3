@@ -1,0 +1,63 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Sat May 22 08:36:50 2021
+[*]
+[dumpfile] "/home/luke/proj/hazard3/test/riscv-compliance/tmp/C-cbeqz-01-on-rv32ic.vcd"
+[dumpfile_mtime] "Sat May 22 08:33:31 2021"
+[dumpfile_size] 1008774
+[savefile] "/home/luke/proj/hazard3/test/riscv-compliance/test.gtkw"
+[timestart] 22
+[size] 2560 1403
+[pos] 1869 0
+*-2.000000 46 503 477 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] core.
+[treeopen] core.alu.
+[sst_width] 233
+[signals_width] 174
+[sst_expanded] 1
+[sst_vpaned_height] 600
+@22
+d_haddr[31:0]
+@28
+d_htrans[1:0]
+d_hwrite
+@22
+d_hwdata[31:0]
+d_hrdata[31:0]
+@200
+-
+@22
+i_haddr[31:0]
+i_hrdata[31:0]
+@28
+i_htrans[1:0]
+@200
+-
+@23
+core.frontend.jump_target[31:0]
+@28
+core.frontend.jump_now
+@22
+core.inst_hazard3_decode.pc[31:0]
+core.frontend.cir[31:0]
+@28
+core.frontend.cir_lock
+core.inst_hazard3_decode.d_starved
+@200
+-
+@22
+core.f_rs1[4:0]
+core.f_rs2[4:0]
+core.d_rs1[4:0]
+core.d_rs2[4:0]
+core.alu.op_a[31:0]
+core.alu.op_b[31:0]
+@200
+-
+@22
+core.x_alu_result[31:0]
+core.d_rd[4:0]
+core.xm_rd[4:0]
+core.xm_result[31:0]
+[pattern_trace] 1
+[pattern_trace] 0
