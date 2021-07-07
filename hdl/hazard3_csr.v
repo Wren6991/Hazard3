@@ -506,8 +506,7 @@ always @ (*) begin
 	end
 	MHARTID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
-		// There is only one hart, and spec says this must be numbered 0.
-		rdata = {XLEN{1'b0}};
+		rdata = MHARTID_VAL;
 	end
 
 	MSTATUS: if (CSR_M_MANDATORY || CSR_M_TRAP) begin

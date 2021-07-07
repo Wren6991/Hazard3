@@ -65,6 +65,9 @@ parameter MARCHID_VAL = 32'h0,
 // Implementation ID for this specific version of Hazard3. Git hash is perfect.
 parameter MIMPID_VAL = 32'h0,
 
+// Each core has a single hardware thread. Multiple cores should have unique IDs.
+parameter MHARTID_VAL = 32'h0,
+
 // ----------------------------------------------------------------------------
 // Performance/size options
 
