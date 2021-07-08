@@ -12,3 +12,5 @@ include::sections/introduction.adoc[]
 include::sections/instruction_timings.adoc[]
 
 include::sections/csr.adoc[]
+
+include::sections/debug.adoc[]

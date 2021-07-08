@@ -1,0 +1,52 @@
+== Debug
+
+Currently the plan is for Hazard3, with its associated debug module (DM), to support the following:
+
+* Run/halt/reset control as required
+* Abstract GPR access as required
+* Program buffer: 2 words plus `impebreak`
+* Automatic program buffer execution triggered by abstract GPR access (`abstractauto`)
+* Some minimum useful trigger unit -- likely just breakpoints, no watchpoints
+
+The core itself will implement the following, enabling the DM to provide a compliant debug interface:
+
+* Debug mode CSRs
+* Ability to enter debug mode with correct update of `dpc` etc
+** Synchronously via exception, `ebreak` or trigger match
+** Asynchronously via external halt request
+* Ability to exit debug mode to M mode
+* Address query/match interface for external trigger unit
+* Ability to inject words into the instruction prefetch queue when the processor is halted
+* Ability to suppress exception entry when executing instructions in debug mode, and provide an external signal to indicate the exception took place
+* A read/write data bus which allows the DM to intercept core CSR accesses
+
+The DM implements abstract GPR access by injecting a dummy CSR access instruction, and manipulating the CSR port to get data in/out of the core. A `csrr` is used to write to a core register, and a `csrw` to read from a core register. By injecting a `csrrw`, the DM can _swap_ a GPR with one of its own internal registers, though this is not exposed through the abstract GPR access command.
+
+The debugger implements memory and CSR access using the Program Buffer, which uses the same instruction injection interface used by the DM to implement abstract GPR access. The `abstractauto` feature allows the DM to execute the program buffer automatically following every abstract GPR access, which can be used for e.g. autoincrementing read/write memory bursts.
+
+=== UART DTM
+
+Hazard3 defines a minimal UART Debug Transport Module, which allows the Debug Module to be accessed via a standard 8n1 asynchronous serial port. The UART DTM is always accessed by the host using a two-wire serial interface (TXD RXD) running at 1 Mbaud. The interface between the DTM and DM is an AMBA 3 APB port with a 32-bit data bus and 8-bit address bus.
+
+This is not intended for production systems:
+
+* Debug hardware should not expect a frequency reference for a UART to be present
+* The UART DTM does not implement any flow control or error detection/correction
+
+However, it suffices for bringup and playing around on FPGA boards. The host sends a 6-byte packet:
+
+* Command:
+** `0x00` nop, ignored, next command can follow immediately (no address or data bytes, no response)
+** `0x01` read
+** `0x02` write
+** `0xa5` return to idle (no address or data bytes, no response)
+* One address byte
+* 4 data bytes (write) or 4 zero-padding bytes (read)
+
+The 6-byte framing can be recovered at any time by writing 6 zero-bytes, which will be interpreted as between 1 and 6 nops depending on current DTM state.
+
+The DTM always responds with four data bytes. For a read command this will be the data read from the given address. For a write command this will echo back the write data.
+
+This interface assumes the actual data transfer takes very little time compared with the UART access (typically less than one baud period). Because the host-to-DTM bandwidth is always greater than the DTM-to-host bandwidth, the host can queue up batches of commands in its transmit buffer, and this should never overrun the DTM's response channel. So, the 1 Mbaud 8n1 UART link provides 67 kB/s of half-duplex data bandwidth between host and DM, which is enough to get your system off the ground.
+
+Initially after power-on the DTM is in the idle state, and will ignore any commands. The host sends the magic sequence `'S', 'U', 'P', '?'` (`0x53, 0x55, 0x50, 0x3f`) to wake the DTM, and then attempts to access a read-only DM register such as `dmstatus` to make sure the link is up. The DTM can be returned to the idle at any time using the `0xa5` return-to-idle command.

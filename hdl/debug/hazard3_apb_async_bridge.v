@@ -1,0 +1,192 @@
+/**********************************************************************
+ * DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE     *
+ *                    Version 3, April 2008                           *
+ *                                                                    *
+ * Copyright (C) 2021 Luke Wren                                       *
+ *                                                                    *
+ * Everyone is permitted to copy and distribute verbatim or modified  *
+ * copies of this license document and accompanying software, and     *
+ * changing either is allowed.                                        *
+ *                                                                    *
+ *   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION  *
+ *                                                                    *
+ * 0. You just DO WHAT THE FUCK YOU WANT TO.                          *
+ * 1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.             *
+ *                                                                    *
+ *********************************************************************/
+
+// APB-to-APB asynchronous bridge for connecting DTM to DM, in case DTM is in
+// a different clock domain (e.g. running directly from crystal to get a
+// fixed baud reference)
+//
+// Note this module depends on the hazard3_sync_1bit module (a flop-chain
+// synchroniser) which should be reimplemented for your FPGA/process.
+
+`ifndef HAZARD3_REG_KEEP_ATTRIBUTE
+`define HAZARD3_REG_KEEP_ATTRIBUTE (* keep = 1'b1 *)
+`endif
+
+module hazard3_apb_async_bridge #(
+    parameter W_ADDR = 8,
+    parameter W_DATA = 32
+) (
+    // Resets assumed to be synchronised externally
+    input wire               clk_src,
+    input wire               rst_n_src,
+
+    input wire               clk_dst,
+    input wire               rst_n_dst,
+
+    // APB port from Transport Module
+    input  wire              src_psel,
+    input  wire              src_penable,
+    input  wire              src_pwrite,
+    input  wire [W_ADDR-1:0] src_paddr,
+    input  wire [W_DATA-1:0] src_pwdata,
+    output wire [W_DATA-1:0] src_prdata,
+    output wire              src_pready,
+    output wire              src_pslverr,
+
+    // APB port to Debug Module
+    output wire              dst_psel,
+    output wire              dst_penable,
+    output wire              dst_pwrite,
+    output wire [W_ADDR-1:0] dst_paddr,
+    output wire [W_DATA-1:0] dst_pwdata,
+    input  wire [W_DATA-1:0] dst_prdata,
+    input  wire              dst_pready,
+    input  wire              dst_pslverr
+);
+
+localparam N_SYNC_STAGES = 3;
+
+// ----------------------------------------------------------------------------
+// Clock-crossing registers
+
+// We're using a modified req/ack handshake:
+//
+// - Initially both req and ack are low
+// - src asserts req high
+// - dst responds with ack high and begins transfer
+// - src deasserts req once it sees ack low
+// - dst deasserts ack once:
+//     - transfer is complete *and*
+//     - dst sees req deasserted
+// - Once src sees ack low, a new transfer can begin.
+//
+// A NRZI toggle handshake might be more appropriate, but can cause spurious
+// bus accesses when only one side of the link is reset.
+
+`HAZARD3_REG_KEEP_ATTRIBUTE reg                            src_req;
+wire                                                       dst_req;
+
+`HAZARD3_REG_KEEP_ATTRIBUTE reg                            dst_ack;
+wire                                                       src_ack;
+
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_ADDR + W_DATA + 1 -1:0] src_paddr_pwdata_pwrite;
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_ADDR + W_DATA + 1 -1:0] dst_paddr_pwdata_pwrite;
+
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_DATA + 1 -1:0]          dst_prdata_pslverr;
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_DATA + 1 -1:0]          src_prdata_pslverr;
+
+hazard3_sync_1bit #(
+    .N_STAGES (N_SYNC_STAGES)
+) sync_req (
+    .clk   (clk_dst),
+    .rst_n (rst_n_dst),
+    .i     (src_req),
+    .o     (dst_req)
+);
+
+hazard3_sync_1bit #(
+    .N_STAGES (N_SYNC_STAGES)
+) sync_ack (
+    .clk   (clk_src),
+    .rst_n (rst_n_src),
+    .i     (dst_ack),
+    .o     (src_ack)
+);
+
+// ----------------------------------------------------------------------------
+// src state machine
+
+reg src_waiting_for_downstream;
+reg src_pready_r;
+
+always @ (posedge clk_src or negedge rst_n_src) begin
+    if (!rst_n_src) begin
+        src_req <= 1'b0;
+        src_waiting_for_downstream <= 1'b0;
+        src_paddr_pwdata_pwrite <= {W_ADDR + W_DATA + 1{1'b0}};
+        src_prdata_pslverr <= {W_DATA + 1{1'b0}};
+        src_pready_r <= 1'b1;
+    end else if (src_waiting_for_downstream) begin
+        if (src_req && src_ack) begin
+            // Request was acknowledged, so deassert.
+            src_req <= 1'b0;
+        end else if (!(src_req || src_ack)) begin
+            // Downstream transfer has finished, data is valid.
+            src_pready_r <= 1'b1;
+            src_waiting_for_downstream <= 1'b0;
+            // Note this assignment is cross-domain (but data has been stable
+            // for duration of ack synchronisation delay):
+            src_prdata_pslverr <= dst_prdata_pslverr;
+        end
+    end else begin
+        // paddr, pwdata and pwrite are all valid during the setup phase, and
+        // APB defines the setup phase to always last one cycle and proceed
+        // to access phase. So, we can ignore penable, and pready is ignored.
+        if (src_psel) begin
+            src_pready_r <= 1'b0;
+            src_req <= 1'b1;
+            src_paddr_pwdata_pwrite <= {src_paddr, src_pwdata, src_pwrite};
+            src_waiting_for_downstream <= 1'b1;
+        end
+    end
+end
+
+assign {src_prdata, src_pslverr} = src_prdata_pslverr;
+assign src_pready = src_pready_r;
+
+// ----------------------------------------------------------------------------
+// dst state machine
+
+wire dst_bus_finish = dst_penable && dst_pready;
+
+always @ (posedge clk_dst or negedge rst_n_dst) begin
+    if (!rst_n_dst) begin
+        dst_ack <= 1'b0;
+    end else if (dst_req) begin
+        dst_ack <= 1'b1;
+    end else if (!dst_req && dst_penable && dst_pready) begin
+        dst_ack <= 1'b0;
+    end
+end
+
+reg dst_psel_r;
+reg dst_penable_r;
+
+always @ (posedge clk_dst or negedge rst_n_dst) begin
+    if (!rst_n_dst) begin
+        dst_psel_r <= 1'b0;
+        dst_penable_r <= 1'b0;
+        dst_prdata_pslverr <= {W_DATA + 1{1'b0}};
+    end else if (dst_req && !dst_ack) begin
+        dst_psel_r <= 1'b1;
+        // Note this assignment is cross-domain. The src register has been
+        // stable for the duration of the req sync delay.
+        dst_paddr_pwdata_pwrite <= src_paddr_pwdata_pwrite;
+    end else if (dst_psel_r && !dst_penable_r) begin
+        dst_penable_r <= 1'b1;
+    end else if (dst_bus_finish) begin
+        dst_psel_r <= 1'b0;
+        dst_penable_r <= 1'b0;
+        dst_prdata_pslverr <= {dst_prdata, dst_pslverr};
+    end
+end
+
+assign dst_psel = dst_psel_r;
+assign dst_penable = dst_penable_r;
+assign {dst_paddr, dst_pwdata, dst_pwrite} = dst_paddr_pwdata_pwrite;
+
+endmodule

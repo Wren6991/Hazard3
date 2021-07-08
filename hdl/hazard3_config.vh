@@ -55,7 +55,7 @@ parameter NUM_IRQ         = 32,
 // ID registers
 
 // JEDEC JEP106-compliant vendor ID, can be left at 0 if "not implemented or
-// that this is a non-commercial implementation" (RISC-V spec).
+// [...] this is a non-commercial implementation" (RISC-V spec).
 // 31:7 is continuation code count, 6:0 is ID. Parity bit is not stored.
 parameter MVENDORID_VAL = 32'h0,
 
