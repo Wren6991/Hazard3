@@ -4,14 +4,17 @@ CDEFINES         := DUAL_PORT
 CPU_RESET_VECTOR := 32'hc0
 EXTENSION_C      := 1
 EXTENSION_M      := 1
-DEBUG_SUPPORT    := 0
+DEBUG_SUPPORT    := 1
 MULDIV_UNROLL    := 2
 MUL_FAST         := 1
 REDUCED_BYPASS   := 0
 
-.PHONY: clean tb all
+.PHONY: clean tb all run
 
-all: tb
+all: run
+
+run: tb
+	./tb zero.bin waves.vcd
 
 SYNTH_CMD += read_verilog -I ../../../hdl $(shell listfiles ../../../hdl/hazard3.f);
 SYNTH_CMD += chparam -set EXTENSION_C $(EXTENSION_C) $(TOP);

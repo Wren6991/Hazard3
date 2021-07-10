@@ -921,6 +921,14 @@ assign enter_debug_mode = (want_halt_irq || want_halt_except) && trap_enter_rdy;
 
 assign exit_debug_mode = pending_dbg_resume && trap_enter_rdy;
 
+// Report back to DM instruction injector to tell it its instruction sequence
+// has finished (ebreak) or crashed out
+assign dbg_instr_caught_ebreak = debug_mode && except == EXCEPT_EBREAK && trap_enter_rdy;
+
+// Note we exclude ebreak from here regardless of dcsr.ebreakm, since we are
+// already in debug mode at this point
+assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE && except != EXCEPT_EBREAK && trap_enter_rdy;
+
 // ----------------------------------------------------------------------------
 // Trap request generation
 
@@ -998,12 +1006,6 @@ assign trap_enter_vld =
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : vector_sel;
-
-// Report back to DM instruction injector to tell it its instruction sequence
-// has finished or crashed out
-assign dbg_instr_caught_ebreak = debug_mode && except == EXCEPT_EBREAK;
-// Note we exclude ebreak from here regardless of dcsr.ebreakm!
-assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE && except != EXCEPT_EBREAK;
 
 // ----------------------------------------------------------------------------
 

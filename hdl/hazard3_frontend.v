@@ -271,7 +271,7 @@ reg [1:0] buf_level;
 reg [W_BUNDLE-1:0] hwbuf;
 
 wire [W_DATA-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
-wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending);
+wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
 
 // Shift any recycled instruction data down to backfill D's consumption
 // We don't care about anything which is invalid or will be overlaid with fresh data,
