@@ -4,23 +4,23 @@ Currently the plan is for Hazard3, with its associated debug module (DM), to sup
 
 * Run/halt/reset control as required
 * Abstract GPR access as required
-* Program buffer: 2 words plus `impebreak`
-* Automatic program buffer execution triggered by abstract GPR access (`abstractauto`)
+* Program Buffer, 2 words plus `impebreak`
+* Automatic trigger of abstract command on data/progbuf access (`abstractauto`) for efficient memory block transfers from the host
 * Some minimum useful trigger unit -- likely just breakpoints, no watchpoints
 
 The core itself will implement the following, enabling the DM to provide a compliant debug interface:
 
-* Debug mode CSRs
-* Ability to enter debug mode with correct update of `dpc` etc
+* Debug mode CSRs `dcsr`, `dpc` and `data0`
+* Ability to enter debug mode with correct update of `dcsr` and `dpc`
 ** Synchronously via exception, `ebreak` or trigger match
 ** Asynchronously via external halt request
 * Ability to exit debug mode to M mode
+* Direct read/write access to the `data0` CSR from an external Debug Module
+* Ability to inject words into the instruction prefetch queue when in debug mode
 * Address query/match interface for external trigger unit
-* Ability to inject words into the instruction prefetch queue when the processor is halted
 * Ability to suppress exception entry when executing instructions in debug mode, and provide an external signal to indicate the exception took place
-* A read/write data bus which allows the DM to intercept core CSR accesses
 
-The DM implements abstract GPR access by injecting a dummy CSR access instruction, and manipulating the CSR port to get data in/out of the core. A `csrr` is used to write to a core register, and a `csrw` to read from a core register. By injecting a `csrrw`, the DM can _swap_ a GPR with one of its own internal registers, though this is not exposed through the abstract GPR access command.
+The DM implements abstract GPR access by reading/writing the `data0` CSR, and injecting CSR access instructions. A GPR write uses a `data0` write followed by a `csrr x, data0`, and a GPR read uses a `csrw data0, x` followed by a `data0` read.
 
 The debugger implements memory and CSR access using the Program Buffer, which uses the same instruction injection interface used by the DM to implement abstract GPR access. The `abstractauto` feature allows the DM to execute the program buffer automatically following every abstract GPR access, which can be used for e.g. autoincrementing read/write memory bursts.
 
@@ -45,7 +45,7 @@ Core behaviour:
 * The `dscratch` CSRs are not implemented
 * `data0` is implemented as a scratch CSR mapped at `0x7b2` (the location of `dscratch0`), readable and writable by the debugger.
 * `dcsr.stepie` is hardwired to 0 (no interrupts during single stepping)
-* `dcsr.stopcount` and `dcsr.stoptime` are hardwired to 1 (no counter/timer increment in debug mode)
+* `dcsr.stopcount` and `dcsr.stoptime` are hardwired to 1 (no counter or internal timer increment in debug mode)
 * `dcsr.mprven` is hardwired to 0
 * `dcsr.prv` is hardwired to 3 (M-mode)
 
