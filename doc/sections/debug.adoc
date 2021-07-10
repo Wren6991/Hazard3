@@ -24,29 +24,57 @@ The DM implements abstract GPR access by injecting a dummy CSR access instructio
 
 The debugger implements memory and CSR access using the Program Buffer, which uses the same instruction injection interface used by the DM to implement abstract GPR access. The `abstractauto` feature allows the DM to execute the program buffer automatically following every abstract GPR access, which can be used for e.g. autoincrementing read/write memory bursts.
 
+=== Implementation-defined behaviour
+
+This is not an exhaustive list (yet).
+
+DM feature support:
+
+* Abstract CSR and memory access are not implemented
+* The Program Buffer is implemented, size 2 words, `impebreak` = 1.
+* A single data register (`data0`) is implemented as a per-hart CSR accessible by the DM
+* `abstractauto` is supported on the program buffer registers and the data register
+* Multiple hart selection (`hasel` = 1) is not supported
+
+Core behaviour:
+
+* All control transfer instructions are illegal in debug mode (depend on value of PC)
+* `auipc` is illegal in debug mode (depends on value of PC)
+* The `dret` instruction is not supported (a special purpose DM-to-core signal is used to signal resume)
+* Entering and exiting debug mode does not clear an atomic load reservation; the host may explicitly clear a reservation using a dummy `sc` instruction via the program buffer.
+* The `dscratch` CSRs are not implemented
+* `data0` is implemented as a scratch CSR mapped at `0x7b2` (the location of `dscratch0`), readable and writable by the debugger.
+* `dcsr.stepie` is hardwired to 0 (no interrupts during single stepping)
+* `dcsr.stopcount` and `dcsr.stoptime` are hardwired to 1 (no counter/timer increment in debug mode)
+* `dcsr.mprven` is hardwired to 0
+* `dcsr.prv` is hardwired to 3 (M-mode)
+
 === UART DTM
 
 Hazard3 defines a minimal UART Debug Transport Module, which allows the Debug Module to be accessed via a standard 8n1 asynchronous serial port. The UART DTM is always accessed by the host using a two-wire serial interface (TXD RXD) running at 1 Mbaud. The interface between the DTM and DM is an AMBA 3 APB port with a 32-bit data bus and 8-bit address bus.
 
-This is not intended for production systems:
+This is a quick hack, and not suitable for production systems:
 
 * Debug hardware should not expect a frequency reference for a UART to be present
 * The UART DTM does not implement any flow control or error detection/correction
 
-However, it suffices for bringup and playing around on FPGA boards. The host sends a 6-byte packet:
+The host may send the following commands:
 
-* Command:
-** `0x00` nop, ignored, next command can follow immediately (no address or data bytes, no response)
-** `0x01` read
-** `0x02` write
-** `0xa5` return to idle (no address or data bytes, no response)
-* One address byte
-* 4 data bytes (write) or 4 zero-padding bytes (read)
+[cols="20h,~,~", options="header"]
+|===
+| Command | To DTM | From DTM
+| `0x00` NOP | - | -
+| `0x01` Read ID | - | 4-byte ID, same format as JTAG-DTM ID (JEP106-compatible)
+| `0x02` Read DMI | 1 address byte | 4 data bytes
+| `0x03` Write DMI | 1 address byte, 4 data bytes | data bytes echoed back
+| `0xa5` Disconnect | - | -
+|===
 
-The 6-byte framing can be recovered at any time by writing 6 zero-bytes, which will be interpreted as between 1 and 6 nops depending on current DTM state.
+Initially after power-on the DTM is in the Dormant state, and will ignore any commands. The host sends the magic sequence `"SUP?"` (`0x53, 0x55, 0x50, 0x3f`) to wake the DTM, and then issues a Read ID command to check the link is up. The DTM can be returned to the Dormant state at any time using the `0xa5` Disconnect command.
 
-The DTM always responds with four data bytes. For a read command this will be the data read from the given address. For a write command this will echo back the write data.
+So that the host can queue up batches of commands in its transmit buffer, without overrunning the DTM's transmit bandwidth, it's recommended to pad each command with NOPs so that it is strictly larger than the response. For example, a Read ID should be followed by four NOPs, and a Read DMI should be followed by 3 NOPs.
 
-This interface assumes the actual data transfer takes very little time compared with the UART access (typically less than one baud period). Because the host-to-DTM bandwidth is always greater than the DTM-to-host bandwidth, the host can queue up batches of commands in its transmit buffer, and this should never overrun the DTM's response channel. So, the 1 Mbaud 8n1 UART link provides 67 kB/s of half-duplex data bandwidth between host and DM, which is enough to get your system off the ground.
+To recover command framing, write 6 NOP commands (the length of the longest commands). This will be interpreted as between 1 and 6 NOPs depending on the DTM's state.
 
-Initially after power-on the DTM is in the idle state, and will ignore any commands. The host sends the magic sequence `'S', 'U', 'P', '?'` (`0x53, 0x55, 0x50, 0x3f`) to wake the DTM, and then attempts to access a read-only DM register such as `dmstatus` to make sure the link is up. The DTM can be returned to the idle at any time using the `0xa5` return-to-idle command.
+This interface assumes the DMI data transfer takes very little time compared with the UART access (typically less than one baud period). When the host-to-DTM bandwidth is kept greater than the DTM-to-host bandwidth, thanks to appropriate NOP padding, the host can queue up batches of commands in its transmit buffer, and this should never overrun the DTM's response channel. So, the 1 Mbaud 8n1 UART link provides 67 kB/s of half-duplex data bandwidth between host and DM, which is enough to get your system off the ground.
+

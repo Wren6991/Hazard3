@@ -24,6 +24,7 @@
 module hazard3_uart_dtm #(
     // Expected to run at 1 Mbaud from some fixed reference frequency.
     parameter BAUD_CLKDIV = 12,
+    parameter DTM_ID_REG = 32'hdeadbeef,
     parameter W_BAUDCTR = $clog2(BAUD_CLKDIV) // do not modify
 ) (
     input  wire        clk,
@@ -157,61 +158,73 @@ end
 
 localparam W_STATE = 5;
 
-localparam [W_STATE-1:0] S_IDLE0   = 5'd0;
-localparam [W_STATE-1:0] S_IDLE1   = 5'd1;
-localparam [W_STATE-1:0] S_IDLE2   = 5'd2;
-localparam [W_STATE-1:0] S_IDLE3   = 5'd3;
+localparam [W_STATE-1:0] S_DORMANT0   = 5'd0;
+localparam [W_STATE-1:0] S_DORMANT1   = 5'd1;
+localparam [W_STATE-1:0] S_DORMANT2   = 5'd2;
+localparam [W_STATE-1:0] S_DORMANT3   = 5'd3;
 
-localparam [W_STATE-1:0] S_CMD     = 5'd4;
+localparam [W_STATE-1:0] S_CMD        = 5'd4;
 
-localparam [W_STATE-1:0] S_WADDR   = 5'd5;
-localparam [W_STATE-1:0] S_WDATA0  = 5'd6;
-localparam [W_STATE-1:0] S_WDATA1  = 5'd7;
-localparam [W_STATE-1:0] S_WDATA2  = 5'd8;
-localparam [W_STATE-1:0] S_WDATA3  = 5'd9;
-localparam [W_STATE-1:0] S_WSETUP  = 5'd10;
-localparam [W_STATE-1:0] S_WACCESS = 5'd11;
+localparam [W_STATE-1:0] S_ID0        = 5'd5;
+localparam [W_STATE-1:0] S_ID1        = 5'd6;
+localparam [W_STATE-1:0] S_ID2        = 5'd7;
+localparam [W_STATE-1:0] S_ID3        = 5'd8;
 
-localparam [W_STATE-1:0] S_RADDR   = 5'd12;
-localparam [W_STATE-1:0] S_RSETUP  = 5'd13;
-localparam [W_STATE-1:0] S_RACCESS = 5'd14;
-localparam [W_STATE-1:0] S_RDATA0  = 5'd15;
-localparam [W_STATE-1:0] S_RDATA1  = 5'd16;
-localparam [W_STATE-1:0] S_RDATA2  = 5'd17;
-localparam [W_STATE-1:0] S_RDATA3  = 5'd18;
+localparam [W_STATE-1:0] S_WADDR      = 5'd9;
+localparam [W_STATE-1:0] S_WDATA0     = 5'd10;
+localparam [W_STATE-1:0] S_WDATA1     = 5'd11;
+localparam [W_STATE-1:0] S_WDATA2     = 5'd12;
+localparam [W_STATE-1:0] S_WDATA3     = 5'd13;
+localparam [W_STATE-1:0] S_WSETUP     = 5'd14;
+localparam [W_STATE-1:0] S_WACCESS    = 5'd15;
+
+localparam [W_STATE-1:0] S_RADDR      = 5'd16;
+localparam [W_STATE-1:0] S_RSETUP     = 5'd17;
+localparam [W_STATE-1:0] S_RACCESS    = 5'd18;
+localparam [W_STATE-1:0] S_RDATA0     = 5'd19;
+localparam [W_STATE-1:0] S_RDATA1     = 5'd20;
+localparam [W_STATE-1:0] S_RDATA2     = 5'd21;
+localparam [W_STATE-1:0] S_RDATA3     = 5'd22;
 
 localparam CMD_NOP = 8'h00;
-localparam CMD_READ = 8'h01;
-localparam CMD_WRITE = 8'h02;
-localparam CMD_RETURN_TO_IDLE = 8'ha5;
+localparam CMD_ID = 8'h01;
+localparam CMD_READ = 8'h02;
+localparam CMD_WRITE = 8'h03;
+localparam CMD_RETURN_TO_DORMANT = 8'ha5;
 
 reg [W_STATE-1:0] state;
 reg [7:0]         dm_addr;
 reg [31:0]        dm_data;
 
 
-
 always @ (posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        state <= S_IDLE0;
+        state <= S_DORMANT0;
         dm_addr <= 8'h0;
         dm_data <= 32'h0;
     end else case (state)
-        S_IDLE0:  if (rx_rvld) state <= rx_rdata == "S" ? S_IDLE1 : S_IDLE0;
-        S_IDLE1:  if (rx_rvld) state <= rx_rdata == "U" ? S_IDLE2 : S_IDLE0;
-        S_IDLE2:  if (rx_rvld) state <= rx_rdata == "P" ? S_IDLE3 : S_IDLE0;
-        S_IDLE3:  if (rx_rvld) state <= rx_rdata == "?" ? S_CMD   : S_IDLE0;
-        S_CMD:    if (rx_rvld) begin
+        S_DORMANT0: if (rx_rvld) state <= rx_rdata == "S" ? S_DORMANT1 : S_DORMANT0;
+        S_DORMANT1: if (rx_rvld) state <= rx_rdata == "U" ? S_DORMANT2 : S_DORMANT0;
+        S_DORMANT2: if (rx_rvld) state <= rx_rdata == "P" ? S_DORMANT3 : S_DORMANT0;
+        S_DORMANT3: if (rx_rvld) state <= rx_rdata == "?" ? S_CMD      : S_DORMANT0;
+        S_CMD: if (rx_rvld) begin
             if (rx_rdata == CMD_READ)
                 state <= S_RADDR;
             else if (rx_rdata == CMD_WRITE)
                 state <= S_WADDR;
-            else if (rx_rdata == CMD_RETURN_TO_IDLE)
-                state <= S_IDLE0;
+            else if (rx_rdata == CMD_ID)
+                state <= S_ID0;
+            else if (rx_rdata == CMD_RETURN_TO_DORMANT)
+                state <= S_DORMANT0;
             // NOP or invalid leave DTM in command state.
         end
 
-        S_WADDR:  if (rx_rvld) begin
+        S_ID0: if (tx_wrdy) state <= S_ID1;
+        S_ID1: if (tx_wrdy) state <= S_ID2;
+        S_ID2: if (tx_wrdy) state <= S_ID3;
+        S_ID3: if (tx_wrdy) state <= S_CMD;
+
+        S_WADDR: if (rx_rvld) begin
             state <= S_WDATA0;
             dm_addr <= rx_rdata;
         end
@@ -266,11 +279,17 @@ end
 // ----------------------------------------------------------------------------
 // Bus & FIFO hookup
 
-wire state_is_idle =
-    state == S_IDLE0 ||
-    state == S_IDLE1 ||
-    state == S_IDLE2 ||
-    state == S_IDLE3;
+wire state_is_dormant =
+    state == S_DORMANT0 ||
+    state == S_DORMANT1 ||
+    state == S_DORMANT2 ||
+    state == S_DORMANT3;
+
+wire state_is_id =
+    state == S_ID0 ||
+    state == S_ID1 ||
+    state == S_ID2 ||
+    state == S_ID3;
 
 wire state_is_wdata =
     state == S_WDATA0 ||
@@ -288,14 +307,23 @@ wire state_is_rdata =
 // these are actually interpreted as NOPs preceding the next command.
 // (They are still important for bus pacing though.)
 assign rx_rrdy =
-    state_is_idle ||
+    state_is_dormant ||
     state == S_CMD ||
     state == S_WADDR ||
     state == S_RADDR ||
     state_is_wdata;
 
-assign tx_wdata = state_is_wdata ? rx_rdata : dm_data[7:0];
-assign tx_wvld = (state_is_wdata && state_is_wdata) || state_is_rdata;
+assign tx_wvld =
+    (state_is_wdata && rx_rvld) ||
+    state_is_rdata ||
+    state_is_id;
+
+assign tx_wdata =
+    state_is_wdata ? rx_rdata          :
+    state == S_ID0 ? DTM_ID_REG[ 7: 0] :
+    state == S_ID1 ? DTM_ID_REG[15: 8] :
+    state == S_ID2 ? DTM_ID_REG[23:16] :
+    state == S_ID3 ? DTM_ID_REG[31:24] : dm_data[7:0];
 
 assign psel =
     state == S_WSETUP ||
