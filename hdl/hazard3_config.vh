@@ -47,6 +47,11 @@ parameter CSR_M_TRAP      = 1,
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
 parameter CSR_COUNTER     = 1,
 
+// DEBUG_SUPPORT: Support for run/halt and instruction injection from an
+// external Debug Module, support for Debug Mode, and Debug Mode CSRs.
+// Requires: CSR_M_MANDATORY, CSR_M_TRAP.
+parameter DEBUG_SUPPORT   = 0,
+
 // NUM_IRQ: Number of external IRQs implemented in meie0 and meip0.
 // Minimum 1 (if CSR_M_TRAP = 1), maximum 32.
 parameter NUM_IRQ         = 32,

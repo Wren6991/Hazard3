@@ -31,6 +31,8 @@ module hazard3_decode #(
 	output wire                 df_cir_lock,
 	output wire [W_ADDR-1:0]    d_pc,
 
+	input wire                  debug_mode,
+
 	output wire                 d_starved,
 	input wire                  x_stall,
 	input wire                  f_jump_now,
@@ -185,16 +187,16 @@ always @ (*) begin
 	d_except = EXCEPT_NONE;
 
 	casez (d_instr)
-	RV_BEQ:     begin d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_ZERO;  end
-	RV_BNE:     begin d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_NZERO; end
-	RV_BLT:     begin d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_NZERO; end
-	RV_BGE:     begin d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_ZERO; end
-	RV_BLTU:    begin d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_NZERO; end
-	RV_BGEU:    begin d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_ZERO; end
-	RV_JALR:    begin d_branchcond = BCOND_ALWAYS; d_jump_is_regoffs = 1'b1; d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
-	RV_JAL:     begin d_branchcond = BCOND_ALWAYS; d_rs1 = X0;               d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
+	RV_BEQ:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_ZERO;  end
+	RV_BNE:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_NZERO; end
+	RV_BLT:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_NZERO; end
+	RV_BGE:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_ZERO; end
+	RV_BLTU:    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_NZERO; end
+	RV_BGEU:    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_ZERO; end
+	RV_JALR:    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_jump_is_regoffs = 1'b1; d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
+	RV_JAL:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_rs1 = X0;               d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
 	RV_LUI:     begin d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_rs1 = X0; end
-	RV_AUIPC:   begin d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_alusrc_a = ALUSRCA_PC;  d_rs1 = X0; end
+	RV_AUIPC:   begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_alusrc_a = ALUSRCA_PC;  d_rs1 = X0; end
 	RV_ADDI:    begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
 	RV_SLLI:    begin d_aluop = ALUOP_SLL; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
 	RV_SLTI:    begin d_aluop = ALUOP_LT;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
@@ -231,7 +233,7 @@ always @ (*) begin
 	RV_REM:     if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
 	RV_REMU:    if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
 	RV_FENCE:   begin d_rd = X0; end  // NOP
-	RV_FENCE_I: begin d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // FIXME this is probably busted now. Maybe implement as an exception?
+	RV_FENCE_I: begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // FIXME this is probably busted now. Maybe implement as an exception?
 	RV_CSRRW:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRS:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRC:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end

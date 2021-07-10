@@ -61,11 +61,19 @@ module hazard3_frontend #(
 	                                  // from being trashed by incoming fetch data;
 	                                  // jump instructions have other side effects besides jumping!
 
-    // Provide the rs1/rs2 register numbers which will be in CIR on the next
-    // cycle. These go straight to the register file read ports.
+	// Provide the rs1/rs2 register numbers which will be in CIR on the next
+	// cycle. These go straight to the register file read ports.
 	output wire [4:0]        next_regs_rs1,
 	output wire [4:0]        next_regs_rs2,
-	output wire              next_regs_vld
+	output wire              next_regs_vld,
+
+	// Debugger instruction injection: instruction fetch is suppressed when in
+	// debug halt state, and the DM can then inject instructions into the last
+	// entry of the prefetch queue using the vld/rdy handshake.
+	input  wire              debug_mode,
+	input  wire [W_DATA-1:0] dbg_instr_data,
+	input  wire              dbg_instr_data_vld,
+	output wire              dbg_instr_data_rdy,
 );
 
 localparam W_BUNDLE = W_DATA / 2;
@@ -96,14 +104,15 @@ wire fifo_almost_full = FIFO_DEPTH == 1 || (!fifo_valid[FIFO_DEPTH - 1] && fifo_
 
 wire fifo_push;
 wire fifo_pop;
+wire fifo_dbg_inject = DEBUG_SUPPORT && dbg_instr_data_vld && dbg_instr_data_rdy;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		fifo_valid <= {FIFO_DEPTH+1{1'b0}};
 	end else if (jump_now) begin
 		fifo_valid[FIFO_DEPTH-1:0] <= {FIFO_DEPTH{1'b0}};
-	end else if (fifo_push || fifo_pop) begin
-		fifo_valid[FIFO_DEPTH-1:0] <= ~(~fifo_valid << fifo_push) >> fifo_pop;
+	end else if (fifo_push || fifo_pop || fifo_dbg_inject) begin
+		fifo_valid[FIFO_DEPTH-1:0] <= ~(~fifo_valid << (fifo_push || fifo_dbg_inject)) >> fifo_pop;
 	end
 end
 
@@ -114,6 +123,11 @@ always @ (posedge clk) begin: fifo_data_shift
 			fifo_mem[i] <= fifo_valid[i + 1] ? fifo_mem[i + 1] : fifo_wdata;
 		end
 	end
+	// Allow DM to inject instructions directly into the lowest-numbered queue
+	// entry. This mux should not extend critical path since it is balanced
+	// with the instruction-assembly muxes on the queue bypass path.
+	if (fifo_dbg_inject)
+		fifo_mem[0] <= dbg_instr_data;
 end
 
 // ----------------------------------------------------------------------------
@@ -126,9 +140,13 @@ reg  [1:0] pending_fetches;
 reg  [1:0] ctr_flush_pending;
 wire [1:0] pending_fetches_next = pending_fetches + (mem_addr_vld && !mem_addr_hold) - mem_data_vld;
 
+// Debugger only injects instructions when the frontend is at rest and empty.
+assign dbg_instr_data_rdy = DEBUG_SUPPORT && !fifo_valid[0] && ~|ctr_flush_pending;
+
 wire cir_must_refill;
 // If fetch data is forwarded past the FIFO, ensure it is not also written to it.
-assign fifo_push = mem_data_vld && ~|ctr_flush_pending && !(cir_must_refill && fifo_empty);
+assign fifo_push = mem_data_vld && ~|ctr_flush_pending && !(cir_must_refill && fifo_empty)
+	&& !(DEBUG_SUPPORT && debug_mode);
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -235,10 +253,11 @@ always @ (*) begin
 	mem_addr_vld_r = 1'b1;
 	mem_size_r = 1'b1; // almost all accesses are 32 bit
 	case (1'b1)
-		mem_addr_hold   : begin mem_addr_r = {fetch_addr[W_ADDR-1:2], unaligned_jump_aph, 1'b0}; mem_size_r = !unaligned_jump_aph; end
-		jump_target_vld : begin mem_addr_r = jump_target; mem_size_r = !unaligned_jump_now; end
-		!fetch_stall    : begin mem_addr_r = fetch_addr; end
-		default         : begin mem_addr_vld_r = 1'b0; end
+		mem_addr_hold               : begin mem_addr_r = {fetch_addr[W_ADDR-1:2], unaligned_jump_aph, 1'b0}; mem_size_r = !unaligned_jump_aph; end
+		jump_target_vld             : begin mem_addr_r = jump_target; mem_size_r = !unaligned_jump_now; end
+		DEBUG_SUPPORT && debug_mode : begin mem_addr_vld_r = 1'b0; end
+		!fetch_stall                : begin mem_addr_r = fetch_addr; end
+		default                     : begin mem_addr_vld_r = 1'b0; end
 	endcase
 end
 

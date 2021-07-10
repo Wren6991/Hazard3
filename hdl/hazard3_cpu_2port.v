@@ -56,6 +56,23 @@ module hazard3_cpu_2port #(
 	output wire [W_DATA-1:0] d_hwdata,
 	input  wire [W_DATA-1:0] d_hrdata,
 
+	// Debugger run/halt control
+	input  wire              dbg_req_halt,
+	input  wire              dbg_req_halt_on_reset,
+	input  wire              dbg_req_resume,
+	output wire              dbg_halted,
+	output wire              dbg_running,
+	// Debugger access to data0 CSR
+	output wire [W_DATA-1:0] dbg_data0_rdata,
+	input  wire [W_DATA-1:0] dbg_data0_wdata,
+	input  wire              dbg_data0_wen,
+	// Debugger instruction injection
+	input  wire [W_DATA-1:0] dbg_instr_data,
+	input  wire              dbg_instr_data_vld,
+	output wire              dbg_instr_data_rdy,
+	output wire              dbg_instr_caught_exception,
+	output wire              dbg_instr_caught_ebreak,
+
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
 	input wire               soft_irq,  // -> mip.msip
@@ -100,28 +117,42 @@ hazard3_core #(
 	`RVFI_CONN ,
 	`endif
 
-	.bus_aph_req_i   (core_aph_req_i),
-	.bus_aph_panic_i (core_aph_panic_i),
-	.bus_aph_ready_i (core_aph_ready_i),
-	.bus_dph_ready_i (core_dph_ready_i),
-	.bus_dph_err_i   (core_dph_err_i),
-	.bus_hsize_i     (core_hsize_i),
-	.bus_haddr_i     (core_haddr_i),
-	.bus_rdata_i     (core_rdata_i),
+	.bus_aph_req_i              (core_aph_req_i),
+	.bus_aph_panic_i            (core_aph_panic_i),
+	.bus_aph_ready_i            (core_aph_ready_i),
+	.bus_dph_ready_i            (core_dph_ready_i),
+	.bus_dph_err_i              (core_dph_err_i),
+	.bus_hsize_i                (core_hsize_i),
+	.bus_haddr_i                (core_haddr_i),
+	.bus_rdata_i                (core_rdata_i),
 
-	.bus_aph_req_d   (core_aph_req_d),
-	.bus_aph_ready_d (core_aph_ready_d),
-	.bus_dph_ready_d (core_dph_ready_d),
-	.bus_dph_err_d   (core_dph_err_d),
-	.bus_haddr_d     (core_haddr_d),
-	.bus_hsize_d     (core_hsize_d),
-	.bus_hwrite_d    (core_hwrite_d),
-	.bus_wdata_d     (core_wdata_d),
-	.bus_rdata_d     (core_rdata_d),
+	.bus_aph_req_d              (core_aph_req_d),
+	.bus_aph_ready_d            (core_aph_ready_d),
+	.bus_dph_ready_d            (core_dph_ready_d),
+	.bus_dph_err_d              (core_dph_err_d),
+	.bus_haddr_d                (core_haddr_d),
+	.bus_hsize_d                (core_hsize_d),
+	.bus_hwrite_d               (core_hwrite_d),
+	.bus_wdata_d                (core_wdata_d),
+	.bus_rdata_d                (core_rdata_d),
 
-	.irq             (irq),
-	.soft_irq        (soft_irq),
-	.timer_irq       (timer_irq)
+	.dbg_req_halt               (dbg_req_halt),
+	.dbg_req_halt_on_reset      (dbg_req_halt_on_reset),
+	.dbg_req_resume             (dbg_req_resume),
+	.dbg_halted                 (dbg_halted),
+	.dbg_running                (dbg_running),
+	.dbg_data0_rdata            (dbg_data0_rdata),
+	.dbg_data0_wdata            (dbg_data0_wdata),
+	.dbg_data0_wen              (dbg_data0_wen),
+	.dbg_instr_data             (dbg_instr_data),
+	.dbg_instr_data_vld         (dbg_instr_data_vld),
+	.dbg_instr_data_rdy         (dbg_instr_data_rdy),
+	.dbg_instr_caught_exception (dbg_instr_caught_exception),
+	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
+
+	.irq                        (irq),
+	.soft_irq                   (soft_irq),
+	.timer_irq                  (timer_irq)
 );
 
 // ----------------------------------------------------------------------------

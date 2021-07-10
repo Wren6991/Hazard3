@@ -30,8 +30,22 @@ module hazard3_csr #(
 ,
 `include "hazard3_width_const.vh"
 ) (
-	input  wire            clk,
-	input  wire            rst_n,
+	input  wire               clk,
+	input  wire               rst_n,
+
+	// Debug signalling
+	output reg                debug_mode,
+
+	input  wire               dbg_req_halt,
+	input  wire               dbg_req_halt_on_reset,
+	input  wire               dbg_req_resume,
+
+	output wire               dbg_instr_caught_exception,
+	output wire               dbg_instr_caught_ebreak,
+
+	output wire [W_DATA-1:0]  dbg_data0_rdata,
+	input  wire [W_DATA-1:0]  dbg_data0_wdata,
+	input  wire               dbg_data0_wen,
 
 	// Read port is combinatorial.
 	// Write port is synchronous, and write effects will be observed on the next clock cycle.
@@ -226,6 +240,13 @@ localparam MEIP0          = 12'hfe0; // External interrupt pending register 0
 localparam MLEI           = 12'hfe4; // Lowest external interrupt number
 
 // ----------------------------------------------------------------------------
+// D-mode CSRs
+
+localparam DCSR           = 12'h7b0;
+localparam DPC            = 12'h7b1;
+localparam DATA0          = 12'h7b2; // DSCRATCH0 would be here if implemented
+
+// ----------------------------------------------------------------------------
 // CSR state + update logic
 // ----------------------------------------------------------------------------
 // Names are (reg)_(field)
@@ -252,6 +273,18 @@ begin
 end
 endfunction
 
+
+wire enter_debug_mode;
+wire exit_debug_mode;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		debug_mode <= 1'b0;
+	end else if (DEBUG_SUPPORT) begin
+		debug_mode <= (debug_mode && !exit_debug_mode) || enter_debug_mode;
+	end
+end
+
 // ----------------------------------------------------------------------------
 // Implementation-defined control register
 
@@ -273,6 +306,8 @@ wire midcr_eivect = midcr[0];
 
 // ----------------------------------------------------------------------------
 // Trap-handling CSRs
+
+wire debug_suppresses_trap_update = DEBUG_SUPPORT && (debug_mode || enter_debug_mode);
 
 // Two-level interrupt enable stack, shuffled on entry/exit:
 reg mstatus_mpie;
@@ -334,7 +369,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mepc <= X0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET) begin
+		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
 			mepc <= mepc_in & MEPC_MASK;
 		end else if (wen && addr == MEPC) begin
 			mepc <= update(mepc) & MEPC_MASK;
@@ -375,7 +410,7 @@ always @ (posedge clk or negedge rst_n) begin
 		mcause_irq <= 1'b0;
 		mcause_code <= 6'h0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET) begin
+		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
 			mcause_irq <= mcause_irq_next;
 			mcause_code <= mcause_code_next;
 		end else if (wen && addr == MCAUSE) begin
@@ -437,10 +472,10 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (CSR_COUNTER) begin
 		// Optionally hold the top (2 * XLEN - W_COUNTER) bits constant to
 		// save gates (noncompliant if enabled)
-		if (!mcountinhibit_cy)
+		if (!(mcountinhibit_cy || debug_mode))
 			{mcycleh, mcycle} <= (({mcycleh, mcycle} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
 				| ({mcycleh, mcycle} & ({2*XLEN{1'b1}} << W_COUNTER));
-		if (!mcountinhibit_ir && instr_ret)
+		if (!(mcountinhibit_ir || debug_mode) && instr_ret)
 			{minstreth, minstret} <= (({minstreth, minstret} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
 				| ({minstreth, minstret} & ({2*XLEN{1'b1}} << W_COUNTER));
 		if (wen) begin
@@ -461,6 +496,73 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
+
+// ----------------------------------------------------------------------------
+// Debug-mode CSRs
+
+// The following DCSR bits are read/writable as normal:
+// - ebreakm (bit 15)
+// - step (bit 2)
+// The following are read-only volatile:
+// - cause (bits 8:6)
+// All others are hardwired constants.
+
+reg dcsr_ebreakm;
+reg dcsr_step;
+reg [2:0] dcsr_cause;
+wire [2:0] dcause_next;
+
+localparam DCSR_CAUSE_EBREAK  = 3'h1;
+localparam DCSR_CAUSE_TRIGGER = 3'h2;
+localparam DCSR_CAUSE_HALTREQ = 3'h3;
+localparam DCSR_CAUSE_STEP    = 3'h4;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		dcsr_ebreakm <= 1'b0;
+		dcsr_step <= 1'b0;
+		dcsr_cause <= 3'h0;
+	end else if (DEBUG_SUPPORT) begin
+		if (debug_mode && wen && addr == DCSR) begin
+			{dcsr_ebreakm, dcsr_step} <=
+				wtype == CSR_WTYPE_C ? {dcsr_ebreakm, dcsr_step} & ~{wdata[15], wdata[2]} :
+				wtype == CSR_WTYPE_S ? {dcsr_ebreakm, dcsr_step} |  {wdata[15], wdata[2]} :
+				                                                    {wdata[15], wdata[2]} ;
+		end
+		if (enter_debug_mode) begin
+			dcsr_cause <= dcause_next;
+		end
+	end
+end
+
+reg [XLEN-1:0] dpc;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		dpc <= X0;
+	end else if (DEBUG_SUPPORT) begin
+		if (enter_debug_mode)
+			dpc <= mepc_in;
+		else if (debug_mode && wen && addr == DPC)
+			dpc <= update(dpc);
+	end
+end
+
+reg [XLEN-1:0] data0;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		data0 <= X0;
+	end else if (DEBUG_SUPPORT) begin
+		if (dbg_data0_wen)
+			data0 <= dbg_data0_wdata;
+		else if (debug_mode && wen && addr == DATA0)
+			data0 <= update(data0);
+	end
+end
+
+assign dbg_data0_rdata = data0;
+
 
 // ----------------------------------------------------------------------------
 // Read port + detect addressing of unmapped CSRs
@@ -709,6 +811,38 @@ always @ (*) begin
 		rdata = minstreth;
 	end
 
+	// ------------------------------------------------------------------------
+	// Debug CSRs
+
+	DCSR: if (DEBUG_SUPPORT && debug_mode) begin
+		decode_match = 1'b1;
+		rdata = {
+			4'h4,         // xdebugver = 4, for 0.13.2 debug spec
+			12'd0,        // reserved
+			dcsr_ebreakm,
+			3'h0,         // No other modes besides M to break from
+			1'b0,         // stepie = 0, no interrupts in single-step mode (FIXME implement this)
+			1'b1,         // stopcount = 1, no counter increment in debug mode
+			1'b1,         // stoptime = 0, no core-local timer increment in debug mode
+			dcsr_cause,
+			1'b0,         // reserved
+			1'b0,         // mprven = 0, we don't have MPRV support
+			1'b0,         // nmip = 0, we have no NMI
+			dcsr_step,
+			2'h3          // prv = 3, we only have M mode
+		};
+	end
+
+	DPC: if (DEBUG_SUPPORT && debug_mode) begin
+		decode_match = 1'b1;
+		rdata = dpc;
+	end
+
+	DATA0: if (DEBUG_SUPPORT && debug_mode) begin
+		decode_match = 1'b1;
+		rdata = data0;
+	end
+
     // ------------------------------------------------------------------------
 	// Custom CSRs
 
@@ -737,6 +871,55 @@ always @ (*) begin
 end
 
 assign illegal = (wen_soon || ren_soon) && !decode_match;
+
+// ----------------------------------------------------------------------------
+// Debug run/halt
+
+reg have_just_reset;
+reg step_halt_req;
+reg pending_dbg_resume;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		have_just_reset <= |DEBUG_SUPPORT;
+		step_halt_req <= 1'b0;
+		pending_dbg_resume <= 1'b0;
+	end else if (DEBUG_SUPPORT) begin
+		if (instr_ret)
+			have_just_reset <= 1'b0;
+
+		if (debug_mode)
+			step_halt_req <= 1'b0;
+		else if (dcsr_step && instr_ret)
+			step_halt_req <= 1'b1;
+
+		pending_dbg_resume <= (pending_dbg_resume || dbg_req_resume) && debug_mode;
+	end
+end
+
+// We can enter the halted state in an IRQ-like manner (squeeze in between the
+// instructions in stage 2 and stage 3) or in an exception-like manner
+// (replace the instruction in stage 3).
+
+// This would also include triggers, if/when those are implemented:
+wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
+	dcsr_ebreakm && except == EXCEPT_EBREAK
+);
+
+// Note all exception-like causes (trigger, ebreak) are higher priority than IRQ-like
+wire want_halt_irq = DEBUG_SUPPORT && !debug_mode && !want_halt_except && (
+	dbg_req_halt || (dbg_req_halt_on_reset && have_just_reset) || step_halt_req
+);
+
+assign dcause_next =
+	// Trigger would be highest priority if implemented
+	except == EXCEPT_EBREAK                                    ? 3'h1 : // ebreak (priority 3)
+	dbg_req_halt || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
+	                                                             3'h4;  // single-step (priority 0)
+
+assign enter_debug_mode = (want_halt_irq || want_halt_except) && trap_enter_rdy;
+
+assign exit_debug_mode = pending_dbg_resume && trap_enter_rdy;
 
 // ----------------------------------------------------------------------------
 // Trap request generation
@@ -794,20 +977,33 @@ hazard3_priority_encode #(
 	.gnt (standard_irq_num)
 );
 
-wire exception_req_any = except != EXCEPT_NONE;
+// ebreak may be treated as a halt-to-debugger or a regular M-mode exception,
+// depending on dcsr.ebreakm.
+wire exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
 
-wire [5:0] vector_sel = 
+wire [5:0] vector_sel =
 	exception_req_any || !irq_vector_enable ? 6'd0                             :
 	standard_irq_active                     ? {2'h0, standard_irq_num}         :
 	external_irq_active                     ? {1'h0, external_irq_num} + 6'd16 : 6'd0;
 
-assign trap_addr = except == EXCEPT_MRET ? mepc : mtvec | {24'h0, vector_sel, 2'h0};
-assign trap_is_irq = !exception_req_any;
-assign trap_enter_vld = CSR_M_TRAP && (exception_req_any ||
-	!delay_irq_entry && (standard_irq_active || external_irq_active));
+assign trap_addr =
+	except == EXCEPT_MRET ? mepc :
+	pending_dbg_resume    ? dpc  : mtvec | {24'h0, vector_sel, 2'h0};
+
+assign trap_is_irq = !exception_req_any || (DEBUG_SUPPORT && want_halt_irq);
+assign trap_enter_vld =
+	CSR_M_TRAP && (exception_req_any ||
+		!delay_irq_entry && (standard_irq_active || external_irq_active)) ||
+	DEBUG_SUPPORT && (want_halt_irq || want_halt_except || pending_dbg_resume);
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : vector_sel;
+
+// Report back to DM instruction injector to tell it its instruction sequence
+// has finished or crashed out
+assign dbg_instr_caught_ebreak = debug_mode && except == EXCEPT_EBREAK;
+// Note we exclude ebreak from here regardless of dcsr.ebreakm!
+assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE && except != EXCEPT_EBREAK;
 
 // ----------------------------------------------------------------------------
 

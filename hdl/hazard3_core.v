@@ -53,6 +53,23 @@ module hazard3_core #(
 	output reg  [W_DATA-1:0] bus_wdata_d,
 	input  wire [W_DATA-1:0] bus_rdata_d,
 
+	// Debugger run/halt control
+	input  wire              dbg_req_halt,
+	input  wire              dbg_req_halt_on_reset,
+	input  wire              dbg_req_resume,
+	output wire              dbg_halted,
+	output wire              dbg_running,
+	// Debugger access to data0 CSR
+	output wire [W_DATA-1:0] dbg_data0_rdata,
+	input  wire [W_DATA-1:0] dbg_data0_wdata,
+	input  wire              dbg_data0_wen,
+	// Debugger instruction injection
+	input  wire [W_DATA-1:0] dbg_instr_data,
+	input  wire              dbg_instr_data_vld,
+	output wire              dbg_instr_data_rdy,
+	output wire              dbg_instr_caught_exception,
+	output wire              dbg_instr_caught_ebreak,
+
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
 	input wire               soft_irq,  // -> mip.msip
@@ -67,6 +84,10 @@ wire m_stall;
 localparam HSIZE_WORD  = 3'd2;
 localparam HSIZE_HWORD = 3'd1;
 localparam HSIZE_BYTE  = 3'd0;
+
+wire debug_mode;
+assign dbg_halted = DEBUG_SUPPORT && debug_mode;
+assign dbg_running = DEBUG_SUPPORT && !debug_mode;
 
 // ----------------------------------------------------------------------------
 // Pipe Stage F
@@ -96,29 +117,34 @@ hazard3_frontend #(
 	.FIFO_DEPTH(2),
 `include "hazard3_config_inst.vh"
 ) frontend (
-	.clk             (clk),
-	.rst_n           (rst_n),
+	.clk                (clk),
+	.rst_n              (rst_n),
 
-	.mem_size        (f_mem_size),
-	.mem_addr        (bus_haddr_i),
-	.mem_addr_vld    (bus_aph_req_i),
-	.mem_addr_rdy    (bus_aph_ready_i),
+	.mem_size           (f_mem_size),
+	.mem_addr           (bus_haddr_i),
+	.mem_addr_vld       (bus_aph_req_i),
+	.mem_addr_rdy       (bus_aph_ready_i),
 
-	.mem_data        (bus_rdata_i),
-	.mem_data_vld    (bus_dph_ready_i),
+	.mem_data           (bus_rdata_i),
+	.mem_data_vld       (bus_dph_ready_i),
 
-	.jump_target     (f_jump_target),
-	.jump_target_vld (f_jump_req),
-	.jump_target_rdy (f_jump_rdy),
+	.jump_target        (f_jump_target),
+	.jump_target_vld    (f_jump_req),
+	.jump_target_rdy    (f_jump_rdy),
 
-	.cir             (fd_cir),
-	.cir_vld         (fd_cir_vld),
-	.cir_use         (df_cir_use),
-	.cir_lock        (df_cir_lock),
+	.cir                (fd_cir),
+	.cir_vld            (fd_cir_vld),
+	.cir_use            (df_cir_use),
+	.cir_lock           (df_cir_lock),
 
-	.next_regs_rs1   (f_rs1),
-	.next_regs_rs2   (f_rs2),
-	.next_regs_vld   (f_regnum_vld)
+	.next_regs_rs1      (f_rs1),
+	.next_regs_rs2      (f_rs2),
+	.next_regs_vld      (f_regnum_vld),
+
+	.debug_mode         (debug_mode),
+	.dbg_instr_data     (dbg_instr_data),
+	.dbg_instr_data_vld (dbg_instr_data_vld),
+	.dbg_instr_data_rdy (dbg_instr_data_rdy)
 );
 
 // ----------------------------------------------------------------------------
@@ -175,6 +201,8 @@ hazard3_decode #(
 	.df_cir_lock          (df_cir_lock),
 	.d_pc                 (d_pc),
 	.x_jump_not_except    (x_jump_not_except),
+
+	.debug_mode           (debug_mode),
 
 	.d_starved            (d_starved),
 	.x_stall              (x_stall),
@@ -465,38 +493,51 @@ hazard3_csr #(
 	.XLEN            (W_DATA),
 `include "hazard3_config_inst.vh"
 ) inst_hazard3_csr (
-	.clk                     (clk),
-	.rst_n                   (rst_n),
+	.clk                        (clk),
+	.rst_n                      (rst_n),
+
+	// Debugger signalling
+	.debug_mode                 (debug_mode),
+	.dbg_req_halt               (dbg_req_halt),
+	.dbg_req_halt_on_reset      (dbg_req_halt_on_reset),
+	.dbg_req_resume             (dbg_req_resume),
+
+	.dbg_instr_caught_exception (dbg_instr_caught_exception),
+	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
+
+	.dbg_data0_rdata            (dbg_data0_rdata),
+	.dbg_data0_wdata            (dbg_data0_wdata),
+	.dbg_data0_wen              (dbg_data0_wen),
 
 	// CSR access port
 	// *en_soon are early access strobes which are not a function of bus stall.
 	// Can generate access faults (hence traps), but do not actually perform access.
-	.addr                    (d_imm[11:0]), // todo could just connect this to the instruction bits
-	.wdata                   (x_csr_wdata),
-	.wen_soon                (d_csr_wen && !m_trap_enter_vld),
-	.wen                     (d_csr_wen && !m_trap_enter_vld && !x_stall),
-	.wtype                   (d_csr_wtype),
-	.rdata                   (x_csr_rdata),
-	.ren_soon                (d_csr_ren && !m_trap_enter_vld),
-	.ren                     (d_csr_ren && !m_trap_enter_vld && !x_stall),
-	.illegal                 (x_csr_illegal_access),
+	.addr                       (d_imm[11:0]), // todo could just connect this to the instruction bits
+	.wdata                      (x_csr_wdata),
+	.wen_soon                   (d_csr_wen && !m_trap_enter_vld),
+	.wen                        (d_csr_wen && !m_trap_enter_vld && !x_stall),
+	.wtype                      (d_csr_wtype),
+	.rdata                      (x_csr_rdata),
+	.ren_soon                   (d_csr_ren && !m_trap_enter_vld),
+	.ren                        (d_csr_ren && !m_trap_enter_vld && !x_stall),
+	.illegal                    (x_csr_illegal_access),
 
 	// Trap signalling
-	.trap_addr               (m_trap_addr),
-	.trap_is_irq             (m_trap_is_irq),
-	.trap_enter_vld          (m_trap_enter_vld),
-	.trap_enter_rdy          (m_trap_enter_rdy),
-	.mepc_in                 (m_exception_return_addr),
+	.trap_addr                  (m_trap_addr),
+	.trap_is_irq                (m_trap_is_irq),
+	.trap_enter_vld             (m_trap_enter_vld),
+	.trap_enter_rdy             (m_trap_enter_rdy),
+	.mepc_in                    (m_exception_return_addr),
 
 	// IRQ and exception requests
-	.delay_irq_entry         (xm_delay_irq_entry),
-	.irq                     (irq),
-	.irq_software            (soft_irq),
-	.irq_timer               (timer_irq),
-	.except                  (xm_except),
+	.delay_irq_entry            (xm_delay_irq_entry),
+	.irq                        (irq),
+	.irq_software               (soft_irq),
+	.irq_timer                  (timer_irq),
+	.except                     (xm_except),
 
 	// Other CSR-specific signalling
-	.instr_ret               (|df_cir_use)
+	.instr_ret                  (|df_cir_use)
 );
 
 wire [W_EXCEPT-1:0] x_except =
@@ -568,7 +609,7 @@ assign f_jump_req = x_jump_req || m_trap_enter_vld;
 assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign x_jump_not_except = !m_trap_enter_vld;
 
-wire m_bus_stall = !xm_memop[3] && !bus_dph_ready_d; 
+wire m_bus_stall = !xm_memop[3] && !bus_dph_ready_d;
 assign m_stall = m_bus_stall || (m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq);
 
 // Exception is taken against the instruction currently in M, so walk the PC
