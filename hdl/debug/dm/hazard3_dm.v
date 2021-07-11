@@ -129,6 +129,7 @@ if (N_HARTS > 1) begin: has_hartsel
 end else begin: has_no_hartsel
 	assign hartsel_next = 1'b0;
 end
+endgenerate
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -165,7 +166,7 @@ always @ (posedge clk or negedge rst_n) begin
 		dmcontrol_haltreq <= {N_HARTS{1'b0}};
 		dmcontrol_hartreset <= {N_HARTS{1'b0}};
 		dmcontrol_resethaltreq <= {N_HARTS{1'b0}};
-	end else if dmi_write && dmi_paddr == ADDR_DMCONTROL) begin
+	end else if (dmi_write && dmi_paddr == ADDR_DMCONTROL) begin
 		dmactive <= dmi_pwdata[0];
 		dmcontrol_ndmreset <= dmi_pwdata[1];
 		dmcontrol_haltreq[hartsel_next] <= dmi_pwdata[31];
@@ -217,8 +218,8 @@ always @ (posedge clk or negedge rst_n) begin
 		dmstatus_resumeack <= {N_HARTS{1'b0}};
 		dmcontrol_resumereq_sticky <= {N_HARTS{1'b0}};
 	end else begin
-		dmstatus_resumeack <= dmstatus_resumeack | (dmcontrol_resumereq_sticky & hart_running);
-		dmcontrol_resumereq_sticky <= dmcontrol_resumereq_sticky & ~hart_running;
+		dmstatus_resumeack <= dmstatus_resumeack | (dmcontrol_resumereq_sticky & hart_running & hart_available);
+		dmcontrol_resumereq_sticky <= dmcontrol_resumereq_sticky & ~(hart_running & hart_available); // TODO this is because our "running" is actually just "not debug mode"
 		// dmcontrol.resumereq:
 		if (dmi_write && dmi_paddr == ADDR_DMCONTROL && dmi_pwdata[30]) begin
 			dmcontrol_resumereq_sticky[hartsel_next] <= 1'b1;
@@ -227,7 +228,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-assign hart_req_resume = ~dmstatus_resumeack;
+assign hart_req_resume = dmcontrol_resumereq_sticky;
 
 // ----------------------------------------------------------------------------
 // Abstract command data registers
@@ -263,7 +264,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (!dmactive) begin
 		abstractauto_autoexecdata <= 1'b0;
 	end else if (dmi_write && dmi_paddr == ADDR_ABSTRACTAUTO) begin
-		abstractauto_autoexecdata <= pwdata[1];
+		abstractauto_autoexecdata <= dmi_pwdata[1];
 	end
 end
 
@@ -292,11 +293,11 @@ localparam CMDERR_HALTRESUME = 3'h4;
 reg [2:0]         abstractcs_cmderr;
 reg [W_STATE-1:0] acmd_state;
 
-assign abstracts_busy = acmd_state != S_IDLE;
+assign abstractcs_busy = acmd_state != S_IDLE;
 
 wire start_abstract_cmd = abstractcs_cmderr == CMDERR_OK && !abstractcs_busy && (
 	(dmi_write && dmi_paddr == ADDR_COMMAND) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_paddr == ADDR_DATA0
+	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_paddr == ADDR_DATA0)
 );
 
 wire dmi_access_illegal_when_busy =
@@ -316,7 +317,7 @@ wire acmd_unsupported =
 wire       acmd_postexec = dmi_pwdata[18];
 wire       acmd_transfer = dmi_pwdata[17];
 wire       acmd_write    = dmi_pwdata[16];
-wire [4:0] acmd_regno    = dmi_pwdata[4:0]
+wire [4:0] acmd_regno    = dmi_pwdata[4:0];
 
 reg        acmd_postexec_r;
 reg  [4:0] acmd_regno_r;
@@ -324,81 +325,81 @@ reg  [4:0] acmd_regno_r;
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		abstractcs_cmderr <= CMDERR_OK;
-		abstractcs_state <= S_IDLE;
+		acmd_state <= S_IDLE;
 		acmd_postexec_r <= 1'b0;
 		acmd_regno_r <= 5'h0;
 	end else if (!dmactive) begin
 		abstractcs_cmderr <= CMDERR_OK;
-		abstractcs_state <= S_IDLE;
+		acmd_state <= S_IDLE;
 	end else begin
-		if (abstractcs_cmderr == CMDERR_OK && abstracts_busy && dmi_access_illegal_when_busy)
+		if (abstractcs_cmderr == CMDERR_OK && abstractcs_busy && dmi_access_illegal_when_busy)
 			abstractcs_cmderr <= CMDERR_BUSY;
-		if (state != S_IDLE && hart_instr_caught_exception)
+		if (acmd_state != S_IDLE && hart_instr_caught_exception)
 			abstractcs_cmderr <= CMDERR_EXCEPTION;
 		case (acmd_state)
 			S_IDLE: begin
 				if (start_abstract_cmd) begin
 					if (!hart_halted[hartsel] || !hart_available[hartsel]) begin
-						abstracts_cmderr <= CMDERR_HALTRESUME;
-					end else if (acmd_unsupported)
+						abstractcs_cmderr <= CMDERR_HALTRESUME;
+					end else if (acmd_unsupported) begin
 						abstractcs_cmderr <= CMDERR_UNSUPPORTED;
 					end else begin
 						acmd_postexec_r <= acmd_postexec;
 						acmd_regno_r <= acmd_regno;
 						if (acmd_transfer && acmd_write)
-							state <= S_ISSUE_REGWRITE;
+							acmd_state <= S_ISSUE_REGWRITE;
 						else if (acmd_transfer && !acmd_write)
-							state <= S_ISSUE_REGREAD;
+							acmd_state <= S_ISSUE_REGREAD;
 						else if (acmd_postexec)
-							state <= S_ISSUE_PROGBUF0;
+							acmd_state <= S_ISSUE_PROGBUF0;
 						else
-							state <= S_IDLE;					
+							acmd_state <= S_IDLE;					
 					end
 				end
 			end
 
 			S_ISSUE_REGREAD: begin
 				if (hart_instr_data_rdy[hartsel])
-					state <= S_ISSUE_REGEBREAK;
+					acmd_state <= S_ISSUE_REGEBREAK;
 			end
 			S_ISSUE_REGWRITE: begin
 				if (hart_instr_data_rdy[hartsel])
-					state <= S_ISSUE_REGEBREAK;
+					acmd_state <= S_ISSUE_REGEBREAK;
 			end
 			S_ISSUE_REGEBREAK: begin
 				if (hart_instr_data_rdy[hartsel])
-					state <= S_WAIT_REGEBREAK
+					acmd_state <= S_WAIT_REGEBREAK;
 			end
 			S_WAIT_REGEBREAK: begin
 				if (hart_instr_caught_ebreak) begin
 					if (acmd_postexec_r)
-						state <= S_ISSUE_PROGBUF0;
+						acmd_state <= S_ISSUE_PROGBUF0;
 					else
-						state <= S_IDLE;
+						acmd_state <= S_IDLE;
 				end
 			end
 
 			S_ISSUE_PROGBUF0: begin
 				if (hart_instr_data_rdy[hartsel])
-					state <= S_ISSUE_PROGBUF1;
+					acmd_state <= S_ISSUE_PROGBUF1;
 			end
 			S_ISSUE_PROGBUF1: begin
 				if (hart_instr_caught_exception || hart_instr_caught_ebreak) begin
-					state <= S_IDLE;
+					acmd_state <= S_IDLE;
 				end else if (hart_instr_data_rdy[hartsel]) begin
-					state <= S_ISSUE_IMPEBREAK;
+					acmd_state <= S_ISSUE_IMPEBREAK;
 				end
 			end
 			S_ISSUE_IMPEBREAK: begin
 				if (hart_instr_caught_exception || hart_instr_caught_ebreak) begin
-					state <= S_IDLE;
+					acmd_state <= S_IDLE;
 				end else if (hart_instr_data_rdy[hartsel]) begin
-					state <= S_WAIT_IMPEBREAK;
+					acmd_state <= S_WAIT_IMPEBREAK;
 				end
 			end
 			S_WAIT_IMPEBREAK: begin
 				if (hart_instr_caught_exception || hart_instr_caught_ebreak) begin
-					state <= S_IDLE;
+					acmd_state <= S_IDLE;
 				end
 			end
 		endcase
@@ -406,20 +407,21 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 assign hart_instr_data_vld = {{N_HARTS{1'b0}},
-	state == S_ISSUE_REGREAD || state == S_ISSUE_REGWRITE || state == S_ISSUE_REGEBREAK ||
-	state == S_ISSUE_PROGBUF0 || state == S_ISSUE_PROGBUF1 || state == S_ISSUE_IMPEBREAK
+	acmd_state == S_ISSUE_REGREAD || acmd_state == S_ISSUE_REGWRITE || acmd_state == S_ISSUE_REGEBREAK ||
+	acmd_state == S_ISSUE_PROGBUF0 || acmd_state == S_ISSUE_PROGBUF1 || acmd_state == S_ISSUE_IMPEBREAK
 } << hartsel;
 
 assign hart_instr_data = {N_HARTS{
-	state == S_ISSUE_REGWRITE  ? 32'h7b202073 | {20'd0, acmd_regno_r,  7'd0} : // csrr xx, data0
-	state == S_ISSUE_REGREAD   ? 32'h7b201073 | {12'd0, acmd_regno_r, 15'd0} : // csrw data0, xx
-	state == S_ISSUE_PROGBUF0  ? progbuf0                                    :
-	state == S_ISSUE_PROGBUF1  ? progbuf1                                    :
-	                             32'h00100073                                  // ebreak
+	acmd_state == S_ISSUE_REGWRITE  ? 32'h7b202073 | {20'd0, acmd_regno_r,  7'd0} : // csrr xx, data0
+	acmd_state == S_ISSUE_REGREAD   ? 32'h7b201073 | {12'd0, acmd_regno_r, 15'd0} : // csrw data0, xx
+	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                    :
+	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                    :
+	                                  32'h00100073                                  // ebreak
 }};
 
 // ----------------------------------------------------------------------------
 // DMI read data mux
+
 always @ (*) begin
 	case (dmi_paddr)
 	ADDR_DATA0:        dmi_prdata = hart_data0_rdata[hartsel * XLEN +: XLEN];
@@ -430,7 +432,7 @@ always @ (*) begin
 		1'b0,                             // ackhavereset is a W1 field
 		1'b0,                             // reserved
 		1'b0,                             // hasel hardwired 0 (no array mask)
-		{{10-W_HARTSEL{1'b0}}, hartsel}   // hartsello
+		{{10-W_HARTSEL{1'b0}}, hartsel},  // hartsello
 		10'h0,                            // hartselhi
 		2'h0,                             // reserved
 		2'h0,                             // set/clrresethaltreq are W1 fields
@@ -444,7 +446,7 @@ always @ (*) begin
 		{2{dmstatus_havereset[hartsel]}}, // allhavereset, anyhavereset
 		{2{dmstatus_resumeack[hartsel]}}, // allresumeack, anyresumeack
 		{2{hartsel >= N_HARTS}},          // allnonexistent, anynonexistent
-		{2{!hart_available[hartsel}},     // allunavail, anyunavail
+		{2{!hart_available[hartsel]}},    // allunavail, anyunavail
 		{2{hart_running[hartsel]}},       // allrunning, anyrunning
 		{2{hart_halted[hartsel]}},        // allhalted, anyhalted
 		1'b1,                             // authenticated
