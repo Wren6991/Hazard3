@@ -264,7 +264,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (!dmactive) begin
 		abstractauto_autoexecdata <= 1'b0;
 	end else if (dmi_write && dmi_paddr == ADDR_ABSTRACTAUTO) begin
-		abstractauto_autoexecdata <= dmi_pwdata[1];
+		abstractauto_autoexecdata <= dmi_pwdata[0];
 	end
 end
 
@@ -307,31 +307,71 @@ wire dmi_access_illegal_when_busy =
 	(dmi_read && (
 		dmi_paddr == ADDR_DATA0 || dmi_paddr == ADDR_PROGBUF0 || dmi_paddr == ADDR_PROGBUF0));
 
-wire acmd_unsupported =
+// Decode what acmd may be triggered on this cycle, and whether it is
+// supported -- command source may be a registered version of most recent
+// command (if abstractauto is used) or a fresh command off the bus. We don't
+// register the entire write data; repeats of unsupported commands are
+// detected by just registering that the last written command was
+// unsupported.
+
+wire       acmd_new = dmi_write && dmi_paddr == ADDR_COMMAND;
+
+wire       acmd_new_postexec    = dmi_pwdata[18];
+wire       acmd_new_transfer    = dmi_pwdata[17];
+wire       acmd_new_write       = dmi_pwdata[16];
+wire [4:0] acmd_new_regno       = dmi_pwdata[4:0];
+
+wire       acmd_new_unsupported =
 	dmi_pwdata[31:24] != 8'h00 || // Only Access Register command supported
 	dmi_pwdata[22:20] != 3'h2  || // Must be 32 bits in size
 	dmi_pwdata[19]             || // aarpostincrement not supported
 	dmi_pwdata[15:12] != 4'h1  || // Only core register access supported
 	dmi_pwdata[11:5]  != 7'h0;    // Only GPRs supported
 
-wire       acmd_postexec = dmi_pwdata[18];
-wire       acmd_transfer = dmi_pwdata[17];
-wire       acmd_write    = dmi_pwdata[16];
-wire [4:0] acmd_regno    = dmi_pwdata[4:0];
+reg        acmd_prev_postexec;
+reg        acmd_prev_transfer;
+reg        acmd_prev_write;
+reg  [4:0] acmd_prev_regno;
+reg        acmd_prev_unsupported;
 
-reg        acmd_postexec_r;
-reg  [4:0] acmd_regno_r;
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		acmd_prev_postexec <= 1'b0;
+		acmd_prev_transfer <= 1'b0;
+		acmd_prev_write <= 1'b0;
+		acmd_prev_regno <= 5'h0;
+		acmd_prev_unsupported <= 1'b1;
+	end else if (!dmactive) begin
+		acmd_prev_postexec <= 1'b0;
+		acmd_prev_transfer <= 1'b0;
+		acmd_prev_write <= 1'b0;
+		acmd_prev_regno <= 5'h0;
+		acmd_prev_unsupported <= 1'b1;
+	end else if (start_abstract_cmd && acmd_new) begin
+		acmd_prev_postexec <= acmd_new_postexec;
+		acmd_prev_transfer <= acmd_new_transfer;
+		acmd_prev_write <= acmd_new_write;
+		acmd_prev_regno <= acmd_new_regno;
+		acmd_prev_unsupported <= acmd_new_unsupported;
+	end
+end
+
+wire       acmd_postexec    = acmd_new ? acmd_new_postexec    : acmd_prev_postexec   ;
+wire       acmd_transfer    = acmd_new ? acmd_new_transfer    : acmd_prev_transfer   ;
+wire       acmd_write       = acmd_new ? acmd_new_write       : acmd_prev_write      ;
+wire [4:0] acmd_regno       = acmd_new ? acmd_new_regno       : acmd_prev_regno      ;
+wire       acmd_unsupported = acmd_new ? acmd_new_unsupported : acmd_prev_unsupported;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		abstractcs_cmderr <= CMDERR_OK;
 		acmd_state <= S_IDLE;
-		acmd_postexec_r <= 1'b0;
-		acmd_regno_r <= 5'h0;
 	end else if (!dmactive) begin
 		abstractcs_cmderr <= CMDERR_OK;
 		acmd_state <= S_IDLE;
 	end else begin
+		if (dmi_write && dmi_paddr == ADDR_ABSTRACTCS && !abstractcs_busy)
+			abstractcs_cmderr <= abstractcs_cmderr & ~dmi_pwdata[10:8];
 		if (abstractcs_cmderr == CMDERR_OK && abstractcs_busy && dmi_access_illegal_when_busy)
 			abstractcs_cmderr <= CMDERR_BUSY;
 		if (acmd_state != S_IDLE && hart_instr_caught_exception)
@@ -344,8 +384,6 @@ always @ (posedge clk or negedge rst_n) begin
 					end else if (acmd_unsupported) begin
 						abstractcs_cmderr <= CMDERR_UNSUPPORTED;
 					end else begin
-						acmd_postexec_r <= acmd_postexec;
-						acmd_regno_r <= acmd_regno;
 						if (acmd_transfer && acmd_write)
 							acmd_state <= S_ISSUE_REGWRITE;
 						else if (acmd_transfer && !acmd_write)
@@ -372,7 +410,7 @@ always @ (posedge clk or negedge rst_n) begin
 			end
 			S_WAIT_REGEBREAK: begin
 				if (hart_instr_caught_ebreak) begin
-					if (acmd_postexec_r)
+					if (acmd_prev_postexec)
 						acmd_state <= S_ISSUE_PROGBUF0;
 					else
 						acmd_state <= S_IDLE;
@@ -412,8 +450,8 @@ assign hart_instr_data_vld = {{N_HARTS{1'b0}},
 } << hartsel;
 
 assign hart_instr_data = {N_HARTS{
-	acmd_state == S_ISSUE_REGWRITE  ? 32'h7b202073 | {20'd0, acmd_regno_r,  7'd0} : // csrr xx, data0
-	acmd_state == S_ISSUE_REGREAD   ? 32'h7b201073 | {12'd0, acmd_regno_r, 15'd0} : // csrw data0, xx
+	acmd_state == S_ISSUE_REGWRITE  ? 32'h7b202073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, data0
+	acmd_state == S_ISSUE_REGREAD   ? 32'h7b201073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw data0, xx
 	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                    :
 	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                    :
 	                                  32'h00100073                                  // ebreak
