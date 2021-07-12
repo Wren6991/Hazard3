@@ -1,49 +1,53 @@
 == Debug
 
-Currently the plan is for Hazard3, with its associated debug module (DM), to support the following:
+Hazard3, along with its external debug components, implements version 0.13.2 of the RISC-V debug specification. The goals of this implementation are:
+
+* Minimal impact on core timing when present
+* No external components which need integrating at the other end of your bus fabric -- just slap the Debug Module onto the core and away you go
+* Maximally efficient block data transfers to target RAM for faster edit-compile-run cycle
+
+Hazard3's debug support implements the following:
 
 * Run/halt/reset control as required
 * Abstract GPR access as required
 * Program Buffer, 2 words plus `impebreak`
-* Automatic trigger of abstract command on data/progbuf access (`abstractauto`) for efficient memory block transfers from the host
-* Some minimum useful trigger unit -- likely just breakpoints, no watchpoints
+* Automatic trigger of abstract command on `data0` access (`abstractauto`) for efficient memory block transfers from the host
+* (TODO) Some minimum useful trigger unit -- likely just breakpoints, no watchpoints
 
-The core itself will implement the following, enabling the DM to provide a compliant debug interface:
+The DM can inject instructions directly into the core's instruction prefetch buffer. The DM writes instructions from the Program Buffer to this interface, as well as writing its own hardcoded instructions to manipulate core state and implement abstract commands.
 
-* Debug mode CSRs `dcsr`, `dpc` and `data0`
-* Ability to enter debug mode with correct update of `dcsr` and `dpc`
-** Synchronously via exception, `ebreak` or trigger match
-** Asynchronously via external halt request
-* Ability to exit debug mode to M mode
-* Direct read/write access to the `data0` CSR from an external Debug Module
-* Ability to inject words into the instruction prefetch queue when in debug mode
-* Address query/match interface for external trigger unit
-* Ability to suppress exception entry when executing instructions in debug mode, and provide an external signal to indicate the exception took place
-
-The DM implements abstract GPR access by reading/writing the `data0` CSR, and injecting CSR access instructions. A GPR write uses a `data0` write followed by a `csrr x, data0`, and a GPR read uses a `csrw data0, x` followed by a `data0` read.
+The DM's `data0` register is implemented as an externally-accessible core CSR in the debug space, so abstract GPR accesses translate to a `csrw data0, x` (read GPR `x`) or `csrr x, data0` (write to GPR `x`). The DM always follows this instruction up with an `ebreak` so that it is notified by the core when the instruction sequence completes, just like the implicit `ebreak` at the end of the Program Buffer.
 
 The debugger implements memory and CSR access using the Program Buffer, which uses the same instruction injection interface used by the DM to implement abstract GPR access. The `abstractauto` feature allows the DM to execute the program buffer automatically following every abstract GPR access, which can be used for e.g. autoincrementing read/write memory bursts.
 
+Abstract memory access is not implemented because it offers no better throughput than Program Buffer execution with `abstractauto` for bulk transfers, and non-bulk transfers are still instantaneous from the perspective of the human at the other end of the wire.
+
 === Implementation-defined behaviour
 
-This is not an exhaustive list (yet).
+Features implemented by DM (beyond the mandatory):
 
-DM feature support:
-
-* Abstract CSR and memory access are not implemented
-* The Program Buffer is implemented, size 2 words, `impebreak` = 1.
+* Halt-on-reset, selectable per-hart
+* Program Buffer, size 2 words, `impebreak` = 1.
 * A single data register (`data0`) is implemented as a per-hart CSR accessible by the DM
-* `abstractauto` is supported on the program buffer registers and the data register
-* Multiple hart selection (`hasel` = 1) is not supported
+* `abstractauto` is supported on the `data0` register
+* Up to 32 harts selectable via `hartsel`
+
+Not implemented:
+
+* Hart array mask selection
+* Halt summary registers
+* Abstract access memory
+* Abstract access CSR
+* Post-incrementing abstract access GPR
+* System bus access
 
 Core behaviour:
 
-* All control transfer instructions are illegal in debug mode (depend on value of PC)
-* `auipc` is illegal in debug mode (depends on value of PC)
-* The `dret` instruction is not supported (a special purpose DM-to-core signal is used to signal resume)
+* Branch, `jal`, `jalr` and `auipc` are illegal in debug mode, because they observe PC: attempting to execute will halt Program Buffer execution and report an exception in `abstractcs.cmderr`
+* The `dret` instruction is not implemented (a special purpose DM-to-core signal is used to signal resume)
 * Entering and exiting debug mode does not clear an atomic load reservation; the host may explicitly clear a reservation using a dummy `sc` instruction via the program buffer.
 * The `dscratch` CSRs are not implemented
-* `data0` is implemented as a scratch CSR mapped at `0x7b2` (the location of `dscratch0`), readable and writable by the debugger.
+* `data0` is implemented as a scratch CSR mapped at `0x7b2` (the location of `dscratch0`), readable and writable by the DM.
 * `dcsr.stepie` is hardwired to 0 (no interrupts during single stepping)
 * `dcsr.stopcount` and `dcsr.stoptime` are hardwired to 1 (no counter or internal timer increment in debug mode)
 * `dcsr.mprven` is hardwired to 0
