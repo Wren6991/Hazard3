@@ -69,7 +69,7 @@ module hazard3_dm #(
 	input  wire [N_HARTS*XLEN-1:0]   hart_data0_rdata,
 	output wire [N_HARTS*XLEN-1:0]   hart_data0_wdata,
 	output wire [N_HARTS-1:0]        hart_data0_wen,
-	
+
 	// Hart instruction injection
 	output wire [N_HARTS*XLEN-1:0]   hart_instr_data,
 	output wire [N_HARTS-1:0]        hart_instr_data_vld,
@@ -353,7 +353,7 @@ always @ (posedge clk or negedge rst_n) begin
 						else if (acmd_postexec)
 							acmd_state <= S_ISSUE_PROGBUF0;
 						else
-							acmd_state <= S_IDLE;					
+							acmd_state <= S_IDLE;
 					end
 				end
 			end

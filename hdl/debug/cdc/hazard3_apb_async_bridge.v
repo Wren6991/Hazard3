@@ -28,7 +28,8 @@
 
 module hazard3_apb_async_bridge #(
     parameter W_ADDR = 8,
-    parameter W_DATA = 32
+    parameter W_DATA = 32,
+    parameter N_SYNC_STAGES = 2
 ) (
     // Resets assumed to be synchronised externally
     input wire               clk_src,
@@ -58,8 +59,6 @@ module hazard3_apb_async_bridge #(
     input  wire              dst_pslverr
 );
 
-localparam N_SYNC_STAGES = 3;
-
 // ----------------------------------------------------------------------------
 // Clock-crossing registers
 
@@ -83,11 +82,18 @@ wire                                                       dst_req;
 `HAZARD3_REG_KEEP_ATTRIBUTE reg                            dst_ack;
 wire                                                       src_ack;
 
-`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_ADDR + W_DATA + 1 -1:0] src_paddr_pwdata_pwrite;
-`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_ADDR + W_DATA + 1 -1:0] dst_paddr_pwdata_pwrite;
+// Note the launch registers are not resettable. We maintain setup/hold on
+// launch-to-capture paths thanks to the req/ack handshake. A stray reset
+// could violate this.
+//
+// The req/ack logic itself can be reset safely because the receiving domain
+// is protected from metastability by a 2FF synchroniser.
 
-`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_DATA + 1 -1:0]          dst_prdata_pslverr;
-`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_DATA + 1 -1:0]          src_prdata_pslverr;
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_ADDR + W_DATA + 1 -1:0] src_paddr_pwdata_pwrite; // launch
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_ADDR + W_DATA + 1 -1:0] dst_paddr_pwdata_pwrite; // capture
+
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_DATA + 1 -1:0]          dst_prdata_pslverr;      // launch
+`HAZARD3_REG_KEEP_ATTRIBUTE reg [W_DATA + 1 -1:0]          src_prdata_pslverr;      // capture
 
 hazard3_sync_1bit #(
     .N_STAGES (N_SYNC_STAGES)
@@ -139,10 +145,15 @@ always @ (posedge clk_src or negedge rst_n_src) begin
         if (src_psel) begin
             src_pready_r <= 1'b0;
             src_req <= 1'b1;
-            src_paddr_pwdata_pwrite <= {src_paddr, src_pwdata, src_pwrite};
             src_waiting_for_downstream <= 1'b1;
         end
     end
+end
+
+// Bus request launch register is not resettable
+always @ (posedge clk_src) begin
+    if (src_psel && !src_waiting_for_downstream)
+        src_paddr_pwdata_pwrite <= {src_paddr, src_pwdata, src_pwrite};
 end
 
 assign {src_prdata, src_pslverr} = src_prdata_pslverr;
@@ -181,8 +192,13 @@ always @ (posedge clk_dst or negedge rst_n_dst) begin
     end else if (dst_bus_finish) begin
         dst_psel_r <= 1'b0;
         dst_penable_r <= 1'b0;
-        dst_prdata_pslverr <= {dst_prdata, dst_pslverr};
     end
+end
+
+// Bus response launch register is not resettable
+always @ (posedge clk_dst) begin
+    if (dst_bus_finish)
+        dst_prdata_pslverr <= {dst_prdata, dst_pslverr};
 end
 
 assign dst_psel = dst_psel_r;
