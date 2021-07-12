@@ -123,7 +123,6 @@ always @ (posedge clk_src or negedge rst_n_src) begin
     if (!rst_n_src) begin
         src_req <= 1'b0;
         src_waiting_for_downstream <= 1'b0;
-        src_paddr_pwdata_pwrite <= {W_ADDR + W_DATA + 1{1'b0}};
         src_prdata_pslverr <= {W_DATA + 1{1'b0}};
         src_pready_r <= 1'b1;
     end else if (src_waiting_for_downstream) begin
@@ -163,25 +162,23 @@ assign src_pready = src_pready_r;
 // dst state machine
 
 wire dst_bus_finish = dst_penable && dst_pready;
+reg dst_psel_r;
+reg dst_penable_r;
 
 always @ (posedge clk_dst or negedge rst_n_dst) begin
     if (!rst_n_dst) begin
         dst_ack <= 1'b0;
     end else if (dst_req) begin
         dst_ack <= 1'b1;
-    end else if (!dst_req && dst_penable && dst_pready) begin
+    end else if (!dst_req && dst_ack && !dst_psel_r) begin
         dst_ack <= 1'b0;
     end
 end
-
-reg dst_psel_r;
-reg dst_penable_r;
 
 always @ (posedge clk_dst or negedge rst_n_dst) begin
     if (!rst_n_dst) begin
         dst_psel_r <= 1'b0;
         dst_penable_r <= 1'b0;
-        dst_prdata_pslverr <= {W_DATA + 1{1'b0}};
     end else if (dst_req && !dst_ack) begin
         dst_psel_r <= 1'b1;
         // Note this assignment is cross-domain. The src register has been

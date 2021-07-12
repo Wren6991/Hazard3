@@ -1,0 +1,67 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Mon Jul 12 17:15:59 2021
+[*]
+[dumpfile] "/home/luke/proj/hazard3/test/sim/debug_openocd_bitbang/waves.vcd"
+[dumpfile_mtime] "Mon Jul 12 17:11:32 2021"
+[dumpfile_size] 2961061
+[savefile] "/home/luke/proj/hazard3/test/sim/debug_openocd_bitbang/waves.gtkw"
+[timestart] 0
+[size] 1920 1043
+[pos] -1 -1
+*-13.000000 18597 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] inst_hazard3_jtag_dtm.
+[sst_width] 233
+[signals_width] 222
+[sst_expanded] 1
+[sst_vpaned_height] 298
+@28
+clk
+trst_n
+rst_n_dmi
+@200
+-
+@201
+-DTM
+@28
+tck
+tms
+tdi
+tdo
+@200
+-
+@22
+inst_hazard3_jtag_dtm.tap_state[3:0]
+inst_hazard3_jtag_dtm.ir[4:0]
+@28
+inst_hazard3_jtag_dtm.dmi_cmderr[1:0]
+inst_hazard3_jtag_dtm.dmi_busy
+@200
+-
+-DMI
+@22
+dm.dmi_paddr[7:0]
+@28
+dm.dmi_penable
+dm.dmi_pwrite
+@22
+dm.dmi_pwdata[31:0]
+dm.dmi_prdata[31:0]
+@200
+-
+-DM Internals
+@28
+dm.dmactive
+@200
+-
+-Processor Debug Controls
+@28
+cpu.dbg_req_halt
+cpu.dbg_req_halt_on_reset
+cpu.dbg_req_resume
+cpu.dbg_halted
+cpu.dbg_running
+@200
+-
+[pattern_trace] 1
+[pattern_trace] 0
