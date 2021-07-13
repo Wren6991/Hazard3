@@ -38,14 +38,6 @@ void exit_help(std::string errtext = "") {
 	exit(-1);
 }
 
-enum cmdstate {
-	S_IDLE = 0,
-	S_WRITE_SETUP,
-	S_WRITE_ACCESS,
-	S_READ_SETUP,
-	S_READ_ACCESS
-};
-
 int main(int argc, char **argv) {
 
 	if (argc < 2)
@@ -178,9 +170,6 @@ int main(int argc, char **argv) {
 	top.p_trst__n.set<bool>(true);
 	top.p_rst__n.set<bool>(true);
 	top.step();
-
-	cmdstate state = S_IDLE;
-	int idle_counter = 0;
 
 	for (int64_t cycle = 0; cycle < max_cycles; ++cycle) {
 		top.p_clk.set<bool>(false);

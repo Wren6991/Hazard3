@@ -707,6 +707,8 @@ hazard3_regfile_1w2r #(
 	.RESET_REGS(1),
 `elsif FORMAL
 	.RESET_REGS(1),
+`elsif FPGA
+	.RESET_REGS(0),
 `else
 	.RESET_REGS(1),
 `endif
