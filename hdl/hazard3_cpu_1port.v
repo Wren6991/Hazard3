@@ -61,9 +61,9 @@ module hazard3_cpu_1port #(
 	output wire              dbg_instr_caught_ebreak,
 
 	// Level-sensitive interrupt sources
-	input wire [NUM_IRQ-1:0] irq,          // -> mip.meip
-	input wire               irq_software, // -> mip.msip
-	input wire               irq_timer     // -> mip.mtip
+	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
+	input wire               soft_irq,  // -> mip.msip
+	input wire               timer_irq  // -> mip.mtip
 );
 
 // ----------------------------------------------------------------------------

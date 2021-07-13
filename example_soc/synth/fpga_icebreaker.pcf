@@ -1,0 +1,35 @@
+# 12 MHz oscillator
+set_io clk_osc 35
+
+# JTAG is on FTDI B channel so it doesn't inadvertently assert flash CS pin
+# (usually UART would be on the B channel)
+set_io tck  6 # FTDI BDBUS0
+set_io tdi  9 # FTDI BDBUS1
+set_io tdo 18 # FTDI BDBUS2
+set_io tms 19 # FTDI BDBUS3
+
+# UART is moved over to FTDI A channel -- this means flash is inaccessible
+# (and stays in a quiescent state since CSn is disconnected and pulled high)
+set_io uart_rx 15 # FTDI ADBUS0, flash SCK, iCE SCK
+set_io uart_tx 14 # FTDI ADBUS1, flash MOSI, iCE SO (if jumper J15 connected)
+
+# SPI flash
+# set_io flash_mosi 14
+# set_io flash_miso 17
+# set_io flash_sclk 15
+# set_io flash_cs 16
+
+# # Buttons
+# set_io dpad_u 20 # Snapoff top
+# set_io dpad_d 18 # Snapoff bottom
+# set_io dpad_l 10 # Main board
+# set_io dpad_r 19 # Snapoff middle
+
+# # LEDs
+# set_io led[0] 37 # Green on main board
+# set_io led[1] 11 # Red on main board
+# set_io led[2] 26 # Middle on snapoff (L1)
+# set_io led[3] 27 # Left on snapoff   (L2)
+# set_io led[4] 25 # Right on snapoff  (L3)
+# set_io led[5] 23 # Top on snapoff    (L4)
+# set_io led[6] 21 # Bottom on snapoff (L5)

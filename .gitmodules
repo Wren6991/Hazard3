@@ -10,3 +10,6 @@
 [submodule "test/formal/riscv-formal"]
 	path = test/formal/riscv-formal/riscv-formal
 	url = https://github.com/Wren6991/riscv-formal.git
+[submodule "example_soc/libfpga"]
+	path = example_soc/libfpga
+	url = https://github.com/Wren6991/libfpga.git

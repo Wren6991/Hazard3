@@ -1,0 +1,10 @@
+srcs.mk
+*.blif
+*.asc
+*.hex
+*.bin
+*.json
+*.log
+*.config
+*.svf
+*.bit
