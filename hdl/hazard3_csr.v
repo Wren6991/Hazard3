@@ -821,7 +821,7 @@ always @ (*) begin
 			12'd0,        // reserved
 			dcsr_ebreakm,
 			3'h0,         // No other modes besides M to break from
-			1'b0,         // stepie = 0, no interrupts in single-step mode (FIXME implement this)
+			1'b0,         // stepie = 0, no interrupts in single-step mode
 			1'b1,         // stopcount = 1, no counter increment in debug mode
 			1'b1,         // stoptime = 0, no core-local timer increment in debug mode
 			dcsr_cause,
@@ -888,10 +888,15 @@ always @ (posedge clk or negedge rst_n) begin
 		if (instr_ret)
 			have_just_reset <= 1'b0;
 
-		if (debug_mode)
+		if (debug_mode) begin
 			step_halt_req <= 1'b0;
-		else if (dcsr_step && instr_ret)
+		end else if (dcsr_step && (instr_ret || (trap_enter_vld && trap_enter_rdy))) begin
+			// Note exception entry is also considered a step -- in this case
+			// we are supposed to take the trap and then break to debug mode
+			// before executing the first trap instruction. *IRQ* entry does
+			// not occur when step is 1 (because we hardwire dcsr.stepie to 0)
 			step_halt_req <= 1'b1;
+		end
 
 		pending_dbg_resume <= (pending_dbg_resume || dbg_req_resume) && debug_mode;
 	end
@@ -964,8 +969,8 @@ assign mip = {
 // When eivect = 1, mip.meip is masked from the standard IRQs, so that the
 // platform-specific causes and vectors are used instead.
 wire [31:0] mip_no_global = mip & ~(32'h800 & ~{XLEN{midcr_eivect}});
-wire standard_irq_active = |(mip_no_global & mie) && mstatus_mie;
-wire external_irq_active = external_irq_pending && mstatus_mie && mie_meie;
+wire standard_irq_active = |(mip_no_global & mie) && mstatus_mie && !dcsr_step;
+wire external_irq_active = external_irq_pending && mstatus_mie && !dcsr_step && mie_meie;
 
 wire [4:0] external_irq_num;
 wire [3:0] standard_irq_num;
