@@ -23,6 +23,8 @@ enum {
 	IO_EXIT       = 8
 };
 
+static const int TCP_BUF_SIZE = 256;
+
 const char *help_str =
 "Usage: tb binfile [vcdfile] [--dump start end] [--cycles n] [--port n]\n"
 "    binfile          : Binary to load into start of memory\n"
@@ -88,6 +90,8 @@ int main(int argc, char **argv) {
 	struct sockaddr_in sock_addr;
 	int sock_opt = 1;
 	socklen_t sock_addr_len = sizeof(sock_addr);
+	char txbuf[TCP_BUF_SIZE], rxbuf[TCP_BUF_SIZE];
+	int rx_ptr = 0, rx_remaining = 0, tx_ptr = 0;
 
 	server_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_fd == 0) {
@@ -183,9 +187,11 @@ int main(int argc, char **argv) {
 		// writes) but reads take 0 cycles, step=false.
 		bool got_exit_cmd = false;
 		bool step = false;
-		char c;
 		while (!step) {
-			if (read(sock_fd, &c, 1) > 0) {
+			if (rx_remaining > 0) {
+				char c = rxbuf[rx_ptr++];
+				--rx_remaining;
+
 				if (c == 'r' || c == 's') {
 					top.p_trst__n.set<bool>(true);
 					step = true;
@@ -201,13 +207,28 @@ int main(int argc, char **argv) {
 					step = true;
 				}
 				else if (c == 'R') {
-					char d = top.p_tdo.get<bool>() ? '1' : '0';
-					send(sock_fd, &d, 1, 0);
+					txbuf[tx_ptr++] = top.p_tdo.get<bool>() ? '1' : '0';
+					if (tx_ptr >= TCP_BUF_SIZE || rx_remaining == 0) {
+						send(sock_fd, txbuf, tx_ptr, 0);
+						tx_ptr = 0;
+					}
 				}
 				else if (c == 'Q') {
 					got_exit_cmd = true;
 					step = true;
 				}
+			}
+			else {
+				// Potentially the last command was not a read command, but
+				// OpenOCD is still waiting for a last response from its
+				// last command packet before it sends us any more, so now is
+				// the time to flush TX.
+				if (tx_ptr > 0) {
+					send(sock_fd, txbuf, tx_ptr, 0);
+					tx_ptr = 0;
+				}	
+				rx_ptr = 0;
+				rx_remaining = read(sock_fd, &rxbuf, TCP_BUF_SIZE);
 			}
 		}
 

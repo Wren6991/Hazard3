@@ -1,0 +1,5 @@
+set arch riscv:rv32
+set confirm off
+set disassemble-next-line on
+targ rem localhost:3333
+monitor reset halt
