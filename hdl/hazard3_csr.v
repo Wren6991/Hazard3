@@ -1003,7 +1003,11 @@ assign trap_addr =
 	except == EXCEPT_MRET ? mepc :
 	pending_dbg_resume    ? dpc  : mtvec | {24'h0, vector_sel, 2'h0};
 
-assign trap_is_irq = !exception_req_any || (DEBUG_SUPPORT && want_halt_irq);
+// Check for exception-like or IRQ-like trap entry; any debug mode entry takes
+// priority over any regular trap.
+assign trap_is_irq = DEBUG_SUPPORT && (want_halt_except || want_halt_irq) ?
+	!want_halt_except : !exception_req_any;
+
 assign trap_enter_vld =
 	CSR_M_TRAP && (exception_req_any ||
 		!delay_irq_entry && (standard_irq_active || external_irq_active)) ||
