@@ -26,13 +26,13 @@ enum {
 static const int TCP_BUF_SIZE = 256;
 
 const char *help_str =
-"Usage: tb binfile [vcdfile] [--dump start end] [--cycles n] [--port n]\n"
-"    binfile          : Binary to load into start of memory\n"
-"    vcdfile          : Path to dump waveforms to\n"
-"    --dump start end : Print out memory contents between start and end (exclusive)\n"
-"                       after execution finishes. Can be passed multiple times.\n"
-"    --cycles n       : Maximum number of cycles to run before exiting.\n"
-"    --port n         : Port number to listen for openocd remote bitbang\n"
+"Usage: tb [vcdfile] [--dump start end] [--cycles n] [--port n]\n"
+"    vcdfile           : Path to dump waveforms to\n"
+"    --dump start end  : Print out memory contents between start and end (exclusive)\n"
+"                        after execution finishes. Can be passed multiple times.\n"
+"    --cycles n        : Maximum number of cycles to run before exiting.\n"
+"                        Default is 0 (no maximum).\n"
+"    --port n          : Port number to listen for openocd remote bitbang\n"
 ;
 
 void exit_help(std::string errtext = "") {
@@ -42,18 +42,15 @@ void exit_help(std::string errtext = "") {
 
 int main(int argc, char **argv) {
 
-	if (argc < 2)
-		exit_help();
-
 	bool dump_waves = false;
 	std::string waves_path;
 	std::vector<std::pair<uint32_t, uint32_t>> dump_ranges;
-	int64_t max_cycles = 100000;
+	int64_t max_cycles = 0;
 	uint16_t port = 9824;
 
-	for (int i = 2; i < argc; ++i) {
+	for (int i = 1; i < argc; ++i) {
 		std::string s(argv[i]);
-		if (i == 2 && s.rfind("--", 0) != 0) {
+		if (i == 1 && s.rfind("--", 0) != 0) {
 			// Optional positional argument: vcdfile
 			dump_waves = true;
 			waves_path = s;
@@ -133,17 +130,6 @@ int main(int argc, char **argv) {
 
 	std::fill(std::begin(mem), std::end(mem), 0);
 
-	std::ifstream fd(argv[1], std::ios::binary | std::ios::ate);
-	std::streamsize bin_size = fd.tellg();
-	if (bin_size > MEM_SIZE) {
-		std::cerr << "Binary file (" << bin_size << " bytes) is larger than memory (" << MEM_SIZE << " bytes)\n";
-		return -1;
-	}
-	fd.seekg(0, std::ios::beg);
-	fd.read((char*)mem, bin_size);
-
-	std::ifstream cmdfile(argv[2]);
-
 	std::ofstream waves_fd;
 	cxxrtl::vcd_writer vcd;
 	if (dump_waves) {
@@ -175,7 +161,7 @@ int main(int argc, char **argv) {
 	top.p_rst__n.set<bool>(true);
 	top.step();
 
-	for (int64_t cycle = 0; cycle < max_cycles; ++cycle) {
+	for (int64_t cycle = 0; cycle < max_cycles || max_cycles == 0; ++cycle) {
 		top.p_clk.set<bool>(false);
 		top.step();
 		if (dump_waves)
@@ -214,6 +200,7 @@ int main(int argc, char **argv) {
 					}
 				}
 				else if (c == 'Q') {
+					printf("OpenOCD sent quit command\n");
 					got_exit_cmd = true;
 					step = true;
 				}
@@ -291,6 +278,9 @@ int main(int argc, char **argv) {
 			waves_fd << vcd.buffer;
 			vcd.buffer.clear();
 		}
+
+		if (cycle + 1 == max_cycles)
+			printf("Max cycles reached\n");
 		if (got_exit_cmd)
 			break;
 	}
