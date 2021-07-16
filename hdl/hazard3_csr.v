@@ -806,9 +806,12 @@ always @ (*) begin
 	// ------------------------------------------------------------------------
 	// Trigger Module CSRs
 
+	// If triggers aren't supported, OpenOCD expects the following:
+	// - tselect must be present
+	// - tselect must raise an exception when written to
+	// Otherwise it returns an error instead of 0 count when enumerating triggers
 	TSELECT: if (DEBUG_SUPPORT) begin
-		decode_match = 1'b1;
-		// lol
+		decode_match = !wen_soon;
 	end
 
 	// ------------------------------------------------------------------------
@@ -877,13 +880,15 @@ assign illegal = (wen_soon || ren_soon) && !decode_match;
 
 reg have_just_reset;
 reg step_halt_req;
-reg pending_dbg_resume;
+reg pending_dbg_resume_prev;
+
+wire pending_dbg_resume = (pending_dbg_resume_prev || dbg_req_resume) && debug_mode;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		have_just_reset <= |DEBUG_SUPPORT;
 		step_halt_req <= 1'b0;
-		pending_dbg_resume <= 1'b0;
+		pending_dbg_resume_prev <= 1'b0;
 	end else if (DEBUG_SUPPORT) begin
 		if (instr_ret)
 			have_just_reset <= 1'b0;
@@ -898,7 +903,7 @@ always @ (posedge clk or negedge rst_n) begin
 			step_halt_req <= 1'b1;
 		end
 
-		pending_dbg_resume <= (pending_dbg_resume || dbg_req_resume) && debug_mode;
+		pending_dbg_resume_prev <= pending_dbg_resume;
 	end
 end
 
@@ -922,9 +927,9 @@ assign dcause_next =
 	dbg_req_halt || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
 	                                                             3'h4;  // single-step (priority 0)
 
-assign enter_debug_mode = (want_halt_irq || want_halt_except) && trap_enter_rdy;
+assign enter_debug_mode = !debug_mode && (want_halt_irq || want_halt_except) && trap_enter_rdy;
 
-assign exit_debug_mode = pending_dbg_resume && trap_enter_rdy;
+assign exit_debug_mode = debug_mode && pending_dbg_resume && trap_enter_rdy;
 
 // Report back to DM instruction injector to tell it its instruction sequence
 // has finished (ebreak) or crashed out
