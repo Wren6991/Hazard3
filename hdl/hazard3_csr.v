@@ -43,9 +43,9 @@ module hazard3_csr #(
 	output wire               dbg_instr_caught_exception,
 	output wire               dbg_instr_caught_ebreak,
 
-	output wire [W_DATA-1:0]  dbg_data0_rdata,
-	input  wire [W_DATA-1:0]  dbg_data0_wdata,
-	input  wire               dbg_data0_wen,
+	input  wire [W_DATA-1:0]  dbg_data0_rdata,
+	output wire [W_DATA-1:0]  dbg_data0_wdata,
+	output wire               dbg_data0_wen,
 
 	// Read port is combinatorial.
 	// Write port is synchronous, and write effects will be observed on the next clock cycle.
@@ -238,6 +238,11 @@ localparam MIDCR          = 12'hbc0; // Implementation-defined control register 
 localparam MEIE0          = 12'hbe0; // External interrupt enable register 0
 localparam MEIP0          = 12'hfe0; // External interrupt pending register 0
 localparam MLEI           = 12'hfe4; // Lowest external interrupt number
+
+// ----------------------------------------------------------------------------
+// Trigger Module
+
+localparam TSELECT       = 12'h7a0;
 
 // ----------------------------------------------------------------------------
 // D-mode CSRs
@@ -548,21 +553,8 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-reg [XLEN-1:0] data0;
-
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		data0 <= X0;
-	end else if (DEBUG_SUPPORT) begin
-		if (dbg_data0_wen)
-			data0 <= dbg_data0_wdata;
-		else if (debug_mode && wen && addr == DATA0)
-			data0 <= update(data0);
-	end
-end
-
-assign dbg_data0_rdata = data0;
-
+assign dbg_data0_wdata = wdata;
+assign dbg_data0_wen = wen && addr == DATA0;
 
 // ----------------------------------------------------------------------------
 // Read port + detect addressing of unmapped CSRs
@@ -812,6 +804,14 @@ always @ (*) begin
 	end
 
 	// ------------------------------------------------------------------------
+	// Trigger Module CSRs
+
+	TSELECT: if (DEBUG_SUPPORT) begin
+		decode_match = 1'b1;
+		// lol
+	end
+
+	// ------------------------------------------------------------------------
 	// Debug CSRs
 
 	DCSR: if (DEBUG_SUPPORT && debug_mode) begin
@@ -840,7 +840,7 @@ always @ (*) begin
 
 	DATA0: if (DEBUG_SUPPORT && debug_mode) begin
 		decode_match = 1'b1;
-		rdata = data0;
+		rdata = dbg_data0_rdata;
 	end
 
     // ------------------------------------------------------------------------

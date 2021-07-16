@@ -60,9 +60,9 @@ module hazard3_core #(
 	output wire              dbg_halted,
 	output wire              dbg_running,
 	// Debugger access to data0 CSR
-	output wire [W_DATA-1:0] dbg_data0_rdata,
-	input  wire [W_DATA-1:0] dbg_data0_wdata,
-	input  wire              dbg_data0_wen,
+	input  wire [W_DATA-1:0] dbg_data0_rdata,
+	output wire [W_DATA-1:0] dbg_data0_wdata,
+	output wire              dbg_data0_wen,
 	// Debugger instruction injection
 	input  wire [W_DATA-1:0] dbg_instr_data,
 	input  wire              dbg_instr_data_vld,

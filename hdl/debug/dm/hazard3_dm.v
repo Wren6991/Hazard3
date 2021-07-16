@@ -66,9 +66,9 @@ module hazard3_dm #(
 	input  wire [N_HARTS-1:0]        hart_running,
 
 	// Hart access to data0 CSR (assumed to be core-internal but per-hart)
-	input  wire [N_HARTS*XLEN-1:0]   hart_data0_rdata,
-	output wire [N_HARTS*XLEN-1:0]   hart_data0_wdata,
-	output wire [N_HARTS-1:0]        hart_data0_wen,
+	output wire [N_HARTS*XLEN-1:0]   hart_data0_rdata,
+	input  wire [N_HARTS*XLEN-1:0]   hart_data0_wdata,
+	input  wire [N_HARTS-1:0]        hart_data0_wen,
 
 	// Hart instruction injection
 	output wire [N_HARTS*XLEN-1:0]   hart_instr_data,
@@ -237,8 +237,33 @@ assign hart_req_resume = dmcontrol_resumereq_sticky;
 
 wire abstractcs_busy;
 
-assign hart_data0_wdata = {N_HARTS{dmi_pwdata}};
-assign hart_data0_wen = {{N_HARTS-1{1'b0}}, dmi_write && dmi_paddr == ADDR_DATA0 && !abstractcs_busy} << hartsel;
+// The same data0 register is aliased as a CSR on all harts connected to this
+// DM. Cores may read data0 as a CSR when in debug mode, and may write it when:
+//
+// - That core is in debug mode, and...
+// - We are currently executing an abstract command on that core
+//
+// The DM can also read/write data0 at all times.
+
+reg [XLEN-1:0] abstract_data0;
+
+assign hart_data0_rdata = {N_HARTS{abstract_data0}};
+
+always @ (posedge clk or negedge rst_n) begin: update_hart_data0
+	integer i;
+	if (!rst_n) begin
+		abstract_data0 <= {XLEN{1'b0}};
+	end else if (!dmactive) begin
+		abstract_data0 <= {XLEN{1'b0}};
+	end else if (dmi_write && dmi_paddr == ADDR_DATA0) begin
+		abstract_data0 <= dmi_pwdata;
+	end else begin
+		for (i = 0; i < N_HARTS; i = i + 1) begin
+			if (hartsel == i && hart_data0_wen[i] && hart_halted[i] && abstractcs_busy)
+				abstract_data0 <= hart_data0_wdata[i * XLEN +: XLEN];
+		end
+	end
+end
 
 reg [XLEN-1:0] progbuf0;
 reg [XLEN-1:0] progbuf1;
@@ -464,7 +489,7 @@ assign hart_instr_data = {N_HARTS{
 
 always @ (*) begin
 	case (dmi_paddr)
-	ADDR_DATA0:        dmi_prdata = hart_data0_rdata[hartsel * XLEN +: XLEN];
+	ADDR_DATA0:        dmi_prdata = abstract_data0;
 	ADDR_DMCONTROL:    dmi_prdata = {
 		dmcontrol_haltreq[hartsel],
 		1'b0,                             // resumereq is a W1 field
