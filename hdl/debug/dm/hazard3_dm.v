@@ -97,7 +97,9 @@ localparam ADDR_DATA0        = 8'h04;
 localparam ADDR_DMCONTROL    = 8'h10;
 localparam ADDR_DMSTATUS     = 8'h11;
 localparam ADDR_HARTINFO     = 8'h12;
-// No halt summary registers (assume no more than 32 harts)
+localparam ADDR_HALTSUM1     = 8'h13;
+localparam ADDR_HALTSUM0     = 8'h40;
+// No HALTSUM2+ registers (we don't support >32 harts anyway)
 // No array mask select registers
 localparam ADDR_ABSTRACTCS   = 8'h16;
 localparam ADDR_COMMAND      = 8'h17;
@@ -500,6 +502,14 @@ always @ (*) begin
 		1'b0,                             // dataccess = 0, data0 is backed by a per-hart CSR
 		4'h1,                             // datasize = 1, a single data CSR (data0) is available
 		12'h7b2                           // dataaddr, same location where dscratch0 would be if implemented
+	};
+	ADDR_HALTSUM0:     dmi_prdata = {
+		{XLEN - N_HARTS{1'b0}},
+		hart_halted & hart_available
+	};
+	ADDR_HALTSUM1:     dmi_prdata = {
+		{XLEN - 1{1'b0}},
+		|(hart_halted & hart_available)
 	};
 	ADDR_ABSTRACTCS:   dmi_prdata = {
 		3'h0,                             // reserved
