@@ -29,9 +29,19 @@ module fpga_icebreaker (
     input  wire       tdi,
     output wire       tdo,
 
+    output wire       mirror_tck,
+    output wire       mirror_tms,
+    output wire       mirror_tdi,
+    output wire       mirror_tdo,
+
 	output wire       uart_tx,
 	input  wire       uart_rx
 );
+
+assign mirror_tck = tck;
+assign mirror_tms = tms;
+assign mirror_tdi = tdi;
+assign mirror_tdo = tdo;
 
 wire clk_sys = clk_osc;
 wire rst_n_sys;
@@ -56,7 +66,7 @@ example_soc soc_u (
 	.rst_n   (rst_n_sys),
 
 	.tck     (tck),
-	.trst_n  (trst_n),
+	.trst_n  (rst_n_sys), //fixme!
 	.tms     (tms),
 	.tdi     (tdi),
 	.tdo     (tdo),

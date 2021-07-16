@@ -196,15 +196,17 @@ wire uart_irq;
 // options like faster multiply/divide.
 
 hazard3_cpu_1port #(
-	.RESET_VECTOR    (32'h2000_00c0),
-	.MTVEC_INIT      (32'h2000_0000),
+	.RESET_VECTOR    (32'h0000_00c0),
+	.MTVEC_INIT      (32'h0000_0000),
 
 	.EXTENSION_C     (0),
-	.EXTENSION_M     (0),
+	.EXTENSION_M     (1),
 	.CSR_M_MANDATORY (1),
 	.CSR_M_TRAP      (1),
-	.CSR_COUNTER     (0), // also no counters cause they're whack
+	.CSR_COUNTER     (1),
 	.DEBUG_SUPPORT   (1),
+
+	.MUL_FAST        (1),
 
 	.NUM_IRQ         (1),
 
@@ -256,7 +258,7 @@ hazard3_cpu_1port #(
 // ----------------------------------------------------------------------------
 // Bus fabric
 
-// - 128 kB SRAM (using SPRAMs) at 0x2000_0000
+// - 128 kB SRAM (using SPRAMs) at 0x0000_0000
 // - UART at 0x4000_0000
 
 // AHBL layer

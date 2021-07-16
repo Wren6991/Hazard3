@@ -2,7 +2,14 @@
 set_io clk_osc 35
 
 # JTAG is on FTDI B channel so it doesn't inadvertently assert flash CS pin
-# (usually UART would be on the B channel)
+# (usually UART would be on the B channel).
+
+# Note TDO/TMS require two of the solder jumpers on the back of the board to
+# be bridged. On the v1.0e board these are jumpers J3/J4. To find these, look
+# for the box of 5 x 2 jumpers (with a few others hanging off the side) and
+# they are the two in the central column. They line up with the space in
+# between "Jump" and "for" in the silk text "Jump for FTDI FIFO".
+
 set_io tck  6 # FTDI BDBUS0
 set_io tdi  9 # FTDI BDBUS1
 set_io tdo 18 # FTDI BDBUS2
@@ -24,6 +31,11 @@ set_io uart_tx 14 # FTDI ADBUS1, flash MOSI, iCE SO (if jumper J15 connected)
 # set_io dpad_d 18 # Snapoff bottom
 # set_io dpad_l 10 # Main board
 # set_io dpad_r 19 # Snapoff middle
+
+set_io mirror_tck 27 # Left on snapoff   (L2)
+set_io mirror_tms 25 # Right on snapoff  (L3)
+set_io mirror_tdi 23 # Top on snapoff    (L4)
+set_io mirror_tdo 21 # Bottom on snapoff (L5)
 
 # # LEDs
 # set_io led[0] 37 # Green on main board

@@ -1,6 +1,6 @@
 CHIPNAME=fpga_icebreaker
 DOTF=../fpga/fpga_icebreaker.f
-SYNTH_OPT=-retime
+SYNTH_OPT=-dsp
 
 DEVICE=up5k
 PACKAGE=sg48
