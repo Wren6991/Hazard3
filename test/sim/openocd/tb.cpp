@@ -17,6 +17,7 @@ static const unsigned int MEM_SIZE = 16 * 1024 * 1024;
 uint8_t mem[MEM_SIZE];
 
 static const unsigned int IO_BASE = 0x80000000;
+static const unsigned int IO_MASK = 0xffffff00;
 enum {
 	IO_PRINT_CHAR = 0,
 	IO_PRINT_U32  = 4,
@@ -219,56 +220,91 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		// Handle current data phase, then move current address phase to data phase
-		uint32_t rdata = 0;
-		if (bus_trans && bus_write) {
-			uint32_t wdata = top.p_d__hwdata.get<uint32_t>();
-			if (bus_addr <= MEM_SIZE) {
-				unsigned int n_bytes = 1u << bus_size;
-				// Note we are relying on hazard3's byte lane replication
-				for (unsigned int i = 0; i < n_bytes; ++i) {
-					mem[bus_addr + i] = wdata >> (8 * i) & 0xffu;
+		if (top.p_d__hready.get<bool>()) {
+			// Clear bus error by default
+			top.p_d__hresp.set<bool>(false);
+			// Handle current data phase
+			uint32_t rdata = 0;
+			bool bus_err = false;
+			if (bus_trans && bus_write) {
+				uint32_t wdata = top.p_d__hwdata.get<uint32_t>();
+				if (bus_addr <= MEM_SIZE - 4u) {
+					unsigned int n_bytes = 1u << bus_size;
+					// Note we are relying on hazard3's byte lane replication
+					for (unsigned int i = 0; i < n_bytes; ++i) {
+						mem[bus_addr + i] = wdata >> (8 * i) & 0xffu;
+					}
+				}
+				else if (bus_addr == IO_BASE + IO_PRINT_CHAR) {
+					putchar(wdata);
+				}
+				else if (bus_addr == IO_BASE + IO_PRINT_U32) {
+					printf("%08x\n", wdata);
+				}
+				else if (bus_addr == IO_BASE + IO_EXIT) {
+					printf("CPU requested halt. Exit code %d\n", wdata);
+					printf("Ran for %ld cycles\n", cycle + 1);
+					break;
+				}
+				else {
+					bus_err = true;
 				}
 			}
-			else if (bus_addr == IO_BASE + IO_PRINT_CHAR) {
-				putchar(wdata);
+			else if (bus_trans && !bus_write) {
+				if (bus_addr <= MEM_SIZE) {
+					bus_addr &= ~0x3u;
+					rdata =
+						(uint32_t)mem[bus_addr] |
+						mem[bus_addr + 1] << 8 |
+						mem[bus_addr + 2] << 16 |
+						mem[bus_addr + 3] << 24;
+				}
+				else {
+					bus_err = true;
+				}
 			}
-			else if (bus_addr == IO_BASE + IO_PRINT_U32) {
-				printf("%08x\n", wdata);
+			if (bus_err) {
+				// Phase 1 of error response
+				top.p_d__hready.set<bool>(false);
+				top.p_d__hresp.set<bool>(true);
 			}
-			else if (bus_addr == IO_BASE + IO_EXIT) {
-				printf("CPU requested halt. Exit code %d\n", wdata);
-				printf("Ran for %ld cycles\n", cycle + 1);
-				break;
-			}
+			top.p_d__hrdata.set<uint32_t>(rdata);
+
+			// Progress current address phase to data phase
+			bus_trans = top.p_d__htrans.get<uint8_t>() >> 1;
+			bus_write = top.p_d__hwrite.get<bool>();
+			bus_size = top.p_d__hsize.get<uint8_t>();
+			bus_addr = top.p_d__haddr.get<uint32_t>();
 		}
-		else if (bus_trans && !bus_write) {
-			if (bus_addr <= MEM_SIZE) {
-				bus_addr &= ~0x3u;
-				rdata =
-					(uint32_t)mem[bus_addr] |
-					mem[bus_addr + 1] << 8 |
-					mem[bus_addr + 2] << 16 |
-					mem[bus_addr + 3] << 24;
-			}
-		}
-		top.p_d__hrdata.set<uint32_t>(rdata);
-		if (bus_trans_i) {
-			bus_addr_i &= ~0x3u;
-			top.p_i__hrdata.set<uint32_t>(
-				(uint32_t)mem[bus_addr_i] |
-				mem[bus_addr_i + 1] << 8 |
-				mem[bus_addr_i + 2] << 16 |
-				mem[bus_addr_i + 3] << 24
-			);
+		else {
+			// hready=0. Currently this only happens when we're in the first
+			// phase of an error response, so go to phase 2.
+			top.p_d__hready.set<bool>(true);
 		}
 
-		bus_trans = top.p_d__htrans.get<uint8_t>() >> 1;
-		bus_write = top.p_d__hwrite.get<bool>();
-		bus_size = top.p_d__hsize.get<uint8_t>();
-		bus_addr = top.p_d__haddr.get<uint32_t>();
-		bus_trans_i = top.p_i__htrans.get<uint8_t>() >> 1;
-		bus_addr_i = top.p_i__haddr.get<uint32_t>();
+		if (top.p_i__hready.get<bool>()) {
+			top.p_i__hresp.set<bool>(false);
+			if (bus_trans_i) {
+				bus_addr_i &= ~0x3u;
+				if (bus_addr_i <= MEM_SIZE - 4u) {
+					top.p_i__hrdata.set<uint32_t>(
+						(uint32_t)mem[bus_addr_i] |
+						mem[bus_addr_i + 1] << 8 |
+						mem[bus_addr_i + 2] << 16 |
+						mem[bus_addr_i + 3] << 24
+					);
+				}
+				else {
+					top.p_i__hready.set<bool>(false);
+					top.p_i__hresp.set<bool>(true);
+				}
+			}
+			bus_trans_i = top.p_i__htrans.get<uint8_t>() >> 1;
+			bus_addr_i = top.p_i__haddr.get<uint32_t>();
+		}
+		else {
+			top.p_i__hready.set<bool>(true);
+		}
 
 		if (dump_waves) {
 			// The extra step() is just here to get the bus responses to line up nicely

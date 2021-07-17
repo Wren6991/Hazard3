@@ -1,15 +1,17 @@
 [*]
 [*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
-[*] Mon Jul 12 17:15:59 2021
+[*] Sat Jul 17 18:13:53 2021
 [*]
-[dumpfile] "/home/luke/proj/hazard3/test/sim/debug_openocd_bitbang/waves.vcd"
-[dumpfile_mtime] "Mon Jul 12 17:11:32 2021"
-[dumpfile_size] 2961061
-[savefile] "/home/luke/proj/hazard3/test/sim/debug_openocd_bitbang/waves.gtkw"
-[timestart] 0
+[dumpfile] "/home/luke/proj/hazard3/test/sim/openocd/waves.vcd"
+[dumpfile_mtime] "Sat Jul 17 18:07:33 2021"
+[dumpfile_size] 6782392
+[savefile] "/home/luke/proj/hazard3/test/sim/openocd/waves.gtkw"
+[timestart] 140588
 [size] 1920 1043
 [pos] -1 -1
-*-13.000000 18597 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-3.000000 140615 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] cpu.
+[treeopen] cpu.core.
 [treeopen] inst_hazard3_jtag_dtm.
 [sst_width] 233
 [signals_width] 222
@@ -21,7 +23,6 @@ trst_n
 rst_n_dmi
 @200
 -
-@201
 -DTM
 @28
 tck
@@ -63,5 +64,32 @@ cpu.dbg_halted
 cpu.dbg_running
 @200
 -
+-Trap stuff
+@22
+cpu.core.inst_hazard3_csr.trap_addr[31:0]
+@28
+cpu.core.inst_hazard3_csr.trap_enter_rdy
+cpu.core.inst_hazard3_csr.trap_enter_vld
+cpu.core.inst_hazard3_csr.trap_is_irq
+@22
+cpu.core.inst_hazard3_csr.except[3:0]
+@28
+cpu.core.m_stall
+@29
+cpu.core.bus_dph_err_d
+@200
+-
+-D Bus
+@22
+d_haddr[31:0]
+@28
+d_htrans[1:0]
+d_hwrite
+d_hsize[2:0]
+d_hready
+d_hresp
+@22
+d_hwdata[31:0]
+d_hrdata[31:0]
 [pattern_trace] 1
 [pattern_trace] 0
