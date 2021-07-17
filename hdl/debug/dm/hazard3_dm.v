@@ -512,20 +512,20 @@ always @ (*) begin
 		dmactive
 	};
 	ADDR_DMSTATUS:     dmi_prdata = {
-		9'h0,                             // reserved
-		1'b1,                             // impebreak = 1
-		2'h0,                             // reserved
-		{2{dmstatus_havereset[hartsel]}}, // allhavereset, anyhavereset
-		{2{dmstatus_resumeack[hartsel]}}, // allresumeack, anyresumeack
-		{2{hartsel >= N_HARTS}},          // allnonexistent, anynonexistent
-		{2{!hart_available[hartsel]}},    // allunavail, anyunavail
-		{2{hart_running[hartsel]}},       // allrunning, anyrunning
-		{2{hart_halted[hartsel]}},        // allhalted, anyhalted
-		1'b1,                             // authenticated
-		1'b0,                             // authbusy
-		1'b1,                             // hasresethaltreq = 1 (we do support it)
-		1'b0,                             // confstrptrvalid
-		4'd2                              // version = 2: RISC-V debug spec 0.13.2
+		9'h0,                                                  // reserved
+		1'b1,                                                  // impebreak = 1
+		2'h0,                                                  // reserved
+		{2{dmstatus_havereset[hartsel]}},                      // allhavereset, anyhavereset
+		{2{dmstatus_resumeack[hartsel]}},                      // allresumeack, anyresumeack
+		{2{hartsel >= N_HARTS}},                               // allnonexistent, anynonexistent
+		{2{!hart_available[hartsel]}},                         // allunavail, anyunavail
+		{2{hart_running[hartsel] && hart_available[hartsel]}}, // allrunning, anyrunning
+		{2{hart_halted[hartsel] && hart_available[hartsel]}},  // allhalted, anyhalted
+		1'b1,                                                  // authenticated
+		1'b0,                                                  // authbusy
+		1'b1,                                                  // hasresethaltreq = 1 (we do support it)
+		1'b0,                                                  // confstrptrvalid
+		4'd2                                                   // version = 2: RISC-V debug spec 0.13.2
 	};
 	ADDR_HARTINFO:     dmi_prdata = {
 		8'h0,                             // reserved
