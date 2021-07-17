@@ -202,7 +202,7 @@ localparam MHPMCOUNTER29H = 12'hb9d;
 localparam MHPMCOUNTER30H = 12'hb9e;
 localparam MHPMCOUNTER31H = 12'hb9f;
 
-localparam MCOUNTINHIBIT  = 12'h302; // Count inhibit register for mcycle/minstret
+localparam MCOUNTINHIBIT  = 12'h320; // Count inhibit register for mcycle/minstret
 localparam MHPMEVENT3     = 12'h323; // WARL (we tie to 0)
 localparam MHPMEVENT4     = 12'h324; // WARL (we tie to 0)
 localparam MHPMEVENT5     = 12'h325; // WARL (we tie to 0)
