@@ -199,9 +199,12 @@ always @ (posedge clk or negedge rst_n)
 	else if (d_hready)
 		dphase_active_d <= core_aph_req_d;
 
+// D-side errors are reported even when not ready, so that the core can make
+// use of the two-phase error response to cleanly squash a second load/store
+// chasing the faulting one down the pipeline.
 assign core_aph_ready_d = d_hready && core_aph_req_d;
 assign core_dph_ready_d = d_hready && dphase_active_d;
-assign core_dph_err_d   = d_hready && dphase_active_d && d_hresp;
+assign core_dph_err_d = dphase_active_d && d_hresp;
 
 assign core_rdata_d = d_hrdata;
 assign d_hwdata = core_wdata_d;

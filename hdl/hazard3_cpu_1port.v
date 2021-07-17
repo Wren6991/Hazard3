@@ -231,8 +231,11 @@ assign core_aph_ready_i = ahblm_hready && bus_gnt_i;
 assign core_dph_ready_i = ahblm_hready && bus_active_dph_i;
 assign core_dph_err_i   = ahblm_hready && bus_active_dph_i && ahblm_hresp;
 
+// D-side errors are reported even when not ready, so that the core can make
+// use of the two-phase error response to cleanly squash a second load/store
+// chasing the faulting one down the pipeline.
 assign core_aph_ready_d = ahblm_hready && bus_gnt_d;
 assign core_dph_ready_d = ahblm_hready && bus_active_dph_d;
-assign core_dph_err_d   = ahblm_hready && bus_active_dph_d && ahblm_hresp;
+assign core_dph_err_d = bus_active_dph_d && ahblm_hresp;
 
 endmodule
