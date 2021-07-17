@@ -284,14 +284,19 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // We only support abstractauto on data0 update (use case is bulk memory read/write)
-reg abstractauto_autoexecdata;
+reg       abstractauto_autoexecdata;
+reg [1:0] abstractauto_autoexecprogbuf;
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		abstractauto_autoexecdata <= 1'b0;
+		abstractauto_autoexecprogbuf <= 2'b00;
 	end else if (!dmactive) begin
 		abstractauto_autoexecdata <= 1'b0;
+		abstractauto_autoexecprogbuf <= 2'b00;
 	end else if (dmi_write && dmi_paddr == ADDR_ABSTRACTAUTO) begin
 		abstractauto_autoexecdata <= dmi_pwdata[0];
+		abstractauto_autoexecprogbuf <= dmi_pwdata[17:16];
 	end
 end
 
@@ -324,7 +329,9 @@ assign abstractcs_busy = acmd_state != S_IDLE;
 
 wire start_abstract_cmd = abstractcs_cmderr == CMDERR_OK && !abstractcs_busy && (
 	(dmi_write && dmi_paddr == ADDR_COMMAND) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_paddr == ADDR_DATA0)
+	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_paddr == ADDR_DATA0) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[0] && dmi_paddr == ADDR_PROGBUF0) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[1] && dmi_paddr == ADDR_PROGBUF1)
 );
 
 wire dmi_access_illegal_when_busy =
@@ -547,8 +554,10 @@ always @ (*) begin
 		4'd1                              // datacount = 1
 	};
 	ADDR_ABSTRACTAUTO: dmi_prdata = {
-		31'h0,
-		abstractauto_autoexecdata         // only data0 supported
+		14'h0,
+		abstractauto_autoexecprogbuf,     // only progbuf0,1 present
+		15'h0,
+		abstractauto_autoexecdata         // only data0 present
 	};
 	ADDR_CONFSTRPTR0:  dmi_prdata = 32'h4c296328;
 	ADDR_CONFSTRPTR1:  dmi_prdata = 32'h20656b75;
