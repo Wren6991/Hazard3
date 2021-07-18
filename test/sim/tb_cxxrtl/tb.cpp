@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
 #else
 			uint32_t wdata = top.p_ahblm__hwdata.get<uint32_t>();
 #endif
-			if (bus_addr <= MEM_SIZE) {
+			if (bus_addr <= MEM_SIZE - (1u << bus_size)) {
 				unsigned int n_bytes = 1u << bus_size;
 				// Note we are relying on hazard3's byte lane replication
 				for (unsigned int i = 0; i < n_bytes; ++i) {
@@ -158,8 +158,8 @@ int main(int argc, char **argv) {
 			}
 		}
 		else if (bus_trans && !bus_write) {
-			if (bus_addr <= MEM_SIZE) {
-				bus_addr &= ~0x3u;
+			bus_addr &= ~0x3u;
+			if (bus_addr <= MEM_SIZE - 4) {
 				rdata =
 					(uint32_t)mem[bus_addr] |
 					mem[bus_addr + 1] << 8 |
@@ -171,12 +171,17 @@ int main(int argc, char **argv) {
 		top.p_d__hrdata.set<uint32_t>(rdata);
 		if (bus_trans_i) {
 			bus_addr_i &= ~0x3u;
-			top.p_i__hrdata.set<uint32_t>(
-				(uint32_t)mem[bus_addr_i] |
-				mem[bus_addr_i + 1] << 8 |
-				mem[bus_addr_i + 2] << 16 |
-				mem[bus_addr_i + 3] << 24
-			);
+			if (bus_addr_i <= MEM_SIZE - 4) {
+				top.p_i__hrdata.set<uint32_t>(
+					(uint32_t)mem[bus_addr_i] |
+					mem[bus_addr_i + 1] << 8 |
+					mem[bus_addr_i + 2] << 16 |
+					mem[bus_addr_i + 3] << 24
+				);
+			}
+			else {
+				top.p_i__hrdata.set<uint32_t>(0);
+			}
 		}
 #else
 		top.p_ahblm__hrdata.set<uint32_t>(rdata);
