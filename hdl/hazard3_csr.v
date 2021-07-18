@@ -1018,7 +1018,7 @@ assign trap_is_irq = DEBUG_SUPPORT && (want_halt_except || want_halt_irq) ?
 
 assign trap_enter_vld =
 	CSR_M_TRAP && (exception_req_any ||
-		!delay_irq_entry && (standard_irq_active || external_irq_active)) ||
+		!delay_irq_entry && !debug_mode && (standard_irq_active || external_irq_active)) ||
 	DEBUG_SUPPORT && (want_halt_irq || want_halt_except || pending_dbg_resume);
 
 assign mcause_irq_next = !exception_req_any;
