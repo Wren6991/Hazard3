@@ -23,6 +23,7 @@ SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
 SYNTH_CMD += chparam -set MULDIV_UNROLL $(MULDIV_UNROLL) $(TOP);
 SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
 SYNTH_CMD += prep -flatten -top $(TOP); async2sync;
+SYNTH_CMD += splitnets -driver;
 SYNTH_CMD += write_cxxrtl dut.cpp
 
 dut.cpp:
