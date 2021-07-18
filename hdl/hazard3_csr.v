@@ -384,7 +384,7 @@ end
 
 // Interrupt enable (reserved bits are tied to 0)
 reg [XLEN-1:0] mie;
-localparam MIE_WMASK = 32'h00000888; // meie, mtip, msip
+localparam MIE_WMASK = 32'h00000888; // meie, mtie, msie
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -999,6 +999,9 @@ hazard3_priority_encode #(
 // depending on dcsr.ebreakm.
 wire exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
 
+// Note when eivect=0 external interrupts also count as standard interrupts,
+// so the standard mapping (collapsed into a single vector) always takes
+// priority.
 wire [5:0] vector_sel =
 	exception_req_any || !irq_vector_enable ? 6'd0                             :
 	standard_irq_active                     ? {2'h0, standard_irq_num}         :
@@ -1019,7 +1022,8 @@ assign trap_enter_vld =
 	DEBUG_SUPPORT && (want_halt_irq || want_halt_except || pending_dbg_resume);
 
 assign mcause_irq_next = !exception_req_any;
-assign mcause_code_next = exception_req_any ? {2'h0, except} : vector_sel;
+assign mcause_code_next = exception_req_any ? {2'h0, except} :
+	standard_irq_active ? standard_irq_num : external_irq_num;
 
 // ----------------------------------------------------------------------------
 
