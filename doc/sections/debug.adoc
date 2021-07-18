@@ -22,6 +22,8 @@ The debug host must use the Program Buffer to access CSRs and memory. This carri
 
 Abstract memory access is not implemented because it offers no better throughput than Program Buffer execution with `abstractauto` for bulk transfers, and non-bulk transfers are still instantaneous from the perspective of the human at the other end of the wire.
 
+The Hazard3 Debug Module has experimental support for multi-core debug. Each core possesses exactly one hardware thread (hart) which is exposed to the debugger. The RISC-V specification does not mandate what mapping is used between the Debug Module hart index `hartsel` and each core's `mhartid` CSR, but a 1:1 match of these values is the least likely to cause issues. Each core's `mhartid` can be configured using the `MHARTID_VAL` parameter during instantiation.
+
 === Implementation-defined behaviour
 
 Features implemented by DM (beyond the mandatory):

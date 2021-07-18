@@ -39,5 +39,6 @@ Hazard3 is still under development.
 - `M` memory
 	- Load/store data phase
 	- Some complex instructions, particularly multiply and divide
+	- Exception handling
 
 This is essentially Hazard5, with the `D` and `X` stages merged and the register file brought forward. Many components are reused directly from Hazard5. The particular focus here is on shortening the branch delay, which is one of the weak points in Hazard5's IPC.
