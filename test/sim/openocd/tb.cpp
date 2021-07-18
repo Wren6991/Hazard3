@@ -161,6 +161,7 @@ int main(int argc, char **argv) {
 	top.p_trst__n.set<bool>(true);
 	top.p_rst__n.set<bool>(true);
 	top.step();
+	top.step(); // workaround for github.com/YosysHQ/yosys/issues/2780
 
 	for (int64_t cycle = 0; cycle < max_cycles || max_cycles == 0; ++cycle) {
 		top.p_clk.set<bool>(false);
@@ -169,6 +170,7 @@ int main(int argc, char **argv) {
 			vcd.sample(cycle * 2);
 		top.p_clk.set<bool>(true);
 		top.step();
+		top.step(); // workaround for github.com/YosysHQ/yosys/issues/2780
 
 		// Most bitbang commands complete in one cycle (e.g. TCK/TMS/TDI
 		// writes) but reads take 0 cycles, step=false.
