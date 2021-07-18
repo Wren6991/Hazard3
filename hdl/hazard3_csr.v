@@ -323,7 +323,7 @@ always @ (posedge clk or negedge rst_n) begin
 		mstatus_mpie <= 1'b0;
 		mstatus_mie <= 1'b0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy) begin
+		if (trap_enter_vld && trap_enter_rdy && !debug_suppresses_trap_update) begin
 			if (except == EXCEPT_MRET) begin
 				mstatus_mpie <= 1'b1;
 				mstatus_mie <= mstatus_mpie;
