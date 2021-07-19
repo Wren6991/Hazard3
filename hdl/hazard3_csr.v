@@ -999,13 +999,15 @@ hazard3_priority_encode #(
 // depending on dcsr.ebreakm.
 wire exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
 
-// Note when eivect=0 external interrupts also count as standard interrupts,
-// so the standard mapping (collapsed into a single vector) always takes
-// priority.
+// Note when eivect=0 platform external interrupts also count as a standard
+// external interrupt, so the standard mapping (collapsed into a single
+// vector) always takes priority.
+wire [5:0] mcause_irq_num =
+	standard_irq_active ? {2'h0, standard_irq_num}         :
+	external_irq_active ? {1'h0, external_irq_num} + 6'd16 : 6'd0;
+
 wire [5:0] vector_sel =
-	exception_req_any || !irq_vector_enable ? 6'd0                             :
-	standard_irq_active                     ? {2'h0, standard_irq_num}         :
-	external_irq_active                     ? {1'h0, external_irq_num} + 6'd16 : 6'd0;
+	!exception_req_any && irq_vector_enable ? mcause_irq_num : 6'd0;
 
 assign trap_addr =
 	except == EXCEPT_MRET ? mepc :
@@ -1022,8 +1024,7 @@ assign trap_enter_vld =
 	DEBUG_SUPPORT && (want_halt_irq || want_halt_except || pending_dbg_resume);
 
 assign mcause_irq_next = !exception_req_any;
-assign mcause_code_next = exception_req_any ? {2'h0, except} :
-	standard_irq_active ? standard_irq_num : external_irq_num;
+assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
 
 // ----------------------------------------------------------------------------
 
