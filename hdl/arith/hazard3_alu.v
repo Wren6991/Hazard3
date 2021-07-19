@@ -48,8 +48,8 @@ assign result_add = sum;
 
 
 wire [W_DATA-1:0] shift_dout;
-reg shift_right_nleft;
-reg shift_arith;
+wire shift_right_nleft = aluop == ALUOP_SRL || aluop == ALUOP_SRA;
+wire shift_arith = aluop == ALUOP_SRA;
 
 hazard3_shift_barrel #(
 	.W_DATA(W_DATA),
@@ -76,15 +76,13 @@ always @ (*) begin: bitwise_ops
 end
 
 always @ (*) begin
-	shift_right_nleft = 1'b0;
-	shift_arith = 1'b0;
 	case (aluop)
 		ALUOP_ADD: begin result = sum; end
 		ALUOP_SUB: begin result = sum; end
 		ALUOP_LT:  begin result = {{W_DATA-1{1'b0}}, lt}; end
 		ALUOP_LTU: begin result = {{W_DATA-1{1'b0}}, lt}; end
-		ALUOP_SRL: begin shift_right_nleft = 1'b1; result = shift_dout; end
-		ALUOP_SRA: begin shift_right_nleft = 1'b1; shift_arith = 1'b1; result = shift_dout; end
+		ALUOP_SRL: begin result = shift_dout; end
+		ALUOP_SRA: begin result = shift_dout; end
 		ALUOP_SLL: begin result = shift_dout; end
 		default:   begin result = bitwise; end
 	endcase

@@ -39,9 +39,7 @@ wire sext = arith && din_rev[0]; // haha
 always @ (*) begin
 	for (i = 0; i < W_DATA; i = i + 1)
 		din_rev[i] = right_nleft ? din[W_DATA - 1 - i] : din[i];
-end
 
-always @ (*) begin
 	shift_accum = din_rev;
 	for (i = 0; i < W_SHAMT; i = i + 1) begin
 		if (shamt[i]) begin
@@ -49,9 +47,7 @@ always @ (*) begin
 				({W_DATA{sext}} & ~({W_DATA{1'b1}} << (1 << i)));
 		end
 	end
-end
 
-always @ (*) begin
 	for (i = 0; i < W_DATA; i = i + 1)
 		dout[i] = right_nleft ? shift_accum[W_DATA - 1 - i] : shift_accum[i];
 end
