@@ -22,8 +22,6 @@ SYNTH_CMD += chparam -set RESET_VECTOR $(CPU_RESET_VECTOR) $(TOP);
 SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
 SYNTH_CMD += chparam -set MULDIV_UNROLL $(MULDIV_UNROLL) $(TOP);
 SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
-SYNTH_CMD += hierarchy -top $(TOP); proc; opt_clean;
-SYNTH_CMD += splitnets -driver;
 SYNTH_CMD += write_cxxrtl dut.cpp
 
 dut.cpp:
