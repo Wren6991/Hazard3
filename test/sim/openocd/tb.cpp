@@ -19,9 +19,13 @@ uint8_t mem[MEM_SIZE];
 static const unsigned int IO_BASE = 0x80000000;
 static const unsigned int IO_MASK = 0xffffff00;
 enum {
-	IO_PRINT_CHAR = 0,
-	IO_PRINT_U32  = 4,
-	IO_EXIT       = 8
+	IO_PRINT_CHAR = 0x000,
+	IO_PRINT_U32  = 0x004,
+	IO_EXIT       = 0x008,
+	IO_MTIME      = 0x100,
+	IO_MTIMEH     = 0x104,
+	IO_MTIMECMP   = 0x108,
+	IO_MTIMECMPH  = 0x10c
 };
 
 static const int TCP_BUF_SIZE = 256;
@@ -151,6 +155,9 @@ int main(int argc, char **argv) {
 	top.p_i__hready.set<bool>(true);
 	top.p_d__hready.set<bool>(true);
 
+	uint64_t mtime = 0;
+	uint64_t mtimecmp = 0;
+
 	// Reset + initial clock pulse
 	top.step();
 	top.p_clk.set<bool>(true);
@@ -222,6 +229,10 @@ int main(int argc, char **argv) {
 			}
 		}
 
+		// Default update logic for mtime, mtimecmp
+		++mtime;
+		top.p_timer__irq.set<bool>(mtime >= mtimecmp);
+
 		if (top.p_d__hready.get<bool>()) {
 			// Clear bus error by default
 			top.p_d__hresp.set<bool>(false);
@@ -248,6 +259,18 @@ int main(int argc, char **argv) {
 					printf("Ran for %ld cycles\n", cycle + 1);
 					break;
 				}
+				else if (bus_addr == IO_BASE + IO_MTIME) {
+					mtime = (mtime & 0xffffffff00000000u) | wdata;
+				}
+				else if (bus_addr == IO_BASE + IO_MTIMEH) {
+					mtime = (mtime & 0x00000000ffffffffu) | ((uint64_t)wdata << 32);
+				}
+				else if (bus_addr == IO_BASE + IO_MTIMECMP) {
+					mtimecmp = (mtimecmp & 0xffffffff00000000u) | wdata;
+				}
+				else if (bus_addr == IO_BASE + IO_MTIMECMPH) {
+					mtimecmp = (mtimecmp & 0x00000000ffffffffu) | ((uint64_t)wdata << 32);
+				}
 				else {
 					bus_err = true;
 				}
@@ -260,6 +283,18 @@ int main(int argc, char **argv) {
 						mem[bus_addr + 1] << 8 |
 						mem[bus_addr + 2] << 16 |
 						mem[bus_addr + 3] << 24;
+				}
+				else if (bus_addr == IO_BASE + IO_MTIME) {
+					rdata = mtime;
+				}
+				else if (bus_addr == IO_BASE + IO_MTIMEH) {
+					rdata = mtime >> 32;
+				}
+				else if (bus_addr == IO_BASE + IO_MTIMECMP) {
+					rdata = mtimecmp;
+				}
+				else if (bus_addr == IO_BASE + IO_MTIMECMPH) {
+					rdata = mtimecmp >> 32;
 				}
 				else {
 					bus_err = true;
