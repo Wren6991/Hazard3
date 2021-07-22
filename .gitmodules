@@ -13,3 +13,6 @@
 [submodule "example_soc/libfpga"]
 	path = example_soc/libfpga
 	url = https://github.com/Wren6991/libfpga.git
+[submodule "test/sim/riscv-tests/riscv-tests"]
+	path = test/sim/riscv-tests/riscv-tests
+	url = git@github.com:Wren6991/riscv-tests.git
