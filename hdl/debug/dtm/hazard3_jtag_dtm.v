@@ -126,9 +126,6 @@ always @ (posedge tck or negedge trst_n) begin
 	end
 end
 
-localparam W_DR_SHIFT = W_ADDR + 32 + 2;
-
-
 // ----------------------------------------------------------------------------
 // Data registers
 
@@ -190,9 +187,8 @@ assign core_dr_ren = (ir == IR_DMI || ir == IR_DTMCS) && tap_state == S_CAPTURE_
 assign core_dr_wdata = dr_shift;
 
 hazard3_jtag_dtm_core #(
-	.DTMCS_IDLE_HINT(DTMCS_IDLE_HINT),
-	.W_ADDR(W_ADDR),
-	.W_DR_SHIFT(W_DR_SHIFT)
+	.DTMCS_IDLE_HINT (DTMCS_IDLE_HINT),
+	.W_ADDR          (W_ADDR)
 ) dtm_core (
 	.tck               (tck),
 	.trst_n            (trst_n),
