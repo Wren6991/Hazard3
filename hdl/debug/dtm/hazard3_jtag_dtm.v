@@ -24,31 +24,32 @@
 
 module hazard3_jtag_dtm #(
 	parameter IDCODE = 32'h0000_0001,
-	parameter DTMCS_IDLE_HINT = 3'd4
+	parameter DTMCS_IDLE_HINT = 3'd4,
+	parameter W_ADDR = 8
 ) (
 	// Standard JTAG signals -- the JTAG hardware is clocked directly by TCK.
-	input  wire        tck,
-	input  wire        trst_n,
-	input  wire        tms,
-	input  wire        tdi,
-	output reg         tdo,
+	input  wire               tck,
+	input  wire               trst_n,
+	input  wire               tms,
+	input  wire               tdi,
+	output reg                tdo,
 
 	// This is synchronous to TCK and asserted for one TCK cycle only
-	output reg         dmihardreset_req,
+	output wire               dmihardreset_req,
 
 	// Bus clock + reset for Debug Module Interface
-	input  wire        clk_dmi,
-	input  wire        rst_n_dmi,
+	input  wire               clk_dmi,
+	input  wire               rst_n_dmi,
 
 	// Debug Module Interface (APB)
-	output wire        dmi_psel,
-	output wire        dmi_penable,
-	output wire        dmi_pwrite,
-	output wire [7:0]  dmi_paddr,
-	output wire [31:0] dmi_pwdata,
-	input  wire [31:0] dmi_prdata,
-	input  wire        dmi_pready,
-	input  wire        dmi_pslverr
+	output wire               dmi_psel,
+	output wire               dmi_penable,
+	output wire               dmi_pwrite,
+	output wire [W_ADDR-1:0]  dmi_paddr,
+	output wire [31:0]        dmi_pwdata,
+	input  wire [31:0]        dmi_prdata,
+	input  wire               dmi_pready,
+	input  wire               dmi_pslverr
 );
 
 // ----------------------------------------------------------------------------
@@ -125,15 +126,24 @@ always @ (posedge tck or negedge trst_n) begin
 	end
 end
 
+localparam W_DR_SHIFT = W_ADDR + 32 + 2;
+
+
 // ----------------------------------------------------------------------------
 // Data registers
 
 // Shift register is sized to largest DR, which is DMI:
 // {addr[7:0], data[31:0], op[1:0]}
-localparam W_DR_SHIFT = 42;
+localparam W_DR_SHIFT = W_ADDR + 32 + 2;
 
 reg [W_DR_SHIFT-1:0] dr_shift;
-reg [1:0]            dmi_cmderr;
+
+// Signals to/from the DTM core, which implements the DTMCS and DMI registers
+wire                  core_dr_wen;
+wire                  core_dr_ren;
+wire                  core_dr_sel_dmi_ndtmcs;
+wire [W_DR_SHIFT-1:0] core_dr_wdata;
+wire [W_DR_SHIFT-1:0] core_dr_rdata;
 
 always @ (posedge tck or negedge trst_n) begin
 	if (!trst_n) begin
@@ -144,26 +154,14 @@ always @ (posedge tck or negedge trst_n) begin
 		dr_shift <= {tdi, dr_shift} >> 1;
 		// Shorten DR shift chain according to IR
 		if (ir == IR_DMI)
-			dr_shift[41] <= tdi;
+			dr_shift[W_DR_SHIFT - 1] <= tdi;
 		else if (ir == IR_IDCODE || ir == IR_DTMCS)
 			dr_shift[31] <= tdi;
 		else // BYPASS
 			dr_shift[0] <= tdi;
 	end else if (tap_state == S_CAPTURE_DR) begin
-		if (ir == IR_DMI)
-			dr_shift <= {
-				8'h0,
-				dtm_prdata,
-				dmi_busy && dmi_cmderr == 2'd0 ? 2'd3 : dmi_cmderr
-			};
-		else if (ir == IR_DTMCS)
-			dr_shift <= {
-				27'h0,
-				DTMCS_IDLE_HINT,
-				dmi_cmderr,
-				6'd8,          // abits
-				4'd1           // version
-			};
+		if (ir == IR_DMI || ir == IR_DTMCS)
+			dr_shift <= core_dr_rdata;
 		else if (ir == IR_IDCODE)
 			dr_shift <= {10'h0, IDCODE};
 		else // BYPASS
@@ -171,116 +169,7 @@ always @ (posedge tck or negedge trst_n) begin
 	end
 end
 
-always @ (posedge tck or negedge trst_n) begin
-	if (!trst_n) begin
-		dmihardreset_req <= 1'b0;
-	end else begin
-		dmihardreset_req <= tap_state == S_UPDATE_DR && ir == IR_DTMCS && dr_shift[17];
-	end
-end
-
-// ----------------------------------------------------------------------------
-// DMI bus adapter
-
-reg dmi_busy;
-
-// DTM-domain bus, connected to a matching DM-domain bus via an APB crossing:
-wire        dtm_psel;
-wire        dtm_penable;
-wire        dtm_pwrite;
-wire [7:0]  dtm_paddr;
-wire [31:0] dtm_pwdata;
-wire [31:0] dtm_prdata;
-wire        dtm_pready;
-wire        dtm_pslverr;
-
-// We are relying on some particular features of our APB clock crossing here
-// to save some registers:
-//
-// - The transfer is launched immediately when psel is seen, no need to
-//   actually assert an access phase (as the standard allows the CDC to
-//   assume that access immediately follows setup) and no need to maintain
-//   pwrite/paddr/pwdata valid after the setup phase
-//
-// - prdata/pslverr remain valid after the transfer completes, until the next
-//   transfer completes
-//
-// These allow us to connect the upstream side of the CDC directly to our DR
-// shifter without any sample/hold registers in between.
-
-// psel is only pulsed for one cycle, penable is not asserted.
-assign dtm_psel = tap_state == S_UPDATE_DR && ir == IR_DMI &&
-	(dr_shift[1:0] == 2'd1 || dr_shift[1:0] == 2'd2) &&
-	!(dmi_busy || dmi_cmderr != 2'd0) && dtm_pready;
-assign dtm_penable = 1'b0;
-
-// paddr/pwdata/pwrite are valid momentarily when psel is asserted.
-assign dtm_paddr = dr_shift[34 +: 8];
-assign dtm_pwrite = dr_shift[1];
-assign dtm_pwdata = dr_shift[2 +: 32];
-
-always @ (posedge tck or negedge trst_n) begin
-	if (!trst_n) begin
-		dmi_busy <= 1'b0;
-		dmi_cmderr <= 2'd0;
-	end else if (tap_state == S_CAPTURE_IR && ir == IR_DMI) begin
-		// Reading while busy sets the busy sticky error. Note the capture
-		// into shift register should also reflect this update on-the-fly
-		if (dmi_busy && dmi_cmderr == 2'd0)
-			dmi_cmderr <= 2'h3;
-	end else if (tap_state == S_UPDATE_DR && ir == IR_DTMCS) begin
-		// Writing dtmcs.dmireset = 1 clears a sticky error
-		if (dr_shift[16])
-			dmi_cmderr <= 2'd0;
-	end else if (tap_state == S_UPDATE_DR && ir == IR_DMI) begin
-		if (dtm_psel) begin
-			dmi_busy <= 1'b1;
-		end else if (dr_shift[1:0] != 2'd0) begin
-			// DMI ignored operation, so set sticky busy
-			if (dmi_cmderr == 2'd0)
-				dmi_cmderr <= 2'd3;
-		end
-	end else if (dmi_busy && dtm_pready) begin
-		dmi_busy <= 1'b0;
-		if (dmi_cmderr == 2'd0 && dtm_pslverr)
-			dmi_cmderr <= 2'd2;
-	end
-end
-
-// DTM logic is in TCK domain, actual DMI + DM is in processor domain
-
-hazard3_apb_async_bridge #(
-	.W_ADDR        (8),
-	.W_DATA        (32),
-	.N_SYNC_STAGES (2)
-) inst_hazard3_apb_async_bridge (
-	.clk_src     (tck),
-	.rst_n_src   (trst_n),
-
-	.clk_dst     (clk_dmi),
-	.rst_n_dst   (rst_n_dmi),
-
-	.src_psel    (dtm_psel),
-	.src_penable (dtm_penable),
-	.src_pwrite  (dtm_pwrite),
-	.src_paddr   (dtm_paddr),
-	.src_pwdata  (dtm_pwdata),
-	.src_prdata  (dtm_prdata),
-	.src_pready  (dtm_pready),
-	.src_pslverr (dtm_pslverr),
-
-	.dst_psel    (dmi_psel),
-	.dst_penable (dmi_penable),
-	.dst_pwrite  (dmi_pwrite),
-	.dst_paddr   (dmi_paddr),
-	.dst_pwdata  (dmi_pwdata),
-	.dst_prdata  (dmi_prdata),
-	.dst_pready  (dmi_pready),
-	.dst_pslverr (dmi_pslverr)
-);
-
-// ----------------------------------------------------------------------------
-// TDO negedge register
+// Must retime shift data onto negedge before presenting on TDO
 
 always @ (negedge tck or negedge trst_n) begin
 	if (!trst_n) begin
@@ -290,5 +179,42 @@ always @ (negedge tck or negedge trst_n) begin
 			   tap_state == S_SHIFT_DR ? dr_shift[0] : 1'b0;
 	end
 end
+
+// ----------------------------------------------------------------------------
+// Core logic and bus interface
+
+assign core_dr_sel_dmi_ndtmcs = ir == IR_DMI;
+assign core_dr_wen = (ir == IR_DMI || ir == IR_DTMCS) && tap_state == S_UPDATE_DR;
+assign core_dr_ren = (ir == IR_DMI || ir == IR_DTMCS) && tap_state == S_CAPTURE_DR;
+
+assign core_dr_wdata = dr_shift;
+
+hazard3_jtag_dtm_core #(
+	.DTMCS_IDLE_HINT(DTMCS_IDLE_HINT),
+	.W_ADDR(W_ADDR),
+	.W_DR_SHIFT(W_DR_SHIFT)
+) dtm_core (
+	.tck               (tck),
+	.trst_n            (trst_n),
+	.clk_dmi           (clk_dmi),
+	.rst_n_dmi         (rst_n_dmi),
+
+	.dmihardreset_req  (dmihardreset_req),
+
+	.dr_wen            (core_dr_wen),
+	.dr_ren            (core_dr_ren),
+	.dr_sel_dmi_ndtmcs (core_dr_sel_dmi_ndtmcs),
+	.dr_wdata          (core_dr_wdata),
+	.dr_rdata          (core_dr_rdata),
+
+	.dmi_psel          (dmi_psel),
+	.dmi_penable       (dmi_penable),
+	.dmi_pwrite        (dmi_pwrite),
+	.dmi_paddr         (dmi_paddr),
+	.dmi_pwdata        (dmi_pwdata),
+	.dmi_prdata        (dmi_prdata),
+	.dmi_pready        (dmi_pready),
+	.dmi_pslverr       (dmi_pslverr)
+);
 
 endmodule

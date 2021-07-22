@@ -26,15 +26,15 @@ module example_soc (
 	input wire               rst_n,
 
 	// JTAG port to RISC-V JTAG-DTM
-    input  wire              tck,
-    input  wire              trst_n,
-    input  wire              tms,
-    input  wire              tdi,
-    output wire              tdo,
+	input  wire              tck,
+	input  wire              trst_n,
+	input  wire              tms,
+	input  wire              tdi,
+	output wire              tdo,
 
-    // IO
-    output wire              uart_tx,
-    input  wire              uart_rx
+	// IO
+	output wire              uart_tx,
+	input  wire              uart_rx
 );
 
 localparam W_ADDR = 32;
@@ -57,7 +57,7 @@ wire              dmi_pready;
 wire              dmi_pslverr;
 
 
-// TCK-domain DTM logic can force a hard reset of the 
+// TCK-domain DTM logic can force a hard reset of the
 wire dmihardreset_req;
 wire assert_dmi_reset = !rst_n || dmihardreset_req;
 wire rst_n_dmi;
