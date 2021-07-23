@@ -115,6 +115,7 @@ localparam MHARTID        = 12'hf14; // Hardware thread ID.
 
 // Machine Trap Setup (RW)
 localparam MSTATUS        = 12'h300; // Machine status register.
+localparam MSTATUSH       = 12'h310; // As of priv-1.12 this must be present even if tied 0.
 localparam MISA           = 12'h301; // ISA and extensions
 localparam MEDELEG        = 12'h302; // Machine exception delegation register.
 localparam MIDELEG        = 12'h303; // Machine interrupt delegation register.
@@ -625,9 +626,13 @@ always @ (*) begin
 		};
 	end
 
-	// MSTATUSH is not implemented (permitted when all fields would be tied to
-	// zero -- those fields being MBE and SBE, which are zero because we are
-	// pure little-endian.)
+	// MSTATUSH is all zeroes (fields are MBE and SBE, which are zero because
+	// we are pure little-endian.) Prior to priv-1.12 MSTATUSH could be left
+	// unimplemented in this case, but now it must be decoded even if
+	// hardwired to 0.
+	MSTATUSH: if (CSR_M_MANDATORY || CSR_M_TRAP) begin
+		decode_match = 1'b1;
+	end
 
 	// MEDELEG, MIDELEG should not exist for M-only implementations. Will raise
 	// illegal instruction exception if accessed.
