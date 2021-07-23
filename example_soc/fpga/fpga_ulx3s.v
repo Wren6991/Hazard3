@@ -25,24 +25,37 @@ module fpga_ulx3s (
 	input  wire       uart_rx
 );
 
-wire clk_sys = clk_osc;
+wire clk_sys;
+wire pll_sys_locked;
 wire rst_n_sys;
-wire trst_n;
+
+pll_25_50 pll_sys (
+	.clkin   (clk_osc),
+	.clkout0 (clk_sys),
+	.locked  (pll_sys_locked)
+);
 
 fpga_reset #(
 	.SHIFT (3)
 ) rstgen (
 	.clk         (clk_sys),
-	.force_rst_n (1'b1),
+	.force_rst_n (pll_sys_locked),
 	.rst_n       (rst_n_sys)
 );
 
 example_soc #(
-	.DTM_TYPE ("ECP5")
+	.DTM_TYPE    ("ECP5"),
+	.SRAM_DEPTH  (1 << 10),
+
+	.CSR_COUNTER (0),
+	.MUL_FAST    (0),
+	.EXTENSION_C (0),
+	.EXTENSION_M (0),
 ) soc_u (
 	.clk     (clk_sys),
 	.rst_n   (rst_n_sys),
 
+	// JTAG connections provided internally by ECP5 JTAGG primitive
 	.tck     (1'b0),
 	.trst_n  (1'b0),
 	.tms     (1'b0),

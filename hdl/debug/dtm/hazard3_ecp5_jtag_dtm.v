@@ -21,8 +21,9 @@
 //
 // Brian Swetland pointed out on Twitter that the standard RISC-V JTAG-DTM
 // only uses two DRs (DTMCS and DMI), besides the standard IDCODE and BYPASS
-// whic. This file instantiates the guts of Hazard3's standard JTAG-DTM and
-// connects the DTMCS and DMI registers to the JTAGG primitive's ER1/ER2 DRs.
+// which are provided already by the ECP5 TAP. This file instantiates the
+// guts of Hazard3's standard JTAG-DTM and connects the DTMCS and DMI
+// registers to the JTAGG primitive's ER1/ER2 DRs.
 //
 // The exciting part is that upstream OpenOCD already allows you to set the IR
 // length *and* set custom DTMCS/DMI IR values for RISC-V JTAG DTMs. This
@@ -59,8 +60,6 @@ wire jtdo2;
 wire jtdo1;
 wire jtdi;
 wire jtck_posedge_dont_use;
-wire jrti2;
-wire jrti1;
 wire jshift;
 wire jupdate;
 wire jrst_n;
@@ -72,8 +71,8 @@ JTAGG jtag_u (
     .JTDO1   (jtdo1),
     .JTDI    (jtdi),
     .JTCK    (jtck_posedge_dont_use),
-    .JRTI2   (jrti2),
-    .JRTI1   (jrti1),
+    .JRTI2   (/* unused */),
+    .JRTI1   (/* unused */),
     .JSHIFT  (jshift),
     .JUPDATE (jupdate),
     .JRSTN   (jrst_n),
@@ -81,10 +80,10 @@ JTAGG jtag_u (
     .JCE1    (jce1)
 );
 
-// JTAGG primitive asserts its signals synchronously to JTCK's posedge
-// (I think), but you get weird and inconsistent results if you try to
-// consume them synchronously on JTCK's posedge, possibly due to a lack of
-// hold constraints in nextpnr.
+// JTAGG primitive asserts its signals synchronously to JTCK's posedge, but
+// you get weird and inconsistent results if you try to consume them
+// synchronously on JTCK's posedge, possibly due to a lack of hold
+// constraints in nextpnr.
 //
 // A quick hack is to move the sampling onto the negedge of the clock. This
 // then creates more problems because we would be running our shift logic on

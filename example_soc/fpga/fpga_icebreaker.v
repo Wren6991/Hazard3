@@ -61,7 +61,10 @@ reset_sync trst_sync_u (
 	.rst_n_out (trst_n)
 );
 
-example_soc soc_u (
+example_soc #(
+	.MUL_FAST    (1),
+	.EXTENSION_C (0)
+) soc_u (
 	.clk     (clk_sys),
 	.rst_n   (rst_n_sys),
 

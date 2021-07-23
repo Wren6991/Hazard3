@@ -21,7 +21,10 @@
 `default_nettype none
 
 module example_soc #(
-	parameter DTM_TYPE = "JTAG"	// can be "JTAG" or "ECP5"
+	parameter DTM_TYPE = "JTAG",    // can be "JTAG" or "ECP5"
+	parameter SRAM_DEPTH = 1 << 15, // default 32 kwords -> 128 kB
+
+	`include "hazard3_config.vh"
 ) (
 	// System clock + reset
 	input wire               clk,
@@ -225,29 +228,27 @@ wire [W_DATA-1:0] proc_hrdata;
 
 wire uart_irq;
 
-// Processor instantiation. Parameters can be set here or by modifying
-// hazard3_config.vh. Turn on all the ISA support but ignore performance
-// options like faster multiply/divide.
-
 hazard3_cpu_1port #(
+	// These must have the values given here for you to end up with a useful SoC:
 	.RESET_VECTOR    (32'h0000_00c0),
 	.MTVEC_INIT      (32'h0000_0000),
-
-	.EXTENSION_C     (0),
-	.EXTENSION_M     (1),
 	.CSR_M_MANDATORY (1),
 	.CSR_M_TRAP      (1),
-	.CSR_COUNTER     (1),
 	.DEBUG_SUPPORT   (1),
-
-	.MUL_FAST        (1),
-
 	.NUM_IRQ         (1),
-
-	.MVENDORID_VAL   (32'h0),
-	.MARCHID_VAL     (32'h0),
-	.MIMPID_VAL      (32'h0),
-	.MHARTID_VAL     (32'h0)
+	// Can be overridden from the defaults in hazard3_config.vh during
+	// instantiation of example_soc():
+	.EXTENSION_C     (EXTENSION_C),
+	.EXTENSION_M     (EXTENSION_M),
+	.CSR_COUNTER     (CSR_COUNTER),
+	.MVENDORID_VAL   (MVENDORID_VAL),
+	.MARCHID_VAL     (MARCHID_VAL),
+	.MIMPID_VAL      (MIMPID_VAL),
+	.MHARTID_VAL     (MHARTID_VAL),
+	.REDUCED_BYPASS  (REDUCED_BYPASS),
+	.MULDIV_UNROLL   (MULDIV_UNROLL),
+	.MUL_FAST        (MUL_FAST),
+	.MTVEC_WMASK     (MTVEC_WMASK)
 ) cpu (
 	.clk                        (clk),
 	.rst_n                      (rst_n_cpu),
@@ -405,7 +406,7 @@ ahbl_to_apb apb_bridge_u (
 // zero-initialised so don't leave the little guy hanging too long)
 
 ahb_sync_sram #(
-	.DEPTH (1 << 15) // 32k x 32 = 128 kB
+	.DEPTH (SRAM_DEPTH)
 ) sram0 (
 	.clk               (clk),
 	.rst_n             (rst_n),
