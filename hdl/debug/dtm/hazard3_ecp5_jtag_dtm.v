@@ -58,7 +58,7 @@ module hazard3_ecp5_jtag_dtm #(
 wire jtdo2;
 wire jtdo1;
 wire jtdi;
-wire jtck;
+wire jtck_posedge_dont_use;
 wire jrti2;
 wire jrti1;
 wire jshift;
@@ -71,7 +71,7 @@ JTAGG jtag_u (
     .JTDO2   (jtdo2),
     .JTDO1   (jtdo1),
     .JTDI    (jtdi),
-    .JTCK    (jtck),
+    .JTCK    (jtck_posedge_dont_use),
     .JRTI2   (jrti2),
     .JRTI1   (jrti1),
     .JSHIFT  (jshift),
@@ -81,25 +81,49 @@ JTAGG jtag_u (
     .JCE1    (jce1)
 );
 
+// JTAGG primitive asserts its signals synchronously to JTCK's posedge
+// (I think), but you get weird and inconsistent results if you try to
+// consume them synchronously on JTCK's posedge, possibly due to a lack of
+// hold constraints in nextpnr.
+//
+// A quick hack is to move the sampling onto the negedge of the clock. This
+// then creates more problems because we would be running our shift logic on
+// a different edge from the control + CDC logic in the DTM core.
+//
+// So, even worse hack, move all our JTAG-domain logic onto the negedge
+// (or near enough) by inverting the clock.
+
+wire jtck = !jtck_posedge_dont_use;
+
 localparam W_DR_SHIFT = W_ADDR + 32 + 2;
 
-wire                  core_dr_wen;
-wire                  core_dr_ren;
-wire                  core_dr_sel_dmi_ndtmcs;
+reg                   core_dr_wen;
+reg                   core_dr_ren;
+reg                   core_dr_sel_dmi_ndtmcs;
+reg                   dr_shift_en;
 wire [W_DR_SHIFT-1:0] core_dr_wdata;
 wire [W_DR_SHIFT-1:0] core_dr_rdata;
 
-// We would like to know at all times which DR is selected. Unfortunately
-// JTAGG does not tell us this. Instead:
-//
-// - During run test/idle, jrti1/jrti2 is asserted if IR matches ER1/ER2
-//
-// - During CAPTURE OR SHIFT, jce1/jce2 is asserted if IR matches ER1/ER2
-//
-// There is no signal that is valid during UPDATE. So we make our own:
+// Decode our shift controls from the interesting ECP5 ones, and re-register
+// onto JTCK negedge (our posedge). Note without re-registering we observe
+// them a half-cycle (effectively one cycle) too early. This is another
+// consequence of the stupid JTDI thing
+
+always @ (posedge jtck or negedge jrst_n) begin
+    if (!jrst_n) begin
+        core_dr_sel_dmi_ndtmcs <= 1'b0;
+        core_dr_wen <= 1'b0;
+        core_dr_ren <= 1'b0;
+        dr_shift_en <= 1'b0;
+    end else begin
+        core_dr_sel_dmi_ndtmcs <= jce1 ? 1'b0 : jce2 ? 1'b1 : dr_sel_prev;
+        core_dr_ren <= (jce1 || jce2) && !jshift;
+        core_dr_wen <= jupdate;
+        dr_shift_en <= jshift;
+    end
+end
 
 reg dr_sel_prev;
-assign core_dr_sel_dmi_ndtmcs = jce1 ? 1'b0 : jce2 ? 1'b1 : dr_sel_prev;
 
 always @ (posedge jtck or negedge jrst_n) begin
     if (!jrst_n) begin
@@ -109,121 +133,78 @@ always @ (posedge jtck or negedge jrst_n) begin
     end
 end
 
-// This is equivalent to "in capture DR state and IR is ER1 or ER2"
-assign core_dr_ren = (jce1 || jce2) && !jshift;
-
-assign core_dr_wen = jupdate;
-
-// Our DR shifter is made much more complex by the flop inserted by JTAGG
-// between TDI and JTDI, which we have no control of. Say we have a total DR
-// shift length of 42 (8 addr 32 data 2 op, in DMI) and first consider just
-// SHIFT -> UPDATE:
-//
-// - After 42 SHIFT clocks, the 42nd data bit will be in the JTDI register
-//
-// - When we UPDATE, the write data must be the concatenation of the JTDI
-//   register and a 41 bit shift register which follows JTDI
-//
-// As we shift, JTDI plus 41 other flops form our 42 bit shift register. So
-// far, mostly normal. The problem is that when we CAPTURE, we can't put the
-// 42nd data bit into the JTDI register, because we have no control of it. We
-// can't have a chain of 42 FPGA flops, because then our total scan length
-// appears from the outside to be 43 bits. So the trick is:
-//
-// - The frontmost flop in the 42-bit scan is usually JTDI, but we have an
-//   additional shadow flop that is used on the first SHIFT cycle after
-//   CAPTURE
-//
-// - CAPTURE loads rdata into the shadow flop and the 41 regular shift flops
-//
-// - The first SHIFT clock drops the shifter LSB (which was previously on
-//   TDO), clocks the shadow flop down into the 41st position (which would
-//   normally take data from JTDI), and JTDI is swapped back in place of the
-//   shadow flop for UPDATE purposes
-//
-// - We are now in steady-state SHIFT.
-//
-// So before/after the first SHIFT clock the notional 42-bit register is
-// {capture[41:0]} -> {JTDI reg, capture[41:1]} Where capture[41] is
-// initially stored in the shadow flop, and then passes on to flop 40 of the
-// main shift register. (we don't support zero-bit SHIFT, who cares!)
-//
-// Ok maybe that was a longwinded explanation but this really confused the
-// shit out of me, so this is a gift for future Luke or other readers
-
-
-reg                  dr_shift_head;
-reg [W_DR_SHIFT-2:0] dr_shift_tail;
-reg                  use_shift_head;
-
-assign core_dr_wdata = core_dr_sel_dmi_ndtmcs ? {jtdi, dr_shift_tail} :
-    {{W_DR_SHIFT-32{1'b0}}, jtdi, dr_shift_tail[30:0]};
+reg [W_DR_SHIFT-1:0] dr_shift;
+assign core_dr_wdata = dr_shift;
 
 always @ (posedge jtck or negedge jrst_n) begin
     if (!jrst_n) begin
-        dr_shift_head <= 1'b0;
-        dr_shift_tail <= {W_DR_SHIFT-1{1'b0}};
-        use_shift_head <= 1'b0;
+        dr_shift <= {W_DR_SHIFT{1'b0}};
     end else if (core_dr_ren) begin
-        use_shift_head <= 1'b1;
-        {dr_shift_head, dr_shift_tail} <= core_dr_rdata;
-    end else begin
-        use_shift_head <= 1'b0;
-        dr_shift_tail <= {
-            use_shift_head ? dr_shift_head : jtdi,
-            dr_shift_tail
-        } >> 1;
+        dr_shift <= core_dr_rdata;
+    end else if (dr_shift_en) begin
+        dr_shift <= {jtdi, dr_shift} >> 1'b1;
         if (!core_dr_sel_dmi_ndtmcs)
-            dr_shift_tail[30] <= jtdi;
+            dr_shift[31] <= jtdi;
+    end
+end
+
+// Not documented on ECP5: as well as the posedge flop on JTDI, the ECP5 puts
+// a negedge flop on JTDO1, JTDO2. (Conjecture based on dicking around with a
+// logic analyser.) To get JTDOx to appear with the same timing as our shifter
+// LSB (which we update on every JTCK negedge) we:
+//
+// - Register the LSB of the *next* value of dr_shift on the JTCK posedge, so
+//   half a cycle earlier than the actual dr_shift update
+//
+// - This then gets re-registered with the pointless JTDO negedge flops, so
+//   that it appears with the same timing as our DR shifter update.
+
+reg dr_shift_next_halfcycle;
+always @ (negedge jtck or negedge jrst_n) begin
+    if (!jrst_n) begin
+        dr_shift_next_halfcycle <= 1'b0;
+    end else  begin
+        dr_shift_next_halfcycle <=
+            core_dr_ren ? core_dr_rdata[0] :
+            dr_shift_en ? dr_shift[1]      : dr_shift[0];
     end
 end
 
 // We have only a single shifter for the ER1 and ER2 chains, so these are tied
 // together:
 
-reg shift_tail_neg;
-
-always @ (negedge jtck or negedge jrst_n) begin
-    if (!jrst_n) begin
-        shift_tail_neg <= 1'b0;
-    end else begin
-        shift_tail_neg <= dr_shift_tail[0];
-    end
-end
-
-assign jtdo1 = shift_tail_neg;
-assign jtdo2 = shift_tail_neg;
+assign jtdo1 = dr_shift_next_halfcycle;
+assign jtdo2 = dr_shift_next_halfcycle;
 
 // The actual DTM is in here:
 
-// hazard3_jtag_dtm_core #(
-//     .DTMCS_IDLE_HINT(DTMCS_IDLE_HINT),
-//     .W_ADDR(W_ADDR),
-//     .W_DR_SHIFT(W_DR_SHIFT)
-// ) inst_hazard3_jtag_dtm_core (
-//     .tck               (tck),
-//     .trst_n            (trst_n),
-//     .clk_dmi           (clk_dmi),
-//     .rst_n_dmi         (rst_n_dmi),
+hazard3_jtag_dtm_core #(
+    .DTMCS_IDLE_HINT(DTMCS_IDLE_HINT),
+    .W_ADDR(W_ADDR),
+    .W_DR_SHIFT(W_DR_SHIFT)
+) inst_hazard3_jtag_dtm_core (
+    .tck               (jtck),
+    .trst_n            (jrst_n),
 
-//     .dr_wen            (core_dr_wen),
-//     .dr_ren            (core_dr_ren),
-//     .dr_sel_dmi_ndtmcs (core_dr_sel_dmi_ndtmcs),
-//     .dr_wdata          (core_dr_wdata),
-//     .dr_rdata          (core_dr_rdata),
+    .clk_dmi           (clk_dmi),
+    .rst_n_dmi         (rst_n_dmi),
 
-//     .dmihardreset_req  (dmihardreset_req),
+    .dr_wen            (core_dr_wen),
+    .dr_ren            (core_dr_ren),
+    .dr_sel_dmi_ndtmcs (core_dr_sel_dmi_ndtmcs),
+    .dr_wdata          (core_dr_wdata),
+    .dr_rdata          (core_dr_rdata),
 
-//     .dmi_psel          (dmi_psel),
-//     .dmi_penable       (dmi_penable),
-//     .dmi_pwrite        (dmi_pwrite),
-//     .dmi_paddr         (dmi_paddr),
-//     .dmi_pwdata        (dmi_pwdata),
-//     .dmi_prdata        (dmi_prdata),
-//     .dmi_pready        (dmi_pready),
-//     .dmi_pslverr       (dmi_pslverr)
-// );
+    .dmihardreset_req  (dmihardreset_req),
 
-assign core_dr_rdata = 42'h555555550;
+    .dmi_psel          (dmi_psel),
+    .dmi_penable       (dmi_penable),
+    .dmi_pwrite        (dmi_pwrite),
+    .dmi_paddr         (dmi_paddr),
+    .dmi_pwdata        (dmi_pwdata),
+    .dmi_prdata        (dmi_prdata),
+    .dmi_pready        (dmi_pready),
+    .dmi_pslverr       (dmi_pslverr)
+);
 
 endmodule

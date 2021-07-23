@@ -20,7 +20,9 @@
 
 `default_nettype none
 
-module example_soc (
+module example_soc #(
+	parameter DTM_TYPE = "JTAG"	// can be "JTAG" or "ECP5"
+) (
 	// System clock + reset
 	input wire               clk,
 	input wire               rst_n,
@@ -43,10 +45,6 @@ localparam W_DATA = 32;
 // ----------------------------------------------------------------------------
 // Processor debug
 
-// JTAG-DTM IDCODE, selected after TAP reset, would normally be a
-// JEP106-compliant ID
-localparam IDCODE = 32'hdeadbeef;
-
 wire              dmi_psel;
 wire              dmi_penable;
 wire              dmi_pwrite;
@@ -68,29 +66,65 @@ reset_sync dmi_reset_sync_u (
 	.rst_n_out (rst_n_dmi)
 );
 
-hazard3_jtag_dtm #(
-	.IDCODE (IDCODE)
-) inst_hazard3_jtag_dtm (
-	.tck              (tck),
-	.trst_n           (trst_n),
-	.tms              (tms),
-	.tdi              (tdi),
-	.tdo              (tdo),
+generate
+if (DTM_TYPE == "JTAG") begin
 
-	.dmihardreset_req (dmihardreset_req),
+	// Standard RISC-V JTAG-DTM connected to external IOs.
+	// JTAG-DTM IDCODE should be a JEP106-compliant ID:
+	localparam IDCODE = 32'hdeadbeef;
 
-	.clk_dmi          (clk),
-	.rst_n_dmi        (rst_n_dmi),
+	hazard3_jtag_dtm #(
+		.IDCODE (IDCODE)
+	) dtm_u (
+		.tck              (tck),
+		.trst_n           (trst_n),
+		.tms              (tms),
+		.tdi              (tdi),
+		.tdo              (tdo),
 
-	.dmi_psel         (dmi_psel),
-	.dmi_penable      (dmi_penable),
-	.dmi_pwrite       (dmi_pwrite),
-	.dmi_paddr        (dmi_paddr),
-	.dmi_pwdata       (dmi_pwdata),
-	.dmi_prdata       (dmi_prdata),
-	.dmi_pready       (dmi_pready),
-	.dmi_pslverr      (dmi_pslverr)
-);
+		.dmihardreset_req (dmihardreset_req),
+
+		.clk_dmi          (clk),
+		.rst_n_dmi        (rst_n_dmi),
+
+		.dmi_psel         (dmi_psel),
+		.dmi_penable      (dmi_penable),
+		.dmi_pwrite       (dmi_pwrite),
+		.dmi_paddr        (dmi_paddr),
+		.dmi_pwdata       (dmi_pwdata),
+		.dmi_prdata       (dmi_prdata),
+		.dmi_pready       (dmi_pready),
+		.dmi_pslverr      (dmi_pslverr)
+	);
+
+end else if (DTM_TYPE == "ECP5") begin
+
+	// Attach RISC-V DTM's DTMCS/DMI registers to ECP5 ER1/ER2 registers. This
+	// allows the processor to be debugged through the ECP5 chip TAP, using
+	// regular upstream OpenOCD.
+
+	// Connects to ECP5 TAP internally by instantiating a JTAGG primitive.
+	assign tdo = 1'b0;
+
+	hazard3_ecp5_jtag_dtm dtm_u (
+		.dmihardreset_req (dmihardreset_req),
+
+		.clk_dmi          (clk),
+		.rst_n_dmi        (rst_n_dmi),
+
+		.dmi_psel         (dmi_psel),
+		.dmi_penable      (dmi_penable),
+		.dmi_pwrite       (dmi_pwrite),
+		.dmi_paddr        (dmi_paddr),
+		.dmi_pwdata       (dmi_pwdata),
+		.dmi_prdata       (dmi_prdata),
+		.dmi_pready       (dmi_pready),
+		.dmi_pslverr      (dmi_pslverr)
+	);
+
+end
+endgenerate
+
 
 localparam N_HARTS = 1;
 localparam XLEN = 32;
