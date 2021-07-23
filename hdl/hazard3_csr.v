@@ -550,7 +550,8 @@ always @ (posedge clk or negedge rst_n) begin
 		if (enter_debug_mode)
 			dpc <= mepc_in;
 		else if (debug_mode && wen && addr == DPC)
-			dpc <= update(dpc);
+			// 1 or 2 LSBs are hardwired to 0, depending on IALIGN.
+			dpc <= update(dpc) & (~X0 << 2 - EXTENSION_C);
 	end
 end
 
