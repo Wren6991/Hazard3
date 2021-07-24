@@ -916,10 +916,23 @@ end
 // We can enter the halted state in an IRQ-like manner (squeeze in between the
 // instructions in stage 2 and stage 3) or in an exception-like manner
 // (replace the instruction in stage 3).
+//
+// A tricky case is halt request: this normally performs an IRQ-like entry,
+// because the instruction in stage 3 can not in general be discarded, as it
+// may already have had system side effects: for example a load/store on an
+// IO region.
+//
+// However a halt request when the instruction in stage 3 is itself generating
+// an exception is an exception-like halt entry. Otherwise, we set DPC to the
+// instruction *after* the excepting one, which is never actually reached.
+
+wire exception_req_any;
 
 // This would also include triggers, if/when those are implemented:
 wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
-	dcsr_ebreakm && except == EXCEPT_EBREAK
+	dcsr_ebreakm && except == EXCEPT_EBREAK ||
+	// This clause takes priority over the IRQ-like dbg_req_halt clause below:
+	dbg_req_halt && exception_req_any
 );
 
 // Note all exception-like causes (trigger, ebreak) are higher priority than IRQ-like
@@ -1003,7 +1016,7 @@ hazard3_priority_encode #(
 
 // ebreak may be treated as a halt-to-debugger or a regular M-mode exception,
 // depending on dcsr.ebreakm.
-wire exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
+assign exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
 
 // Note when eivect=0 platform external interrupts also count as a standard
 // external interrupt, so the standard mapping (collapsed into a single
