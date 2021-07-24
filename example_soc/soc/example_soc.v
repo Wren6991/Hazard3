@@ -327,7 +327,7 @@ wire [W_DATA-1:0]  bridge_hrdata;
 
 ahbl_splitter #(
 	.N_PORTS     (2),
-	.ADDR_MAP    (64'h40000000_20000000),
+	.ADDR_MAP    (64'h40000000_00000000),
 	.ADDR_MASK   (64'he0000000_e0000000)
 ) splitter_u (
 	.clk (clk),

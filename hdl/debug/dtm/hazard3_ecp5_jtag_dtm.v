@@ -115,20 +115,11 @@ always @ (posedge jtck or negedge jrst_n) begin
         core_dr_ren <= 1'b0;
         dr_shift_en <= 1'b0;
     end else begin
-        core_dr_sel_dmi_ndtmcs <= jce1 ? 1'b0 : jce2 ? 1'b1 : dr_sel_prev;
+        if (jce1 || jce2)
+            core_dr_sel_dmi_ndtmcs <= jce2;
         core_dr_ren <= (jce1 || jce2) && !jshift;
         core_dr_wen <= jupdate;
         dr_shift_en <= jshift;
-    end
-end
-
-reg dr_sel_prev;
-
-always @ (posedge jtck or negedge jrst_n) begin
-    if (!jrst_n) begin
-        dr_sel_prev <= 1'b0;
-    end else begin
-        dr_sel_prev <= core_dr_sel_dmi_ndtmcs;
     end
 end
 
