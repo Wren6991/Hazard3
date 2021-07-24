@@ -1,6 +1,6 @@
 #include "tb_cxxrtl_io.h"
 
-void main() {
-	tb_puts("Hello world from Hazard5 + CXXRTL!\n");
-	tb_exit(123);
+int main() {
+	tb_puts("Hello world from Hazard3 + CXXRTL!\n");
+	return 123;
 }
