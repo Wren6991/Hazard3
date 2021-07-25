@@ -29,6 +29,8 @@ module fpga_icebreaker (
 	input  wire       tdi,
 	output wire       tdo,
 
+	output wire       led,
+
 	output wire       mirror_tck,
 	output wire       mirror_tms,
 	output wire       mirror_tdi,
@@ -61,6 +63,16 @@ reset_sync trst_sync_u (
 	.rst_n_out (trst_n)
 );
 
+activity_led #(
+	.WIDTH        (1 << 16),
+	.ACTIVE_LEVEL (1'b0)
+) tck_led_u (
+	.clk   (clk_sys),
+	.rst_n (rst_n_sys),
+	.i     (tck),
+	.o     (led)
+);
+
 example_soc #(
 	.MUL_FAST    (1),
 	.EXTENSION_C (0)
@@ -69,7 +81,7 @@ example_soc #(
 	.rst_n   (rst_n_sys),
 
 	.tck     (tck),
-	.trst_n  (rst_n_sys), //fixme!
+	.trst_n  (trst_n),
 	.tms     (tms),
 	.tdi     (tdi),
 	.tdo     (tdo),

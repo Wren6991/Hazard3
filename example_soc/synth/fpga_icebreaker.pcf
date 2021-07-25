@@ -20,6 +20,8 @@ set_io tms 19 # FTDI BDBUS3
 set_io uart_rx 15 # FTDI ADBUS0, flash SCK, iCE SCK
 set_io uart_tx 14 # FTDI ADBUS1, flash MOSI, iCE SO (if jumper J15 connected)
 
+set_io led 37 # Green on main board
+
 # SPI flash
 # set_io flash_mosi 14
 # set_io flash_miso 17
