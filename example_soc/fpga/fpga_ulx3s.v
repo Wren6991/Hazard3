@@ -29,7 +29,7 @@ wire clk_sys;
 wire pll_sys_locked;
 wire rst_n_sys;
 
-pll_25_50 pll_sys (
+pll_25_40 pll_sys (
 	.clkin   (clk_osc),
 	.clkout0 (clk_sys),
 	.locked  (pll_sys_locked)
