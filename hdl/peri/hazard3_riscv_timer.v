@@ -121,7 +121,7 @@ end
 reg [63:0] mtimecmp;
 reg        mtimecmp_borrow;
 
-wire mtimecmp_borrow_next = (!mtimecmp[0] && (mtime[0] || mtimecmp_borrow)) || (mtime[0] && mtimecmp_borrow);
+wire mtimecmp_borrow_next = (!mtime[0] && (mtimecmp[0] || mtimecmp_borrow)) || (mtimecmp[0] && mtimecmp_borrow);
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -129,8 +129,8 @@ always @ (posedge clk or negedge rst_n) begin
 		mtimecmp_borrow <= 1'b0;
 		timer_irq <= 1'b0;
 	end else begin
-		// Serially subtract mtime from mtimecmp. If there is no borrow from
-		// bit 63 (i.e. if mtimecmp was greater or equal) then assert IRQ.
+		// Serially subtract mtimecmp from mtime. If there is no borrow from
+		// bit 63 (i.e. if mtime was greater or equal) then assert IRQ.
 		if (tick) begin
 			mtimecmp_borrow <= mtimecmp_borrow_next;
 			mtimecmp <= {mtimecmp[0], mtimecmp[63:1]};
@@ -150,7 +150,7 @@ always @ (*) begin
 	ADDR_MTIME:     begin  prdata = mtime[31:0];                 pready = serial_ctr == 6'h00; end
 	ADDR_MTIMEH:    begin  prdata = mtime[31:0];                 pready = serial_ctr == 6'h20; end
 	ADDR_MTIMECMP:  begin  prdata = mtimecmp[31:0];              pready = serial_ctr == 6'h00; end
-	ADDR_MTIMECMPH: begin  prdata = mtimecmp[63:32];             pready = serial_ctr == 6'h20; end
+	ADDR_MTIMECMPH: begin  prdata = mtimecmp[31:0];              pready = serial_ctr == 6'h20; end
 	default:        begin  prdata = {W_DATA{1'b0}};              pready = 1'b1;                end
 	endcase
 end
