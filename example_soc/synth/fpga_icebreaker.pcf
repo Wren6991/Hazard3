@@ -15,18 +15,22 @@ set_io tdi  9 # FTDI BDBUS1
 set_io tdo 18 # FTDI BDBUS2
 set_io tms 19 # FTDI BDBUS3
 
-# UART is moved over to FTDI A channel -- this means flash is inaccessible
-# (and stays in a quiescent state since CSn is disconnected and pulled high)
-set_io uart_rx 15 # FTDI ADBUS0, flash SCK, iCE SCK
-set_io uart_tx 14 # FTDI ADBUS1, flash MOSI, iCE SO (if jumper J15 connected)
+# # UART is moved over to FTDI A channel -- this means flash is inaccessible
+# # (and stays in a quiescent state since CSn is disconnected and pulled high)
+# set_io uart_rx 15 # FTDI ADBUS0, flash SCK, iCE SCK
+# set_io uart_tx 14 # FTDI ADBUS1, flash MOSI, iCE SO (if jumper J15 connected)
+
+# FIXME UART clashes with SPI signals, so punt it onto a header
+set_io uart_rx 4 # P1A1
+set_io uart_tx 2 # P1A2
 
 set_io led 37 # Green on main board
 
 # SPI flash
-# set_io flash_mosi 14
-# set_io flash_miso 17
-# set_io flash_sclk 15
-# set_io flash_cs 16
+set_io spi_mosi 14
+set_io spi_miso 17
+set_io spi_sck 15
+set_io spi_cs_n 16
 
 # # Buttons
 # set_io dpad_u 20 # Snapoff top

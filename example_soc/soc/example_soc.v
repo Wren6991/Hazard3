@@ -39,7 +39,12 @@ module example_soc #(
 
 	// IO
 	output wire              uart_tx,
-	input  wire              uart_rx
+	input  wire              uart_rx,
+
+	output wire              spi_cs_n,
+	output wire              spi_sck,
+	output wire              spi_mosi,
+	input  wire              spi_miso
 );
 
 localparam W_ADDR = 32;
@@ -227,6 +232,7 @@ wire [W_DATA-1:0] proc_hwdata;
 wire [W_DATA-1:0] proc_hrdata;
 
 wire uart_irq;
+wire timer_irq;
 
 hazard3_cpu_1port #(
 	// These must have the values given here for you to end up with a useful SoC:
@@ -283,18 +289,19 @@ hazard3_cpu_1port #(
 
 	.irq                        (uart_irq),
 
-	// Should provide timer and software-controllable IRQ at system level --
-	// not implemented in this basic SoC.
 	.soft_irq                   (1'b0),
-	.timer_irq                  (1'b0)
+	.timer_irq                  (timer_irq)
 );
 
 
 // ----------------------------------------------------------------------------
 // Bus fabric
 
-// - 128 kB SRAM (using SPRAMs) at 0x0000_0000
-// - UART at 0x4000_0000
+// - 128 kB SRAM at... 0x0000_0000
+// - System timer at.. 0x4000_0000
+// - UART at.......... 0x4000_4000
+// - XIP controls at.. 0x4000_8000
+// - XIP window at.... 0x8000_0000
 
 // AHBL layer
 
@@ -324,11 +331,24 @@ wire               bridge_hmastlock;
 wire [W_DATA-1:0]  bridge_hwdata;
 wire [W_DATA-1:0]  bridge_hrdata;
 
+wire               xip_hready_resp;
+wire               xip_hready;
+wire               xip_hresp;
+wire [W_ADDR-1:0]  xip_haddr;
+wire               xip_hwrite;
+wire [1:0]         xip_htrans;
+wire [2:0]         xip_hsize;
+wire [2:0]         xip_hburst;
+wire [3:0]         xip_hprot;
+wire               xip_hmastlock;
+wire [W_DATA-1:0]  xip_hwdata;
+wire [W_DATA-1:0]  xip_hrdata;
+
 
 ahbl_splitter #(
-	.N_PORTS     (2),
-	.ADDR_MAP    (64'h40000000_00000000),
-	.ADDR_MASK   (64'he0000000_e0000000)
+	.N_PORTS     (3),
+	.ADDR_MAP    (96'h80000000_40000000_00000000),
+	.ADDR_MASK   (96'he0000000_e0000000_e0000000)
 ) splitter_u (
 	.clk (clk),
 	.rst_n (rst_n),
@@ -346,21 +366,30 @@ ahbl_splitter #(
 	.src_hwdata      (proc_hwdata   ),
 	.src_hrdata      (proc_hrdata   ),
 
-	.dst_hready_resp ({bridge_hready_resp , sram0_hready_resp}),
-	.dst_hready      ({bridge_hready      , sram0_hready     }),
-	.dst_hresp       ({bridge_hresp       , sram0_hresp      }),
-	.dst_haddr       ({bridge_haddr       , sram0_haddr      }),
-	.dst_hwrite      ({bridge_hwrite      , sram0_hwrite     }),
-	.dst_htrans      ({bridge_htrans      , sram0_htrans     }),
-	.dst_hsize       ({bridge_hsize       , sram0_hsize      }),
-	.dst_hburst      ({bridge_hburst      , sram0_hburst     }),
-	.dst_hprot       ({bridge_hprot       , sram0_hprot      }),
-	.dst_hmastlock   ({bridge_hmastlock   , sram0_hmastlock  }),
-	.dst_hwdata      ({bridge_hwdata      , sram0_hwdata     }),
-	.dst_hrdata      ({bridge_hrdata      , sram0_hrdata     })
+	.dst_hready_resp ({xip_hready_resp , bridge_hready_resp , sram0_hready_resp}),
+	.dst_hready      ({xip_hready      , bridge_hready      , sram0_hready     }),
+	.dst_hresp       ({xip_hresp       , bridge_hresp       , sram0_hresp      }),
+	.dst_haddr       ({xip_haddr       , bridge_haddr       , sram0_haddr      }),
+	.dst_hwrite      ({xip_hwrite      , bridge_hwrite      , sram0_hwrite     }),
+	.dst_htrans      ({xip_htrans      , bridge_htrans      , sram0_htrans     }),
+	.dst_hsize       ({xip_hsize       , bridge_hsize       , sram0_hsize      }),
+	.dst_hburst      ({xip_hburst      , bridge_hburst      , sram0_hburst     }),
+	.dst_hprot       ({xip_hprot       , bridge_hprot       , sram0_hprot      }),
+	.dst_hmastlock   ({xip_hmastlock   , bridge_hmastlock   , sram0_hmastlock  }),
+	.dst_hwdata      ({xip_hwdata      , bridge_hwdata      , sram0_hwdata     }),
+	.dst_hrdata      ({xip_hrdata      , bridge_hrdata      , sram0_hrdata     })
 );
 
 // APB layer
+
+wire        bridge_psel;
+wire        bridge_penable;
+wire        bridge_pwrite;
+wire [15:0] bridge_paddr;
+wire [31:0] bridge_pwdata;
+wire [31:0] bridge_prdata;
+wire        bridge_pready;
+wire        bridge_pslverr;
 
 wire        uart_psel;
 wire        uart_penable;
@@ -370,6 +399,25 @@ wire [31:0] uart_pwdata;
 wire [31:0] uart_prdata;
 wire        uart_pready;
 wire        uart_pslverr;
+
+wire        timer_psel;
+wire        timer_penable;
+wire        timer_pwrite;
+wire [15:0] timer_paddr;
+wire [31:0] timer_pwdata;
+wire [31:0] timer_prdata;
+wire        timer_pready;
+wire        timer_pslverr;
+
+wire        xip_psel;
+wire        xip_penable;
+wire        xip_pwrite;
+wire [15:0] xip_paddr;
+wire [31:0] xip_pwdata;
+wire [31:0] xip_prdata;
+wire        xip_pready;
+wire        xip_pslverr;
+
 
 ahbl_to_apb apb_bridge_u (
 	.clk               (clk),
@@ -388,14 +436,38 @@ ahbl_to_apb apb_bridge_u (
 	.ahbls_hwdata      (bridge_hwdata),
 	.ahbls_hrdata      (bridge_hrdata),
 
-	.apbm_paddr        (uart_paddr),
-	.apbm_psel         (uart_psel),
-	.apbm_penable      (uart_penable),
-	.apbm_pwrite       (uart_pwrite),
-	.apbm_pwdata       (uart_pwdata),
-	.apbm_pready       (uart_pready),
-	.apbm_prdata       (uart_prdata),
-	.apbm_pslverr      (uart_pslverr)
+	.apbm_paddr        (bridge_paddr),
+	.apbm_psel         (bridge_psel),
+	.apbm_penable      (bridge_penable),
+	.apbm_pwrite       (bridge_pwrite),
+	.apbm_pwdata       (bridge_pwdata),
+	.apbm_pready       (bridge_pready),
+	.apbm_prdata       (bridge_prdata),
+	.apbm_pslverr      (bridge_pslverr)
+);
+
+apb_splitter #(
+	.N_SLAVES   (3),
+	.ADDR_MAP   (48'h8000_4000_0000),
+	.ADDR_MASK  (48'hc000_c000_c000)
+) inst_apb_splitter (
+	.apbs_paddr   (bridge_paddr),
+	.apbs_psel    (bridge_psel),
+	.apbs_penable (bridge_penable),
+	.apbs_pwrite  (bridge_pwrite),
+	.apbs_pwdata  (bridge_pwdata),
+	.apbs_pready  (bridge_pready),
+	.apbs_prdata  (bridge_prdata),
+	.apbs_pslverr (bridge_pslverr),
+
+	.apbm_paddr   ({xip_paddr   , uart_paddr   , timer_paddr  }),
+	.apbm_psel    ({xip_psel    , uart_psel    , timer_psel   }),
+	.apbm_penable ({xip_penable , uart_penable , timer_penable}),
+	.apbm_pwrite  ({xip_pwrite  , uart_pwrite  , timer_pwrite }),
+	.apbm_pwdata  ({xip_pwdata  , uart_pwdata  , timer_pwdata }),
+	.apbm_pready  ({xip_pready  , uart_pready  , timer_pready }),
+	.apbm_prdata  ({xip_prdata  , uart_prdata  , timer_prdata }),
+	.apbm_pslverr ({xip_pslverr , uart_pslverr , timer_pslverr})
 );
 
 // ----------------------------------------------------------------------------
@@ -445,5 +517,113 @@ uart_mini uart_u (
 	.irq          (uart_irq),
 	.dreq         (/* unused */)
 );
+
+hazard3_riscv_timer timer_u (
+	.clk       (clk),
+	.rst_n     (rst_n),
+
+	.psel      (timer_psel),
+	.penable   (timer_penable),
+	.pwrite    (timer_pwrite),
+	.paddr     (timer_paddr),
+	.pwdata    (timer_pwdata),
+	.prdata    (timer_prdata),
+	.pready    (timer_pready),
+	.pslverr   (timer_pslverr),
+
+	.dbg_halt  (&hart_halted),
+
+	// Tie high for 64-cycle timebase:
+	.tick      (1'b1),
+
+	.timer_irq (timer_irq)
+);
+
+wire               xip_uncached_hready_resp;
+wire               xip_uncached_hready;
+wire               xip_uncached_hresp;
+wire [23:0]        xip_uncached_haddr;
+wire               xip_uncached_hwrite;
+wire [1:0]         xip_uncached_htrans;
+wire [2:0]         xip_uncached_hsize;
+wire [2:0]         xip_uncached_hburst;
+wire [3:0]         xip_uncached_hprot;
+wire               xip_uncached_hmastlock;
+wire [W_DATA-1:0]  xip_uncached_hwdata;
+wire [W_DATA-1:0]  xip_uncached_hrdata;
+
+ahb_cache_readonly #(
+	.N_WAYS       (1),
+	.W_ADDR       (24),
+	.W_DATA       (32),
+	.W_LINE       (32),
+	.TMEM_PRELOAD (""),
+	.DMEM_PRELOAD (""),
+	// 4 kB cache, 12 iCE40 BRAMs (1024 x 32 data, 1024 x (12 + 1) (tag + valid))
+	.DEPTH        (1024)
+) xip_cache_u (
+	.clk             (clk),
+	.rst_n           (rst_n),
+
+	.src_hready_resp (xip_hready_resp),
+	.src_hready      (xip_hready),
+	.src_hresp       (xip_hresp),
+	.src_haddr       (xip_haddr[23:0]),
+	.src_hwrite      (xip_hwrite),
+	.src_htrans      (xip_htrans),
+	.src_hsize       (xip_hsize),
+	.src_hburst      (xip_hburst),
+	.src_hprot       (xip_hprot),
+	.src_hmastlock   (xip_hmastlock),
+	.src_hwdata      (xip_hwdata),
+	.src_hrdata      (xip_hrdata),
+
+	.dst_hready_resp (xip_uncached_hready_resp),
+	.dst_hready      (xip_uncached_hready),
+	.dst_hresp       (xip_uncached_hresp),
+	.dst_haddr       (xip_uncached_haddr),
+	.dst_hwrite      (xip_uncached_hwrite),
+	.dst_htrans      (xip_uncached_htrans),
+	.dst_hsize       (xip_uncached_hsize),
+	.dst_hburst      (xip_uncached_hburst),
+	.dst_hprot       (xip_uncached_hprot),
+	.dst_hmastlock   (xip_uncached_hmastlock),
+	.dst_hwdata      (xip_uncached_hwdata),
+	.dst_hrdata      (xip_uncached_hrdata)
+);
+
+
+spi_03h_xip xip_u (
+	.clk               (clk),
+	.rst_n             (rst_n),
+
+	.apbs_psel         (xip_psel),
+	.apbs_penable      (xip_penable),
+	.apbs_pwrite       (xip_pwrite),
+	.apbs_paddr        (xip_paddr),
+	.apbs_pwdata       (xip_pwdata),
+	.apbs_prdata       (xip_prdata),
+	.apbs_pready       (xip_pready),
+	.apbs_pslverr      (xip_pslverr),
+
+	.ahbls_hready_resp (xip_uncached_hready_resp),
+	.ahbls_hready      (xip_uncached_hready),
+	.ahbls_hresp       (xip_uncached_hresp),
+	.ahbls_haddr       (xip_uncached_haddr),
+	.ahbls_hwrite      (xip_uncached_hwrite),
+	.ahbls_htrans      (xip_uncached_htrans),
+	.ahbls_hsize       (xip_uncached_hsize),
+	.ahbls_hburst      (xip_uncached_hburst),
+	.ahbls_hprot       (xip_uncached_hprot),
+	.ahbls_hmastlock   (xip_uncached_hmastlock),
+	.ahbls_hwdata      (xip_uncached_hwdata),
+	.ahbls_hrdata      (xip_uncached_hrdata),
+
+	.spi_cs_n          (spi_cs_n),
+	.spi_sck           (spi_sck),
+	.spi_mosi          (spi_mosi),
+	.spi_miso          (spi_miso)
+);
+
 
 endmodule
