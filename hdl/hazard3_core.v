@@ -104,6 +104,7 @@ wire [W_REGADDR-1:0] f_rs1;
 wire [W_REGADDR-1:0] f_rs2;
 
 wire [31:0]          fd_cir;
+wire [1:0]           fd_cir_err;
 wire [1:0]           fd_cir_vld;
 wire [1:0]           df_cir_use;
 wire                 df_cir_lock;
@@ -126,6 +127,7 @@ hazard3_frontend #(
 	.mem_addr_rdy       (bus_aph_ready_i),
 
 	.mem_data           (bus_rdata_i),
+	.mem_data_err       (bus_dph_err_i),
 	.mem_data_vld       (bus_dph_ready_i),
 
 	.jump_target        (f_jump_target),
@@ -133,6 +135,7 @@ hazard3_frontend #(
 	.jump_target_rdy    (f_jump_rdy),
 
 	.cir                (fd_cir),
+	.cir_err            (fd_cir_err),
 	.cir_vld            (fd_cir_vld),
 	.cir_use            (df_cir_use),
 	.cir_lock           (df_cir_lock),
@@ -196,6 +199,7 @@ hazard3_decode #(
 	.rst_n                (rst_n),
 
 	.fd_cir               (fd_cir),
+	.fd_cir_err           (fd_cir_err),
 	.fd_cir_vld           (fd_cir_vld),
 	.df_cir_use           (df_cir_use),
 	.df_cir_lock          (df_cir_lock),

@@ -229,7 +229,7 @@ assign ahblm_hwdata = core_wdata_d;
 // Handhshake based on grant and bus stall
 assign core_aph_ready_i = ahblm_hready && bus_gnt_i;
 assign core_dph_ready_i = ahblm_hready && bus_active_dph_i;
-assign core_dph_err_i   = ahblm_hready && bus_active_dph_i && ahblm_hresp;
+assign core_dph_err_i   = bus_active_dph_i && ahblm_hresp;
 
 // D-side errors are reported even when not ready, so that the core can make
 // use of the two-phase error response to cleanly squash a second load/store

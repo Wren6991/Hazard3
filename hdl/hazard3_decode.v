@@ -26,6 +26,7 @@ module hazard3_decode #(
 	input wire rst_n,
 
 	input wire  [31:0]          fd_cir,
+	input wire  [1:0]           fd_cir_err,
 	input wire  [1:0]           fd_cir_vld,
 	output wire [1:0]           df_cir_use,
 	output wire                 df_cir_lock,
@@ -91,6 +92,13 @@ wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[3
 
 // ----------------------------------------------------------------------------
 // PC/CIR control
+
+// Must not flag bus error for a valid 16-bit instruction *followed by* an
+// error, because instruction fetch errors are speculative, and can be
+// flushed by e.g. a branch instruction. Note the 16 LSBs must be valid for
+// us to know an instruction's size.
+wire d_except_instr_bus_fault = fd_cir_vld > 2'd0 && fd_cir_err[0] ||
+	fd_cir_vld > 2'd1 && d_instr_is_32bit && fd_cir_err[1];
 
 assign d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
 wire d_stall = x_stall || d_starved;
@@ -246,7 +254,7 @@ always @ (*) begin
 	default:    begin d_invalid_32bit = 1'b1; end
 	endcase
 
-	if (d_invalid || d_starved) begin
+	if (d_invalid || d_starved || d_except_instr_bus_fault) begin
 		d_rs1        = {W_REGADDR{1'b0}};
 		d_rs2        = {W_REGADDR{1'b0}};
 		d_rd         = {W_REGADDR{1'b0}};
@@ -258,7 +266,9 @@ always @ (*) begin
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;
 
-		if (d_invalid && !d_starved)
+		if (d_except_instr_bus_fault)
+			d_except = EXCEPT_INSTR_FAULT;
+		else if (d_invalid && !d_starved)
 			d_except = EXCEPT_INSTR_ILLEGAL;
 	end
 	if (cir_lock_prev) begin

@@ -34,16 +34,17 @@ module hazard3_frontend #(
 	output wire              mem_size, // 1'b1 -> 32 bit access
 	output wire [W_ADDR-1:0] mem_addr,
 	output wire              mem_addr_vld,
-	input wire               mem_addr_rdy,
-	input wire  [W_DATA-1:0] mem_data,
-	input wire               mem_data_vld,
+	input  wire              mem_addr_rdy,
+	input  wire [W_DATA-1:0] mem_data,
+	input  wire              mem_data_err,
+	input  wire              mem_data_vld,
 
 	// Jump/flush interface
 	// Processor may assert vld at any time. The request will not go through
 	// unless rdy is high. Processor *may* alter request during this time.
 	// Inputs must not be a function of hready.
-	input wire  [W_ADDR-1:0] jump_target,
-	input wire               jump_target_vld,
+	input  wire [W_ADDR-1:0] jump_target,
+	input  wire              jump_target_vld,
 	output wire              jump_target_rdy,
 
 	// Interface to Decode
@@ -53,9 +54,10 @@ module hazard3_frontend #(
 	// This works OK because size is decoded from 2 LSBs of instruction, so cheap.
 	output reg  [31:0]       cir,
 	output reg  [1:0]        cir_vld, // number of valid halfwords in CIR
-	input wire  [1:0]        cir_use, // number of halfwords D intends to consume
+	input  wire [1:0]        cir_use, // number of halfwords D intends to consume
 	                                  // *may* be a function of hready
-	input wire               cir_lock,// Lock-in current contents and level of CIR.
+	output wire [1:0]        cir_err, // Bus error on upper/lower halfword of CIR.
+	input  wire              cir_lock,// Lock-in current contents and level of CIR.
 	                                  // Assert simultaneously with a jump request,
 	                                  // if decode is going to stall. This stops the CIR
 	                                  // from being trashed by incoming fetch data;
@@ -91,7 +93,15 @@ wire jump_now = jump_target_vld && jump_target_rdy;
 // an extra entry which is constant-0. These are just there to handle loop
 // boundary conditions.
 
+// err has an error (HRESP) bit associated with each FIFO entry, so that we
+// can correctly speculate and flush fetch errors. The error bit moves
+// through the prefetch queue alongside the corresponding bus data. We sample
+// bus errors like an extra data bit -- fetch continues to speculate forward
+// past an error, and we eventually flush and redirect the frontent if an
+// errored fetch makes it to the execute stage.
+
 reg [W_DATA-1:0]   fifo_mem [0:FIFO_DEPTH];
+reg [FIFO_DEPTH:0] fifo_err;
 reg [FIFO_DEPTH:0] fifo_valid;
 
 wire [W_DATA-1:0] fifo_wdata = mem_data;
@@ -121,13 +131,16 @@ always @ (posedge clk) begin: fifo_data_shift
 	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 		if (fifo_pop || (fifo_push && !fifo_valid[i])) begin
 			fifo_mem[i] <= fifo_valid[i + 1] ? fifo_mem[i + 1] : fifo_wdata;
+			fifo_err[i] <= fifo_err[i + 1] ? fifo_err[i + 1] : mem_data_err;
 		end
 	end
 	// Allow DM to inject instructions directly into the lowest-numbered queue
 	// entry. This mux should not extend critical path since it is balanced
 	// with the instruction-assembly muxes on the queue bypass path.
-	if (fifo_dbg_inject)
+	if (fifo_dbg_inject) begin
 		fifo_mem[0] <= dbg_instr_data;
+		fifo_err[0] <= 1'b0;
+	end
 end
 
 // ----------------------------------------------------------------------------
@@ -290,8 +303,10 @@ wire [1:0] level_next_no_fetch = buf_level - cir_use_clipped;
 // Overlay fresh fetch data onto the shifted/recycled instruction data
 // Again, if something won't be looked at, generate cheapest possible garbage.
 // Don't care if fetch data is valid or not, as will just retry next cycle (as long as flags set correctly)
+wire instr_fetch_overlay_blocked = cir_lock || (level_next_no_fetch[1] && !unaligned_jump_dph);
+
 wire [3*W_BUNDLE-1:0] instr_data_plus_fetch =
-	cir_lock || (level_next_no_fetch[1] && !unaligned_jump_dph) ? instr_data_shifted :
+	instr_fetch_overlay_blocked           ? instr_data_shifted :
 	unaligned_jump_dph     && EXTENSION_C ? {instr_data_shifted[W_BUNDLE +: 2*W_BUNDLE], fetch_data[W_BUNDLE +: W_BUNDLE]} :
 	level_next_no_fetch[0] && EXTENSION_C ? {fetch_data, instr_data_shifted[0 +: W_BUNDLE]} :
 	                         {instr_data_shifted[2*W_BUNDLE +: W_BUNDLE], fetch_data};
@@ -326,6 +341,32 @@ end
 always @ (posedge clk)
 	{hwbuf, cir} <= instr_data_plus_fetch;
 
+// Also keep track of bus errors associated with CIR contents, shifted in the
+// same way as instruction data. Errors may come straight from the bus, or
+// may be buffered in the prefetch queue.
+
+wire fetch_bus_err = fifo_empty ? mem_data_err : fifo_err[0];
+
+reg  [2:0] cir_bus_err;
+wire [2:0] cir_bus_err_shifted =
+	cir_use[1]                ? cir_bus_err >> 2 :
+	cir_use[0] && EXTENSION_C ? cir_bus_err >> 1 : cir_bus_err;
+
+wire [2:0] cir_bus_err_plus_fetch =
+	instr_fetch_overlay_blocked        ? cir_bus_err_shifted :
+	unaligned_jump_dph  && EXTENSION_C ? {cir_bus_err_shifted[2:1], fetch_bus_err} :
+	level_next_no_fetch && EXTENSION_C ? {{2{fetch_bus_err}}, cir_bus_err_shifted[0]} :
+                                         {cir_bus_err_shifted[2], {2{fetch_bus_err}}};
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		cir_bus_err <= 3'h0;
+	end else if (CSR_M_TRAP) begin
+		cir_bus_err <= cir_bus_err_plus_fetch;
+	end
+end
+
+assign cir_err = cir_bus_err[1:0];
 
 // ----------------------------------------------------------------------------
 // Register number predecode
