@@ -922,9 +922,10 @@ end
 // may already have had system side effects: for example a load/store on an
 // IO region.
 //
-// However a halt request when the instruction in stage 3 is itself generating
-// an exception is an exception-like halt entry. Otherwise, we set DPC to the
-// instruction *after* the excepting one, which is never actually reached.
+// However an asynchronous halt request when the instruction in stage 3 is
+// itself generating an exception is an exception-like halt entry. Otherwise,
+// we set DPC to the instruction *after* (in X) the excepting one, which is
+// never actually reached, due to the exception.
 
 wire exception_req_any;
 
@@ -1037,10 +1038,12 @@ assign trap_addr =
 assign trap_is_irq = DEBUG_SUPPORT && (want_halt_except || want_halt_irq) ?
 	!want_halt_except : !exception_req_any;
 
+// delay_irq_entry also applies to IRQ-like debug entries.
 assign trap_enter_vld =
 	CSR_M_TRAP && (exception_req_any ||
 		!delay_irq_entry && !debug_mode && (standard_irq_active || external_irq_active)) ||
-	DEBUG_SUPPORT && (want_halt_irq || want_halt_except || pending_dbg_resume);
+	DEBUG_SUPPORT && (
+		(!delay_irq_entry && want_halt_irq) || want_halt_except || pending_dbg_resume);
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
