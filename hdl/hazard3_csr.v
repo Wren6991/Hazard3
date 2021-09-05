@@ -81,6 +81,15 @@ module hazard3_csr #(
 	output wire                trap_is_irq,
 	output wire                trap_enter_vld,
 	input  wire                trap_enter_rdy,
+	// True when we are about to trap into debug mode, but are waiting for an
+	// excepting or potentially-excepting instruction to clear M first. The
+	// instruction in X is suppressed, X PC does not increment but still
+	// tracks exception addresses.
+	output wire                trap_enter_soon,
+	// We need to know about load/stores in data phase because their exception
+	// status is still unknown, so we fence off on them before entering debug
+	// mode.
+	input  wire                loadstore_dphase_pending,
 	input  wire [XLEN-1:0]     mepc_in,
 
 	// Exceptions must *not* be a function of bus stall.
@@ -917,29 +926,44 @@ end
 // instructions in stage 2 and stage 3) or in an exception-like manner
 // (replace the instruction in stage 3).
 //
-// A tricky case is halt request: this normally performs an IRQ-like entry,
-// because the instruction in stage 3 can not in general be discarded, as it
-// may already have had system side effects: for example a load/store on an
-// IO region.
+// Halt request and step-break are IRQ-like. We need to be careful when a halt
+// request lines up with an instruction in M which either has generated an
+// exception (e.g. an ecall) or may yet generate an exception (a load). In
+// this case the correct thing to do is to:
 //
-// However an asynchronous halt request when the instruction in stage 3 is
-// itself generating an exception is an exception-like halt entry. Otherwise,
-// we set DPC to the instruction *after* (in X) the excepting one, which is
-// never actually reached, due to the exception.
+// - Squash whatever instruction may be in X, and inhibit X PC increment
+// - Wait until after the exception entry is taken (or the load/store
+//   completes successfully)
+// - Immediately trigger an IRQ-like debug entry.
+//
+// This ensures the debugger sees mcause/mepc set correctly, with dpc pointing
+// to the handler entry point, if the instruction excepts.
 
 wire exception_req_any;
+wire halt_delayed_by_exception = exception_req_any || loadstore_dphase_pending;
 
 // This would also include triggers, if/when those are implemented:
 wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
-	dcsr_ebreakm && except == EXCEPT_EBREAK ||
-	// This clause takes priority over the IRQ-like dbg_req_halt clause below:
-	dbg_req_halt && exception_req_any
+	dcsr_ebreakm && except == EXCEPT_EBREAK
 );
 
-// Note all exception-like causes (trigger, ebreak) are higher priority than IRQ-like
-wire want_halt_irq = DEBUG_SUPPORT && !debug_mode && !want_halt_except && (
-	dbg_req_halt || (dbg_req_halt_on_reset && have_just_reset) || step_halt_req
+// Note exception-like causes (trigger, ebreak) are higher priority than
+// IRQ-like.
+//
+// We must mask halt_req with delay_irq_entry (true on cycle 2 and beyond of
+// load/store address phase) because at that point we can't suppress the bus
+// access..
+wire want_halt_irq_if_no_exception = DEBUG_SUPPORT && !debug_mode && !want_halt_except && (
+	(dbg_req_halt && !delay_irq_entry) ||
+	(dbg_req_halt_on_reset && have_just_reset) ||
+	step_halt_req
 );
+
+// Exception (or potential exception due to load/store) in M delays halt
+// entry. The halt intention still blocks X, so we can't get blocked forever
+// by a string of load/stores. This is just here to get sequencing between an
+// exception (or potential exception) in M, and debug mode entry.
+wire want_halt_irq = want_halt_irq_if_no_exception && !halt_delayed_by_exception;
 
 assign dcause_next =
 	// Trigger would be highest priority if implemented
@@ -1044,6 +1068,8 @@ assign trap_enter_vld =
 		!delay_irq_entry && !debug_mode && (standard_irq_active || external_irq_active)) ||
 	DEBUG_SUPPORT && (
 		(!delay_irq_entry && want_halt_irq) || want_halt_except || pending_dbg_resume);
+
+assign trap_enter_soon = trap_enter_vld || (DEBUG_SUPPORT && want_halt_irq_if_no_exception);
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;

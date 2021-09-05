@@ -257,6 +257,7 @@ wire                 x_alu_cmp;
 wire [W_DATA-1:0]    m_trap_addr;
 wire                 m_trap_is_irq;
 wire                 m_trap_enter_vld;
+wire                 m_trap_enter_soon;
 wire                 m_trap_enter_rdy = f_jump_rdy;
 
 reg  [W_REGADDR-1:0] xm_rs1;
@@ -275,7 +276,8 @@ wire x_jump_req;
 
 // IRQs squeeze in between the instructions in X and M, so in this case X
 // stalls but M can continue. -> X always stalls on M trap, M *may* stall.
-wire x_stall_on_trap = m_trap_enter_vld && !m_trap_enter_rdy;
+wire x_stall_on_trap = m_trap_enter_vld && !m_trap_enter_rdy ||
+	m_trap_enter_soon && !m_trap_enter_vld;
 
 assign x_stall =
 	m_stall ||
@@ -368,7 +370,7 @@ always @ (*) begin
 		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
 		default:   bus_hsize_d = HSIZE_BYTE;
 	endcase
-	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_unaligned_addr || m_trap_enter_vld);
+	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_unaligned_addr || m_trap_enter_soon);
 end
 
 // Multiply/divide
@@ -391,7 +393,7 @@ if (EXTENSION_M) begin: has_muldiv
 		else
 			x_muldiv_posted <= (x_muldiv_posted || (x_muldiv_op_vld && x_muldiv_op_rdy)) && x_stall;
 
-	wire x_muldiv_kill = m_trap_enter_vld;
+	wire x_muldiv_kill = m_trap_enter_soon;
 
 	wire x_use_fast_mul = MUL_FAST && d_aluop == ALUOP_MULDIV && d_mulop == M_OP_MUL;
 
@@ -473,6 +475,8 @@ wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
 wire [W_DATA-1:0] x_csr_rdata;
 wire              x_csr_illegal_access;
 
+// "Previous" refers to next-most-recent instruction to be in D/X, i.e. the
+// most recent instruction to reach stage M (which may or may not still be in M).
 reg prev_instr_was_32_bit;
 
 always @ (posedge clk or negedge rst_n) begin
@@ -522,19 +526,21 @@ hazard3_csr #(
 	// Can generate access faults (hence traps), but do not actually perform access.
 	.addr                       (d_imm[11:0]), // todo could just connect this to the instruction bits
 	.wdata                      (x_csr_wdata),
-	.wen_soon                   (d_csr_wen && !m_trap_enter_vld),
-	.wen                        (d_csr_wen && !m_trap_enter_vld && !x_stall),
+	.wen_soon                   (d_csr_wen && !m_trap_enter_soon),
+	.wen                        (d_csr_wen && !m_trap_enter_soon && !x_stall),
 	.wtype                      (d_csr_wtype),
 	.rdata                      (x_csr_rdata),
-	.ren_soon                   (d_csr_ren && !m_trap_enter_vld),
-	.ren                        (d_csr_ren && !m_trap_enter_vld && !x_stall),
+	.ren_soon                   (d_csr_ren && !m_trap_enter_soon),
+	.ren                        (d_csr_ren && !m_trap_enter_soon && !x_stall),
 	.illegal                    (x_csr_illegal_access),
 
 	// Trap signalling
 	.trap_addr                  (m_trap_addr),
 	.trap_is_irq                (m_trap_is_irq),
+	.trap_enter_soon            (m_trap_enter_soon),
 	.trap_enter_vld             (m_trap_enter_vld),
 	.trap_enter_rdy             (m_trap_enter_rdy),
+	.loadstore_dphase_pending   (!xm_memop[3]),
 	.mepc_in                    (m_exception_return_addr),
 
 	// IRQ and exception requests
@@ -566,7 +572,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
 			xm_except <= x_except;
-			if (x_stall || m_trap_enter_vld) begin
+			if (x_stall || m_trap_enter_soon) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
