@@ -524,7 +524,7 @@ hazard3_csr #(
 	// CSR access port
 	// *en_soon are early access strobes which are not a function of bus stall.
 	// Can generate access faults (hence traps), but do not actually perform access.
-	.addr                       (d_imm[11:0]), // todo could just connect this to the instruction bits
+	.addr                       (fd_cir[31:20]), // Always I-type immediate
 	.wdata                      (x_csr_wdata),
 	.wen_soon                   (d_csr_wen && !m_trap_enter_soon),
 	.wen                        (d_csr_wen && !m_trap_enter_soon && !x_stall),

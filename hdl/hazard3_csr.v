@@ -105,8 +105,6 @@ module hazard3_csr #(
 	input  wire                instr_ret
 );
 
-// TODO block CSR access when entering trap?
-
 `include "hazard3_ops.vh"
 
 localparam X0 = {XLEN{1'b0}};
@@ -650,8 +648,8 @@ always @ (*) begin
     // ------------------------------------------------------------------------
 	// Trap-handling CSRs
 
-	// TODO bit of a hack but this is a 32 bit synthesised register with
-	// set/clear/write/read, don't turn it on unless we really have to
+	// This is a 32 bit synthesised register with set/clear/write/read, don't
+	// turn it on unless we really have to
 	MSCRATCH: if (CSR_M_TRAP && CSR_M_MANDATORY) begin
 		decode_match = 1'b1;
 		rdata = mscratch;
