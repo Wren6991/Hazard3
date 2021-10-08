@@ -120,7 +120,7 @@ class RVCSR:
 
 	WRITE       = 0
 	WRITE_SET   = 1
-	WRITE_CLEAR = 2	
+	WRITE_CLEAR = 2
 
 	MSCRATCH    = 0x340
 	MCYCLE      = 0xb00
@@ -265,7 +265,7 @@ class RVCore:
 				if log: log_disasm = f"slti x{regnum_rd}, x{regnum_rs1}, {imm}"
 				rd_wdata = 1 * (rs1 < imm)
 			elif funct3 == 0b011:
-				if log: log_disasm = f"slti x{regnum_rd}, x{regnum_rs1}, {imm & XLEN_MASK}"
+				if log: log_disasm = f"sltiu x{regnum_rd}, x{regnum_rs1}, {imm & XLEN_MASK}"
 				rd_wdata = 1 * (rs1 & XLEN_MASK < imm & XLEN_MASK)
 			elif funct3 == 0b100:
 				if log: log_disasm = f"xori x{regnum_rd}, x{regnum_rs1}, 0x{imm & XLEN_MASK:x}"
