@@ -185,6 +185,7 @@ wire [W_ADDR-1:0]    d_jump_offs;
 wire                 d_jump_is_regoffs;
 wire [W_ADDR-1:0]    d_pc;
 wire [W_EXCEPT-1:0]  d_except;
+wire                 d_wfi;
 wire                 d_csr_ren;
 wire                 d_csr_wen;
 wire [1:0]           d_csr_wtype;
@@ -229,7 +230,8 @@ hazard3_decode #(
 	.d_branchcond         (d_branchcond),
 	.d_jump_offs          (d_jump_offs),
 	.d_jump_is_regoffs    (d_jump_is_regoffs),
-	.d_except             (d_except)
+	.d_except             (d_except),
+	.d_wfi                (d_wfi)
 );
 
 // ----------------------------------------------------------------------------
@@ -267,6 +269,7 @@ reg  [W_DATA-1:0]    xm_result;
 reg  [W_DATA-1:0]    xm_store_data;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
+reg                  xm_wfi;
 reg                  xm_delay_irq_entry;
 
 
@@ -496,6 +499,7 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 wire [W_ADDR-1:0] m_exception_return_addr;
+wire m_wfi_stall_clear;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
@@ -542,6 +546,7 @@ hazard3_csr #(
 	.trap_enter_rdy             (m_trap_enter_rdy),
 	.loadstore_dphase_pending   (!xm_memop[3]),
 	.mepc_in                    (m_exception_return_addr),
+	.wfi_stall_clear            (m_wfi_stall_clear),
 
 	// IRQ and exception requests
 	.delay_irq_entry            (xm_delay_irq_entry),
@@ -565,6 +570,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_memop <= MEMOP_NONE;
 		xm_except <= EXCEPT_NONE;
+		xm_wfi <= 1'b0;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
 		if (!m_stall) begin
@@ -572,11 +578,13 @@ always @ (posedge clk or negedge rst_n) begin
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
 			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
 			xm_except <= x_except;
+			xm_wfi <= d_wfi;
 			if (x_stall || m_trap_enter_soon) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
 				xm_except <= EXCEPT_NONE;
+				xm_wfi <= 1'b0;
 			end
 		end else if (bus_dph_err_d) begin
 			// First phase of 2-phase AHBL error response. Pass the exception along on
@@ -586,6 +594,7 @@ always @ (posedge clk or negedge rst_n) begin
 			assert(!xm_memop[3]); // Not NONE
 `endif
 			xm_except <= xm_memop <= MEMOP_LBU ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
+			xm_wfi <= 1'b0;
 		end
 	end
 end
@@ -624,7 +633,9 @@ assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign x_jump_not_except = !m_trap_enter_vld;
 
 wire m_bus_stall = !xm_memop[3] && !bus_dph_ready_d;
-assign m_stall = m_bus_stall || (m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq);
+assign m_stall = m_bus_stall ||
+	(m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq) ||
+	(xm_wfi && !m_wfi_stall_clear);
 
 // Exception is taken against the instruction currently in M, so walk the PC
 // back. IRQ is taken "in between" the instruction in M and the instruction

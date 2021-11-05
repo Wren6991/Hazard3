@@ -91,6 +91,7 @@ module hazard3_csr #(
 	// mode.
 	input  wire                loadstore_dphase_pending,
 	input  wire [XLEN-1:0]     mepc_in,
+	output wire                wfi_stall_clear,
 
 	// Exceptions must *not* be a function of bus stall.
 	input  wire [W_EXCEPT-1:0] except,
@@ -1018,6 +1019,10 @@ assign mip = {
 wire [31:0] mip_no_global = mip & ~(32'h800 & ~{XLEN{midcr_eivect}});
 wire standard_irq_active = |(mip_no_global & mie) && mstatus_mie && !dcsr_step;
 wire external_irq_active = external_irq_pending && mstatus_mie && !dcsr_step && mie_meie;
+
+// WFI clear respects individual interrupt enables but ignores mstatus.mie.
+// Additionally, wfi is treated as a nop during single-stepping and D-mode.
+assign wfi_stall_clear = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
 
 wire [4:0] external_irq_num;
 wire [3:0] standard_irq_num;

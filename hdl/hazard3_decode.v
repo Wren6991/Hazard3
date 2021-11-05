@@ -56,7 +56,8 @@ module hazard3_decode #(
 	output reg  [W_BCOND-1:0]   d_branchcond,
 	output reg  [W_ADDR-1:0]    d_jump_offs,
 	output reg                  d_jump_is_regoffs,
-	output reg  [W_EXCEPT-1:0]  d_except
+	output reg  [W_EXCEPT-1:0]  d_except,
+	output reg                  d_wfi
 );
 
 `include "rv_opcodes.vh"
@@ -193,6 +194,7 @@ always @ (*) begin
 	d_jump_is_regoffs = 1'b0;
 	d_invalid_32bit = 1'b0;
 	d_except = EXCEPT_NONE;
+	d_wfi = 1'b0;
 
 	casez (d_instr)
 	RV_BEQ:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_ZERO;  end
@@ -251,6 +253,7 @@ always @ (*) begin
 	RV_ECALL:   if (HAVE_CSR) begin d_except = EXCEPT_ECALL;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	RV_EBREAK:  if (HAVE_CSR) begin d_except = EXCEPT_EBREAK; d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	RV_MRET:    if (HAVE_CSR) begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	RV_WFI:     if (HAVE_CSR) begin d_wfi = 1'b1;             d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	default:    begin d_invalid_32bit = 1'b1; end
 	endcase
 
@@ -263,6 +266,7 @@ always @ (*) begin
 		d_csr_ren    = 1'b0;
 		d_csr_wen    = 1'b0;
 		d_except     = EXCEPT_NONE;
+		d_wfi        = 1'b0;
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;
 
