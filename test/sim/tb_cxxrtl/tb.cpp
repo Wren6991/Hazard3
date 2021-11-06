@@ -15,9 +15,13 @@ uint8_t mem[MEM_SIZE];
 
 static const unsigned int IO_BASE = 0x80000000;
 enum {
-	IO_PRINT_CHAR = 0,
-	IO_PRINT_U32  = 4,
-	IO_EXIT       = 8
+	IO_PRINT_CHAR = 0x000,
+	IO_PRINT_U32  = 0x004,
+	IO_EXIT       = 0x008,
+	IO_MTIME      = 0x100,
+	IO_MTIMEH     = 0x104,
+	IO_MTIMECMP   = 0x108,
+	IO_MTIMECMPH  = 0x10c
 };
 
 const char *help_str =
@@ -115,6 +119,9 @@ int main(int argc, char **argv) {
 	top.p_ahblm__hready.set<bool>(true);
 #endif
 
+	uint64_t mtime = 0;
+	uint64_t mtimecmp = 0;
+
 	// Reset + initial clock pulse
 	top.step();
 	top.p_clk.set<bool>(true);
@@ -132,6 +139,11 @@ int main(int argc, char **argv) {
 		top.p_clk.set<bool>(true);
 		top.step();
 		top.step(); // workaround for github.com/YosysHQ/yosys/issues/2780
+
+		// Default update logic for mtime, mtimecmp
+		++mtime;
+		top.p_timer__irq.set<bool>(mtime >= mtimecmp);
+
 		// Handle current data phase, then move current address phase to data phase
 		uint32_t rdata = 0;
 		if (bus_trans && bus_write) {
@@ -158,6 +170,18 @@ int main(int argc, char **argv) {
 				printf("Ran for %ld cycles\n", cycle + 1);
 				break;
 			}
+			else if (bus_addr == IO_BASE + IO_MTIME) {
+				mtime = (mtime & 0xffffffff00000000u) | wdata;
+			}
+			else if (bus_addr == IO_BASE + IO_MTIMEH) {
+				mtime = (mtime & 0x00000000ffffffffu) | ((uint64_t)wdata << 32);
+			}
+			else if (bus_addr == IO_BASE + IO_MTIMECMP) {
+				mtimecmp = (mtimecmp & 0xffffffff00000000u) | wdata;
+			}
+			else if (bus_addr == IO_BASE + IO_MTIMECMPH) {
+				mtimecmp = (mtimecmp & 0x00000000ffffffffu) | ((uint64_t)wdata << 32);
+			}
 		}
 		else if (bus_trans && !bus_write) {
 			bus_addr &= ~0x3u;
@@ -167,6 +191,18 @@ int main(int argc, char **argv) {
 					mem[bus_addr + 1] << 8 |
 					mem[bus_addr + 2] << 16 |
 					mem[bus_addr + 3] << 24;
+			}
+			else if (bus_addr == IO_BASE + IO_MTIME) {
+				rdata = mtime;
+			}
+			else if (bus_addr == IO_BASE + IO_MTIMEH) {
+				rdata = mtime >> 32;
+			}
+			else if (bus_addr == IO_BASE + IO_MTIMECMP) {
+				rdata = mtimecmp;
+			}
+			else if (bus_addr == IO_BASE + IO_MTIMECMPH) {
+				rdata = mtimecmp >> 32;
 			}
 		}
 #ifdef DUAL_PORT
