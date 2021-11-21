@@ -46,7 +46,7 @@ This is essentially Hazard5, with the `D` and `X` stages merged and the register
 
 # Cloning This Repository
 
-For the purpose of running hello world, or using Hazard3 in your design, this repository is self-contained. You will need to pull in the submodules for compliance tests and for components for the example SoC:
+For the purpose of using Hazard3 in your design, this repository is self-contained. You will need to pull in the submodules for simulation scripts, compliance tests and for components for the example SoC:
 
 ```bash
 git clone --recursive https://github.com/Wren6991/Hazard3.git hazard3

@@ -37,13 +37,7 @@ module fpga_icebreaker (
 	output wire       mirror_tdo,
 
 	output wire       uart_tx,
-	input  wire       uart_rx,
-
-	output wire       spi_cs_n,
-	output wire       spi_sck,
-	output wire       spi_mosi,
-	input  wire       spi_miso
-
+	input  wire       uart_rx
 );
 
 assign mirror_tck = tck;
@@ -82,7 +76,7 @@ activity_led #(
 example_soc #(
 	.MUL_FAST    (1),
 	.EXTENSION_C (0),
-	.CSR_COUNTER (0)
+	.CSR_COUNTER (1)
 ) soc_u (
 	.clk            (clk_sys),
 	.rst_n          (rst_n_sys),
@@ -94,12 +88,7 @@ example_soc #(
 	.tdo            (tdo),
 
 	.uart_tx        (uart_tx),
-	.uart_rx        (uart_rx),
-
-	.spi_cs_n       (spi_cs_n),
-	.spi_sck        (spi_sck),
-	.spi_mosi       (spi_mosi),
-	.spi_miso       (spi_miso)
+	.uart_rx        (uart_rx)
 );
 
 endmodule
