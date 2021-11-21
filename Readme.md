@@ -59,7 +59,7 @@ These instructions are for Ubuntu 20.04. You will need:
 - A recent Yosys build to process the Verilog. At least version `c2afcbe7`, which includes a workaround for a gtkwave string parsing issue. Latest master should be fine.
 - A `riscv32-unknown-elf-` toolchain to build software for the core
 - A native `clang` to build the simulator
-- (For debug) a recent build of [https://github.com/riscv/riscv-openocd](riscv-openocd) with the `remote-bitbang` protocol enabled. A recent version of upstream openocd should also work.
+- (For debug) a recent build of [riscv-openocd](https://github.com/riscv/riscv-openocd) with the `remote-bitbang` protocol enabled. A recent version of upstream openocd should also work.
 
 ## Yosys
 
