@@ -373,7 +373,12 @@ always @ (*) begin
 		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
 		default:   bus_hsize_d = HSIZE_BYTE;
 	endcase
-	bus_aph_req_d = x_memop_vld && !(x_stall_raw || x_unaligned_addr || m_trap_enter_soon);
+	bus_aph_req_d = x_memop_vld && !(
+		x_stall_raw ||
+		x_unaligned_addr ||
+		m_trap_enter_soon ||
+		(xm_wfi && !m_wfi_stall_clear) // FIXME will cause a timing issue, better to stall til *after* clear
+	);
 end
 
 // Multiply/divide
