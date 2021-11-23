@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
-[*] Sat Jul 17 18:39:08 2021
+[*] Sat Sep  4 00:39:00 2021
 [*]
 [dumpfile] "/home/luke/proj/hazard3/test/sim/openocd/waves.vcd"
-[dumpfile_mtime] "Sat Jul 17 18:35:01 2021"
-[dumpfile_size] 6773918
+[dumpfile_mtime] "Sat Sep  4 00:36:35 2021"
+[dumpfile_size] 31718403
 [savefile] "/home/luke/proj/hazard3/test/sim/openocd/waves.gtkw"
-[timestart] 0
+[timestart] 877885
 [size] 1920 1043
 [pos] 174 41
-*-15.000000 128200 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-3.000000 877889 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] cpu.
 [treeopen] cpu.core.
 [treeopen] inst_hazard3_jtag_dtm.
@@ -34,9 +34,6 @@ tdo
 @22
 inst_hazard3_jtag_dtm.tap_state[3:0]
 inst_hazard3_jtag_dtm.ir[4:0]
-@28
-inst_hazard3_jtag_dtm.dmi_cmderr[1:0]
-inst_hazard3_jtag_dtm.dmi_busy
 @200
 -
 -DMI
@@ -90,8 +87,18 @@ cpu.core.bus_dph_err_d
 cpu.core.inst_hazard3_csr.addr[11:0]
 @28
 cpu.core.inst_hazard3_csr.wen
-@29
 cpu.core.inst_hazard3_csr.ren_soon
+@200
+-
+-I Bus
+@22
+cpu.i_haddr[31:0]
+@28
+cpu.i_htrans[1:0]
+cpu.i_hready
+cpu.i_hresp
+@23
+cpu.i_hrdata[31:0]
 @200
 -
 -D Bus

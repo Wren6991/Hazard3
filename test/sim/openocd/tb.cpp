@@ -17,7 +17,6 @@ static const unsigned int MEM_SIZE = 16 * 1024 * 1024;
 uint8_t mem[MEM_SIZE];
 
 static const unsigned int IO_BASE = 0x80000000;
-static const unsigned int IO_MASK = 0xffffff00;
 enum {
 	IO_PRINT_CHAR = 0x000,
 	IO_PRINT_U32  = 0x004,
@@ -276,7 +275,7 @@ int main(int argc, char **argv) {
 				}
 			}
 			else if (bus_trans && !bus_write) {
-				if (bus_addr <= MEM_SIZE) {
+				if (bus_addr <= MEM_SIZE - (1u << bus_size)) {
 					bus_addr &= ~0x3u;
 					rdata =
 						(uint32_t)mem[bus_addr] |
@@ -323,7 +322,7 @@ int main(int argc, char **argv) {
 			top.p_i__hresp.set<bool>(false);
 			if (bus_trans_i) {
 				bus_addr_i &= ~0x3u;
-				if (bus_addr_i <= MEM_SIZE - 4u) {
+				if (bus_addr_i < MEM_SIZE) {
 					top.p_i__hrdata.set<uint32_t>(
 						(uint32_t)mem[bus_addr_i] |
 						mem[bus_addr_i + 1] << 8 |
