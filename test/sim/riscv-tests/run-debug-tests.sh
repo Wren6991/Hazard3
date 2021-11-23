@@ -27,6 +27,7 @@ DebugTurbostep \
 DownloadTest \
 InfoTest \
 InterruptTest \
+CrashLoop \
 InstantChangePc \
 InstantHaltTest \
 MemTest16 \
