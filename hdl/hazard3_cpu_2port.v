@@ -19,6 +19,8 @@
 // Hazard3 core, and interfaces its instruction fetch and load/store signals
 // to a pair of AHB-Lite master ports.
 
+`default_nettype none
+
 module hazard3_cpu_2port #(
 `include "hazard3_config.vh"
 ) (
@@ -214,3 +216,5 @@ assign d_hprot = 4'b0010;
 assign d_hmastlock = 1'b0;
 
 endmodule
+
+`default_nettype wire

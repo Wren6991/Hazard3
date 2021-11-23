@@ -30,6 +30,8 @@
 // mtimecmp comparison. To pause the timer due to an external event, assert
 // dbg_halt high. To pause from software, write 0 to CTRL.EN.
 
+`default_nettype none
+
 module hazard3_riscv_timer (
 	input  wire               clk,
 	input  wire               rst_n,
@@ -59,6 +61,7 @@ localparam ADDR_MTIMEH    = 8'h0c;
 localparam ADDR_MTIMECMP  = 8'h10;
 localparam ADDR_MTIMECMPH = 8'h14;
 
+wire bus_write = pwrite && psel && penable && pready;
 
 reg ctrl_en;
 always @ (posedge clk or negedge rst_n) begin
@@ -69,7 +72,6 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-wire bus_write = pwrite && psel && penable && pready;
 wire tick_and_increment = ctrl_en && !dbg_halt && tick;
 
 // ----------------------------------------------------------------------------
@@ -170,3 +172,5 @@ always @ (*) case (paddr)
 endcase
 
 endmodule
+
+`default_nettype wire

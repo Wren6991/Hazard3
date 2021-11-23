@@ -18,6 +18,8 @@
 // Really something like this should be in a utility library (or the language!),
 // but Hazard3 is supposed to be self-contained
 
+`default_nettype none
+
 module hazard3_priority_encode #(
 	parameter W_REQ = 16,
 	parameter W_GNT = $clog2(W_REQ) // do not modify
@@ -55,3 +57,5 @@ end
 assign gnt = gnt_accum;
 
 endmodule
+
+`default_nettype wire

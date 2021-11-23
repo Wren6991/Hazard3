@@ -15,6 +15,8 @@
  *                                                                    *
  *********************************************************************/
 
+`default_nettype none
+
 module hazard3_mul_fast #(
 	parameter XLEN = 32
 ) (
@@ -73,3 +75,5 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 endmodule
+
+`default_nettype wire

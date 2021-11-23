@@ -769,3 +769,5 @@ hazard3_regfile_1w2r #(
 `endif
 
 endmodule
+
+`default_nettype wire

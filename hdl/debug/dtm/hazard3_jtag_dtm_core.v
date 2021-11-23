@@ -23,6 +23,8 @@
 // This core logic can be reused and connected to some other serial transport
 // or, for example, the ECP5 JTAGG primitive (see hazard5_ecp5_jtag_dtm.v)
 
+`default_nettype none
+
 module hazard3_jtag_dtm_core #(
 	parameter DTMCS_IDLE_HINT = 3'd4,
 	parameter W_ADDR = 8,
@@ -190,3 +192,5 @@ always @ (posedge tck or negedge trst_n) begin
 end
 
 endmodule
+
+`default_nettype wire

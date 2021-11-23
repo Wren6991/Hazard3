@@ -15,6 +15,8 @@
  *                                                                    *
  *********************************************************************/
 
+`default_nettype none
+
 module hazard3_alu #(
 	parameter W_DATA = 32
 ) (
@@ -113,3 +115,5 @@ end
 `endif
 
 endmodule
+
+`default_nettype wire

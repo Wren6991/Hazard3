@@ -391,3 +391,5 @@ assign next_regs_rs2 =
 	next_instr[1:0] == 2'b10 ? next_instr[6:2]   : {2'b01, next_instr[4:2]};
 
 endmodule
+
+`default_nettype wire

@@ -19,6 +19,8 @@
 // Hazard3 core, and arbitrates its instruction fetch and load/store signals
 // down to a single AHB-Lite master port.
 
+`default_nettype none
+
 module hazard3_cpu_1port #(
 `include "hazard3_config.vh"
 ) (
@@ -239,3 +241,5 @@ assign core_dph_ready_d = ahblm_hready && bus_active_dph_d;
 assign core_dph_err_d = bus_active_dph_d && ahblm_hresp;
 
 endmodule
+
+`default_nettype wire

@@ -19,6 +19,8 @@
 // using a single log-type barrel shifter. Around 240 LUTs for 32 bits.
 // (7 layers of 32 2-input muxes, some extra LUTs and LUT inputs used for arith)
 
+`default_nettype none
+
 module hazard3_shift_barrel #(
 	parameter W_DATA = 32,
 	parameter W_SHAMT = 5
@@ -65,3 +67,5 @@ end
 `endif
 
 endmodule
+
+`default_nettype wire

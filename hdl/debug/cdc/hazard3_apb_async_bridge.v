@@ -26,6 +26,8 @@
 `define HAZARD3_REG_KEEP_ATTRIBUTE (* keep = 1'b1 *)
 `endif
 
+`default_nettype none
+
 module hazard3_apb_async_bridge #(
     parameter W_ADDR = 8,
     parameter W_DATA = 32,
@@ -203,3 +205,5 @@ assign dst_penable = dst_penable_r;
 assign {dst_paddr, dst_pwdata, dst_pwrite} = dst_paddr_pwdata_pwrite;
 
 endmodule
+
+`default_nettype wire

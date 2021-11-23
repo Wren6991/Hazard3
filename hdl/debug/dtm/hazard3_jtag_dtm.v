@@ -214,3 +214,5 @@ hazard3_jtag_dtm_core #(
 );
 
 endmodule
+
+`default_nettype wire

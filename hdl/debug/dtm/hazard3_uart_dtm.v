@@ -21,6 +21,8 @@
 // This is not suitable for production systems (it's a UART...) but is a
 // simple way to get your FPGA board up and running.
 
+`default_nettype none
+
 module hazard3_uart_dtm #(
     // Expected to run at 1 Mbaud from some fixed reference frequency.
     parameter BAUD_CLKDIV = 12,
@@ -343,3 +345,5 @@ assign paddr = dm_addr;
 assign pwdata = dm_data;
 
 endmodule
+
+`default_nettype wire

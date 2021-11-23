@@ -17,6 +17,8 @@
 
 // Nothing to see here, just a sync FIFO
 
+`default_nettype none
+
 module hazard3_uart_dtm_fifo #(
 	parameter WIDTH = 8,
 	parameter LOG_DEPTH = 2
@@ -59,3 +61,5 @@ end
 assign rdata = fifo_mem[rptr[LOG_DEPTH-1:0]];
 
 endmodule
+
+`default_nettype wire

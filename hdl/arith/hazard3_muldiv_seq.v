@@ -27,6 +27,8 @@
 // The actual multiply/divide hardware is unsigned. We handle signedness at
 // input/output.
 
+`default_nettype none
+
 module hazard3_muldiv_seq #(
 	parameter XLEN = 32,
 	parameter UNROLL = 1,
@@ -232,7 +234,7 @@ assign {result_h, result_l} = accum;
 `else
 
 // Provide arithmetically simpler alternative operations, to speed up formal checks
-always assert(XLEN == 32); // TODO may care about this one day
+always assert(XLEN == 32);
 
 reg [XLEN-1:0] fml_a_saved;
 reg [XLEN-1:0] fml_b_saved;
@@ -293,3 +295,5 @@ end
 `endif
 
 endmodule
+
+`default_nettype wire

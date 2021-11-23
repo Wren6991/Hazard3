@@ -23,6 +23,8 @@
 `define HAZARD3_REG_KEEP_ATTRIBUTE (* keep = 1'b1 *)
 `endif
 
+`default_nettype none
+
 module hazard3_sync_1bit #(
 	parameter N_STAGES = 2 // Should be >=2
 ) (
@@ -43,3 +45,5 @@ always @ (posedge clk or negedge rst_n)
 assign o = sync_flops[N_STAGES-1];
 
 endmodule
+
+`default_nettype wire
