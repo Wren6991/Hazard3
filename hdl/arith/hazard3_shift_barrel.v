@@ -22,23 +22,25 @@
 `default_nettype none
 
 module hazard3_shift_barrel #(
-	parameter W_DATA = 32,
-	parameter W_SHAMT = 5
+`include "hazard3_config.vh"
+,
+`include "hazard3_width_const.vh"
 ) (
 	input wire [W_DATA-1:0]  din,
 	input wire [W_SHAMT-1:0] shamt,
 	input wire               right_nleft,
+	input wire               rotate,
 	input wire               arith,
 	output reg [W_DATA-1:0]  dout
 );
-
-integer i;
 
 reg [W_DATA-1:0] din_rev;
 reg [W_DATA-1:0] shift_accum;
 wire sext = arith && din_rev[0]; // haha
 
-always @ (*) begin
+always @ (*) begin: shift
+	integer i;
+
 	for (i = 0; i < W_DATA; i = i + 1)
 		din_rev[i] = right_nleft ? din[W_DATA - 1 - i] : din[i];
 
@@ -46,7 +48,8 @@ always @ (*) begin
 	for (i = 0; i < W_SHAMT; i = i + 1) begin
 		if (shamt[i]) begin
 			shift_accum = (shift_accum << (1 << i)) |
-				({W_DATA{sext}} & ~({W_DATA{1'b1}} << (1 << i)));
+				({W_DATA{sext}} & ~({W_DATA{1'b1}} << (1 << i))) |
+				({W_DATA{rotate && |EXTENSION_ZBB}} & (shift_accum >> (W_DATA - (1 << i))));
 		end
 	end
 

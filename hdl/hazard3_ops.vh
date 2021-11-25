@@ -1,26 +1,56 @@
 
 // ALU operation selectors
 
-localparam ALUOP_ADD     = 4'h0; 
-localparam ALUOP_SUB     = 4'h1; 
-localparam ALUOP_LT      = 4'h2;
-localparam ALUOP_LTU     = 4'h4;
-localparam ALUOP_AND     = 4'h6;
-localparam ALUOP_OR      = 4'h7;
-localparam ALUOP_XOR     = 4'h8;
-localparam ALUOP_SRL     = 4'h9;
-localparam ALUOP_SRA     = 4'ha;
-localparam ALUOP_SLL     = 4'hb;
-localparam ALUOP_MULDIV  = 4'hc;
+localparam ALUOP_ADD     = 6'h00; 
+localparam ALUOP_SUB     = 6'h01; 
+localparam ALUOP_LT      = 6'h02;
+localparam ALUOP_LTU     = 6'h04;
+localparam ALUOP_AND     = 6'h06;
+localparam ALUOP_OR      = 6'h07;
+localparam ALUOP_XOR     = 6'h08;
+localparam ALUOP_SRL     = 6'h09;
+localparam ALUOP_SRA     = 6'h0a;
+localparam ALUOP_SLL     = 6'h0b;
+localparam ALUOP_MULDIV  = 6'h0c;
+// Bitmanip ALU operations:
+localparam ALUOP_SH1ADD  = 6'h20;
+localparam ALUOP_SH2ADD  = 6'h21;
+localparam ALUOP_SH3ADD  = 6'h22;
+localparam ALUOP_CLZ     = 6'h23;
+localparam ALUOP_CPOP    = 6'h24;
+localparam ALUOP_CTZ     = 6'h25;
+localparam ALUOP_ANDN    = 6'h26; // Same LSBs as non-inverted
+localparam ALUOP_ORN     = 6'h27; // Same LSBs as non-inverted
+localparam ALUOP_XNOR    = 6'h28; // Same LSBs as non-inverted
+localparam ALUOP_MAX     = 6'h29;
+localparam ALUOP_MAXU    = 6'h2a;
+localparam ALUOP_MIN     = 6'h2b;
+localparam ALUOP_MINU    = 6'h2c;
+localparam ALUOP_ORC_B   = 6'h2d;
+localparam ALUOP_REV8    = 6'h2e;
+localparam ALUOP_ROL     = 6'h2f;
+localparam ALUOP_ROR     = 6'h30;
+localparam ALUOP_SEXT_B  = 6'h31;
+localparam ALUOP_SEXT_H  = 6'h32;
+localparam ALUOP_ZEXT_H  = 6'h33;
+
+localparam ALUOP_CLMUL   = 6'h34;
+localparam ALUOP_CLMULH  = 6'h35;
+localparam ALUOP_CLMULR  = 6'h36;
+
+localparam ALUOP_BCLR    = 6'h37;
+localparam ALUOP_BEXT    = 6'h38;
+localparam ALUOP_BINV    = 6'h39;
+localparam ALUOP_BSET    = 6'h3a;
 
 // Parameters to control ALU input muxes. Bypass mux paths are
 // controlled by X, so D has no parameters to choose these.
 
-localparam ALUSRCA_RS1 = 2'h0;
-localparam ALUSRCA_PC  = 2'h1;
+localparam ALUSRCA_RS1 = 1'h0;
+localparam ALUSRCA_PC  = 1'h1;
 
-localparam ALUSRCB_RS2 = 2'h0;
-localparam ALUSRCB_IMM = 2'h1;
+localparam ALUSRCB_RS2 = 1'h0;
+localparam ALUSRCB_IMM = 1'h1;
 
 localparam MEMOP_LW   = 4'h0;
 localparam MEMOP_LH   = 4'h1;

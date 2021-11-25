@@ -37,6 +37,18 @@ parameter EXTENSION_C     = 1,
 // EXTENSION_M: Support for hardware multiply/divide/modulo instructions
 parameter EXTENSION_M     = 1,
 
+// EXTENSION_ZBA: Support for Zba address generation instructions
+parameter EXTENSION_ZBA   = 1,
+
+// EXTENSION_ZBB: Support for Zbb basic bit manipulation instructions
+parameter EXTENSION_ZBB   = 1,
+
+// EXTENSION_ZBC: Support for Zbc carry-less multiplication instructions
+parameter EXTENSION_ZBC   = 1,
+
+// EXTENSION_ZBS: Support for Zbs single-bit manipulation instructions
+parameter EXTENSION_ZBS   = 1,
+
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.
 parameter CSR_M_MANDATORY = 1,

@@ -345,7 +345,9 @@ always @ (*) begin
 		x_op_b = x_rs2_bypass;
 end
 
-hazard3_alu alu (
+hazard3_alu #(
+`include "hazard3_config_inst.vh"
+) alu (
 	.aluop      (d_aluop),
 	.op_a       (x_op_a),
 	.op_b       (x_op_b),
