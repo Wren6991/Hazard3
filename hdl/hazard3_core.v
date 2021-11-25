@@ -276,6 +276,7 @@ reg                  xm_delay_irq_entry;
 reg x_stall_raw;
 wire x_stall_muldiv;
 wire x_jump_req;
+wire m_wfi_stall_clear;
 
 // IRQs squeeze in between the instructions in X and M, so in this case X
 // stalls but M can continue. -> X always stalls on M trap, M *may* stall.
@@ -504,7 +505,11 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 wire [W_ADDR-1:0] m_exception_return_addr;
-wire m_wfi_stall_clear;
+
+wire [W_EXCEPT-1:0] x_except =
+	x_csr_illegal_access               ? EXCEPT_INSTR_ILLEGAL :
+	x_unaligned_addr &&  x_memop_write ? EXCEPT_STORE_ALIGN   :
+	x_unaligned_addr && !x_memop_write ? EXCEPT_LOAD_ALIGN    : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
@@ -563,11 +568,6 @@ hazard3_csr #(
 	// Other CSR-specific signalling
 	.instr_ret                  (|x_instr_ret)
 );
-
-wire [W_EXCEPT-1:0] x_except =
-	x_csr_illegal_access               ? EXCEPT_INSTR_ILLEGAL :
-	x_unaligned_addr &&  x_memop_write ? EXCEPT_STORE_ALIGN   :
-	x_unaligned_addr && !x_memop_write ? EXCEPT_LOAD_ALIGN    : d_except;
 
 // Pipe register
 

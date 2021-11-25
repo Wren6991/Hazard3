@@ -75,7 +75,7 @@ module hazard3_frontend #(
 	input  wire              debug_mode,
 	input  wire [W_DATA-1:0] dbg_instr_data,
 	input  wire              dbg_instr_data_vld,
-	output wire              dbg_instr_data_rdy,
+	output wire              dbg_instr_data_rdy
 );
 
 localparam W_BUNDLE = W_DATA / 2;
