@@ -124,6 +124,7 @@ _sbrk:
 	mv a0, a2
 	ret
 
+.p2align 2
 heap_ptr:
 	.word _end
 

@@ -124,7 +124,7 @@ always @ (*) begin: cpop_count
 	integer i;
 	cpop = {W_SHAMT+1{1'b0}};
 	for (i = 0; i < W_DATA; i = i + 1) begin
-		cpop = cpop + op_a[i];
+		cpop = cpop + {{W_SHAMT{1'b0}}, op_a[i]};
 	end
 end
 
@@ -167,7 +167,6 @@ always @ (*) begin
 		{4'bzzzz, ALUOP_SRL    }: result = shift_dout;
 		{4'bzzzz, ALUOP_SRA    }: result = shift_dout;
 		{4'bzzzz, ALUOP_SLL    }: result = shift_dout;
-		{4'bzzzz, ALUOP_SLL    }: result = shift_dout;
 		// Zba
 		{4'b1zzz, ALUOP_SH1ADD }: result = sum;
 		{4'b1zzz, ALUOP_SH2ADD }: result = sum;
@@ -200,7 +199,7 @@ always @ (*) begin
 		{4'bzzz1, ALUOP_BINV   }: result = op_a ^ ~zbs_mask;
 		{4'bzzz1, ALUOP_BEXT   }: result = {{W_DATA-1{1'b0}}, shift_dout[0]};
 
-		default:   begin result = bitwise; end
+		default:                  result = bitwise;
 	endcase
 end
 
