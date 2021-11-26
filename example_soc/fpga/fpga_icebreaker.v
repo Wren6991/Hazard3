@@ -74,9 +74,13 @@ activity_led #(
 );
 
 example_soc #(
-	.MUL_FAST    (1),
-	.EXTENSION_C (0),
-	.CSR_COUNTER (1)
+	.MUL_FAST      (1),
+	.EXTENSION_C   (0),
+	.EXTENSION_ZBA (0),
+	.EXTENSION_ZBB (0),
+	.EXTENSION_ZBC (0),
+	.EXTENSION_ZBS (0),
+	.CSR_COUNTER   (1)
 ) soc_u (
 	.clk            (clk_sys),
 	.rst_n          (rst_n_sys),
