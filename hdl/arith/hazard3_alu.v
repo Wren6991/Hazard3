@@ -49,9 +49,9 @@ wire sub = !(aluop == ALUOP_ADD || (|EXTENSION_ZBA && (
 	aluop == ALUOP_SH1ADD || aluop == ALUOP_SH2ADD || aluop == ALUOP_SH3ADD
 )));
 
-wire inv_op_b = sub || (|EXTENSION_ZBB && (
-	aluop == ALUOP_ANDN || aluop == ALUOP_ORN || aluop == ALUOP_XNOR
-));
+wire inv_op_b = sub && !(
+	aluop == ALUOP_AND || aluop == ALUOP_OR || aluop == ALUOP_XOR
+);
 
 wire [W_DATA-1:0] op_a_shifted =
 	|EXTENSION_ZBA && aluop == ALUOP_SH1ADD ? op_a << 1 :
@@ -158,7 +158,7 @@ end
 wire [W_DATA-1:0] zbs_mask = {{W_DATA-1{1'b0}}, 1'b1} << op_b[W_SHAMT-1:0];
 
 always @ (*) begin
-	casez ({|EXTENSION_ZBA, |EXTENSION_ZBB, EXTENSION_ZBC, |EXTENSION_ZBS, aluop})
+	casez ({|EXTENSION_ZBA, |EXTENSION_ZBB, |EXTENSION_ZBC, |EXTENSION_ZBS, aluop})
 		// Base ISA
 		{4'bzzzz, ALUOP_ADD    }: result = sum;
 		{4'bzzzz, ALUOP_SUB    }: result = sum;
@@ -176,9 +176,9 @@ always @ (*) begin
 		{4'bz1zz, ALUOP_ANDN   }: result = bitwise;
 		{4'bz1zz, ALUOP_ORN    }: result = bitwise;
 		{4'bz1zz, ALUOP_XNOR   }: result = bitwise;
-		{4'bz1zz, ALUOP_CLZ    }: result = ctz_clz;
-		{4'bz1zz, ALUOP_CTZ    }: result = ctz_clz;
-		{4'bz1zz, ALUOP_CPOP   }: result = cpop;
+		{4'bz1zz, ALUOP_CLZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
+		{4'bz1zz, ALUOP_CTZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
+		{4'bz1zz, ALUOP_CPOP   }: result = {{W_DATA-W_SHAMT-1{1'b0}}, cpop};
 		{4'bz1zz, ALUOP_MAX    }: result = lt ? op_b : op_a;
 		{4'bz1zz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
 		{4'bz1zz, ALUOP_MIN    }: result = lt ? op_a : op_b;
