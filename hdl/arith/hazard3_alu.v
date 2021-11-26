@@ -106,7 +106,7 @@ always @ (*) begin: rev_op_a
 end
 
 // "leading" means starting at MSB. This is an LSB-first priority encoder, so
-// ""leading" is reversed and "trailing" is not.
+// "leading" is reversed and "trailing" is not.
 wire [W_DATA-1:0] ctz_search_mask = aluop == ALUOP_CLZ ? op_a_rev : op_a;
 wire [W_SHAMT:0]  ctz_clz;
 
