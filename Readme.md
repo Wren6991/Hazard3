@@ -6,6 +6,7 @@ Hazard3 is a 3-stage RISC-V processor, providing the following architectural sup
 * `M` extension: integer multiply/divide/modulo
 * `C` extension: compressed instructions
 * `Zicsr` extension: CSR access
+* Tentatively the `Zba`, `Zbb`, `Zbc` and `Zbs` bitmanip extensions, though there are no upstream compliance tests for these as of yet
 * M-mode privileged instructions `ECALL`, `EBREAK`, `MRET`
 * The machine-mode (M-mode) privilege state, and standard M-mode CSRs
 * Debug support, compliant with RISC-V debug specification version 0.13.2
