@@ -36,13 +36,15 @@ module hazard3_shift_barrel #(
 
 reg [W_DATA-1:0] din_rev;
 reg [W_DATA-1:0] shift_accum;
-wire sext = arith && din_rev[0]; // haha
+reg sext; // haha
 
 always @ (*) begin: shift
 	integer i;
 
 	for (i = 0; i < W_DATA; i = i + 1)
 		din_rev[i] = right_nleft ? din[W_DATA - 1 - i] : din[i];
+
+	sext = arith && din_rev[0];
 
 	shift_accum = din_rev;
 	for (i = 0; i < W_SHAMT; i = i + 1) begin
