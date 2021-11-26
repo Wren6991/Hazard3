@@ -22,12 +22,12 @@ module hazard3_alu #(
 ,
 `include "hazard3_width_const.vh"
 ) (
-	input  wire [3:0]        aluop,
-	input  wire [W_DATA-1:0] op_a,
-	input  wire [W_DATA-1:0] op_b,
-	output reg  [W_DATA-1:0] result,
-	output wire [W_DATA-1:0] result_add,
-	output wire              cmp
+	input  wire [W_ALUOP-1:0] aluop,
+	input  wire [W_DATA-1:0]  op_a,
+	input  wire [W_DATA-1:0]  op_b,
+	output reg  [W_DATA-1:0]  result,
+	output wire [W_DATA-1:0]  result_add,
+	output wire               cmp
 );
 
 `include "hazard3_ops.vh"
@@ -46,7 +46,7 @@ end
 endfunction
 
 wire sub = !(aluop == ALUOP_ADD || (|EXTENSION_ZBA && (
-	aluop == ALUOP_ADD_SH1 || aluop == ALUOP_ADD_SH2 || aluop == ALUOP_ADD_SH3
+	aluop == ALUOP_SH1ADD || aluop == ALUOP_SH2ADD || aluop == ALUOP_SH3ADD
 )));
 
 wire inv_op_b = sub || (|EXTENSION_ZBB && (
@@ -54,9 +54,9 @@ wire inv_op_b = sub || (|EXTENSION_ZBB && (
 ));
 
 wire [W_DATA-1:0] op_a_shifted =
-	|EXTENSION_ZBA && aluop == ALUOP_ADD_SH1 ? op_a << 1 :
-	|EXTENSION_ZBA && aluop == ALUOP_ADD_SH2 ? op_a << 2 :
-	|EXTENSION_ZBA && aluop == ALUOP_ADD_SH3 ? op_a << 3 : op_a;
+	|EXTENSION_ZBA && aluop == ALUOP_SH1ADD ? op_a << 1 :
+	|EXTENSION_ZBA && aluop == ALUOP_SH2ADD ? op_a << 2 :
+	|EXTENSION_ZBA && aluop == ALUOP_SH3ADD ? op_a << 3 : op_a;
 
 wire [W_DATA-1:0] op_b_inv = op_b ^ {W_DATA{inv_op_b}};
 
@@ -169,9 +169,9 @@ always @ (*) begin
 		{4'bzzzz, ALUOP_SLL    }: result = shift_dout;
 		{4'bzzzz, ALUOP_SLL    }: result = shift_dout;
 		// Zba
-		{4'b1zzz, ALUOP_ADD_SH1}: result = sum;
-		{4'b1zzz, ALUOP_ADD_SH2}: result = sum;
-		{4'b1zzz, ALUOP_ADD_SH3}: result = sum;
+		{4'b1zzz, ALUOP_SH1ADD }: result = sum;
+		{4'b1zzz, ALUOP_SH2ADD }: result = sum;
+		{4'b1zzz, ALUOP_SH3ADD }: result = sum;
 		// Zbb
 		{4'bz1zz, ALUOP_ANDN   }: result = bitwise;
 		{4'bz1zz, ALUOP_ORN    }: result = bitwise;
@@ -186,8 +186,8 @@ always @ (*) begin
 		{4'bz1zz, ALUOP_SEXT_B }: result = {{W_DATA-8{op_a[7]}}, op_a[7:0]};
 		{4'bz1zz, ALUOP_SEXT_H }: result = {{W_DATA-16{op_a[15]}}, op_a[15:0]};
 		{4'bz1zz, ALUOP_ZEXT_H }: result = {{W_DATA-16{1'b0}}, op_a[15:0]};
-		{4'bz1zz, ALUOP_ORC_B  }: result = {{8{|op[31:24]}}, {8{|op[23:16]}}, {8{|op[15:8]}}, {8{|op[7:0]}}};
-		{4'bz1zz, ALUOP_REV8   }: result = {op[7:0], op[15:8], op[23:16], op[31:24]};
+		{4'bz1zz, ALUOP_ORC_B  }: result = {{8{|op_a[31:24]}}, {8{|op_a[23:16]}}, {8{|op_a[15:8]}}, {8{|op_a[7:0]}}};
+		{4'bz1zz, ALUOP_REV8   }: result = {op_a[7:0], op_a[15:8], op_a[23:16], op_a[31:24]};
 		{4'bz1zz, ALUOP_ROL    }: result = shift_dout;
 		{4'bz1zz, ALUOP_ROR    }: result = shift_dout;
 		// Zbc
