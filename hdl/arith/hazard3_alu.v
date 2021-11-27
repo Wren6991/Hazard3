@@ -196,7 +196,7 @@ always @ (*) begin
 		// Zbs
 		{4'bzzz1, ALUOP_BCLR   }: result = op_a & ~zbs_mask;
 		{4'bzzz1, ALUOP_BSET   }: result = op_a |  zbs_mask;
-		{4'bzzz1, ALUOP_BINV   }: result = op_a ^ ~zbs_mask;
+		{4'bzzz1, ALUOP_BINV   }: result = op_a ^  zbs_mask;
 		{4'bzzz1, ALUOP_BEXT   }: result = {{W_DATA-1{1'b0}}, shift_dout[0]};
 
 		default:                  result = bitwise;

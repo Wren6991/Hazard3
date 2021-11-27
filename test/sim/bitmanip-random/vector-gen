@@ -59,11 +59,10 @@ instr_reg_imm = [
 	("bseti" , [*all_onehot0_neg, *get_random()], all_shamt),
 ]
 
-# Generate output files
+# Generate input vector programs
 
 prolog = """
 .option norelax
-.section .text
 
 // Automatically-generated test vector. Don't edit.
 
@@ -72,6 +71,8 @@ prolog = """
 #define IO_PRINT_U32  (IO_BASE + 0x4)
 #define IO_EXIT       (IO_BASE + 0x8)
 
+.section .text
+
 .global _start
 _start:
 	la sp, test_signature_start
@@ -79,11 +80,23 @@ _start:
 """
 
 interlude = """
+
+// Hazard3 sim returns exit status if you do this:
+
 test_end:
 	li a0, IO_EXIT
 	sw zero, (a0)
 
-.section .data
+// Catch other simulators with or without debug support:
+
+	la a0, it_dead
+	csrw mtvec, a0
+.p2align 2
+it_dead:
+	ebreak
+	j it_dead
+
+.section .testdata, "wa"
 
 .p2align 2
 .global test_signature_start
@@ -99,15 +112,19 @@ def sanitise(name):
 	return "".join(c if ("_" + c).isidentifier() else "_" for c in name)
 
 Path("test").mkdir(exist_ok = True)
+Path("refgen").mkdir(exist_ok = True)
 
 for instr, data in instr_one_operand:
 	with open(f"test/{sanitise(instr)}.S", "w") as f:
 		f.write(prolog)
+		i = 0
 		for d in data:
+			f.write(f"test{i}:\n")
 			f.write(f"\tli a1, 0x{d:08x}\n")
 			f.write(f"\t{instr} a0, a1\n")
 			f.write( "\tsw a0, (sp)\n")
 			f.write(f"\taddi sp, sp, {XLEN // 8}\n\n")
+			i = i + 1
 		f.write(interlude)
 		# Label the output locations for easier debug
 		i = 0
@@ -120,13 +137,16 @@ for instr, data in instr_one_operand:
 for instr, rs1_list, rs2_list in instr_reg_reg:
 	with open(f"test/{sanitise(instr)}.S", "w") as f:
 		f.write(prolog)
+		i = 0
 		for rs1 in rs1_list:
 			for rs2 in rs2_list:
+				f.write(f"test{i}:\n")
 				f.write(f"\tli a1, 0x{rs1:08x}\n")
 				f.write(f"\tli a2, 0x{rs2:08x}\n")
 				f.write(f"\t{instr} a0, a1, a2\n")
 				f.write( "\tsw a0, (sp)\n")
 				f.write(f"\taddi sp, sp, {XLEN // 8}\n\n")
+				i = i + 1
 		f.write(interlude)
 		i = 0
 		for rs1 in rs1_list:
@@ -139,12 +159,15 @@ for instr, rs1_list, rs2_list in instr_reg_reg:
 for instr, rs1_list, imm_list in instr_reg_imm:
 	with open(f"test/{sanitise(instr)}.S", "w") as f:
 		f.write(prolog)
+		i = 0
 		for rs1 in rs1_list:
 			for imm in imm_list:
+				f.write(f"test{i}:\n")
 				f.write(f"\tli a1, 0x{rs1:08x}\n")
 				f.write(f"\t{instr} a0, a1, 0x{imm:02x}\n")
 				f.write( "\tsw a0, (sp)\n")
 				f.write(f"\taddi sp, sp, {XLEN // 8}\n\n")
+				i = i + 1
 		f.write(interlude)
 		i = 0
 		for rs1 in rs1_list:
@@ -153,3 +176,53 @@ for instr, rs1_list, imm_list in instr_reg_imm:
 				f.write("\t.word 0\n" if XLEN == 32 else "\tdword 0\n")
 				i = i + 1
 		f.write(epilog)
+
+# Generate reference vector programs for running on spike + pk
+
+# (I spent a while fighting spike to just be a processor + physical memory +
+# some MMIO, so I could run the same binaries, but this is easier)
+
+c_prolog = """
+#include <stdio.h>
+
+// Automatically-generated test vector. Don't edit.
+
+int main() {
+	unsigned int rd, rs1, rs2;
+"""
+c_output_result = '\tprintf("%08x\\n", rd);\n\n'
+
+c_epilog = """
+	return 0;
+}
+"""
+
+for instr, data in instr_one_operand:
+	with open(f"refgen/{sanitise(instr)}.c", "w") as f:
+		f.write(c_prolog)
+		for d in data:
+			f.write(f"\trs1 = 0x{d:08x};\n");
+			f.write(f'\tasm("{instr} %0, %1" : "=r" (rd) : "r" (rs1));\n')
+			f.write(c_output_result)
+		f.write(c_epilog)
+
+for instr, rs1_list, rs2_list in instr_reg_reg:
+	with open(f"refgen/{sanitise(instr)}.c", "w") as f:
+		f.write(c_prolog)
+		for rs1 in rs1_list:
+			for rs2 in rs2_list:
+				f.write(f"\trs1 = 0x{rs1:08x};\n");
+				f.write(f"\trs2 = 0x{rs2:08x};\n");
+				f.write(f'\tasm("{instr} %0, %1, %2" : "=r" (rd) : "r" (rs1), "r" (rs2));\n')
+				f.write(c_output_result)
+		f.write(c_epilog)
+
+for instr, rs1_list, imm_list in instr_reg_imm:
+	with open(f"refgen/{sanitise(instr)}.c", "w") as f:
+		f.write(c_prolog)
+		for rs1 in rs1_list:
+			for imm in imm_list:
+				f.write(f"\trs1 = 0x{rs1:08x};\n");
+				f.write(f'\tasm("{instr} %0, %1, %2" : "=r" (rd) : "r" (rs1), "i" ({imm}));\n')
+				f.write(c_output_result)
+		f.write(c_epilog)

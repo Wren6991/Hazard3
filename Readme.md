@@ -1,6 +1,6 @@
 # Hazard3
 
-Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` base instruction set and, optionally, the following extensions:
+Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` instruction set and the following optional extensions:
 
 * `M`: integer multiply/divide/modulo
 * `C`: compressed instructions
@@ -9,7 +9,6 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` base instruction
 * `Zbb`: basic bit manipulation
 * `Zbc`: carry-less multiplication
 * `Zbs`: single-bit manipulation
-	* _Support for the `Zba`/`Zbb`/`Zbc`/`Zbs` bit manipulation extensions is tentative, as there are no upstream compliance tests for these at time of writing._
 * M-mode privileged instructions `ECALL`, `EBREAK`, `MRET` and the `WFI` instruction
 * The machine-mode (M-mode) privilege state, and standard M-mode CSRs
 * Debug support, compliant with RISC-V debug specification version 0.13.2
@@ -19,6 +18,8 @@ You can [read the documentation here](doc/hazard3.pdf). (PDF link)
 This repository also contains a compliant RISC-V Debug Module for Hazard3, which can be accessed over an AMBA 3 APB port or using the optional JTAG Debug Transport Module.
 
 There is an [example SoC integration](example_soc/soc/example_soc.v), showing how these components can be assembled to create a minimal system with a JTAG-enabled RISC-V processor, some RAM and a serial port.
+
+_Note: the bit manipulation instructions don't have upstream compliance tests at time of writing. See [here](test/sim/bitmanip-random) for my constrained-random bitmanip tests run against spike, the RISC-V ISA simulator._
 
 The following are planned for future implementation:
 
