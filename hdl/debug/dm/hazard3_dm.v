@@ -484,8 +484,8 @@ assign hart_instr_data_vld = {{N_HARTS{1'b0}},
 } << hartsel;
 
 assign hart_instr_data = {N_HARTS{
-	acmd_state == S_ISSUE_REGWRITE  ? 32'h7b202073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, data0
-	acmd_state == S_ISSUE_REGREAD   ? 32'h7b201073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw data0, xx
+	acmd_state == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, dmdata0
+	acmd_state == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw dmdata0, xx
 	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                    :
 	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                    :
 	                                  32'h00100073                                  // ebreak
@@ -531,9 +531,10 @@ always @ (*) begin
 		8'h0,                             // reserved
 		4'h0,                             // nscratch = 0
 		3'h0,                             // reserved
-		1'b0,                             // dataccess = 0, data0 is backed by a per-hart CSR
+		1'b0,                             // dataccess = 0, data0 is mapped to each hart's CSR space
 		4'h1,                             // datasize = 1, a single data CSR (data0) is available
-		12'h7b2                           // dataaddr, same location where dscratch0 would be if implemented
+		12'hbff                           // dataaddr, placed at the top of the M-custom space since
+		                                  // the spec doesn't reserve a location for it.
 	};
 	ADDR_HALTSUM0:     dmi_prdata = {
 		{XLEN - N_HARTS{1'b0}},

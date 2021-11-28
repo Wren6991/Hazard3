@@ -90,7 +90,7 @@ Read-only, constant. Value depends on which ISA extensions Hazard3 is configured
 |===
 | Bits | Name | Description
 | 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
-| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence.
+| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
 | 12 | `m` | 1 if the M extension is present, otherwise 0.
 | 2 | `c` | 1 if the C extension is present, otherwise 0.
 |===
@@ -362,16 +362,13 @@ Debug program counter. When entering Debug Mode, `dpc` samples the current progr
 
 Address: `0x7b2`
 
-Not implemented. However, the Debug Module's internal `data0` register is mapped to this CSR address under the following conditions:
+Not implemented. Access will cause an illegal instruction exception.
 
-- The core is in Debug Mode
-- The Debug Module is _currently executing an abstract command on this core_
-
-The Debug Module uses this mapping to exchange data with the core by injecting `csrr`/`csrw` instructions into the prefetch buffer. This in turn is used to implement the Abstract Access Register command. See <<debug-chapter>>.
-
-The Debug Module lists the number of scratch registers as 0 in `hartinfo.dscratch`.
+To provide data exchange between the Debug Module and the core, the Debug Module's `data0` register is mapped into the core's CSR space at a read/write M-custom address -- see <<reg-dmdata0>>.
 
 ==== dscratch1
+
+Address: `0x7b3`
 
 Not implemented. Access will cause an illegal instruction exception.
 
@@ -379,6 +376,20 @@ Not implemented. Access will cause an illegal instruction exception.
 
 These are all allocated in the space `0xbc0` through `0xbff` which is available for custom read/write M-mode CSRs, and `0xfc0` through `0xfff` which is available for custom read-only M-mode CSRs.
 
+Hazard3 also allocates a custom _Debug Mode_ register <<reg-dmdata0>> in this space.
+
+[[reg-dmdata0]]
+==== dmdata0
+
+Address: `0xbff`
+
+The Debug Module's internal `data0` register is mapped to this CSR address when the core is in debug mode. At any other time, access to this CSR address will cause an illegal instruction exception.
+
+NOTE: The 0.13.2 debug specification allows for the Debug Module's abstract data registers to be mapped into the core's CSR address space, but there is no Debug-custom space, so the read/write M-custom space is used instead to avoid conflict with future versions of the debug specification.
+
+The Debug Module uses this mapping to exchange data with the core by injecting `csrr`/`csrw` instructions into the prefetch buffer. This in turn is used to implement the Abstract Access Register command. See <<debug-chapter>>.
+
+This CSR address is given by the `dataaddress` field of the Debug Module's `hartinfo` register, and `hartinfo.dataaccess` is set to 0 to indicate this is a CSR mapping, not a memory mapping.
 
 [[reg-midcr]]
 ==== midcr

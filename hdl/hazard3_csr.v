@@ -258,7 +258,7 @@ localparam TSELECT       = 12'h7a0;
 
 localparam DCSR           = 12'h7b0;
 localparam DPC            = 12'h7b1;
-localparam DATA0          = 12'h7b2; // DSCRATCH0 would be here if implemented
+localparam DMDATA0        = 12'hbff; // Custom read/write
 
 // ----------------------------------------------------------------------------
 // CSR state + update logic
@@ -564,7 +564,7 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 assign dbg_data0_wdata = wdata;
-assign dbg_data0_wen = wen && addr == DATA0;
+assign dbg_data0_wen = debug_mode && wen && addr == DMDATA0;
 
 // ----------------------------------------------------------------------------
 // Read port + detect addressing of unmapped CSRs
@@ -857,7 +857,7 @@ always @ (*) begin
 		rdata = dpc;
 	end
 
-	DATA0: if (DEBUG_SUPPORT && debug_mode) begin
+	DMDATA0: if (DEBUG_SUPPORT && debug_mode) begin
 		decode_match = 1'b1;
 		rdata = dbg_data0_rdata;
 	end
