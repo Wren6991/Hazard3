@@ -66,10 +66,10 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 | `mulhsu rd, rs1, rs2` | 18 to 20 | Depending on sign correction
 | `mulhu rd, rs1, rs2` | 18 |
 3+| Divide and Remainder
-| `div` | 18 or 19 | Depending on sign correction
-| `divu` | 18 |
-| `rem` | 18 or 19 | Depending on sign correction
-| `remu` | 18 |
+| `div rd, rs1, rs2` | 18 or 19 | Depending on sign correction
+| `divu rd, rs1, rs2` | 18 |
+| `rem rd, rs1, rs2` | 18 or 19 | Depending on sign correction
+| `remu rd, rs1, rs2` | 18 |
 |===
 
 === C Extension
@@ -101,40 +101,40 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 |===
 | Instruction | Cycles | Note
 3+| Zba (address generation)
-|`sh1add` | 1 |
-|`sh2add` | 1 |
-|`sh3add` | 1 |
+|`sh1add rd, rs1, rs2` | 1 |
+|`sh2add rd, rs1, rs2` | 1 |
+|`sh3add rd, rs1, rs2` | 1 |
 3+| Zbb (basic bit manipulation)
-|`andn`   | 1 |
-|`clz`    | 1 |
-|`cpop`   | 1 |
-|`ctz`    | 1 |
-|`max`    | 1 |
-|`maxu`   | 1 |
-|`min`    | 1 |
-|`minu`   | 1 |
-|`orc.b`  | 1 |
-|`orn`    | 1 |
-|`rev8`   | 1 |
-|`rol`    | 1 |
-|`ror`    | 1 |
-|`rori`   | 1 |
-|`sext.b` | 1 |
-|`sext.h` | 1 |
-|`xnor`   | 1 |
-|`zext.h` | 1 |
-|`zext.b` | 1 | `zext.b` is a pseudo-op for `andi rd, rs1, 0xff`
+|`andn rd, rs1, rs2`   | 1 |
+|`clz rd, rs1`         | 1 |
+|`cpop rd, rs1`        | 1 |
+|`ctz rd, rs1`         | 1 |
+|`max rd, rs1, rs2`    | 1 |
+|`maxu rd, rs1, rs2`   | 1 |
+|`min rd, rs1, rs2`    | 1 |
+|`minu rd, rs1, rs2`   | 1 |
+|`orc.b rd, rs1`       | 1 |
+|`orn rd, rs1, rs2`    | 1 |
+|`rev8 rd, rs1`        | 1 |
+|`rol rd, rs1, rs2`    | 1 |
+|`ror rd, rs1, rs2`    | 1 |
+|`rori rd, rs1, imm`   | 1 |
+|`sext.b rd, rs1`      | 1 |
+|`sext.h rd, rs1`      | 1 |
+|`xnor rd, rs1, rs2`   | 1 |
+|`zext.h rd, rs1`      | 1 |
+|`zext.b rd, rs1`      | 1 | `zext.b` is a pseudo-op for `andi rd, rs1, 0xff`
 3+| Zbc (carry-less multiply)
-|`clmul`  | 1 |
-|`clmulh` | 1 |
-|`clmulr` | 1 |
+|`clmul rd, rs1, rs2`  | 1 |
+|`clmulh rd, rs1, rs2` | 1 |
+|`clmulr rd, rs1, rs2` | 1 |
 3+| Zbs (single-bit manipulation)
-|`bclr`   | 1 |
-|`bclri`  | 1 |
-|`bext`   | 1 |
-|`bexti`  | 1 |
-|`binv`   | 1 |
-|`binvi`  | 1 |
-|`bset`   | 1 |
-|`bseti`  | 1 |
+|`bclr rd, rs1, rs2`   | 1 |
+|`bclri rd, rs1, imm`  | 1 |
+|`bext rd, rs1, rs2`   | 1 |
+|`bexti rd, rs1, imm`  | 1 |
+|`binv rd, rs1, rs2`   | 1 |
+|`binvi rd, rs1, imm`  | 1 |
+|`bset rd, rs1, rs2`   | 1 |
+|`bseti rd, rs1, imm`  | 1 |
 |===
