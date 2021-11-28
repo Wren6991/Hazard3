@@ -69,7 +69,7 @@ module hazard3_apb_async_bridge #(
 // - Initially both req and ack are low
 // - src asserts req high
 // - dst responds with ack high and begins transfer
-// - src deasserts req once it sees ack low
+// - src deasserts req once it sees ack high
 // - dst deasserts ack once:
 //     - transfer is complete *and*
 //     - dst sees req deasserted
