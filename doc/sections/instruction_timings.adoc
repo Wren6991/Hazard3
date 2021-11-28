@@ -94,3 +94,47 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 | `ecall` | 3 | Time given is for jumping to `mtvec`
 | `ebreak` | 3 | Time given is for jumping to `mtvec`
 |===
+
+=== Bit Manipulation
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+3+| Zba (address generation)
+|`sh1add` | 1 |
+|`sh2add` | 1 |
+|`sh3add` | 1 |
+3+| Zbb (basic bit manipulation)
+|`andn`   | 1 |
+|`clz`    | 1 |
+|`cpop`   | 1 |
+|`ctz`    | 1 |
+|`max`    | 1 |
+|`maxu`   | 1 |
+|`min`    | 1 |
+|`minu`   | 1 |
+|`orc.b`  | 1 |
+|`orn`    | 1 |
+|`rev8`   | 1 |
+|`rol`    | 1 |
+|`ror`    | 1 |
+|`rori`   | 1 |
+|`sext.b` | 1 |
+|`sext.h` | 1 |
+|`xnor`   | 1 |
+|`zext.h` | 1 |
+|`zext.b` | 1 | `zext.b` is a pseudo-op for `andi rd, rs1, 0xff`
+3+| Zbc (carry-less multiply)
+|`clmul`  | 1 |
+|`clmulh` | 1 |
+|`clmulr` | 1 |
+3+| Zbs (single-bit manipulation)
+|`bclr`   | 1 |
+|`bclri`  | 1 |
+|`bext`   | 1 |
+|`bexti`  | 1 |
+|`binv`   | 1 |
+|`binvi`  | 1 |
+|`bset`   | 1 |
+|`bseti`  | 1 |
+|===

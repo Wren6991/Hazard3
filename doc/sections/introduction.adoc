@@ -3,16 +3,22 @@
 Hazard3 is a 3-stage RISC-V processor, providing the following architectural support:
 
 * `RV32I`: 32-bit base instruction set
-* `M` extension: integer multiply/divide/modulo
-* `C` extension: compressed instructions
-* `Zicsr` extension: CSR access
+* `M`: integer multiply/divide/modulo
+* `C`: compressed instructions
+* `Zba`: address generation
+* `Zbb`: basic bit manipulation
+* `Zbc`: carry-less multiplication
+* `Zbs`: single-bit manipulation
 * M-mode privileged instructions `ECALL`, `EBREAK`, `MRET`
+* The `WFI` instruction
+* `Zicsr`: CSR access
 * The machine-mode (M-mode) privilege state, and standard M-mode CSRs
 * Debug support, fully compliant with version 0.13.2 of the RISC-V external debug specification
 
 The following are planned for future implementation:
 
-* Support for `WFI` instruction
 * `A` extension: atomic memory access
 ** `LR`/`SC` fully supported
 ** AMONone PMA on all of memory (AMOs are decoded but unconditionally trigger access fault without attempting memory access)
+* Trigger unit for debug mode
+** Likely breakpoints only

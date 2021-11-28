@@ -2,6 +2,8 @@
 
 The RISC-V privileged specification affords flexibility as to which CSRs are implemented, and how they behave. This section documents the concrete behaviour of Hazard3's standard and nonstandard M-mode CSRs, as implemented.
 
+This section does not attempt to supplant the [RISC-V Privileged Specification](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf), which is the authoritative reference on the RISC-V CSRs.
+
 === Standard CSRs
 
 ==== mvendorid
@@ -24,11 +26,31 @@ Read-only, constant. Value is configured when the processor is instantiated. Sho
 
 ==== mstatus
 
-blah blah
+The below table lists the fields which are _not_ always hardwired to 0:
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 12:11 | MPP | Previous privilege level. Always `0x3`, indicating M-mode.
+| 7 | MPIE | Previous interrupt enable. Readable and writable. Is set to the value of MIE on trap entry. Is set to 1 on trap return.
+| 3 | MIE | Interrupt enable. Readable and writable. Is set to 0 on trap entry. Is set to the value of MPIE on trap return.
+|===
+
+==== mstatush
+
+This CSR is present, but it is entirely hardwired to zero.
 
 ==== misa
 
-Read-only, constant. Value depends on which ISA extensions Hazard5 is configured with.
+Read-only, constant. Value depends on which ISA extensions Hazard5 is configured with. The table below lists the fields which are _not_ always hardwired to 0:
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:30 | MXL | Always `0x1`. Indicates this is a 32-bit processor.
+| 12 | M | 1 if the M extension is present.
+| 2 | C | 1 if the C extension is present.
+|===
 
 === Custom CSRs
 
