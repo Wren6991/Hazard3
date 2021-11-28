@@ -16,3 +16,6 @@
 [submodule "test/sim/riscv-tests/riscv-tests"]
 	path = test/sim/riscv-tests/riscv-tests
 	url = git@github.com:Wren6991/riscv-tests.git
+[submodule "test/sim/embench/embench-iot"]
+	path = test/sim/embench/embench-iot
+	url = git@github.com:Wren6991/embench-iot.git
