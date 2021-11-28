@@ -191,7 +191,6 @@ hazard3_cpu_2port #(
 	.DEBUG_SUPPORT   (1),
 	.NUM_IRQ         (NUM_IRQ),
 	.MVENDORID_VAL   (32'hdeadbeef),
-	.MARCHID_VAL     (32'hfeedf00d),
 	.MIMPID_VAL      (32'h12345678),
 	.MHARTID_VAL     (32'h0),
 	.REDUCED_BYPASS  (0),

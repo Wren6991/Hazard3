@@ -76,9 +76,6 @@ parameter NUM_IRQ         = 32,
 // 31:7 is continuation code count, 6:0 is ID. Parity bit is not stored.
 parameter MVENDORID_VAL = 32'h0,
 
-// Architecture ID for Hazard3, currently 0 because unregistered. (TODO)
-parameter MARCHID_VAL = 32'h0,
-
 // Implementation ID for this specific version of Hazard3. Git hash is perfect.
 parameter MIMPID_VAL = 32'h0,
 

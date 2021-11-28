@@ -27,12 +27,13 @@ Vendor identifier. Read-only, configurable constant.
 
 Address: `0xf12`
 
-Architecture identifier for Hazard3. Read-only, configurable constant.
+Architecture identifier for Hazard3. Read-only, constant.
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 31:0 | - | Default is currently all-zeroes as Hazard3 is unregistered.
+| 31 | - | 0: Open-source implementation
+| 30:0 | - | 0x1b (decimal 27): the https://github.com/riscv/riscv-isa-manual/blob/master/marchid.md[registered] architecture ID for Hazard3
 |===
 
 
@@ -291,7 +292,7 @@ Counter inhibit. Read-write. The table below lists the fields which are _not_ ha
 |===
 | Bits | Name | Description
 | 2 | `ir` | When 1, inhibit counting of `minstret`/`minstreth`
-| 0 | `cy` | When 1, inhibit counting
+| 0 | `cy` | When 1, inhibit counting of `mcycle`/`mcycleh`
 |===
 
 ==== mhpmevent3...31

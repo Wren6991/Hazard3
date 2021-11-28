@@ -604,7 +604,8 @@ always @ (*) begin
 	end
 	MARCHID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
-		rdata = MARCHID_VAL;
+		// Hazard3's open source architecture ID
+		rdata = 32'd27;
 	end
 	MIMPID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
