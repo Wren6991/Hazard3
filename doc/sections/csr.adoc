@@ -6,9 +6,10 @@ NOTE: All CSR addresses not listed in this section are unimplemented. Accessing 
 
 All CSRs are 32-bit; MXLEN is fixed at 32 bits on Hazard3.
 
-=== Standard CSRs
 
-This section does not attempt to supplant the https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf[RISC-V Privileged Specification], which is the authoritative reference on the RISC-V CSRs.
+=== Standard M-mode CSRs
+
+IMPORTANT: The https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf[RISC-V Privileged Specification] should be your primary reference for writing software to run on Hazard3. This section specifies those details which are left implementation-defined by the RISC-V Privileged Specification, for sake of completeness, but portable RISC-V software should not rely on these details.
 
 ==== mvendorid
 
@@ -130,7 +131,7 @@ Address: `0x344`
 
 Interrupt pending register. Read-only.
 
-NOTE: The RISC-V specification lists `mip` as a read-write register, but the bits which are readable correspond to lower privilege modes (S- and U-mode) which are not implemented on Hazard3, so it is documented here as read-only.
+NOTE: The RISC-V specification lists `mip` as a read-write register, but the bits which are writable correspond to lower privilege modes (S- and U-mode) which are not implemented on Hazard3, so it is documented here as read-only.
 
 The table below lists the fields which are _not_ hardwired to 0:
 
@@ -183,7 +184,7 @@ Exception program counter. When entering a trap, the current value of the progra
 
 On Hazard3, bits 31:1 of `mepc` are capable of holding all 31-bit values. Bit 0 is hardwired to 0, as per the specification.
 
-All traps on Hazard3 are precise.
+All traps on Hazard3 are precise. For example, a load/store bus error will set `mepc` to the exact address of the load/store instruction which encountered the fault.
 
 ==== mcause
 
@@ -200,10 +201,12 @@ The most significant bit of `mcause` is set to 1 to indicate an interrupt cause,
 | Cause | Description
 | 3 | Software interrupt (`mip.msip`)
 | 7 | Timer interrupt (`mip.mtip`)
-| 11 | External interrupt (`mip.meie`)
+| 11 | External interrupt (`mip.meip`)
 |===
 
-Higher numbers may be used for distinct external IRQs when expanded vectoring is enabled -- see <<reg-midcr>>. The following exception causes may be set by Hazard3 hardware:
+Numbers >16 are used for to disambiguate between external IRQs when expanded vectoring is enabled -- see <<reg-midcr>>.
+
+The following exception causes may be set by Hazard3 hardware:
 
 [cols="10h,~", options="header"]
 |===
@@ -220,17 +223,161 @@ Higher numbers may be used for distinct external IRQs when expanded vectoring is
 
 NOTE: Not every instruction fetch bus cycle which returns a bus error leads to an exception. Hazard3 prefetches instructions ahead of execution, and associated bus errors are speculated through to the point the processor actually attempts to decode the instruction. Until this point, the error can be flushed by a branch, with no ill effect.
 
+==== mtval
+
+Address: `0x343`
+
+Hardwired to 0.
+
+==== pmpcfg0...3
+
+Address: `0x3a0` through `0x3a3`
+
+Unimplemented. Access will cause an illegal instruction exception.
+
+==== pmpaddr0...15
+
+Address: `0x3b0` through `0x3bf`
+
+Unimplemented. Access will cause an illegal instruction exception.
+
+==== mcycle
+
+Address: `0xb00`
+
+Lower half of the 64-bit cycle counter. Readable and writable by software. Increments every cycle, unless `mcountinhibit.cy` is 1, or the processor is in Debug Mode (as <<reg-dcsr>>.`stopcount` is hardwired to 1).
+
+If written with a value `n` and read on the very next cycle, the value read will be exactly `n + 1` (ignoring wrapping).
+
+==== mcycleh
+
+Address: `0xb80`
+
+Upper half of the 64-bit cycle counter. Readable and writable by software. Increments every time `mcycle` wraps from `0xffffffff` to `0x00000000` upon increment.
+
+==== minstret
+
+Address: `0xb02`
+
+Lower half of the 64-bit instruction retire counter. Readable and writable by software. Increments with every instruction exectued, unless `mcountinhibit.ir` is 1, or the processor is in Debug Mode (as <<reg-dcsr>>.`stopcount` is hardwired to 1).
+
+==== minstreth
+
+Address: `0xb82`
+
+Upper half of the 64-bit instruction retire counter. Readable and writable by software. Increments every time `minstret` wraps from `0xffffffff` to `0x00000000` upon increment.
+
+==== mhpmcounter3...31
+
+Address: `0xb03` through `0xb1f`
+
+Hardwired to 0.
+
+==== mhpmcounter3...31h
+
+Address: `0xb83` through `0xb9f`
+
+Hardwired to 0.
+
+
 [[reg-mcountinhibit]]
 ==== mcountinhibit
 
+Address: `0x320`
 
+Counter inhibit. Read-write. The table below lists the fields which are _not_ hardwired to 0:
 
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 2 | `ir` | When 1, inhibit counting of `minstret`/`minstreth`
+| 0 | `cy` | When 1, inhibit counting
+|===
+
+==== mhpmevent3...31
+
+Address: `0x323` through `0x33f`
+
+Hardwired to 0.
+
+==== tselect
+
+Address: `0x7a0`
+
+Unimplemented. Reads as 0, write causes illegal instruction exception.
+
+==== tdata1...3
+
+Address: `0x7a1` through `0x7a3`
+
+Unimplemented. Access will cause an illegal instruction exception.
+
+=== Standard Debug Mode CSRs
+
+This section describes the Debug Mode CSRs, which are follow the 0.13.2 RISC-V debug specification. The <<debug-chapter>> section gives more detail on the remainder of Hazard3's debug implementation, including the Debug Module.
+
+All Debug Mode CSRs are 32-bit; DXLEN is always 32.
+
+==== dcsr
+
+Address: `0x7b0`
+
+Debug control and status register. Access outside of Debug Mode will cause an illegal instruction exception. Relevant fields are implemented as follows:
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:28 | `xdebugver` | Hardwired to 4: external debug support as per RISC-V 0.13.2 debug specification.
+| 15 | `ebreakm` | When 1, `ebreak` instructions will break to Debug Mode instead of trapping in M mode.
+| 11 | `stepie` | Hardwired to 0: no interrupts are taken during hardware single-stepping.
+| 10 | `stopcount` | Hardwired to 1: `mcycle`/`mcycleh` and `minstret`/`minstreth` do not increment in Debug Mode.
+| 9 | `stoptime` | Hardwired to 1: core-local timers don't increment in debug mode. This requires cooperation of external hardware based on the halt status to implement correctly.
+| 8:6 | `cause` | Read-only, set by hardware -- see table below.
+| 2 | `step` | When 1, re-enter Debug Mode after each instruction executed in M-mode.
+| 1:0 | `prv` | Hardwired to 3, as only M-mode is implemented.
+|===
+
+Fields not mentioned above are hardwired to 0.
+
+Hazard3 may set the following `dcsr.cause` values:
+
+[cols="10h,~", options="header"]
+|===
+| Cause | Description
+| 1 | Processor entered Debug Mode due to an `ebreak` instruction executed in M-mode.
+| 3 | Processor entered Debug Mode due to a halt request, or a reset-halt request present when the core reset was released.
+| 4 | Processor entered Debug Mode after executing one instruction with single-stepping enabled.
+|===
+
+Cause 5 (`resethaltreq`) is never set by hardware. This event is reported as a normal halt, cause 3. Cause 2 (trigger) is never used because there are no triggers. (TODO?)
+
+==== dpc
+
+Address: `0x7b1`
+
+Debug program counter. When entering Debug Mode, `dpc` samples the current program counter, e.g. the address of an `ebreak` which caused Debug Mode entry. When leaving debug mode, the processor jumps to `dpc`. The host may read/write this register whilst in Debug Mode.
+
+==== dscratch0
+
+Address: `0x7b2`
+
+Not implemented. However, the Debug Module's internal `data0` register is mapped to this CSR address under the following conditions:
+
+- The core is in Debug Mode
+- The Debug Module is _currently executing an abstract command on this core_
+
+The Debug Module uses this mapping to exchange data with the core by injecting `csrr`/`csrw` instructions into the prefetch buffer. This in turn is used to implement the Abstract Access Register command. See <<debug-chapter>>.
+
+The Debug Module lists the number of scratch registers as 0 in `hartinfo.dscratch`.
+
+==== dscratch1
+
+Not implemented. Access will cause an illegal instruction exception.
 
 === Custom CSRs
 
 These are all allocated in the space `0xbc0` through `0xbff` which is available for custom read/write M-mode CSRs, and `0xfc0` through `0xfff` which is available for custom read-only M-mode CSRs.
 
-[cols="10h,20h,~", options="header"]
 
 [[reg-midcr]]
 ==== midcr

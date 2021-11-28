@@ -13,4 +13,5 @@ include::sections/instruction_timings.adoc[]
 
 include::sections/csr.adoc[]
 
+[[debug-chapter]]
 include::sections/debug.adoc[]
