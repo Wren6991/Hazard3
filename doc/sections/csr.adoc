@@ -2,60 +2,237 @@
 
 The RISC-V privileged specification affords flexibility as to which CSRs are implemented, and how they behave. This section documents the concrete behaviour of Hazard3's standard and nonstandard M-mode CSRs, as implemented.
 
-This section does not attempt to supplant the [RISC-V Privileged Specification](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf), which is the authoritative reference on the RISC-V CSRs.
+NOTE: All CSR addresses not listed in this section are unimplemented. Accessing an unimplemented CSR will cause an illegal instruction exception (`mcause` = 2). This includes all U-mode and S-mode CSRs.
+
+All CSRs are 32-bit; MXLEN is fixed at 32 bits on Hazard3.
 
 === Standard CSRs
+
+This section does not attempt to supplant the https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf[RISC-V Privileged Specification], which is the authoritative reference on the RISC-V CSRs.
 
 ==== mvendorid
 
 Address: `0xf11`
 
-Read-only, constant. Value is configured when the processor is instantiated. Should contain either all-zeroes, or a valid JEDEC JEP106 vendor ID.
+Vendor identifier. Read-only, configurable constant.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:0 | - | Should contain either all-zeroes, or a valid JEDEC JEP106 vendor ID using the encoding in the RISC-V specification (_not_ the same as a JTAG IDCODE)
+|===
 
 ==== marchid
 
 Address: `0xf12`
 
-Read-only, constant. Architecture identifier for Hazard3, value can be altered when the processor is instantiated. Default is currently all zeroes as unregistered.
-
-==== mimpid
-
-Address: `0xf12`
-
-Read-only, constant. Value is configured when the processor is instantiated. Should contain either all-zeroes, or some number specifiying a version of Hazard3 (e.g. git hash).
-
-==== mstatus
-
-The below table lists the fields which are _not_ always hardwired to 0:
+Architecture identifier for Hazard3. Read-only, configurable constant.
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 12:11 | MPP | Previous privilege level. Always `0x3`, indicating M-mode.
-| 7 | MPIE | Previous interrupt enable. Readable and writable. Is set to the value of MIE on trap entry. Is set to 1 on trap return.
-| 3 | MIE | Interrupt enable. Readable and writable. Is set to 0 on trap entry. Is set to the value of MPIE on trap return.
+| 31:0 | - | Default is currently all-zeroes as Hazard3 is unregistered.
+|===
+
+
+==== mimpid
+
+Address: `0xf13`
+
+Implementation identifier. Read-only, configurable constant.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:0 | - | Should contain the git hash of the Hazard3 revision from which the processor was synthesised, or all-zeroes.
+|===
+
+==== mhartid
+
+Address: `0xf14`
+
+Hart identification register. Read-only, configurable constant.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:0 | - | Hazard3 cores possess only one hardware thread, so this is a unique per-core identifier, assigned consecutively from 0.
+|===
+
+==== mstatus
+
+Address: `0x300`
+
+The below table lists the fields which are _not_ hardwired to 0:
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 12:11 | `mpp` | Previous privilege level. Always `0x3`, indicating M-mode.
+| 7 | `mpie` | Previous interrupt enable. Readable and writable. Is set to the current value of `mstatus.mie` on trap entry. Is set to 1 on trap return.
+| 3 | `mie` | Interrupt enable. Readable and writable. Is set to 0 on trap entry. Is set to the current value of `mstatus.mpie` on trap return.
 |===
 
 ==== mstatush
 
-This CSR is present, but it is entirely hardwired to zero.
+Address: `0x310`
+
+This CSR is present, but it is entirely hardwired to zero. Its presence is required for compliance.
 
 ==== misa
 
-Read-only, constant. Value depends on which ISA extensions Hazard5 is configured with. The table below lists the fields which are _not_ always hardwired to 0:
+Address: `0x301`
+
+Read-only, constant. Value depends on which ISA extensions Hazard3 is configured with. The table below lists the fields which are _not_ always hardwired to 0:
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 31:30 | MXL | Always `0x1`. Indicates this is a 32-bit processor.
-| 12 | M | 1 if the M extension is present.
-| 2 | C | 1 if the C extension is present.
+| 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
+| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence.
+| 12 | `m` | 1 if the M extension is present, otherwise 0.
+| 2 | `c` | 1 if the C extension is present, otherwise 0.
 |===
+
+==== medeleg
+
+Address: `0x302`
+
+Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+
+==== mideleg
+
+Address: `0x303`
+
+Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+
+==== mie
+
+Address: `0x304`
+
+Interrupt enable register. Not to be confused with `mstatus.mie`, which is a global enable, having the final say in whether any interrupt which is both enabled in `mie` and pending in `mip` will actually cause the processor to transfer control to a handler.
+
+The table below lists the fields which are _not_ hardwired to 0:
+
+[cols="10h,20h,~", options="header"]
+|===
+|Bits | Name | Description
+| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-meie0>>.
+| 7 | `mtie` | Timer interrupt enable. A timer interrupt is requested when `mie.mtie`, `mip.mtip` and `mstatus.mie` are all 1.
+| 3 | `msie` | Software interrupt enable. A software interupt is requested when  `mie.msie`, `mip.mtip` and `mstatus.mie` are all 1.
+|===
+
+NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-meie0>>, and keeps the upper half of `mie` reserved.
+
+==== mip
+
+Address: `0x344`
+
+Interrupt pending register. Read-only.
+
+NOTE: The RISC-V specification lists `mip` as a read-write register, but the bits which are readable correspond to lower privilege modes (S- and U-mode) which are not implemented on Hazard3, so it is documented here as read-only.
+
+The table below lists the fields which are _not_ hardwired to 0:
+
+[cols="10h,20h,~", options="header"]
+|===
+|Bits | Name | Description
+| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-meip0>>) and enabled in <<reg-meie0>>.
+| 7 | `mtip` | Timer interrupt pending. Level-sensitive interrupt signal from outside the core. Connected to a standard, external RISC-V 64-bit timer.
+| 3 | `msip` | Software interrupt pending. In spite of the name, this is not triggered by an instruction on this core, rather it is wired to an external memory-mapped register to provide a cross-hart level-sensitive doorbell interrupt.
+|===
+
+NOTE: Hazard3 assumes interrupts to be level-sensitive at system level. Bits in `mip` are cleared by servicing the requestor and causing it to deassert its interrupt request.
+
+==== mtvec
+
+Address: `0x305`
+
+Trap vector base address. Read-write. Exactly which bits of `mtvec` can be modified (possibly none) is configurable when instantiating the processor, but by default the entire register is writable. The reset value of `mtvec` is also configurable.
+
+[cols="10h,20h,~", options="header"]
+|===
+|Bits | Name | Description
+| 31:2 | `base` | Base address for trap entry. In Vectored mode, this is _OR'd_ with the trap offset to calculate the trap entry address, so the table must be aligned to its total size, rounded up to a power of 2. In Direct mode, `base` is word-aligned.
+| 0 | `mode` | 0 selects Direct mode -- all traps (whether exception or interrupt) jump to `base`. 1 selects Vectored mode -- exceptions go to `base`, interrupts go to `base \| mcause << 2`.
+|===
+
+NOTE: In the RISC-V specification, `mode` is a 2-bit write-any read-legal field in bits 1:0. Hazard3 implements this by hardwiring bit 1 to 0.
+
+NOTE: Hazard3 has an additional nonstandard vectoring mode, where external interrupts are each separated into distinct vectors and `mcause` values. This is enabled through the implementation-defined control register, <<reg-midcr>>, since the RISC-V specification reserves `mtvec.mode == 2, 3` for future standard use.
+
+==== mcounteren
+
+Address: `0x306`
+
+Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+
+Not to be confused with <<reg-mcountinhibit>>.
+
+==== mscratch
+
+Address: `0x340`
+
+Read-write 32-bit register. No specific hardware function -- available for software to swap with a register when entering a trap handler.
+
+==== mepc
+
+Address: `0x341`
+
+Exception program counter. When entering a trap, the current value of the program counter is recorded here. When executing an `mret`, the processor jumps to `mepc`. Can also be read and written by software.
+
+On Hazard3, bits 31:1 of `mepc` are capable of holding all 31-bit values. Bit 0 is hardwired to 0, as per the specification.
+
+All traps on Hazard3 are precise.
+
+==== mcause
+
+Address: `0x342`
+
+Exception cause. Set when entering a trap to indicate the reason for the trap. Readable and writable by software.
+
+NOTE: On Hazard3, most bits of `mcause` are hardwired to 0. Only bit 31, and enough least-significant bits to index all exception and all interrupt causes (at least four bits), are backed by registers. Only these bits are writable; the RISC-V specification only requires that `mcause` be able to hold all legal cause values.
+
+The most significant bit of `mcause` is set to 1 to indicate an interrupt cause, and 0 to indicate an exception cause. The following interrupt causes may be set by Hazard3 hardware:
+
+[cols="10h,~", options="header"]
+|===
+| Cause | Description
+| 3 | Software interrupt (`mip.msip`)
+| 7 | Timer interrupt (`mip.mtip`)
+| 11 | External interrupt (`mip.meie`)
+|===
+
+Higher numbers may be used for distinct external IRQs when expanded vectoring is enabled -- see <<reg-midcr>>. The following exception causes may be set by Hazard3 hardware:
+
+[cols="10h,~", options="header"]
+|===
+| Cause | Description
+| 1 | Instruction access fault
+| 2 | Illegal instruction
+| 3 | Breakpoint
+| 4 | Load address misaligned
+| 5 | Load access fault
+| 6 | Store/AMO address misaligned
+| 7 | Store/AMO access fault
+| 11 | Environment call
+|===
+
+NOTE: Not every instruction fetch bus cycle which returns a bus error leads to an exception. Hazard3 prefetches instructions ahead of execution, and associated bus errors are speculated through to the point the processor actually attempts to decode the instruction. Until this point, the error can be flushed by a branch, with no ill effect.
+
+[[reg-mcountinhibit]]
+==== mcountinhibit
+
+
+
 
 === Custom CSRs
 
 These are all allocated in the space `0xbc0` through `0xbff` which is available for custom read/write M-mode CSRs, and `0xfc0` through `0xfff` which is available for custom read-only M-mode CSRs.
 
+[cols="10h,20h,~", options="header"]
+
+[[reg-midcr]]
 ==== midcr
 
 Address: `0xbc0`
@@ -69,6 +246,7 @@ Implementation-defined control register. Miscellaneous nonstandard controls.
 | 0 | `eivect` | Modified external interrupt vectoring. If 0, use standard behaviour: all external interrupts set interrupt `mcause` of 11 and vector to `mtvec + 0x2c`. If 1, external interrupts use distinct interrupt `mcause` numbers 16 upward, and distinct vectors `mtvec + (irq + 16) * 4`. Resets to 0. Has no effect when `mtvec[0]` is 0.
 |===
 
+[[reg-meie0]]
 ==== meie0
 
 Address: `0xbe0`
@@ -86,6 +264,7 @@ An external interrupt is taken when all of the following are true:
 
 `meie0` resets to *all-ones*, for compatibility with software which is only aware of `mstatus` and `mie`. Because `mstatus.mie` and `mie.meie` are both initially clear, the core will not take interrupts straight out of reset, but it is strongly recommended to configure `meie0` before setting the global interrupt enable, to avoid interrupts from unexpected sources.
 
+[[reg-meip0]]
 ==== meip0
 
 Address: `0xfe0`

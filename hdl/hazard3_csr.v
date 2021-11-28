@@ -587,7 +587,9 @@ always @ (*) begin
 			2'h1,              // MXL: 32-bit
 			{XLEN-28{1'b0}},   // WLRL
 
-			13'd0,             // Z...N, no
+			2'd0,              // Z, Y, no
+			|CSR_M_TRAP,       // X is set for our non-standard interrupt enable CSRs
+			10'd0,             // W...N, no
 			|EXTENSION_M,
 			3'd0,              // L...J, no
 			1'b1,              // Integer ISA
