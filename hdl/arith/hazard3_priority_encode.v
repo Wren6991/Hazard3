@@ -30,16 +30,13 @@ module hazard3_priority_encode #(
 
 // First do a priority-select of the input bitmap.
 
-reg [W_REQ-1:0] deny;
+reg [W_REQ-1:0] gnt_onehot;
 
 always @ (*) begin: smear
 	integer i;
-	deny[0] = 1'b0;
-	for (i = 1; i < W_REQ; i = i + 1)
-		deny[i] = deny[i - 1] || req[i - 1];
+	for (i = 0; i < W_REQ; i = i + 1)
+		gnt_onehot[i] = req[i] && ~|(req & ~({W_REQ{1'b1}} << i));
 end
-
-wire [W_REQ-1:0] gnt_onehot = req & ~deny;
 
 // As the result is onehot, we can now just OR in the representation of each
 // encoded integer.
