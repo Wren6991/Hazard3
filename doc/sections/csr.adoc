@@ -318,6 +318,7 @@ This section describes the Debug Mode CSRs, which are follow the 0.13.2 RISC-V d
 
 All Debug Mode CSRs are 32-bit; DXLEN is always 32.
 
+[[reg-dcsr]]
 ==== dcsr
 
 Address: `0x7b0`

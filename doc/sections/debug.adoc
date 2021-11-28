@@ -14,6 +14,28 @@ Hazard3's debug support implements the following:
 * Automatic trigger of abstract command (`abstractauto`) on `data0` or Program Buffer access for efficient memory block transfers from the host
 * (TODO) Some minimum useful trigger unit -- likely just breakpoints, no watchpoints
 
+=== Debug Topologies
+
+Hazard3's Debug Module has the following interfaces:
+
+* An upstream AMBA 3 APB port -- the "Debug Module Interface" -- for host access to the Debug Module
+* A downstream Hazard3-specific interface to one or more cores _(multicore support is experimental)_
+* Some reset request/acknowledge signals which require careful handshaking with system-level reset logic
+
+The Debug Module _must_ be connected directly to the processors without intervening registers. This implies the Debug Module is in the same clock domain as the processors, so multiple processors on the same Debug Module must share a common clock. This is shown in the example topology below.
+
+image::diagrams/debug_topology.png[pdfwidth=50%]
+
+Upstream of the Debug Module is at least one Debug Transport Module, which bridges some host-facing interface such as JTAG to the APB Debug Module Interface. An APB arbiter could be inserted here, to allow multiple transports to be used, provided the host(s) avoid using multiple transports concurrently.
+
+Hazard3 provides an implementation of a standard RISC-V JTAG-DTM, but any APB master could be used. The Debug Module requires at least 7 bits of word addressing, i.e. 9 bits of byte address space.
+
+The clock domain crossing (if any) occurs on the downstream port of the Debug Transport Module. Hazard3's JTAG-DTM implementation runs entirely in the TCK domain, and instantiates a bus clock-crossing module internally to bridge a TCK-domain internal APB bus to an external bus in the processor clock domain.
+
+It is possible to instantiate multiple Debug Modules, one per core, and attach them to a single Debug Transport Module. This is not the preferred topology, but it does allow multiple cores to be independently clocked.
+
+=== Debug Module to Core Interface
+
 The DM can inject instructions directly into the core's instruction prefetch buffer. This mechanism is used to execute the Program Buffer, or used directly by the DM, issuing hardcoded instructions to manipulate core state.
 
 The DM's `data0` register is exposed to the core as a debug mode CSR. By issuing instructions to make the core read or write this dummy CSR, the DM can exchange data with the core. To read from a GPR `x` into `data0`, the DM issues a `csrw data0, x` instruction. Similarly `csrr x, data0` will write `data0` to that GPR. The DM always follows the CSR instruction with an `ebreak`, just like the implicit `ebreak` at the end of the Program Buffer, so that it is notified by the core when the GPR read instruction sequence completes.
