@@ -30,9 +30,8 @@
 `default_nettype none
 
 module hazard3_muldiv_seq #(
-	parameter XLEN = 32,
-	parameter UNROLL = 1,
-	parameter W_CTR = $clog2(XLEN + 1), // do not modify
+`include "hazard3_config.vh"
+,
 `include "hazard3_width_const.vh"
 ) (
 	input  wire               clk,
@@ -41,21 +40,24 @@ module hazard3_muldiv_seq #(
 	input  wire               op_vld,
 	output wire               op_rdy,
 	input  wire               op_kill,
-	input  wire [XLEN-1:0]    op_a,
-	input  wire [XLEN-1:0]    op_b,
+	input  wire [W_DATA-1:0]  op_a,
+	input  wire [W_DATA-1:0]  op_b,
 
-	output wire [XLEN-1:0]    result_h, // mulh* or rem*
-	output wire [XLEN-1:0]    result_l, // mul   or div*
+	output wire [W_DATA-1:0]  result_h, // mulh* or rem*
+	output wire [W_DATA-1:0]  result_l, // mul   or div*
 	output wire               result_vld
 );
 
 `include "hazard3_ops.vh"
 
 //synthesis translate_off
-generate if (UNROLL & (UNROLL - 1) || ~|UNROLL)
-	initial $fatal("%m: UNROLL must be a positive power of 2");
+generate if (MULDIV_UNROLL & (MULDIV_UNROLL - 1) || ~|MULDIV_UNROLL)
+	initial $fatal("%m: MULDIV_UNROLL must be a positive power of 2");
 endgenerate
 //synthesis translate_on
+
+localparam XLEN = W_DATA;
+parameter W_CTR = $clog2(XLEN + 1);
 
 // ----------------------------------------------------------------------------
 // Operation decode, operand sign adjustment
@@ -85,7 +87,10 @@ wire op_b_signed =
 wire op_a_neg = op_a_signed && accum[XLEN-1];
 wire op_b_neg = op_b_signed && op_b_r[XLEN-1];
 
-wire is_div = op_r[2];
+// Non-divide parts of the circuit should be constant-folded if all the MUL
+// operations are handled by the fast multiplier
+
+wire is_div = op_r[2] || (MUL_FAST && MULH_FAST);
 
 // Controls for modifying sign of all/part of accumulator
 wire accum_neg_l;
@@ -109,7 +114,7 @@ always @ (*) begin: alu
 	addend = {2*XLEN{1'b0}};
 	addsub_tmp = {2*XLEN{1'b0}};
 	neg_l_borrow = 1'b0;
-	for (i = 0; i < UNROLL; i = i + 1) begin
+	for (i = 0; i < MULDIV_UNROLL; i = i + 1) begin
 		addend = {is_div && |op_b_r, op_b_r, {XLEN-1{1'b0}}};
 		shift_tmp = is_div ? accum_next : accum_next >> 1;
 		addsub_tmp = shift_tmp + addend;
@@ -167,11 +172,11 @@ always @ (posedge clk or negedge rst_n) begin
 			if (op_b_neg ^ is_div)
 				op_b_r <= -op_b_r;
 		end else begin
-			ctr <= ctr - UNROLL[W_CTR-1:0];
+			ctr <= ctr - MULDIV_UNROLL[W_CTR-1:0];
 			accum <= accum_next;
 		end
 	end else if (|ctr) begin
-		ctr <= ctr - UNROLL[W_CTR-1:0];
+		ctr <= ctr - MULDIV_UNROLL[W_CTR-1:0];
 		accum <= accum_next;
 	end else if (!sign_postadj_done || sign_postadj_carry) begin
 		sign_postadj_done <= 1'b1;
@@ -287,7 +292,7 @@ always @ (posedge clk) if (rst_n && $past(rst_n)) begin: properties
 	// are forced in immediately, simultaneous with a kill, in which case there
 	// is no intermediate ready state.
 	alive = op_rdy || (op_kill && op_vld);
-	for (i = 1; i <= XLEN / UNROLL + 3; i = i + 1)
+	for (i = 1; i <= XLEN / MULDIV_UNROLL + 3; i = i + 1)
 		alive = alive || $past(op_rdy || (op_kill && op_vld), i);
 	assert(alive);
 end

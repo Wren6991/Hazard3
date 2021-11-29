@@ -406,14 +406,18 @@ if (EXTENSION_M) begin: has_muldiv
 
 	wire x_muldiv_kill = m_trap_enter_soon;
 
-	wire x_use_fast_mul = MUL_FAST && d_aluop == ALUOP_MULDIV && d_mulop == M_OP_MUL;
+	wire x_use_fast_mul = d_aluop == ALUOP_MULDIV && (
+		MUL_FAST  && d_mulop == M_OP_MUL   ||
+		MULH_FAST && d_mulop == M_OP_MULH  ||
+		MULH_FAST && d_mulop == M_OP_MULHU ||
+		MULH_FAST && d_mulop == M_OP_MULHSU
+	);
 
 	assign x_muldiv_op_vld = (d_aluop == ALUOP_MULDIV && !x_use_fast_mul)
 		&& !(x_muldiv_posted || x_stall_raw || x_muldiv_kill);
 
 	hazard3_muldiv_seq #(
-		.XLEN   (W_DATA),
-		.UNROLL (MULDIV_UNROLL)
+	`include "hazard3_config_inst.vh"
 	) muldiv (
 		.clk        (clk),
 		.rst_n      (rst_n),
@@ -444,14 +448,15 @@ if (EXTENSION_M) begin: has_muldiv
 		wire x_issue_fast_mul = x_use_fast_mul && |d_rd && !x_stall;
 
 		hazard3_mul_fast #(
-			.XLEN(W_DATA)
-		) inst_hazard3_mul_fast (
+		`include "hazard3_config_inst.vh"
+		) mul_fast (
 			.clk        (clk),
 			.rst_n      (rst_n),
 
+			.op_vld     (x_issue_fast_mul),
+			.op         (d_mulop),
 			.op_a       (x_rs1_bypass),
 			.op_b       (x_rs2_bypass),
-			.op_vld     (x_issue_fast_mul),
 
 			.result     (m_fast_mul_result),
 			.result_vld (m_fast_mul_result_vld)
