@@ -256,6 +256,10 @@ _weak_handler_name_in_x31:
 	li x31, IO_PRINT_U32
 	csrr x28, mepc
 	sw x28, (x31)
+	csrr x26, mcause
+	bltz x26, 1f
+	print_reg _str_mcause x26
+1:
 	print_reg _str_s0 s0
 	print_reg _str_s1 s1
 	print_reg _str_a0 a0
@@ -274,6 +278,7 @@ _weak_handler_name_in_x31:
 
 _str_unhandled_trap: .asciz "*** Unhandled trap ***\n"
 _str_at_mepc:        .asciz " @ mepc = "
+_str_mcause:         .asciz "                 mcause = "
 _str_s0:             .asciz "s0: "
 _str_s1:             .asciz "s1: "
 _str_a0:             .asciz "a0: "
