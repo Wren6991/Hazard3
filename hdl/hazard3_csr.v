@@ -120,6 +120,7 @@ localparam MVENDORID      = 12'hf11; // Vendor ID.
 localparam MARCHID        = 12'hf12; // Architecture ID.
 localparam MIMPID         = 12'hf13; // Implementation ID.
 localparam MHARTID        = 12'hf14; // Hardware thread ID.
+localparam MCONFIGPTR     = 12'hf15; // Pointer to configuration data structure.
 
 // Machine Trap Setup (RW)
 localparam MSTATUS        = 12'h300; // Machine status register.
@@ -614,6 +615,11 @@ always @ (*) begin
 	MHARTID: if (CSR_M_MANDATORY) begin
 		decode_match = !wen_soon; // MRO
 		rdata = MHARTID_VAL;
+	end
+
+	MCONFIGPTR: if (CSR_M_MANDATORY) begin
+		decode_match = !wen_soon; // MRO
+		rdata = MCONFIGPTR_VAL;
 	end
 
 	MSTATUS: if (CSR_M_MANDATORY || CSR_M_TRAP) begin

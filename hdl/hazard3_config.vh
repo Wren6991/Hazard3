@@ -74,13 +74,17 @@ parameter NUM_IRQ         = 32,
 // JEDEC JEP106-compliant vendor ID, can be left at 0 if "not implemented or
 // [...] this is a non-commercial implementation" (RISC-V spec).
 // 31:7 is continuation code count, 6:0 is ID. Parity bit is not stored.
-parameter MVENDORID_VAL = 32'h0,
+parameter MVENDORID_VAL   = 32'h0,
 
 // Implementation ID for this specific version of Hazard3. Git hash is perfect.
-parameter MIMPID_VAL = 32'h0,
+parameter MIMPID_VAL      = 32'h0,
 
 // Each core has a single hardware thread. Multiple cores should have unique IDs.
-parameter MHARTID_VAL = 32'h0,
+parameter MHARTID_VAL     = 32'h0,
+
+// Pointer to configuration structure blob, or all-zeroes. Must be at least
+// 4-byte-aligned.
+parameter MCONFIGPTR_VAL  = 32'h0,
 
 // ----------------------------------------------------------------------------
 // Performance/size options

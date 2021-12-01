@@ -61,6 +61,18 @@ Hart identification register. Read-only, configurable constant.
 | 31:0 | - | Hazard3 cores possess only one hardware thread, so this is a unique per-core identifier, assigned consecutively from 0.
 |===
 
+==== mconfigptr
+
+Address: `0xf15`
+
+Pointer to configuration data structure. Read-only, configurable constant.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:0 | - | Either pointer to configuration data structure, containing information about the harts and system, or all-zeroes. At least 4-byte-aligned.
+|===
+
 ==== mstatus
 
 Address: `0x300`
@@ -315,7 +327,7 @@ Unimplemented. Access will cause an illegal instruction exception.
 
 === Standard Debug Mode CSRs
 
-This section describes the Debug Mode CSRs, which are follow the 0.13.2 RISC-V debug specification. The <<debug-chapter>> section gives more detail on the remainder of Hazard3's debug implementation, including the Debug Module.
+This section describes the Debug Mode CSRs, which follow the 0.13.2 RISC-V debug specification. The <<debug-chapter>> section gives more detail on the remainder of Hazard3's debug implementation, including the Debug Module.
 
 All Debug Mode CSRs are 32-bit; DXLEN is always 32.
 
