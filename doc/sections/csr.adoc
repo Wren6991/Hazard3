@@ -333,6 +333,7 @@ Address: `0x7a1` through `0x7a3`
 
 Unimplemented. Access will cause an illegal instruction exception.
 
+[[debug-csr-section]]
 === Standard Debug Mode CSRs
 
 This section describes the Debug Mode CSRs, which follow the 0.13.2 RISC-V debug specification. The <<debug-chapter>> section gives more detail on the remainder of Hazard3's debug implementation, including the Debug Module.

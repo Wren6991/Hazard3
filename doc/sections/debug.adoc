@@ -53,13 +53,22 @@ The core behaves as follows:
 * Branch, `jal`, `jalr` and `auipc` are illegal in debug mode, because they observe PC: attempting to execute will halt Program Buffer execution and report an exception in `abstractcs.cmderr`
 * The `dret` instruction is not implemented (a special purpose DM-to-core signal is used to signal resume)
 * The `dscratch` CSRs are not implemented
-* External `data0` register is exposed as a dummy CSR mapped at `0x7b2` (the location of `dscratch0`), readable and writable by the DM.
-** This is a debug mode CSR, so raises an illegal instruction exception when accessed in machine mode
-** The DM ignores writes unless it is currently executing an abstract command on this core (`hartsel` = this core, `abstractcs.busy` = 1)
+* The DM's `data0` register is mapped into the core as a CSR, <<reg-dmdata0>>, address `0xbff`.
+** Raises an illegal instruction exception when accessed outside of Debug Mode
+** The DM ignores attempted core writes to the CSR, unless the DM is currently executing an abstract command on that core
+** Used by the DM to implement abstract GPR access, by injecting CSR read/write instructions
 * `dcsr.stepie` is hardwired to 0 (no interrupts during single stepping)
 * `dcsr.stopcount` and `dcsr.stoptime` are hardwired to 1 (no counter or internal timer increment in debug mode)
 * `dcsr.mprven` is hardwired to 0
 * `dcsr.prv` is hardwired to 3 (M-mode)
+
+See also <<debug-csr-section>> for more details on the core-side Debug Mode registers.
+
+The debug host must use the Program Buffer to access CSRs and memory. This carries some overhead for individual accesses, but is efficient for bulk transfers: the `abstractauto` feature allows the DM to trigger the Program Buffer and/or a GPR tranfer automatically following every `data0` access, which can be used for e.g. autoincrementing read/write memory bursts. Program Buffer read/writes can also be used as `abstractauto` triggers: this is less useful than the `data0` trigger, but takes little extra effort to implement, and can be used to read/write a large number of CSRs efficiently.
+
+Abstract memory access is not implemented because, for bulk transfers, it offers no better throughput than Program Buffer execution with `abstractauto`. Non-bulk transfers, while slower, are still instantaneous from the perspective of the human at the other end of the wire.
+
+The Hazard3 Debug Module has experimental support for multi-core debug. Each core possesses exactly one hardware thread (hart) which is exposed to the debugger. The RISC-V specification does not mandate what mapping is used between the Debug Module hart index `hartsel` and each core's `mhartid` CSR, but a 1:1 match of these values is the least likely to cause issues. Each core's `mhartid` can be configured using the `MHARTID_VAL` parameter during instantiation.
 
 === Debug Module to Core Interface
 
@@ -67,9 +76,4 @@ The DM can inject instructions directly into the core's instruction prefetch buf
 
 The DM's `data0` register is exposed to the core as a debug mode CSR. By issuing instructions to make the core read or write this dummy CSR, the DM can exchange data with the core. To read from a GPR `x` into `data0`, the DM issues a `csrw data0, x` instruction. Similarly `csrr x, data0` will write `data0` to that GPR. The DM always follows the CSR instruction with an `ebreak`, just like the implicit `ebreak` at the end of the Program Buffer, so that it is notified by the core when the GPR read instruction sequence completes.
 
-The debug host must use the Program Buffer to access CSRs and memory. This carries some overhead for individual accesses, but is efficient for bulk transfers: the `abstractauto` feature allows the DM to trigger the Program Buffer and/or a GPR tranfer automatically following every `data0` access, which can be used for e.g. autoincrementing read/write memory bursts. Program Buffer read/writes can also be used as `abstractauto` triggers: this is less useful than the `data0` trigger, but takes little extra effort to implement, and can be used to read/write a large number of CSRs efficiently.
-
-Abstract memory access is not implemented because it offers no better throughput than Program Buffer execution with `abstractauto` for bulk transfers, and non-bulk transfers are still instantaneous from the perspective of the human at the other end of the wire.
-
-The Hazard3 Debug Module has experimental support for multi-core debug. Each core possesses exactly one hardware thread (hart) which is exposed to the debugger. The RISC-V specification does not mandate what mapping is used between the Debug Module hart index `hartsel` and each core's `mhartid` CSR, but a 1:1 match of these values is the least likely to cause issues. Each core's `mhartid` can be configured using the `MHARTID_VAL` parameter during instantiation.
-
+TODO reset interface description
