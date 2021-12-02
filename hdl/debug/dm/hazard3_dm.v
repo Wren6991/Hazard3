@@ -24,7 +24,7 @@ module hazard3_dm #(
 	// least-significant on each concatenated hart access bus.
 	parameter N_HARTS = 1,
 	// Where there are multiple DMs, the address of each DM should be a
-	// multiple of 'h100, so that the lower 8 bits decode correctly.
+	// multiple of 'h200, so that bits[8:2] decode correctly.
 	parameter NEXT_DM_ADDR = 32'h0000_0000,
 
 	parameter XLEN = 32, // Do not modify
@@ -39,7 +39,7 @@ module hazard3_dm #(
 	input  wire                      dmi_psel,
 	input  wire                      dmi_penable,
 	input  wire                      dmi_pwrite,
-	input  wire [7:0]                dmi_paddr,
+	input  wire [8:0]                dmi_paddr,
 	input  wire [31:0]               dmi_pwdata,
 	output reg  [31:0]               dmi_prdata,
 	output wire                      dmi_pready,
@@ -92,26 +92,29 @@ localparam PROGBUF_SIZE = 2;
 // ----------------------------------------------------------------------------
 // Address constants
 
-localparam ADDR_DATA0        = 8'h04;
+localparam ADDR_DATA0        = 7'h04;
 // Other data registers not present.
-localparam ADDR_DMCONTROL    = 8'h10;
-localparam ADDR_DMSTATUS     = 8'h11;
-localparam ADDR_HARTINFO     = 8'h12;
-localparam ADDR_HALTSUM1     = 8'h13;
-localparam ADDR_HALTSUM0     = 8'h40;
+localparam ADDR_DMCONTROL    = 7'h10;
+localparam ADDR_DMSTATUS     = 7'h11;
+localparam ADDR_HARTINFO     = 7'h12;
+localparam ADDR_HALTSUM1     = 7'h13;
+localparam ADDR_HALTSUM0     = 7'h40;
 // No HALTSUM2+ registers (we don't support >32 harts anyway)
 // No array mask select registers
-localparam ADDR_ABSTRACTCS   = 8'h16;
-localparam ADDR_COMMAND      = 8'h17;
-localparam ADDR_ABSTRACTAUTO = 8'h18;
-localparam ADDR_CONFSTRPTR0  = 8'h19;
-localparam ADDR_CONFSTRPTR1  = 8'h1a;
-localparam ADDR_CONFSTRPTR2  = 8'h1b;
-localparam ADDR_CONFSTRPTR3  = 8'h1c;
-localparam ADDR_NEXTDM       = 8'h1d;
-localparam ADDR_PROGBUF0     = 8'h20;
-localparam ADDR_PROGBUF1     = 8'h21;
+localparam ADDR_ABSTRACTCS   = 7'h16;
+localparam ADDR_COMMAND      = 7'h17;
+localparam ADDR_ABSTRACTAUTO = 7'h18;
+localparam ADDR_CONFSTRPTR0  = 7'h19;
+localparam ADDR_CONFSTRPTR1  = 7'h1a;
+localparam ADDR_CONFSTRPTR2  = 7'h1b;
+localparam ADDR_CONFSTRPTR3  = 7'h1c;
+localparam ADDR_NEXTDM       = 7'h1d;
+localparam ADDR_PROGBUF0     = 7'h20;
+localparam ADDR_PROGBUF1     = 7'h21;
 // No authentication, no system bus access
+
+// APB is byte-addressed, DM registers are word-addressed.
+wire [6:0] dmi_regaddr = dmi_paddr[8:2];
 
 // ----------------------------------------------------------------------------
 // Hart selection
@@ -126,7 +129,7 @@ wire [W_HARTSEL-1:0] hartsel_next;
 generate
 if (N_HARTS > 1) begin: has_hartsel
 	// only the lower 10 bits of hartsel are supported
-	assign hartsel_next = dmi_write && dmi_paddr == ADDR_DMCONTROL ?
+	assign hartsel_next = dmi_write && dmi_regaddr == ADDR_DMCONTROL ?
 		dmi_pwdata[16 +: W_HARTSEL] : hartsel;
 end else begin: has_no_hartsel
 	assign hartsel_next = 1'b0;
@@ -162,13 +165,13 @@ always @ (posedge clk or negedge rst_n) begin
 		dmcontrol_resethaltreq <= {N_HARTS{1'b0}};
 	end else if (!dmactive) begin
 		// Only dmactive is writable when !dmactive
-		if (dmi_write && dmi_paddr == ADDR_DMCONTROL)
+		if (dmi_write && dmi_regaddr == ADDR_DMCONTROL)
 			dmactive <= dmi_pwdata[0];
 		dmcontrol_ndmreset <= 1'b0;
 		dmcontrol_haltreq <= {N_HARTS{1'b0}};
 		dmcontrol_hartreset <= {N_HARTS{1'b0}};
 		dmcontrol_resethaltreq <= {N_HARTS{1'b0}};
-	end else if (dmi_write && dmi_paddr == ADDR_DMCONTROL) begin
+	end else if (dmi_write && dmi_regaddr == ADDR_DMCONTROL) begin
 		dmactive <= dmi_pwdata[0];
 		dmcontrol_ndmreset <= dmi_pwdata[1];
 		dmcontrol_haltreq[hartsel_next] <= dmi_pwdata[31];
@@ -204,7 +207,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else begin
 		dmstatus_havereset <= dmstatus_havereset | (hart_reset_done & ~hart_reset_done_prev);
 		// dmcontrol.ackhavereset:
-		if (dmi_write && dmi_paddr == ADDR_DMCONTROL && dmi_pwdata[28])
+		if (dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[28])
 			dmstatus_havereset[hartsel_next] <= 1'b0;
 	end
 end
@@ -223,7 +226,7 @@ always @ (posedge clk or negedge rst_n) begin
 		dmstatus_resumeack <= dmstatus_resumeack | (dmcontrol_resumereq_sticky & hart_running & hart_available);
 		dmcontrol_resumereq_sticky <= dmcontrol_resumereq_sticky & ~(hart_running & hart_available); // TODO this is because our "running" is actually just "not debug mode"
 		// dmcontrol.resumereq:
-		if (dmi_write && dmi_paddr == ADDR_DMCONTROL && dmi_pwdata[30]) begin
+		if (dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[30]) begin
 			dmcontrol_resumereq_sticky[hartsel_next] <= 1'b1;
 			dmstatus_resumeack[hartsel_next] <= 1'b0;
 		end
@@ -255,7 +258,7 @@ always @ (posedge clk or negedge rst_n) begin: update_hart_data0
 		abstract_data0 <= {XLEN{1'b0}};
 	end else if (!dmactive) begin
 		abstract_data0 <= {XLEN{1'b0}};
-	end else if (dmi_write && dmi_paddr == ADDR_DATA0) begin
+	end else if (dmi_write && dmi_regaddr == ADDR_DATA0) begin
 		abstract_data0 <= dmi_pwdata;
 	end else begin
 		for (i = 0; i < N_HARTS; i = i + 1) begin
@@ -276,9 +279,9 @@ always @ (posedge clk or negedge rst_n) begin
 		progbuf0 <= {XLEN{1'b0}};
 		progbuf1 <= {XLEN{1'b0}};
 	end else if (dmi_write && !abstractcs_busy) begin
-		if (dmi_paddr == ADDR_PROGBUF0)
+		if (dmi_regaddr == ADDR_PROGBUF0)
 			progbuf0 <= dmi_pwdata;
-		if (dmi_paddr == ADDR_PROGBUF1)
+		if (dmi_regaddr == ADDR_PROGBUF1)
 			progbuf1 <= dmi_pwdata;
 	end
 end
@@ -294,7 +297,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (!dmactive) begin
 		abstractauto_autoexecdata <= 1'b0;
 		abstractauto_autoexecprogbuf <= 2'b00;
-	end else if (dmi_write && dmi_paddr == ADDR_ABSTRACTAUTO) begin
+	end else if (dmi_write && dmi_regaddr == ADDR_ABSTRACTAUTO) begin
 		abstractauto_autoexecdata <= dmi_pwdata[0];
 		abstractauto_autoexecprogbuf <= dmi_pwdata[17:16];
 	end
@@ -328,18 +331,18 @@ reg [W_STATE-1:0] acmd_state;
 assign abstractcs_busy = acmd_state != S_IDLE;
 
 wire start_abstract_cmd = abstractcs_cmderr == CMDERR_OK && !abstractcs_busy && (
-	(dmi_write && dmi_paddr == ADDR_COMMAND) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_paddr == ADDR_DATA0) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[0] && dmi_paddr == ADDR_PROGBUF0) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[1] && dmi_paddr == ADDR_PROGBUF1)
+	(dmi_write && dmi_regaddr == ADDR_COMMAND) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_regaddr == ADDR_DATA0) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[0] && dmi_regaddr == ADDR_PROGBUF0) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[1] && dmi_regaddr == ADDR_PROGBUF1)
 );
 
 wire dmi_access_illegal_when_busy =
 	(dmi_write && (
-		dmi_paddr == ADDR_ABSTRACTCS || dmi_paddr == ADDR_COMMAND || dmi_paddr == ADDR_ABSTRACTAUTO ||
-		dmi_paddr == ADDR_DATA0 || dmi_paddr == ADDR_PROGBUF0 || dmi_paddr == ADDR_PROGBUF0)) ||
+		dmi_regaddr == ADDR_ABSTRACTCS || dmi_regaddr == ADDR_COMMAND || dmi_regaddr == ADDR_ABSTRACTAUTO ||
+		dmi_regaddr == ADDR_DATA0 || dmi_regaddr == ADDR_PROGBUF0 || dmi_regaddr == ADDR_PROGBUF0)) ||
 	(dmi_read && (
-		dmi_paddr == ADDR_DATA0 || dmi_paddr == ADDR_PROGBUF0 || dmi_paddr == ADDR_PROGBUF0));
+		dmi_regaddr == ADDR_DATA0 || dmi_regaddr == ADDR_PROGBUF0 || dmi_regaddr == ADDR_PROGBUF0));
 
 // Decode what acmd may be triggered on this cycle, and whether it is
 // supported -- command source may be a registered version of most recent
@@ -348,7 +351,7 @@ wire dmi_access_illegal_when_busy =
 // detected by just registering that the last written command was
 // unsupported.
 
-wire       acmd_new = dmi_write && dmi_paddr == ADDR_COMMAND;
+wire       acmd_new = dmi_write && dmi_regaddr == ADDR_COMMAND;
 
 wire       acmd_new_postexec    = dmi_pwdata[18];
 wire       acmd_new_transfer    = dmi_pwdata[17];
@@ -404,7 +407,7 @@ always @ (posedge clk or negedge rst_n) begin
 		abstractcs_cmderr <= CMDERR_OK;
 		acmd_state <= S_IDLE;
 	end else begin
-		if (dmi_write && dmi_paddr == ADDR_ABSTRACTCS && !abstractcs_busy)
+		if (dmi_write && dmi_regaddr == ADDR_ABSTRACTCS && !abstractcs_busy)
 			abstractcs_cmderr <= abstractcs_cmderr & ~dmi_pwdata[10:8];
 		if (abstractcs_cmderr == CMDERR_OK && abstractcs_busy && dmi_access_illegal_when_busy)
 			abstractcs_cmderr <= CMDERR_BUSY;
@@ -495,7 +498,7 @@ assign hart_instr_data = {N_HARTS{
 // DMI read data mux
 
 always @ (*) begin
-	case (dmi_paddr)
+	case (dmi_regaddr)
 	ADDR_DATA0:        dmi_prdata = abstract_data0;
 	ADDR_DMCONTROL:    dmi_prdata = {
 		dmcontrol_haltreq[hartsel],

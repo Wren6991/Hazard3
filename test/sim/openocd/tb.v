@@ -58,7 +58,7 @@ localparam IDCODE = 32'hdeadbeef;
 wire              dmi_psel;
 wire              dmi_penable;
 wire              dmi_pwrite;
-wire [7:0]        dmi_paddr;
+wire [8:0]        dmi_paddr;
 wire [31:0]       dmi_pwdata;
 reg  [31:0]       dmi_prdata;
 wire              dmi_pready;
@@ -132,7 +132,7 @@ hazard3_dm #(
 	.dmi_psel                    (dmi_psel),
 	.dmi_penable                 (dmi_penable),
 	.dmi_pwrite                  (dmi_pwrite),
-	.dmi_paddr                   (dmi_paddr),
+	.dmi_paddr                   ({dmi_paddr, 2'b00}),
 	.dmi_pwdata                  (dmi_pwdata),
 	.dmi_prdata                  (dmi_prdata),
 	.dmi_pready                  (dmi_pready),
