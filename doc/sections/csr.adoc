@@ -2,25 +2,24 @@
 
 The RISC-V privileged specification affords flexibility as to which CSRs are implemented, and how they behave. This section documents the concrete behaviour of Hazard3's standard and nonstandard M-mode CSRs, as implemented.
 
-NOTE: All CSR addresses not listed in this section are unimplemented. Accessing an unimplemented CSR will cause an illegal instruction exception (`mcause` = 2). This includes all U-mode and S-mode CSRs.
+All CSRs are 32-bit; MXLEN is fixed at 32 bits on Hazard3. All CSR addresses not listed in this section are unimplemented. Accessing an unimplemented CSR will cause an illegal instruction exception (`mcause` = 2). This includes all U-mode and S-mode CSRs.
 
-All CSRs are 32-bit; MXLEN is fixed at 32 bits on Hazard3.
-
-
-=== Standard M-mode CSRs
 
 IMPORTANT: The https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf[RISC-V Privileged Specification] should be your primary reference for writing software to run on Hazard3. This section specifies those details which are left implementation-defined by the RISC-V Privileged Specification, for sake of completeness, but portable RISC-V software should not rely on these details.
+
+=== Standard M-mode Identification CSRs
 
 ==== mvendorid
 
 Address: `0xf11`
 
-Vendor identifier. Read-only, configurable constant.
+Vendor identifier. Read-only, configurable constant. Should contain either all-zeroes, or a valid JEDEC JEP106 vendor ID using the encoding in the RISC-V specification.
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 31:0 | - | Should contain either all-zeroes, or a valid JEDEC JEP106 vendor ID using the encoding in the RISC-V specification (_not_ the same as a JTAG IDCODE)
+| 31:7 | `bank` | The number of continuation codes in the vendor JEP106 ID. _One less than the JEP106 bank number._
+| 6:0 | `offset` | Vendor ID within the specified bank. LSB (parity) is not stored.
 |===
 
 ==== marchid
@@ -73,6 +72,23 @@ Pointer to configuration data structure. Read-only, configurable constant.
 | 31:0 | - | Either pointer to configuration data structure, containing information about the harts and system, or all-zeroes. At least 4-byte-aligned.
 |===
 
+==== misa
+
+Address: `0x301`
+
+Read-only, constant. Value depends on which ISA extensions Hazard3 is configured with. The table below lists the fields which are _not_ always hardwired to 0:
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits | Name | Description
+| 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
+| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
+| 12 | `m` | 1 if the M extension is present, otherwise 0.
+| 2 | `c` | 1 if the C extension is present, otherwise 0.
+|===
+
+=== Standard M-mode Trap Handling CSRs
+
 ==== mstatus
 
 Address: `0x300`
@@ -91,22 +107,8 @@ The below table lists the fields which are _not_ hardwired to 0:
 
 Address: `0x310`
 
-This CSR is present, but it is entirely hardwired to zero. Its presence is required for compliance.
+Hardwired to 0.
 
-==== misa
-
-Address: `0x301`
-
-Read-only, constant. Value depends on which ISA extensions Hazard3 is configured with. The table below lists the fields which are _not_ always hardwired to 0:
-
-[cols="10h,20h,~", options="header"]
-|===
-| Bits | Name | Description
-| 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
-| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
-| 12 | `m` | 1 if the M extension is present, otherwise 0.
-| 2 | `c` | 1 if the C extension is present, otherwise 0.
-|===
 
 ==== medeleg
 
@@ -175,14 +177,6 @@ NOTE: In the RISC-V specification, `mode` is a 2-bit write-any read-legal field 
 
 NOTE: Hazard3 has an additional nonstandard vectoring mode, where external interrupts are each separated into distinct vectors and `mcause` values. This is enabled through the implementation-defined control register, <<reg-midcr>>, since the RISC-V specification reserves `mtvec.mode == 2, 3` for future standard use.
 
-==== mcounteren
-
-Address: `0x306`
-
-Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
-
-Not to be confused with <<reg-mcountinhibit>>.
-
 ==== mscratch
 
 Address: `0x340`
@@ -242,6 +236,16 @@ Address: `0x343`
 
 Hardwired to 0.
 
+==== mcounteren
+
+Address: `0x306`
+
+Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+
+Not to be confused with <<reg-mcountinhibit>>.
+
+=== Standard Memory Protection
+
 ==== pmpcfg0...3
 
 Address: `0x3a0` through `0x3a3`
@@ -253,6 +257,8 @@ Unimplemented. Access will cause an illegal instruction exception.
 Address: `0x3b0` through `0x3bf`
 
 Unimplemented. Access will cause an illegal instruction exception.
+
+=== Standard M-mode Performance Counters
 
 ==== mcycle
 
@@ -312,6 +318,8 @@ Counter inhibit. Read-write. The table below lists the fields which are _not_ ha
 Address: `0x323` through `0x33f`
 
 Hardwired to 0.
+
+=== Standard Trigger CSRs
 
 ==== tselect
 
