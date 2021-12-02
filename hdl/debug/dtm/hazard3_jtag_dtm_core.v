@@ -69,14 +69,14 @@ reg [1:0]   dmi_cmderr;
 reg         dmi_busy;
 
 // DTM-domain bus, connected to a matching DM-domain bus via an APB crossing:
-wire        dtm_psel;
-wire        dtm_penable;
-wire        dtm_pwrite;
-wire [7:0]  dtm_paddr;
-wire [31:0] dtm_pwdata;
-wire [31:0] dtm_prdata;
-wire        dtm_pready;
-wire        dtm_pslverr;
+wire              dtm_psel;
+wire              dtm_penable;
+wire              dtm_pwrite;
+wire [W_ADDR-1:0] dtm_paddr;
+wire [31:0]       dtm_pwdata;
+wire [31:0]       dtm_prdata;
+wire              dtm_pready;
+wire              dtm_pslverr;
 
 // We are relying on some particular features of our APB clock crossing here
 // to save some registers:
@@ -99,7 +99,7 @@ assign dtm_psel = write_dmi &&
 assign dtm_penable = 1'b0;
 
 // paddr/pwdata/pwrite are valid momentarily when psel is asserted.
-assign dtm_paddr = dr_wdata[34 +: 8];
+assign dtm_paddr = dr_wdata[34 +: W_ADDR];
 assign dtm_pwrite = dr_wdata[1];
 assign dtm_pwdata = dr_wdata[2 +: 32];
 
@@ -171,7 +171,7 @@ wire [W_DR_SHIFT-1:0] dtmcs_rdata = {
 	19'h0,
 	DTMCS_IDLE_HINT[2:0],
 	dmi_cmderr,
-	6'd8,          // abits
+	W_ADDR[5:0],   // abits
 	4'd1           // version
 };
 

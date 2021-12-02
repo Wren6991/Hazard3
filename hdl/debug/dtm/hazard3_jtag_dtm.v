@@ -23,9 +23,10 @@
 `default_nettype none
 
 module hazard3_jtag_dtm #(
-	parameter IDCODE = 32'h0000_0001,
+	parameter IDCODE          = 32'h0000_0001,
 	parameter DTMCS_IDLE_HINT = 3'd4,
-	parameter W_ADDR = 8
+	parameter W_PADDR         = 9,
+	parameter ABITS           = W_PADDR - 2 // do not modify
 ) (
 	// Standard JTAG signals -- the JTAG hardware is clocked directly by TCK.
 	input  wire               tck,
@@ -45,7 +46,7 @@ module hazard3_jtag_dtm #(
 	output wire               dmi_psel,
 	output wire               dmi_penable,
 	output wire               dmi_pwrite,
-	output wire [W_ADDR-1:0]  dmi_paddr,
+	output wire [W_PADDR-1:0] dmi_paddr,
 	output wire [31:0]        dmi_pwdata,
 	input  wire [31:0]        dmi_prdata,
 	input  wire               dmi_pready,
@@ -131,7 +132,7 @@ end
 
 // Shift register is sized to largest DR, which is DMI:
 // {addr[7:0], data[31:0], op[1:0]}
-localparam W_DR_SHIFT = W_ADDR + 32 + 2;
+localparam W_DR_SHIFT = ABITS + 32 + 2;
 
 reg [W_DR_SHIFT-1:0] dr_shift;
 
@@ -188,7 +189,7 @@ assign core_dr_wdata = dr_shift;
 
 hazard3_jtag_dtm_core #(
 	.DTMCS_IDLE_HINT (DTMCS_IDLE_HINT),
-	.W_ADDR          (W_ADDR)
+	.W_ADDR          (ABITS)
 ) dtm_core (
 	.tck               (tck),
 	.trst_n            (trst_n),
@@ -206,12 +207,14 @@ hazard3_jtag_dtm_core #(
 	.dmi_psel          (dmi_psel),
 	.dmi_penable       (dmi_penable),
 	.dmi_pwrite        (dmi_pwrite),
-	.dmi_paddr         (dmi_paddr),
+	.dmi_paddr         (dmi_paddr[W_PADDR-1:2]),
 	.dmi_pwdata        (dmi_pwdata),
 	.dmi_prdata        (dmi_prdata),
 	.dmi_pready        (dmi_pready),
 	.dmi_pslverr       (dmi_pslverr)
 );
+
+assign dmi_paddr[1:0] = 2'b00;
 
 endmodule
 

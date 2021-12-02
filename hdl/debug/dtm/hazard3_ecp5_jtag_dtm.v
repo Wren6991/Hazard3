@@ -34,7 +34,8 @@
 
 module hazard3_ecp5_jtag_dtm #(
     parameter DTMCS_IDLE_HINT = 3'd4,
-    parameter W_ADDR = 8
+    parameter W_PADDR         = 9,
+    parameter ABITS           = W_PADDR - 2 // do not modify
 ) (
     // This is synchronous to TCK and asserted for one TCK cycle only
     output wire               dmihardreset_req,
@@ -47,7 +48,7 @@ module hazard3_ecp5_jtag_dtm #(
     output wire               dmi_psel,
     output wire               dmi_penable,
     output wire               dmi_pwrite,
-    output wire [W_ADDR-1:0]  dmi_paddr,
+    output wire [W_PADDR-1:0] dmi_paddr,
     output wire [31:0]        dmi_pwdata,
     input  wire [31:0]        dmi_prdata,
     input  wire               dmi_pready,
@@ -94,7 +95,7 @@ JTAGG jtag_u (
 
 wire jtck = !jtck_posedge_dont_use;
 
-localparam W_DR_SHIFT = W_ADDR + 32 + 2;
+localparam W_DR_SHIFT = ABITS + 32 + 2;
 
 reg                   core_dr_wen;
 reg                   core_dr_ren;
@@ -169,9 +170,8 @@ assign jtdo2 = dr_shift_next_halfcycle;
 // The actual DTM is in here:
 
 hazard3_jtag_dtm_core #(
-    .DTMCS_IDLE_HINT(DTMCS_IDLE_HINT),
-    .W_ADDR(W_ADDR),
-    .W_DR_SHIFT(W_DR_SHIFT)
+    .DTMCS_IDLE_HINT (DTMCS_IDLE_HINT),
+    .W_ADDR          (ABITS)
 ) inst_hazard3_jtag_dtm_core (
     .tck               (jtck),
     .trst_n            (jrst_n),
@@ -190,12 +190,14 @@ hazard3_jtag_dtm_core #(
     .dmi_psel          (dmi_psel),
     .dmi_penable       (dmi_penable),
     .dmi_pwrite        (dmi_pwrite),
-    .dmi_paddr         (dmi_paddr),
+    .dmi_paddr         (dmi_paddr[W_PADDR-1:2]),
     .dmi_pwdata        (dmi_pwdata),
     .dmi_prdata        (dmi_prdata),
     .dmi_pready        (dmi_pready),
     .dmi_pslverr       (dmi_pslverr)
 );
+
+assign dmi_paddr[1:0] = 2'b00;
 
 endmodule
 
