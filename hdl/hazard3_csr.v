@@ -244,7 +244,6 @@ localparam MHPMEVENT30    = 12'h33e; // WARL (we tie to 0)
 localparam MHPMEVENT31    = 12'h33f; // WARL (we tie to 0)
 
 // Custom M-mode CSRs:
-localparam MIDCR          = 12'hbc0; // Implementation-defined control register (bag of bits)
 localparam MEIE0          = 12'hbe0; // External interrupt enable register 0
 localparam MEIP0          = 12'hfe0; // External interrupt pending register 0
 localparam MLEI           = 12'hfe4; // Lowest external interrupt number
@@ -299,25 +298,6 @@ always @ (posedge clk or negedge rst_n) begin
 		debug_mode <= (debug_mode && !exit_debug_mode) || enter_debug_mode;
 	end
 end
-
-// ----------------------------------------------------------------------------
-// Implementation-defined control register
-
-localparam MIDCR_INIT = X0;
-localparam MIDCR_WMASK = 32'h00000001;
-
-reg [XLEN-1:0] midcr;
-
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		midcr <= MIDCR_INIT;
-	end else if (wen && addr == MIDCR) begin
-		midcr <= update_nonconst(midcr, MIDCR_WMASK);
-	end
-end
-
-// Modified external interrupt vectoring
-wire midcr_eivect = midcr[0];
 
 // ----------------------------------------------------------------------------
 // Trap-handling CSRs
@@ -872,11 +852,6 @@ always @ (*) begin
     // ------------------------------------------------------------------------
 	// Custom CSRs
 
-	MIDCR: if (CSR_M_TRAP) begin
-		decode_match = 1'b1;
-		rdata = midcr;
-	end
-
 	MEIE0: if (CSR_M_TRAP) begin
 		decode_match = 1'b1;
 		rdata = meie0;
@@ -889,7 +864,7 @@ always @ (*) begin
 
 	MLEI: if (CSR_M_TRAP) begin
 		decode_match = !wen_soon;
-		rdata = {{XLEN-5{1'b0}}, mlei};
+		rdata = {{XLEN-7{1'b0}}, mlei, 2'b00};
 	end
 
 	default: begin end
@@ -1023,11 +998,7 @@ assign mip = {
 	3'h0                  // Reserved
 };
 
-// When eivect = 1, mip.meip is masked from the standard IRQs, so that the
-// platform-specific causes and vectors are used instead.
-wire [31:0] mip_no_global = mip & ~(32'h800 & ~{XLEN{midcr_eivect}});
-wire standard_irq_active = |(mip_no_global & mie) && mstatus_mie && !dcsr_step;
-wire external_irq_active = external_irq_pending && mstatus_mie && !dcsr_step && mie_meie;
+wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
 
 // WFI clear respects individual interrupt enables but ignores mstatus.mie.
 // Additionally, wfi is treated as a nop during single-stepping and D-mode.
@@ -1047,7 +1018,7 @@ hazard3_priority_encode #(
 hazard3_priority_encode #(
 	.W_REQ (16)
 ) irq_priority (
-	.req (mip_no_global[15:0] & mie[15:0]),
+	.req (mip[15:0] & mie[15:0]),
 	.gnt (standard_irq_num)
 );
 
@@ -1055,15 +1026,9 @@ hazard3_priority_encode #(
 // depending on dcsr.ebreakm.
 assign exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
 
-// Note when eivect=0 platform external interrupts also count as a standard
-// external interrupt, so the standard mapping (collapsed into a single
-// vector) always takes priority.
-wire [5:0] mcause_irq_num =
-	standard_irq_active ? {2'h0, standard_irq_num}         :
-	external_irq_active ? {1'h0, external_irq_num} + 6'd16 : 6'd0;
+wire [5:0] mcause_irq_num =	irq_active ? {2'h0, standard_irq_num} : 6'd0;
 
-wire [5:0] vector_sel =
-	!exception_req_any && irq_vector_enable ? mcause_irq_num : 6'd0;
+wire [5:0] vector_sel =	!exception_req_any && irq_vector_enable ? mcause_irq_num : 6'd0;
 
 assign trap_addr =
 	except == EXCEPT_MRET ? mepc :
@@ -1077,7 +1042,7 @@ assign trap_is_irq = DEBUG_SUPPORT && (want_halt_except || want_halt_irq) ?
 // delay_irq_entry also applies to IRQ-like debug entries.
 assign trap_enter_vld =
 	CSR_M_TRAP && (exception_req_any ||
-		!delay_irq_entry && !debug_mode && (standard_irq_active || external_irq_active)) ||
+		!delay_irq_entry && !debug_mode && irq_active) ||
 	DEBUG_SUPPORT && (
 		(!delay_irq_entry && want_halt_irq) || want_halt_except || pending_dbg_resume);
 

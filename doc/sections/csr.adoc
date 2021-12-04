@@ -175,8 +175,6 @@ Trap vector base address. Read-write. Exactly which bits of `mtvec` can be modif
 
 NOTE: In the RISC-V specification, `mode` is a 2-bit write-any read-legal field in bits 1:0. Hazard3 implements this by hardwiring bit 1 to 0.
 
-NOTE: Hazard3 has an additional nonstandard vectoring mode, where external interrupts are each separated into distinct vectors and `mcause` values. This is enabled through the implementation-defined control register, <<reg-midcr>>, since the RISC-V specification reserves `mtvec.mode == 2, 3` for future standard use.
-
 ==== mscratch
 
 Address: `0x340`
@@ -210,8 +208,6 @@ The most significant bit of `mcause` is set to 1 to indicate an interrupt cause,
 | 7 | Timer interrupt (`mip.mtip`)
 | 11 | External interrupt (`mip.meip`)
 |===
-
-Numbers >16 are used for to disambiguate between external IRQs when expanded vectoring is enabled -- see <<reg-midcr>>.
 
 The following exception causes may be set by Hazard3 hardware:
 
@@ -413,20 +409,6 @@ The Debug Module uses this mapping to exchange data with the core by injecting `
 
 This CSR address is given by the `dataaddress` field of the Debug Module's `hartinfo` register, and `hartinfo.dataaccess` is set to 0 to indicate this is a CSR mapping, not a memory mapping.
 
-[[reg-midcr]]
-==== midcr
-
-Address: `0xbc0`
-
-Implementation-defined control register. Miscellaneous nonstandard controls.
-
-[cols="10h,20h,~", options="header"]
-|===
-| Bits | Name | Description
-| 31:1 | - | RES0
-| 0 | `eivect` | Modified external interrupt vectoring. If 0, use standard behaviour: all external interrupts set interrupt `mcause` of 11 and vector to `mtvec + 0x2c`. If 1, external interrupts use distinct interrupt `mcause` numbers 16 upward, and distinct vectors `mtvec + (irq + 16) * 4`. Resets to 0. Has no effect when `mtvec[0]` is 0.
-|===
-
 [[reg-meie0]]
 ==== meie0
 
@@ -464,24 +446,18 @@ When any bit is set in both `meip0` and `meie0`, the standard external interrupt
 In this case, the processor jumps to either:
 
 * `mtvec` directly, if vectoring is disabled (`mtvec[0]` is 0)
-* `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1) and modified external IRQ vectoring is disabled (`midcr.eivect` is 0)
-* `mtvect + (mlei + 16) * 4`, if vectoring is enabled (`mtvec[0]` is 1) and modified external IRQ vectoring is enabled (`midcr.eivect` is 1). `
-** `mlei` is a read-only CSR containing the lowest-numbered pending-and-enabled external interrupt.
+* `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1)
 
 ==== mlei
 
 Address: `0xfe4`
 
-Lowest external interrupt. Contains the index of the lowest-numbered external interrupt which is both asserted in `meip0` and enabled in `meie0`. Can be used for faster software vectoring when modified external interrupt vectoring (`midcr.eivect = 1`) is not in use.
+Lowest external interrupt. Contains the index of the lowest-numbered external interrupt which is both asserted in `meip0` and enabled in `meie0`, left-shifted by 2 so that it can be used to index an array of 32-bit function pointers.
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 31:5 | - | RES0
-| 4:0 | - | Index of the lowest-numbered active external interrupt. A LSB-first priority encode of `meip0 & meie0`. Zero when no external interrupts are both pending and enabled.
+| 31:7 | - | RES0
+| 6:2 | - | Index of the lowest-numbered active external interrupt. A LSB-first priority encode of `meip0 & meie0`. Zero when no external interrupts are both pending and enabled.
+| 1:0 | - | RES0
 |===
-
-
-==== Maybe-adds
-
-An option to clear a bit in `meie0` when that interrupt is taken, and set it when an `mret` has a matching `mcause` for that interrupt. Makes preemption support easier.
