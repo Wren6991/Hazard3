@@ -4,6 +4,7 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` instruction set 
 
 * `M`: integer multiply/divide/modulo
 * `C`: compressed instructions
+* `A` _(partial)_: load reserved/store conditional instructions, with AHB5 HEXCL/HEXOKAY signalling for global monitor queries
 * `Zicsr`: CSR access
 * `Zba`: address generation
 * `Zbb`: basic bit manipulation
@@ -23,7 +24,8 @@ _Note: the bit manipulation instructions don't have upstream compliance tests at
 
 The following are planned for future implementation:
 
-* `A` extension: atomic memory access
+* Complete support for the `A` extension: atomic memory operations
+* Debug trigger unit (breakpoint-only)
 
 Hazard3 is still under development.
 

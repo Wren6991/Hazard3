@@ -1,6 +1,6 @@
 == Instruction Cycle Counts
 
-All timings are given assuming perfect bus behaviour (no stalls). Stalling of the `I` bus can delay execution indefinitely, as can stalling of the `D` bus during a load or store.
+All timings are given assuming perfect bus behaviour (no downstream bus stalls).
 
 === RV32I
 
@@ -71,6 +71,17 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 | `rem rd, rs1, rs2` | 18 or 19 | Depending on sign correction
 | `remu rd, rs1, rs2` | 18 |
 |===
+
+=== A Extension
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+| `lr.w rd, (rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
+| `sc.w rd, rs2, (rs1)` | 1 | `lr.w` followed by `sc.w` always inserts a dependency stall.footnote:lr_to_sc[A 1-cycle pipeline bubble is inserted in between an `lr.w` and an immediately-following `sc.w`, so that the store can be suppressed by a reservation failure on the load. It does not matter whether the `lr.w` and `sc.w` use the same registers. Load reservation may fail if the memory region does not support exclusive transfers.]
+|===
+
+AMOs are currently not supported.
 
 === C Extension
 

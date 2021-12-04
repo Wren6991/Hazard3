@@ -53,8 +53,10 @@ module hazard3_cpu_2port #(
 	output wire [2:0]        d_hburst,
 	output wire [3:0]        d_hprot,
 	output wire              d_hmastlock,
+	output wire              d_hexcl,
 	input  wire              d_hready,
 	input  wire              d_hresp,
+	input  wire              d_hexokay,
 	output wire [W_DATA-1:0] d_hwdata,
 	input  wire [W_DATA-1:0] d_hrdata,
 
@@ -98,9 +100,11 @@ wire [W_DATA-1:0] core_rdata_i;
 
 // Load/store signals
 wire              core_aph_req_d;
+wire              core_aph_excl_d;
 wire              core_aph_ready_d;
 wire              core_dph_ready_d;
 wire              core_dph_err_d;
+wire              core_dph_exokay_d;
 
 wire [W_ADDR-1:0] core_haddr_d;
 wire [2:0]        core_hsize_d;
@@ -112,8 +116,8 @@ wire [W_DATA-1:0] core_rdata_d;
 hazard3_core #(
 `include "hazard3_config_inst.vh"
 ) core (
-	.clk             (clk),
-	.rst_n           (rst_n),
+	.clk                        (clk),
+	.rst_n                      (rst_n),
 
 	`ifdef RISCV_FORMAL
 	`RVFI_CONN ,
@@ -129,9 +133,11 @@ hazard3_core #(
 	.bus_rdata_i                (core_rdata_i),
 
 	.bus_aph_req_d              (core_aph_req_d),
+	.bus_aph_excl_d             (core_aph_excl_d),
 	.bus_aph_ready_d            (core_aph_ready_d),
 	.bus_dph_ready_d            (core_dph_ready_d),
 	.bus_dph_err_d              (core_dph_err_d),
+	.bus_dph_exokay_d           (core_dph_exokay_d),
 	.bus_haddr_d                (core_haddr_d),
 	.bus_hsize_d                (core_hsize_d),
 	.bus_hwrite_d               (core_hwrite_d),
@@ -193,6 +199,7 @@ assign d_haddr = core_haddr_d;
 assign d_htrans = core_aph_req_d ? HTRANS_NSEQ : HTRANS_IDLE;
 assign d_hwrite = core_hwrite_d;
 assign d_hsize = core_hsize_d;
+assign d_hexcl = core_aph_excl_d;
 
 reg dphase_active_d;
 always @ (posedge clk or negedge rst_n)
@@ -207,6 +214,7 @@ always @ (posedge clk or negedge rst_n)
 assign core_aph_ready_d = d_hready && core_aph_req_d;
 assign core_dph_ready_d = d_hready && dphase_active_d;
 assign core_dph_err_d = dphase_active_d && d_hresp;
+assign core_dph_exokay_d = dphase_active_d && d_hexokay;
 
 assign core_rdata_d = d_hrdata;
 assign d_hwdata = core_wdata_d;

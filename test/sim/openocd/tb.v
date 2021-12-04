@@ -36,12 +36,14 @@ module tb #(
 	output wire [W_ADDR-1:0] d_haddr,
 	output wire              d_hwrite,
 	output wire [1:0]        d_htrans,
+	output wire              d_hexcl,
 	output wire [2:0]        d_hsize,
 	output wire [2:0]        d_hburst,
 	output wire [3:0]        d_hprot,
 	output wire              d_hmastlock,
 	input  wire              d_hready,
 	input  wire              d_hresp,
+	input  wire              d_hexokay,
 	output wire [W_DATA-1:0] d_hwdata,
 	input  wire [W_DATA-1:0] d_hrdata,
 
@@ -213,6 +215,7 @@ hazard3_cpu_2port #(
 	.i_hrdata                   (i_hrdata),
 
 	.d_haddr                    (d_haddr),
+	.d_hexcl                    (d_hexcl),
 	.d_hwrite                   (d_hwrite),
 	.d_htrans                   (d_htrans),
 	.d_hsize                    (d_hsize),
@@ -221,6 +224,7 @@ hazard3_cpu_2port #(
 	.d_hmastlock                (d_hmastlock),
 	.d_hready                   (d_hready),
 	.d_hresp                    (d_hresp),
+	.d_hexokay                  (d_hexokay),
 	.d_hwdata                   (d_hwdata),
 	.d_hrdata                   (d_hrdata),
 

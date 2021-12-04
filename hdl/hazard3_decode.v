@@ -234,6 +234,7 @@ always @ (*) begin
 	RV_SB:      begin d_aluop = ALUOP_ADD; d_imm = d_imm_s; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SB;  d_rd = X0; end
 	RV_SH:      begin d_aluop = ALUOP_ADD; d_imm = d_imm_s; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SH;  d_rd = X0; end
 	RV_SW:      begin d_aluop = ALUOP_ADD; d_imm = d_imm_s; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SW;  d_rd = X0; end
+
 	RV_MUL:     if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MUL;    end else begin d_invalid_32bit = 1'b1; end
 	RV_MULH:    if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULH;   end else begin d_invalid_32bit = 1'b1; end
 	RV_MULHSU:  if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULHSU; end else begin d_invalid_32bit = 1'b1; end
@@ -242,9 +243,14 @@ always @ (*) begin
 	RV_DIVU:    if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_DIVU;   end else begin d_invalid_32bit = 1'b1; end
 	RV_REM:     if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
 	RV_REMU:    if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
+
+	RV_LR_W:    if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LR_W; end
+	RV_SC_W:    if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_SC_W; end
+
 	RV_SH1ADD:  if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH1ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
 	RV_SH2ADD:  if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH2ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
 	RV_SH3ADD:  if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH3ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
+
 	RV_ANDN:    if (EXTENSION_ZBB) begin d_aluop = ALUOP_ANDN;                                                          end else begin d_invalid_32bit = 1'b1; end
 	RV_CLZ:     if (EXTENSION_ZBB) begin d_aluop = ALUOP_CLZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	RV_CPOP:    if (EXTENSION_ZBB) begin d_aluop = ALUOP_CPOP;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
@@ -263,6 +269,7 @@ always @ (*) begin
 	RV_SEXT_H:  if (EXTENSION_ZBB) begin d_aluop = ALUOP_SEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	RV_XNOR:    if (EXTENSION_ZBB) begin d_aluop = ALUOP_XNOR;                                                          end else begin d_invalid_32bit = 1'b1; end
 	RV_ZEXT_H:  if (EXTENSION_ZBB) begin d_aluop = ALUOP_ZEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+
 	RV_CLMUL:   if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
 	RV_CLMULH:  if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMULH;                                                        end else begin d_invalid_32bit = 1'b1; end
 	RV_CLMULR:  if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMULR;                                                        end else begin d_invalid_32bit = 1'b1; end
@@ -274,6 +281,7 @@ always @ (*) begin
 	RV_BINVI:   if (EXTENSION_ZBC) begin d_aluop = ALUOP_BINV;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 	RV_BSET:    if (EXTENSION_ZBC) begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
 	RV_BSETI:   if (EXTENSION_ZBC) begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+
 	RV_FENCE:   begin d_rd = X0; end  // NOP
 	RV_FENCE_I: begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // FIXME this is probably busted now. Maybe implement as an exception?
 	RV_CSRRW:   if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end

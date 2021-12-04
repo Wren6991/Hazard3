@@ -221,8 +221,10 @@ wire [2:0]        proc_hsize;
 wire [2:0]        proc_hburst;
 wire [3:0]        proc_hprot;
 wire              proc_hmastlock;
+wire              proc_hexcl;
 wire              proc_hready;
 wire              proc_hresp;
+wire              proc_hexokay = 1'b1; // No global monitor
 wire [W_DATA-1:0] proc_hwdata;
 wire [W_DATA-1:0] proc_hrdata;
 
@@ -264,8 +266,10 @@ hazard3_cpu_1port #(
 	.ahblm_hburst               (proc_hburst),
 	.ahblm_hprot                (proc_hprot),
 	.ahblm_hmastlock            (proc_hmastlock),
+	.ahblm_hexcl                (proc_hexcl),
 	.ahblm_hready               (proc_hready),
 	.ahblm_hresp                (proc_hresp),
+	.ahblm_hexokay              (proc_hexokay),
 	.ahblm_hwdata               (proc_hwdata),
 	.ahblm_hrdata               (proc_hrdata),
 

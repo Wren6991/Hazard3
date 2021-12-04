@@ -40,8 +40,10 @@ module hazard3_cpu_1port #(
 	output wire [2:0]        ahblm_hburst,
 	output reg  [3:0]        ahblm_hprot,
 	output wire              ahblm_hmastlock,
+	output reg               ahblm_hexcl,
 	input  wire              ahblm_hready,
 	input  wire              ahblm_hresp,
+	input  wire              ahblm_hexokay,
 	output wire [W_DATA-1:0] ahblm_hwdata,
 	input  wire [W_DATA-1:0] ahblm_hrdata,
 
@@ -85,9 +87,11 @@ wire [W_DATA-1:0] core_rdata_i;
 
 // Load/store signals
 wire              core_aph_req_d;
+wire              core_aph_excl_d;
 wire              core_aph_ready_d;
 wire              core_dph_ready_d;
 wire              core_dph_err_d;
+wire              core_dph_exokay_d;
 
 wire [W_ADDR-1:0] core_haddr_d;
 wire [2:0]        core_hsize_d;
@@ -116,9 +120,11 @@ hazard3_core #(
 	.bus_rdata_i                (core_rdata_i),
 
 	.bus_aph_req_d              (core_aph_req_d),
+	.bus_aph_excl_d             (core_aph_excl_d),
 	.bus_aph_ready_d            (core_aph_ready_d),
 	.bus_dph_ready_d            (core_dph_ready_d),
 	.bus_dph_err_d              (core_dph_err_d),
+	.bus_dph_exokay_d           (core_dph_exokay_d),
 	.bus_haddr_d                (core_haddr_d),
 	.bus_hsize_d                (core_hsize_d),
 	.bus_hwrite_d               (core_hwrite_d),
@@ -143,7 +149,6 @@ hazard3_core #(
 	.soft_irq                   (soft_irq),
 	.timer_irq                  (timer_irq)
 );
-
 
 // ----------------------------------------------------------------------------
 // Arbitration state machine
@@ -201,18 +206,21 @@ assign ahblm_hmastlock = 1'b0;
 always @ (*) begin
 	if (bus_gnt_d) begin
 		ahblm_htrans = HTRANS_NSEQ;
+		ahblm_hexcl  = core_aph_excl_d;
 		ahblm_haddr  = core_haddr_d;
 		ahblm_hsize  = core_hsize_d;
 		ahblm_hwrite = core_hwrite_d;
 		ahblm_hprot  = HPROT_DATA;
 	end else if (bus_gnt_i) begin
 		ahblm_htrans = HTRANS_NSEQ;
+		ahblm_hexcl  = 1'b0;
 		ahblm_haddr  = core_haddr_i;
 		ahblm_hsize  = core_hsize_i;
 		ahblm_hwrite = 1'b0;
 		ahblm_hprot  = HPROT_INSTR;
 	end else begin
 		ahblm_htrans = HTRANS_IDLE;
+		ahblm_hexcl  = 1'b0;
 		ahblm_haddr  = {W_ADDR{1'b0}};
 		ahblm_hsize  = 3'h0;
 		ahblm_hwrite = 1'b0;
@@ -239,6 +247,7 @@ assign core_dph_err_i   = bus_active_dph_i && ahblm_hresp;
 assign core_aph_ready_d = ahblm_hready && bus_gnt_d;
 assign core_dph_ready_d = ahblm_hready && bus_active_dph_d;
 assign core_dph_err_d = bus_active_dph_d && ahblm_hresp;
+assign core_dph_exokay_d = bus_active_dph_d && ahblm_hexokay;
 
 endmodule
 

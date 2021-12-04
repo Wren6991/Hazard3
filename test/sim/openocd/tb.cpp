@@ -153,6 +153,7 @@ int main(int argc, char **argv) {
 	// Never generate bus stalls
 	top.p_i__hready.set<bool>(true);
 	top.p_d__hready.set<bool>(true);
+	top.p_d__hexokay.set<bool>(true);
 
 	uint64_t mtime = 0;
 	uint64_t mtimecmp = 0;

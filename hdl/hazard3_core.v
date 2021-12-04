@@ -43,9 +43,11 @@ module hazard3_core #(
 
 	// Load/store port
 	output reg               bus_aph_req_d,
+	output wire              bus_aph_excl_d,
 	input  wire              bus_aph_ready_d,
 	input  wire              bus_dph_ready_d,
 	input  wire              bus_dph_err_d,
+	input  wire              bus_dph_exokay_d,
 
 	output reg  [W_ADDR-1:0] bus_haddr_d,
 	output reg  [2:0]        bus_hsize_d,
@@ -300,6 +302,9 @@ always @ (*) begin
 		x_stall_raw =
 			|xm_rd && (xm_rd == d_rs1 || xm_rd == d_rs2) ||
 			|mw_rd && (mw_rd == d_rs1 || mw_rd == d_rs2);
+	end else if (|EXTENSION_A && xm_memop == MEMOP_LR_W && d_memop == MEMOP_SC_W) begin
+		// Conditional-store address phase depends on data-phase update of local monitor bit
+		x_stall_raw = 1'b1;
 	end else if (m_generating_result) begin
 		// With the full bypass network, load-use (or fast multiply-use) is the only RAW stall
 		if (|xm_rd && xm_rd == d_rs1) begin
@@ -358,12 +363,23 @@ hazard3_alu #(
 
 // AHB transaction request
 
-wire x_memop_vld = !d_memop[3];
-wire x_memop_write = d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB;
+reg mw_local_exclusive_reserved;
+
+wire x_memop_vld = d_memop != MEMOP_NONE && !(
+	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved
+);
+
+wire x_memop_write =
+	d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB ||
+	|EXTENSION_A && d_memop == MEMOP_SC_W;
+
 wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
 	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0]
 );
+
+// Always query the global monitor, except for store-conditional suppressed by local monitor.
+assign bus_aph_excl_d = |EXTENSION_A && (d_memop == MEMOP_LR_W || d_memop == MEMOP_SC_W);
 
 always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
@@ -609,7 +625,9 @@ always @ (posedge clk or negedge rst_n) begin
 `ifdef FORMAL
 			assert(xm_memop != MEMOP_NONE);
 `endif
-			xm_except <= xm_memop <= MEMOP_LBU ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
+			xm_except <=
+				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
+				                xm_memop <= MEMOP_LBU  ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
 			xm_wfi <= 1'b0;
 		end
 	end
@@ -648,7 +666,10 @@ assign f_jump_req = x_jump_req || m_trap_enter_vld;
 assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign x_jump_not_except = !m_trap_enter_vld;
 
-wire m_bus_stall = xm_memop != MEMOP_NONE && !bus_dph_ready_d;
+wire m_bus_stall = xm_memop != MEMOP_NONE && !bus_dph_ready_d && !(
+	|EXTENSION_A && xm_memop == MEMOP_SC_W && !mw_local_exclusive_reserved
+);
+
 assign m_stall = m_bus_stall ||
 	(m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq) ||
 	(xm_wfi && !m_wfi_stall_clear);
@@ -672,10 +693,9 @@ always @ (*) begin
 	end
 	// Replicate store data to ensure appropriate byte lane is driven
 	case (xm_memop)
-		MEMOP_SW: bus_wdata_d = m_wdata;
 		MEMOP_SH: bus_wdata_d = {2{m_wdata[15:0]}};
 		MEMOP_SB: bus_wdata_d = {4{m_wdata[7:0]}};
-		default:  bus_wdata_d = 32'h0;
+		default:  bus_wdata_d = m_wdata; // TODO worth it to mask when not writing? Costs LUTs, saves energy
 	endcase
 
 	casez ({xm_memop, xm_result[1:0]})
@@ -694,7 +714,10 @@ always @ (*) begin
 		default:             m_rdata_pick_sext = bus_rdata_d;
 	endcase
 
-	if (xm_memop != MEMOP_NONE) begin
+	if (|EXTENSION_A && xm_memop == MEMOP_SC_W) begin
+		// sc.w may fail due to negative response from either local or global monitor.
+		m_result = {31'h0, mw_local_exclusive_reserved && bus_dph_exokay_d};
+	end else if (xm_memop != MEMOP_NONE) begin
 		m_result = m_rdata_pick_sext;
 	end else if (MUL_FAST && m_fast_mul_result_vld) begin
 		m_result = m_fast_mul_result;
@@ -703,11 +726,28 @@ always @ (*) begin
 	end
 end
 
+// Local monitor update.
+// - Set on a load-reserved with good response from global monitor
+// - Cleared by any store-conditional
+// - Not affected by trap entry (permitted by RISC-V spec)
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		mw_local_exclusive_reserved <= 1'b0;
+	end else if (|EXTENSION_A && !m_stall) begin
+		if (xm_memop == MEMOP_SC_W) begin
+			mw_local_exclusive_reserved <= 1'b0;
+		end else if (xm_memop == MEMOP_LR_W) begin
+			mw_local_exclusive_reserved <= bus_dph_exokay_d;
+		end
+	end
+end
 
 // Note that exception entry prevents writeback, because the exception entry
 // replaces the instruction in M. Interrupt entry does not prevent writeback,
 // because the interrupt is notionally inserted in between the instruction in
 // M and the instruction in X.
+
 wire m_reg_wen_if_nonzero = !m_bus_stall && xm_except == EXCEPT_NONE;
 wire m_reg_wen = |xm_rd && m_reg_wen_if_nonzero;
 

@@ -115,8 +115,10 @@ int main(int argc, char **argv) {
 #ifdef DUAL_PORT
 	top.p_i__hready.set<bool>(true);
 	top.p_d__hready.set<bool>(true);
+	top.p_d__hexokay.set<bool>(true);
 #else
 	top.p_ahblm__hready.set<bool>(true);
+	top.p_ahblm__hexokay.set<bool>(true);
 #endif
 
 	uint64_t mtime = 0;
