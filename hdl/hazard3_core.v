@@ -360,9 +360,10 @@ hazard3_alu #(
 
 wire x_memop_vld = !d_memop[3];
 wire x_memop_write = d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB;
-wire x_unaligned_addr =
+wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
-	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0];
+	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0]
+);
 
 always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
@@ -374,7 +375,10 @@ always @ (*) begin
 		MEMOP_LH:  bus_hsize_d = HSIZE_HWORD;
 		MEMOP_LHU: bus_hsize_d = HSIZE_HWORD;
 		MEMOP_SH:  bus_hsize_d = HSIZE_HWORD;
-		default:   bus_hsize_d = HSIZE_BYTE;
+		MEMOP_LB:  bus_hsize_d = HSIZE_BYTE;
+		MEMOP_LBU: bus_hsize_d = HSIZE_BYTE;
+		MEMOP_SB:  bus_hsize_d = HSIZE_BYTE;
+		default:   bus_hsize_d = HSIZE_WORD;
 	endcase
 	bus_aph_req_d = x_memop_vld && !(
 		x_stall_raw ||
@@ -636,7 +640,7 @@ assign x_jump_req = !x_stall_raw && (
 // ----------------------------------------------------------------------------
 //                               Pipe Stage M
 
-reg [W_DATA-1:0] m_rdata_shift;
+reg [W_DATA-1:0] m_rdata_pick_sext;
 reg [W_DATA-1:0] m_wdata;
 reg [W_DATA-1:0] m_result;
 
@@ -653,7 +657,7 @@ assign m_stall = m_bus_stall ||
 // back. IRQ is taken "in between" the instruction in M and the instruction
 // in X, so set return to X program counter. Note that, if taking an
 // exception, we know that the previous instruction to be in X (now in M)
-// was *not* a branch, which is why we can just walk back the PC.
+// was *not* a taken branch, which is why we can just walk back the PC.
 assign m_exception_return_addr = d_pc - (
 	m_trap_is_irq         ? 32'h0 :
 	prev_instr_was_32_bit ? 32'h4 : 32'h2
@@ -673,29 +677,30 @@ always @ (*) begin
 		MEMOP_SB: bus_wdata_d = {4{m_wdata[7:0]}};
 		default:  bus_wdata_d = 32'h0;
 	endcase
-	// Pick out correct data from load access, and sign/unsign extend it.
-	// This is slightly cheaper than a normal shift:
-	case (xm_result[1:0])
-		2'b00: m_rdata_shift = bus_rdata_d;
-		2'b01: m_rdata_shift = {bus_rdata_d[31:8],  bus_rdata_d[15:8]};
-		2'b10: m_rdata_shift = {bus_rdata_d[31:16], bus_rdata_d[31:16]};
-		2'b11: m_rdata_shift = {bus_rdata_d[31:8],  bus_rdata_d[31:24]};
+
+	casez ({xm_memop, xm_result[1:0]})
+		{MEMOP_LH  , 2'b0z}: m_rdata_pick_sext = {{16{bus_rdata_d[15]}}, bus_rdata_d[15: 0]};
+		{MEMOP_LH  , 2'b1z}: m_rdata_pick_sext = {{16{bus_rdata_d[31]}}, bus_rdata_d[31:16]};
+		{MEMOP_LHU , 2'b0z}: m_rdata_pick_sext = {{16{1'b0           }}, bus_rdata_d[15: 0]};
+		{MEMOP_LHU , 2'b1z}: m_rdata_pick_sext = {{16{1'b0           }}, bus_rdata_d[31:16]};
+		{MEMOP_LB  , 2'b00}: m_rdata_pick_sext = {{24{bus_rdata_d[ 7]}}, bus_rdata_d[ 7: 0]};
+		{MEMOP_LB  , 2'b01}: m_rdata_pick_sext = {{24{bus_rdata_d[15]}}, bus_rdata_d[15: 8]};
+		{MEMOP_LB  , 2'b10}: m_rdata_pick_sext = {{24{bus_rdata_d[23]}}, bus_rdata_d[23:16]};
+		{MEMOP_LB  , 2'b11}: m_rdata_pick_sext = {{24{bus_rdata_d[31]}}, bus_rdata_d[31:24]};
+		{MEMOP_LBU , 2'b00}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[ 7: 0]};
+		{MEMOP_LBU , 2'b01}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[15: 8]};
+		{MEMOP_LBU , 2'b10}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[23:16]};
+		{MEMOP_LBU , 2'b11}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[31:24]};
+		default:             m_rdata_pick_sext = bus_rdata_d;
 	endcase
 
-	case (xm_memop)
-		MEMOP_LW:  m_result = m_rdata_shift;
-		MEMOP_LH:  m_result = {{16{m_rdata_shift[15]}}, m_rdata_shift[15:0]};
-		MEMOP_LHU: m_result = {16'h0, m_rdata_shift[15:0]};
-		MEMOP_LB:  m_result = {{24{m_rdata_shift[7]}}, m_rdata_shift[7:0]};
-		MEMOP_LBU: m_result = {24'h0, m_rdata_shift[7:0]};
-		default:   begin
-			if (MUL_FAST && m_fast_mul_result_vld) begin
-				m_result = m_fast_mul_result;
-			end else begin
-				m_result = xm_result;
-			end
-		end
-	endcase
+	if (xm_memop != MEMOP_NONE) begin
+		m_result = m_rdata_pick_sext;
+	end else if (MUL_FAST && m_fast_mul_result_vld) begin
+		m_result = m_fast_mul_result;
+	end else begin
+		m_result = xm_result;
+	end
 end
 
 
