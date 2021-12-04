@@ -403,7 +403,7 @@ hazard3_alu #(
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		x_amo_phase <= 3'h0;
-	end else if (|EXTENSION_A && !x_stall) begin
+	end else if (|EXTENSION_A && (bus_aph_ready_d || bus_dph_ready_d || m_trap_enter_vld)) begin
 		if (!d_memop_is_amo) begin
 			x_amo_phase <= 3'h0;
 		end else if (x_stall_on_raw) begin
@@ -413,7 +413,7 @@ always @ (posedge clk or negedge rst_n) begin
 			assert(x_amo_phase == 3'h0);
 `endif
 			x_amo_phase <= 3'h0;
-		end else if (m_trap_enter_soon) begin
+		end else if (m_trap_enter_vld) begin
 			x_amo_phase <= 3'h0;
 		end else if (x_amo_phase == 3'h1 && !bus_dph_exokay_d) begin
 			// Load reserve fail indicates the memory region does not support
@@ -449,7 +449,11 @@ wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 );
 
 // Always query the global monitor, except for store-conditional suppressed by local monitor.
-assign bus_aph_excl_d = |EXTENSION_A && (d_memop == MEMOP_LR_W || d_memop == MEMOP_SC_W);
+assign bus_aph_excl_d = |EXTENSION_A && (
+	d_memop == MEMOP_LR_W ||
+	d_memop == MEMOP_SC_W ||
+	d_memop_is_amo
+);
 
 always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
@@ -681,7 +685,8 @@ always @ (posedge clk or negedge rst_n) begin
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
-			xm_memop <= d_memop | {x_unaligned_addr, 3'h0};
+			// Likewise, AMOs are handled entirely in X (well it's ambiguous; anyway different logic & stalls)
+			xm_memop <= x_unaligned_addr || d_memop_is_amo ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
 			xm_wfi <= d_wfi;
 			if (x_stall || m_trap_enter_soon) begin
@@ -706,6 +711,8 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+reg [W_DATA-1:0]  amo_load_data;
+
 // Datapath flops
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -713,9 +720,10 @@ always @ (posedge clk or negedge rst_n) begin
 		xm_store_data <= {W_DATA{1'b0}};
 	end else if (!m_stall) begin
 		xm_result <=
-			d_csr_ren                              ? x_csr_rdata :
-			EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
-			                                         x_alu_result;
+			d_csr_ren                               ? x_csr_rdata :
+			|EXTENSION_A && d_memop_is_amo          ? amo_load_data :
+			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
+			                                          x_alu_result;
 		xm_store_data <= x_rs2_bypass;
 
 	end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
@@ -773,7 +781,6 @@ generate
 if (EXTENSION_A) begin: has_amo_alu
 
 	reg [W_MEMOP-1:0] amo_memop;
-	reg [W_DATA-1:0]  amo_load_data;
 	reg               m_amo_wdata_valid_r;
 
 	assign m_amo_wdata_valid = m_amo_wdata_valid_r;
@@ -805,6 +812,7 @@ end else begin: no_amo_alu
 
 	assign m_amo_wdata = {W_DATA{1'b0}};
 	assign m_amo_wdata_valid = 1'b0;
+	always @ (*) amo_load_data = {W_DATA{1'b0}};
 
 end
 endgenerate
@@ -822,7 +830,7 @@ always @ (*) begin
 		MEMOP_SB: bus_wdata_d = {4{m_wdata[7:0]}};
 		default:  bus_wdata_d = m_wdata;
 	endcase
-	if (|EXTENSION_A && amo_wdata_valid)
+	if (|EXTENSION_A && m_amo_wdata_valid)
 		bus_wdata_d = m_amo_wdata;
 
 	casez ({xm_memop, xm_result[1:0]})
