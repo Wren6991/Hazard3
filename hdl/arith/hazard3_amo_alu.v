@@ -29,6 +29,8 @@ module hazard3_amo_alu #(
 	output reg  [W_DATA-1:0]  result
 );
 
+`include "hazard3_ops.vh"
+
 wire sub          = op != MEMOP_AMOADD_W;
 wire cmp_unsigned = op == MEMOP_AMOMINU_W || op == MEMOP_AMOMAXU_W;
 
@@ -41,12 +43,12 @@ wire rs1_lessthan_rs2 =
 
 always @ (*) begin
 	case(op)
-	MEMOP_AMOADD_W : result = sum;
-	MEMOP_AMOXOR_W : result = op_rs1 ^ op_rs2;
-	MEMOP_AMOAND_W : result = op_rs1 & op_rs2;
-	MEMOP_AMOOR_W  : result = op_rs1 | op_rs2;
-	MEMOP_AMOMIN_W : result = rs1_lessthan_rs2 ? op_rs1 : op_rs2;
-	MEMOP_AMOMAX_W : result = rs1_lessthan_rs2 ? op_rs2 : op_rs1;
+	MEMOP_AMOADD_W:  result = sum;
+	MEMOP_AMOXOR_W:  result = op_rs1 ^ op_rs2;
+	MEMOP_AMOAND_W:  result = op_rs1 & op_rs2;
+	MEMOP_AMOOR_W:   result = op_rs1 | op_rs2;
+	MEMOP_AMOMIN_W:  result = rs1_lessthan_rs2 ? op_rs1 : op_rs2;
+	MEMOP_AMOMAX_W:  result = rs1_lessthan_rs2 ? op_rs2 : op_rs1;
 	MEMOP_AMOMINU_W: result = rs1_lessthan_rs2 ? op_rs1 : op_rs2;
 	MEMOP_AMOMAXU_W: result = rs1_lessthan_rs2 ? op_rs2 : op_rs1;
 	// AMOSWAP

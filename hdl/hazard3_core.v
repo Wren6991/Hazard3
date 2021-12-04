@@ -274,11 +274,8 @@ reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_wfi;
 reg                  xm_delay_irq_entry;
 
-
-reg x_stall_raw;
-wire x_stall_muldiv;
-wire x_jump_req;
-wire m_wfi_stall_clear;
+// ----------------------------------------------------------------------------
+// Stall logic
 
 // IRQs squeeze in between the instructions in X and M, so in this case X
 // stalls but M can continue. -> X always stalls on M trap, M *may* stall.
@@ -299,36 +296,60 @@ wire x_stall_on_exclusive_overlap = |EXTENSION_A && (
 	(xm_memop == MEMOP_SC_W || xm_memop	== MEMOP_LR_W)
 );
 
-assign x_stall =
-	m_stall ||
-	x_stall_on_trap ||
-	x_stall_on_exclusive_overlap ||
-	x_stall_raw || x_stall_muldiv ||
-	bus_aph_req_d && !bus_aph_ready_d ||
-	x_jump_req && !f_jump_rdy;
+// AMOs are issued completely from X. We keep X stalled, and pass bubbles into
+// M. Otherwise the exception handling would be even more of a mess. Phases
+// 0-3 are read/write address/data phases. Phase 4 is error, due to HRESP or
+// due to low HEXOKAY response to read.
+
+// Also need to clear AMO if it follows an excepting instruction.
+
+reg [2:0] x_amo_phase;
+wire x_stall_on_amo = |EXTENSION_A && d_memop_is_amo && !m_trap_enter_soon && (
+	x_amo_phase < 3'h3 || (x_amo_phase == 3'h3 && !bus_dph_ready_d)
+);
+
+// Read-after-write hazard detection (e.g. load-use)
 
 wire m_fast_mul_result_vld;
-wire m_generating_result = xm_memop < MEMOP_SW || m_fast_mul_result_vld;
+wire m_generating_result = xm_memop < MEMOP_SW || x_memop == MEMOP_LR_W || m_fast_mul_result_vld;
 
-// Load-use hazard detection
+reg x_stall_on_raw;
 
 always @ (*) begin
-	x_stall_raw = 1'b0;
+	x_stall_on_raw = 1'b0;
 	if (REDUCED_BYPASS) begin
-		x_stall_raw =
+		x_stall_on_raw =
 			|xm_rd && (xm_rd == d_rs1 || xm_rd == d_rs2) ||
 			|mw_rd && (mw_rd == d_rs1 || mw_rd == d_rs2);
 	end else if (m_generating_result) begin
 		// With the full bypass network, load-use (or fast multiply-use) is the only RAW stall
 		if (|xm_rd && xm_rd == d_rs1) begin
 			// Store addresses cannot be bypassed later, so there is no exception here.
-			x_stall_raw = 1'b1;
+			x_stall_on_raw = 1'b1;
 		end else if (|xm_rd && xm_rd == d_rs2) begin
 			// Store data can be bypassed in M. Any other instructions must stall.
-			x_stall_raw = !(d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB);
+			x_stall_on_raw = !(d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB);
 		end
 	end
 end
+
+wire x_stall_muldiv;
+wire x_jump_req;
+
+assign x_stall =
+	m_stall ||
+	x_stall_on_trap ||
+	x_stall_on_exclusive_overlap ||
+	x_stall_on_amo ||
+	x_stall_on_raw ||
+	x_stall_muldiv ||
+	bus_aph_req_d && !bus_aph_ready_d ||
+	x_jump_req && !f_jump_rdy;
+
+wire m_wfi_stall_clear;
+
+// ----------------------------------------------------------------------------
+// Execution logic
 
 // ALU, operand muxes and bypass
 
@@ -376,15 +397,51 @@ hazard3_alu #(
 
 // AHB transaction request
 
+// AMO stalls the pipe, then generates two bus transfers per 4-cycle
+// iteration, unless it bails out due to a bus fault or failed load
+// reservation.
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		x_amo_phase <= 3'h0;
+	end else if (|EXTENSION_A && !x_stall) begin
+		if (!d_memop_is_amo) begin
+			x_amo_phase <= 3'h0;
+		end else if (x_stall_on_raw) begin
+			// First address phase stalled due to address dependency on
+			// previous load/mul/etc. Shouldn't be possible in later phases.
+`ifdef FORMAL
+			assert(x_amo_phase == 3'h0);
+`endif
+			x_amo_phase <= 3'h0;
+		end else if (m_trap_enter_soon) begin
+			x_amo_phase <= 3'h0;
+		end else if (x_amo_phase == 3'h1 && !bus_dph_exokay_d) begin
+			// Load reserve fail indicates the memory region does not support
+			// exclusives, so we will never succeed at store. Exception.
+			x_amo_phase <= 3'h4;
+		end else if ((x_amo_phase == 3'h1 || x_amo_phase == 3'h3) && bus_dph_err_d) begin
+			// Bus fault. Exception.
+			x_amo_phase <= 3'h4;
+		end else if (x_amo_phase == 3'h3) begin
+			// We're done!
+			x_amo_phase <= 3'h0;
+		end else begin
+			x_amo_phase <= x_amo_phase + 3'h1;
+		end
+	end
+end
+
 reg mw_local_exclusive_reserved;
 
 wire x_memop_vld = d_memop != MEMOP_NONE && !(
-	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved
+	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved ||
+	|EXTENSION_A && d_memop_is_amo && x_amo_phase != 3'h0 && x_amo_phase != 3'h2
 );
 
 wire x_memop_write =
 	d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB ||
-	|EXTENSION_A && d_memop == MEMOP_SC_W;
+	|EXTENSION_A && d_memop == MEMOP_SC_W ||
+	|EXTENSION_A && d_memop_is_amo && x_amo_phase == 3'h2;
 
 wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
@@ -410,7 +467,7 @@ always @ (*) begin
 		default:   bus_hsize_d = HSIZE_WORD;
 	endcase
 	bus_aph_req_d = x_memop_vld && !(
-		x_stall_raw ||
+		x_stall_on_raw ||
 		x_stall_on_exclusive_overlap ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
@@ -448,7 +505,7 @@ if (EXTENSION_M) begin: has_muldiv
 	);
 
 	assign x_muldiv_op_vld = (d_aluop == ALUOP_MULDIV && !x_use_fast_mul)
-		&& !(x_muldiv_posted || x_stall_raw || x_muldiv_kill);
+		&& !(x_muldiv_posted || x_stall_on_raw || x_muldiv_kill);
 
 	hazard3_muldiv_seq #(
 	`include "hazard3_config_inst.vh"
@@ -548,9 +605,11 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
-	x_csr_illegal_access               ? EXCEPT_INSTR_ILLEGAL :
-	x_unaligned_addr &&  x_memop_write ? EXCEPT_STORE_ALIGN   :
-	x_unaligned_addr && !x_memop_write ? EXCEPT_LOAD_ALIGN    : d_except;
+	x_csr_illegal_access                                ? EXCEPT_INSTR_ILLEGAL :
+	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo ? EXCEPT_STORE_ALIGN   :
+	|EXTENSION_A && x_amo_phase == 3'h4                 ? EXCEPT_STORE_FAULT   :
+	x_unaligned_addr &&  x_memop_write                  ? EXCEPT_STORE_ALIGN   :
+	x_unaligned_addr && !x_memop_write                  ? EXCEPT_LOAD_ALIGN    : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
@@ -647,15 +706,22 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// No reset on datapath flops
-always @ (posedge clk)
-	if (!m_stall) begin
+// Datapath flops
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		xm_result <= {W_DATA{1'b0}};
+		xm_store_data <= {W_DATA{1'b0}};
+	end else if (!m_stall) begin
 		xm_result <=
 			d_csr_ren                              ? x_csr_rdata :
 			EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
 			                                         x_alu_result;
 		xm_store_data <= x_rs2_bypass;
+
+	end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
+		xm_store_data <= x_rs2_bypass;
 	end
+end
 
 // Branch handling
 
@@ -663,7 +729,7 @@ always @ (posedge clk)
 wire [W_ADDR-1:0] x_jump_target = ((d_jump_is_regoffs ? x_rs1_bypass : d_pc) + d_jump_offs) & ~32'h1;
 
 // Be careful not to take branches whose comparisons depend on a load result
-assign x_jump_req = !x_stall_raw && (
+assign x_jump_req = !x_stall_on_raw && (
 	d_branchcond == BCOND_ALWAYS ||
 	d_branchcond == BCOND_ZERO && !x_alu_cmp ||
 	d_branchcond == BCOND_NZERO && x_alu_cmp
@@ -698,6 +764,51 @@ assign m_exception_return_addr = d_pc - (
 	prev_instr_was_32_bit ? 32'h4 : 32'h2
 );
 
+// Load/store data handling
+
+wire [W_DATA-1:0] m_amo_wdata;
+wire              m_amo_wdata_valid;
+
+generate
+if (EXTENSION_A) begin: has_amo_alu
+
+	reg [W_MEMOP-1:0] amo_memop;
+	reg [W_DATA-1:0]  amo_load_data;
+	reg               m_amo_wdata_valid_r;
+
+	assign m_amo_wdata_valid = m_amo_wdata_valid_r;
+
+	always @ (posedge clk or negedge rst_n) begin
+		if (!rst_n) begin
+			amo_memop <= MEMOP_NONE;
+			amo_load_data <= {W_DATA{1'b0}};
+			m_amo_wdata_valid_r <= 1'b0;
+		end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
+			amo_memop <= d_memop;
+			amo_load_data <= bus_rdata_d;
+			m_amo_wdata_valid_r <= 1'b1;
+		end else if (x_amo_phase == 3'h4 || (x_amo_phase == 3'h3 && bus_dph_ready_d) || m_trap_enter_soon) begin
+			m_amo_wdata_valid_r <= 1'b0;
+		end
+	end
+
+	hazard3_amo_alu #(
+	`include "hazard3_config_inst.vh"
+	) amo_alu (
+		.op    (amo_memop),
+		.op_rs1(amo_load_data),
+		.op_rs2(xm_store_data),
+		.result(m_amo_wdata)
+	);
+
+end else begin: no_amo_alu
+
+	assign m_amo_wdata = {W_DATA{1'b0}};
+	assign m_amo_wdata_valid = 1'b0;
+
+end
+endgenerate
+
 always @ (*) begin
 	// Local forwarding of store data
 	if (|mw_rd && xm_rs2 == mw_rd && !REDUCED_BYPASS) begin
@@ -709,8 +820,10 @@ always @ (*) begin
 	case (xm_memop)
 		MEMOP_SH: bus_wdata_d = {2{m_wdata[15:0]}};
 		MEMOP_SB: bus_wdata_d = {4{m_wdata[7:0]}};
-		default:  bus_wdata_d = m_wdata; // TODO worth it to mask when not writing? Costs LUTs, saves energy
+		default:  bus_wdata_d = m_wdata;
 	endcase
+	if (|EXTENSION_A && amo_wdata_valid)
+		bus_wdata_d = m_amo_wdata;
 
 	casez ({xm_memop, xm_result[1:0]})
 		{MEMOP_LH  , 2'b0z}: m_rdata_pick_sext = {{16{bus_rdata_d[15]}}, bus_rdata_d[15: 0]};
@@ -749,7 +862,13 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mw_local_exclusive_reserved <= 1'b0;
 	end else if (|EXTENSION_A && !m_stall) begin
-		if (xm_memop == MEMOP_SC_W) begin
+`ifdef FORMAL
+		// AMOs should handle the entire bus transfer in stage X.
+		assert(xm_memop != MEMOP_AMOADD_W);
+`endif
+		if (d_memop_is_amo && |x_amo_phase) begin // TODO do AMOs clear reservation?
+			mw_local_exclusive_reserved <= 1'b0;
+		end else if (xm_memop == MEMOP_SC_W) begin
 			mw_local_exclusive_reserved <= 1'b0;
 		end else if (xm_memop == MEMOP_LR_W) begin
 			mw_local_exclusive_reserved <= bus_dph_exokay_d;
