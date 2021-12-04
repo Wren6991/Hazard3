@@ -2,7 +2,7 @@
  * DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE     *
  *                    Version 3, April 2008                           *
  *                                                                    *
- * Copyright (C) 2018 Luke Wren                                       *
+ * Copyright (C) 2021 Luke Wren                                       *
  *                                                                    *
  * Everyone is permitted to copy and distribute verbatim or modified  *
  * copies of this license document and accompanying software, and     *
