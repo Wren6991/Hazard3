@@ -561,7 +561,7 @@ hazard3_csr #(
 	.trap_enter_soon            (m_trap_enter_soon),
 	.trap_enter_vld             (m_trap_enter_vld),
 	.trap_enter_rdy             (m_trap_enter_rdy),
-	.loadstore_dphase_pending   (!xm_memop[3]),
+	.loadstore_dphase_pending   (xm_memop != MEMOP_NONE),
 	.mepc_in                    (m_exception_return_addr),
 	.wfi_stall_clear            (m_wfi_stall_clear),
 
@@ -603,7 +603,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// this cycle, and on the next cycle the trap entry will be asserted,
 			// suppressing any load/store that may currently be in stage X.
 `ifdef FORMAL
-			assert(!xm_memop[3]); // Not NONE
+			assert(xm_memop != MEMOP_NONE);
 `endif
 			xm_except <= xm_memop <= MEMOP_LBU ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
 			xm_wfi <= 1'b0;
@@ -644,7 +644,7 @@ assign f_jump_req = x_jump_req || m_trap_enter_vld;
 assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign x_jump_not_except = !m_trap_enter_vld;
 
-wire m_bus_stall = !xm_memop[3] && !bus_dph_ready_d;
+wire m_bus_stall = xm_memop != MEMOP_NONE && !bus_dph_ready_d;
 assign m_stall = m_bus_stall ||
 	(m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq) ||
 	(xm_wfi && !m_wfi_stall_clear);
