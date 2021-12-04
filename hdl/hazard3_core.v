@@ -285,9 +285,24 @@ wire m_wfi_stall_clear;
 wire x_stall_on_trap = m_trap_enter_vld && !m_trap_enter_rdy ||
 	m_trap_enter_soon && !m_trap_enter_vld;
 
+// Stall inserted to avoid illegal pipelining of exclusive accesses on the bus
+// (also gives time to update local monitor on direct lr.w -> sc.w instruction
+// sequences). Note we don't check for AMOs in stage M, because AMOs fully
+// fence off on their own completion before passing down the pipe.
+
+wire d_memop_is_amo = |EXTENSION_A && (
+	d_memop >= MEMOP_AMOSWAP_W && d_memop <= MEMOP_AMOMAXU_W
+);
+
+wire x_stall_on_exclusive_overlap = |EXTENSION_A && (
+	(d_memop_is_amo || d_memop == MEMOP_SC_W || d_memop == MEMOP_LR_W) &&
+	(xm_memop == MEMOP_SC_W || xm_memop	== MEMOP_LR_W)
+);
+
 assign x_stall =
 	m_stall ||
 	x_stall_on_trap ||
+	x_stall_on_exclusive_overlap ||
 	x_stall_raw || x_stall_muldiv ||
 	bus_aph_req_d && !bus_aph_ready_d ||
 	x_jump_req && !f_jump_rdy;
@@ -296,15 +311,13 @@ wire m_fast_mul_result_vld;
 wire m_generating_result = xm_memop < MEMOP_SW || m_fast_mul_result_vld;
 
 // Load-use hazard detection
+
 always @ (*) begin
 	x_stall_raw = 1'b0;
 	if (REDUCED_BYPASS) begin
 		x_stall_raw =
 			|xm_rd && (xm_rd == d_rs1 || xm_rd == d_rs2) ||
 			|mw_rd && (mw_rd == d_rs1 || mw_rd == d_rs2);
-	end else if (|EXTENSION_A && xm_memop == MEMOP_LR_W && d_memop == MEMOP_SC_W) begin
-		// Conditional-store address phase depends on data-phase update of local monitor bit
-		x_stall_raw = 1'b1;
 	end else if (m_generating_result) begin
 		// With the full bypass network, load-use (or fast multiply-use) is the only RAW stall
 		if (|xm_rd && xm_rd == d_rs1) begin
@@ -398,6 +411,7 @@ always @ (*) begin
 	endcase
 	bus_aph_req_d = x_memop_vld && !(
 		x_stall_raw ||
+		x_stall_on_exclusive_overlap ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
 		(xm_wfi && !m_wfi_stall_clear) // FIXME will cause a timing issue, better to stall til *after* clear

@@ -77,8 +77,9 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 [%autowidth.stretch, options="header"]
 |===
 | Instruction | Cycles | Note
-| `lr.w rd, (rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
-| `sc.w rd, rs2, (rs1)` | 1 | `lr.w` followed by `sc.w` always inserts a dependency stall.footnote:lr_to_sc[A 1-cycle pipeline bubble is inserted in between an `lr.w` and an immediately-following `sc.w`, so that the store can be suppressed by a reservation failure on the load. It does not matter whether the `lr.w` and `sc.w` use the same registers. Load reservation may fail if the memory region does not support exclusive transfers.]
+3+| Load-Reserved/Store-Conditional
+| `lr.w rd, (rs1)` | 1 or 2 | 2 if next instruction is dependentfootnote:data_dependency[], or is an `lr.w`, `sc.w` or `amo*`.footnote:exclusive_pipelining[A pipeline bubble is inserted between `lr.w`/`sc.w` and an immediately-following `lr.w`/`sc.w`/`amo*`, because the AHB5 bus standard does not permit pipelined exclusive accesses. A stall would be inserted between `lr.w` and `sc.w` anyhow, so the local monitor can be updated based on `lr.w` data phase in time to suppress `sc.w` data phase.]
+| `sc.w rd, rs2, (rs1)` | 1 or 2 | 2 if next instruction is an `lr.w`, `sc.w` or `amo*`.footnote:exclusive_pipelining[]
 |===
 
 AMOs are currently not supported.
