@@ -282,14 +282,15 @@ always @ (*) begin
 	RV_CLMUL:     if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
 	RV_CLMULH:    if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMULH;                                                        end else begin d_invalid_32bit = 1'b1; end
 	RV_CLMULR:    if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMULR;                                                        end else begin d_invalid_32bit = 1'b1; end
-	RV_BCLR:      if (EXTENSION_ZBC) begin d_aluop = ALUOP_BCLR;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BCLRI:     if (EXTENSION_ZBC) begin d_aluop = ALUOP_BCLR;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_BEXT:      if (EXTENSION_ZBC) begin d_aluop = ALUOP_BEXT;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BEXTI:     if (EXTENSION_ZBC) begin d_aluop = ALUOP_BEXT;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_BINV:      if (EXTENSION_ZBC) begin d_aluop = ALUOP_BINV;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BINVI:     if (EXTENSION_ZBC) begin d_aluop = ALUOP_BINV;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_BSET:      if (EXTENSION_ZBC) begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BSETI:     if (EXTENSION_ZBC) begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+
+	RV_BCLR:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BCLR;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BCLRI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BCLR;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BEXT:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BEXT;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BEXTI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BEXT;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BINV:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BINV;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BINVI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BINV;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BSET:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BSETI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 
 	RV_FENCE:     begin d_rd = X0; end  // NOP
 	RV_FENCE_I:   begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // FIXME this is probably busted now. Maybe implement as an exception?
