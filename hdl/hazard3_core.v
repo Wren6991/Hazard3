@@ -311,7 +311,11 @@ wire x_stall_on_amo = |EXTENSION_A && d_memop_is_amo && !m_trap_enter_soon && (
 // Read-after-write hazard detection (e.g. load-use)
 
 wire m_fast_mul_result_vld;
-wire m_generating_result = xm_memop < MEMOP_SW || x_memop == MEMOP_LR_W || m_fast_mul_result_vld;
+wire m_generating_result =
+	xm_memop < MEMOP_SW ||
+	|EXTENSION_A && xm_memop == MEMOP_LR_W ||
+	|EXTENSION_A && xm_memop == MEMOP_SC_W || // sc.w success result is data phase
+	|EXTENSION_M && m_fast_mul_result_vld;
 
 reg x_stall_on_raw;
 
