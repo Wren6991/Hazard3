@@ -241,6 +241,7 @@ hazard3_cpu_1port #(
 	.NUM_IRQ         (1),
 	// Can be overridden from the defaults in hazard3_config.vh during
 	// instantiation of example_soc():
+	.EXTENSION_A     (EXTENSION_A),
 	.EXTENSION_C     (EXTENSION_C),
 	.EXTENSION_M     (EXTENSION_M),
 	.EXTENSION_ZBA   (EXTENSION_ZBA),
