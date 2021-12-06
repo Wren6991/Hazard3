@@ -6,15 +6,6 @@
 #define __wfi()         asm volatile ("wfi")
 #define __compiler_mb() asm volatile ("" ::: "memory")
 
-typedef struct {
-	volatile uint32_t mtime;
-	volatile uint32_t mtimeh;
-	volatile uint32_t mtimecmp;
-	volatile uint32_t mtimecmph;
-} timer_hw;
-
-timer_hw *const timer = (timer_hw*)(IO_BASE + 0x100);
-
 int irq_count;
 void __attribute__((interrupt)) isr_machine_timer() {
 	__compiler_mb();
@@ -27,7 +18,7 @@ void __attribute__((interrupt)) isr_machine_timer() {
 	if (irq_count >= MAX_IRQ_COUNT)
 		asm ("csrc mie, %0" :: "r" (1u << 7));
 	else
-		timer->mtimecmp = timer->mtime + TIMER_INTERVAL;
+		mm_timer->mtimecmp = mm_timer->mtime + TIMER_INTERVAL;
 }
 
 int main() {

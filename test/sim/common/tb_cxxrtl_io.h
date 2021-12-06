@@ -7,13 +7,23 @@
 
 #define IO_BASE 0x80000000
 
-struct io_hw {
+typedef struct {
 	volatile uint32_t print_char;
 	volatile uint32_t print_u32;
 	volatile uint32_t exit;
-};
+} io_hw_t;
 
-#define mm_io ((struct io_hw *const)IO_BASE)
+#define mm_io ((io_hw_t *const)IO_BASE)
+
+typedef struct {
+	volatile uint32_t mtime;
+	volatile uint32_t mtimeh;
+	volatile uint32_t mtimecmp;
+	volatile uint32_t mtimecmph;
+} timer_hw_t;
+
+#define mm_timer ((timer_hw_t *const)(IO_BASE + 0x100))
+
 
 static inline void tb_putc(char c) {
 	mm_io->print_char = (uint32_t)c;
