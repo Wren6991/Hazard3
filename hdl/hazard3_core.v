@@ -794,12 +794,13 @@ if (EXTENSION_A) begin: has_amo_alu
 			amo_memop <= MEMOP_NONE;
 			amo_load_data <= {W_DATA{1'b0}};
 			m_amo_wdata_valid_r <= 1'b0;
+		end else if (x_amo_phase == 3'h4 || (x_amo_phase == 3'h3 && bus_dph_ready_d) || m_trap_enter_soon) begin
+			// Higher precedence to make sure trap always clears the valid bit
+			m_amo_wdata_valid_r <= 1'b0;
 		end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
 			amo_memop <= d_memop;
 			amo_load_data <= bus_rdata_d;
 			m_amo_wdata_valid_r <= 1'b1;
-		end else if (x_amo_phase == 3'h4 || (x_amo_phase == 3'h3 && bus_dph_ready_d) || m_trap_enter_soon) begin
-			m_amo_wdata_valid_r <= 1'b0;
 		end
 	end
 
