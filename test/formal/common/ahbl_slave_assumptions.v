@@ -28,6 +28,7 @@ module ahbl_slave_assumptions #(
 	input wire               dst_hready_resp,
 	input wire               dst_hready,
 	input wire               dst_hresp,
+	input wire               dst_hexokay,
 	input wire [W_ADDR-1:0]  dst_haddr,
 	input wire               dst_hwrite,
 	input wire [1:0]         dst_htrans,
@@ -35,6 +36,7 @@ module ahbl_slave_assumptions #(
 	input wire [2:0]         dst_hburst,
 	input wire [3:0]         dst_hprot,
 	input wire               dst_hmastlock,
+	input wire               dst_hexcl,
 	input wire [W_DATA-1:0]  dst_hwdata,
 	input wire [W_DATA-1:0]  dst_hrdata
 );

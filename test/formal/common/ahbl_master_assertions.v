@@ -26,6 +26,7 @@ module ahbl_master_assertions #(
 
 	input wire               src_hready,
 	input wire               src_hresp,
+	input wire               src_hexokay,
 	input wire [W_ADDR-1:0]  src_haddr,
 	input wire               src_hwrite,
 	input wire [1:0]         src_htrans,
@@ -33,6 +34,7 @@ module ahbl_master_assertions #(
 	input wire [2:0]         src_hburst,
 	input wire [3:0]         src_hprot,
 	input wire               src_hmastlock,
+	input wire               src_hexcl,
 	input wire [W_DATA-1:0]  src_hwdata,
 	input wire [W_DATA-1:0]  src_hrdata
 );

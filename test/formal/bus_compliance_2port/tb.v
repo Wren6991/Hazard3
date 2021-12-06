@@ -30,8 +30,10 @@ always @ (posedge clk)
 (* keep *) wire [2:0]   d_hburst;
 (* keep *) wire [3:0]   d_hprot;
 (* keep *) wire         d_hmastlock;
+(* keep *) wire         d_hexcl;
 (* keep *) wire         d_hready;
 (* keep *) wire         d_hresp;
+(* keep *) wire         d_hexokay;
 (* keep *) wire [31:0]  d_hwdata;
 (* keep *) wire [31:0]  d_hrdata;
 
@@ -60,8 +62,10 @@ hazard3_cpu_2port dut (
 	.d_hburst     (d_hburst),
 	.d_hprot      (d_hprot),
 	.d_hmastlock  (d_hmastlock),
+	.d_hexcl      (d_hexcl),
 	.d_hready     (d_hready),
 	.d_hresp      (d_hresp),
+	.d_hexokay    (d_hexokay),
 	.d_hwdata     (d_hwdata),
 	.d_hrdata     (d_hrdata),
 
@@ -83,6 +87,7 @@ ahbl_slave_assumptions #(
 	.dst_hready_resp (i_hready),
 	.dst_hready      (i_hready),
 	.dst_hresp       (i_hresp),
+	.dst_hexokay     (1'b0),
 	.dst_haddr       (i_haddr),
 	.dst_hwrite      (i_hwrite),
 	.dst_htrans      (i_htrans),
@@ -90,6 +95,7 @@ ahbl_slave_assumptions #(
 	.dst_hburst      (i_hburst),
 	.dst_hprot       (i_hprot),
 	.dst_hmastlock   (i_hmastlock),
+	.dst_hexcl       (1'b0),
 	.dst_hwdata      (i_hwdata),
 	.dst_hrdata      (i_hrdata)
 );
@@ -103,6 +109,7 @@ ahbl_slave_assumptions #(
 	.dst_hready_resp (d_hready),
 	.dst_hready      (d_hready),
 	.dst_hresp       (d_hresp),
+	.dst_hexokay     (d_hexokay),
 	.dst_haddr       (d_haddr),
 	.dst_hwrite      (d_hwrite),
 	.dst_htrans      (d_htrans),
@@ -110,6 +117,7 @@ ahbl_slave_assumptions #(
 	.dst_hburst      (d_hburst),
 	.dst_hprot       (d_hprot),
 	.dst_hmastlock   (d_hmastlock),
+	.dst_hexcl       (d_hexcl),
 	.dst_hwdata      (d_hwdata),
 	.dst_hrdata      (d_hrdata)
 );
@@ -120,6 +128,7 @@ ahbl_master_assertions i_assertions (
 
 	.src_hready      (i_hready),
 	.src_hresp       (i_hresp),
+	.src_hexokay     (1'b0),
 	.src_haddr       (i_haddr),
 	.src_hwrite      (i_hwrite),
 	.src_htrans      (i_htrans),
@@ -127,6 +136,7 @@ ahbl_master_assertions i_assertions (
 	.src_hburst      (i_hburst),
 	.src_hprot       (i_hprot),
 	.src_hmastlock   (i_hmastlock),
+	.src_hexcl       (1'b0),
 	.src_hwdata      (i_hwdata),
 	.src_hrdata      (i_hrdata)
 );
@@ -138,6 +148,7 @@ ahbl_master_assertions d_assertions (
 
 	.src_hready      (d_hready),
 	.src_hresp       (d_hresp),
+	.src_hexokay     (d_hexokay),
 	.src_haddr       (d_haddr),
 	.src_hwrite      (d_hwrite),
 	.src_htrans      (d_htrans),
@@ -145,6 +156,7 @@ ahbl_master_assertions d_assertions (
 	.src_hburst      (d_hburst),
 	.src_hprot       (d_hprot),
 	.src_hmastlock   (d_hmastlock),
+	.src_hexcl       (d_hexcl),
 	.src_hwdata      (d_hwdata),
 	.src_hrdata      (d_hrdata)
 );

@@ -1052,8 +1052,9 @@ assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
 
 // ----------------------------------------------------------------------------
+// Properties
 
-`ifdef RISCV_FORMAL
+`ifdef FORMAL
 
 // Keep track of whether we are in a trap (only for formal property purposes)
 reg in_trap;
@@ -1066,31 +1067,47 @@ always @ (posedge clk or negedge rst_n)
 			&& !(trap_enter_vld && trap_enter_rdy && except == EXCEPT_MRET);
 
 always @ (posedge clk) begin
+`ifdef RISCV_FORMAL
 	// Assume there are no nested exceptions, to stop riscv-formal from doing
 	// annoying things like stopping instructions from retiring by repeatedly
 	// feeding in invalid instructions
-
 	if (in_trap)
-		assume(except == EXCEPT_NONE);
+		assume(except == EXCEPT_NONE || except == EXCEPT_MRET);
 
 	// Assume IRQs are not deasserted on cycles where exception entry does not
 	// take place
-
 	if (!trap_enter_rdy)
 		assume(~|(irq_r & ~irq));
+`endif
 
 	// Make sure CSR accesses are flushed
 	if (trap_enter_vld && trap_enter_rdy)
 		assert(!(wen || ren));
-	// Something is screwed up if this happens
+
+	// Writing to CSR on cycle after trap entry -- should be impossible, a CSR
+	// access instruction should have been flushed or moved down to stage 3, and
+	// no fetch could have arrived by now
 	if ($past(trap_enter_vld && trap_enter_rdy))
 		assert(!wen);
-	// Should be impossible to get into the trap and exit it so quickly:
+
+	// Should be impossible to get into the trap and exit immediately:
 	if (in_trap && !$past(in_trap))
 		assert(except != EXCEPT_MRET);
-	// Should be impossible to get to another mret so soon after exiting:
-	assert(!(except == EXCEPT_MRET && $past(except == EXCEPT_MRET)));
 
+	// Should be impossible to get to another mret so soon after exiting:
+	if ($past(except == EXCEPT_MRET && trap_enter_vld && trap_enter_rdy))
+		assert(except != EXCEPT_MRET);
+
+	// Must be impossible to enter two traps on consecutive cycles. Most importantly:
+	//
+	// - IRQ -> Except: no new instruction could have been fetched by this point,
+	//   and an exception by e.g. a left-behind store data phase would sample the
+	//   wrong PC.
+	//
+	// - Except -> IRQ: would need to re-set mstatus.mie first
+
+	if ($past(trap_enter_vld && trap_enter_rdy))
+		assert(!(trap_enter_vld && trap_enter_rdy));
 end
 
 `endif
