@@ -606,8 +606,13 @@ always @ (posedge clk or negedge rst_n) begin
 		// taken once this load/store moves to the next stage: if another load/store
 		// is chasing down the pipeline then this is immediately suppressed by the
 		// IRQ entry, before its address phase can begin.
+
+		// Also hold off on AMOs, unless the AMO is transitioning to an address
+		// phase or completing. (This excludes transitions to error phase.)
+
 		xm_delay_irq_entry <= bus_aph_req_d && !bus_aph_ready_d ||
-			d_memop_is_amo && !((x_amo_phase == 3'h1 || x_amo_phase == 3'h3) && bus_dph_ready_d);
+			d_memop_is_amo && !((x_amo_phase == 3'h1 || x_amo_phase == 3'h3) && bus_dph_ready_d && !bus_dph_err_d);
+
 		if (!x_stall)
 			prev_instr_was_32_bit <= df_cir_use == 2'd2;
 	end
