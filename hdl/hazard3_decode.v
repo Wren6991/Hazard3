@@ -244,17 +244,17 @@ always @ (*) begin
 	RV_REM:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
 	RV_REMU:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
 
-	RV_LR_W:      if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LR_W;      end
-	RV_SC_W:      if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_SC_W;      end
-	RV_AMOSWAP_W: if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOSWAP_W; end
-	RV_AMOADD_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOADD_W;  end
-	RV_AMOXOR_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOXOR_W;  end
-	RV_AMOAND_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOAND_W;  end
-	RV_AMOOR_W:   if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOOR_W;   end
-	RV_AMOMIN_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMIN_W;  end
-	RV_AMOMAX_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMAX_W;  end
-	RV_AMOMINU_W: if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMINU_W; end
-	RV_AMOMAXU_W: if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMAXU_W; end
+	RV_LR_W:      if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LR_W;      end else begin d_invalid_32bit = 1'b1; end
+	RV_SC_W:      if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_SC_W;      end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOSWAP_W: if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOSWAP_W; end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOADD_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOADD_W;  end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOXOR_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOXOR_W;  end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOAND_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOAND_W;  end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOOR_W:   if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOOR_W;   end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMIN_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMIN_W;  end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMAX_W:  if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMAX_W;  end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMINU_W: if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMINU_W; end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMAXU_W: if (EXTENSION_A) begin d_imm = X0; d_alusrc_b = ALUSRCB_IMM;             d_memop = MEMOP_AMOMAXU_W; end else begin d_invalid_32bit = 1'b1; end
 
 	RV_SH1ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH1ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
 	RV_SH2ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH2ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
