@@ -301,11 +301,13 @@ wire x_stall_on_exclusive_overlap = |EXTENSION_A && (
 // 0-3 are read/write address/data phases. Phase 4 is error, due to HRESP or
 // due to low HEXOKAY response to read.
 
-// Also need to clear AMO if it follows an excepting instruction.
+// Also need to clear AMO if it follows an excepting instruction. Note we
+// still stall on phase 3 when hready is high if hresp is also high, since we
+// then proceed to phase 4 for the error response.
 
 reg [2:0] x_amo_phase;
 wire x_stall_on_amo = |EXTENSION_A && d_memop_is_amo && !m_trap_enter_soon && (
-	x_amo_phase < 3'h3 || (x_amo_phase == 3'h3 && !bus_dph_ready_d)
+	x_amo_phase < 3'h3 || (x_amo_phase == 3'h3 && (!bus_dph_ready_d || bus_dph_err_d))
 );
 
 // Read-after-write hazard detection (e.g. load-use)
