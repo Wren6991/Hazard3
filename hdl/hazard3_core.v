@@ -605,7 +605,7 @@ always @ (posedge clk or negedge rst_n) begin
 		// is chasing down the pipeline then this is immediately suppressed by the
 		// IRQ entry, before its address phase can begin.
 		xm_delay_irq_entry <= bus_aph_req_d && !bus_aph_ready_d ||
-			d_memop_is_amo && (x_amo_phase == 3'h2 || x_amo_phase == 3'h3 && !bus_dph_ready_d);
+			d_memop_is_amo && !((x_amo_phase == 3'h1 || x_amo_phase == 3'h3) && bus_dph_ready_d);
 		if (!x_stall)
 			prev_instr_was_32_bit <= df_cir_use == 2'd2;
 	end
