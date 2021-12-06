@@ -61,11 +61,11 @@ end
 
 `ifdef FORMAL
 always @ (*) begin
-	if (right_nleft && arith) begin: asr
+	if (right_nleft && arith && !rotate) begin: asr
 		assert($signed(dout) == $signed(din) >>> $signed(shamt));
-	end else if (right_nleft && !arith) begin
+	end else if (right_nleft && !arith && !rotate) begin
 		assert(dout == din >> shamt);
-	end else if (!right_nleft && !arith) begin
+	end else if (!right_nleft && !arith && !rotate) begin
 		assert(dout == din << shamt);
 	end
 end
