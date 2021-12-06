@@ -766,7 +766,11 @@ assign f_jump_req = x_jump_req || m_trap_enter_vld;
 assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign x_jump_not_except = !m_trap_enter_vld;
 
-wire m_bus_stall = xm_memop != MEMOP_NONE && !bus_dph_ready_d && !(
+// EXCEPT_NONE clause is needed in the following sequence:
+// - Cycle 0: hresp asserted, hready low. We set the exception to squash behind us. Bus stall high.
+// - Cycle 1: hready high. For whatever reason, the frontend can't accept the trap address this cycle.
+// - Cycle 2: Our dataphase has ended, so bus_dph_ready_d doesn't pulse again. m_bus_stall stuck high.
+wire m_bus_stall = xm_memop != MEMOP_NONE && !bus_dph_ready_d && xm_except == EXCEPT_NONE && !(
 	|EXTENSION_A && xm_memop == MEMOP_SC_W && !mw_local_exclusive_reserved
 );
 
