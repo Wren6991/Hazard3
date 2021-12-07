@@ -171,7 +171,6 @@ always @ (posedge clk or negedge rst_n) begin
 		assert(ctr_flush_pending <= pending_fetches);
 		assert(pending_fetches < 2'd3);
 		assert(!(mem_data_vld && !pending_fetches));
-		// assert(!($past(mem_addr_hold) && $past(mem_addr_vld) && !$stable(mem_addr)));
 `endif
 		mem_addr_hold <= mem_addr_vld && !mem_addr_rdy;
 		pending_fetches <= pending_fetches_next;
@@ -220,11 +219,6 @@ always @ (posedge clk or negedge rst_n) begin
 		unaligned_jump_aph <= 1'b0;
 		unaligned_jump_dph <= 1'b0;
 	end else if (EXTENSION_C) begin
-`ifdef FORMAL_FIXMEEEE
-		assert(!(unaligned_jump_aph && !unaligned_jump_dph));
-		assert(!($past(jump_now && !jump_target[1]) && unaligned_jump_aph));
-		assert(!($past(jump_now && !jump_target[1]) && unaligned_jump_dph));
-`endif
 		if (mem_addr_rdy || (jump_now && !unaligned_jump_now)) begin
 			unaligned_jump_aph <= 1'b0;
 		end
@@ -243,6 +237,26 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
+
+`ifdef FORMAL
+reg property_after_aligned_jump;
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		property_after_aligned_jump <= 1'b0;
+	end else begin
+		// Every unaligned jump that requires care in aphase also requires care in dphase.
+		assert(!(unaligned_jump_aph && !unaligned_jump_dph));
+
+		property_after_aligned_jump <= jump_now && !jump_target[1];
+		if (property_after_aligned_jump) begin
+			// Make sure these clear properly (have been subtle historic bugs here)
+			assert(!unaligned_jump_aph);
+			assert(!unaligned_jump_dph);
+		end		
+	end
+end
+`endif
+
 
 // Combinatorially generate the address-phase request
 
@@ -326,8 +340,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else begin
 `ifdef FORMAL
 		assert(cir_vld <= 2);
-		assert(cir_use <= cir_vld);
-		// assert(cir_vld <= buf_level || $past(cir_lock));
+ 		assert(cir_use <= cir_vld);
 `endif
 		// Update CIR flags
 		buf_level <= buf_level_next;
@@ -340,6 +353,20 @@ end
 // No need to reset these as they will be written before first use
 always @ (posedge clk)
 	{hwbuf, cir} <= instr_data_plus_fetch;
+
+`ifdef FORMAL
+reg [1:0] property_past_buf_level; // Workaround for weird non-constant $past reset issue
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		property_past_buf_level <= 2'h0;
+	end else begin
+		property_past_buf_level <= buf_level;
+		// We fetch 32 bits per cycle, max. If this happens it's due to negative overflow.
+		if (property_past_buf_level == 2'h0)
+			assert(buf_level != 2'h3);
+	end
+end
+`endif
 
 // Also keep track of bus errors associated with CIR contents, shifted in the
 // same way as instruction data. Errors may come straight from the bus, or

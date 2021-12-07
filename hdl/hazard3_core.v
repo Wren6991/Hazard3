@@ -534,7 +534,6 @@ if (EXTENSION_M) begin: has_muldiv
 		.result_vld (x_muldiv_result_vld)
 	);
 
-	// TODO fusion of MULHx->MUL and DIVy->REMy sequences
 	wire x_muldiv_result_is_high =
 		d_mulop == M_OP_MULH ||
 		d_mulop == M_OP_MULHSU ||
@@ -891,7 +890,7 @@ always @ (posedge clk or negedge rst_n) begin
 		// AMOs should handle the entire bus transfer in stage X.
 		assert(xm_memop != MEMOP_AMOADD_W);
 `endif
-		if (d_memop_is_amo && |x_amo_phase) begin // TODO do AMOs clear reservation?
+		if (d_memop_is_amo) begin
 			mw_local_exclusive_reserved <= 1'b0;
 		end else if (xm_memop == MEMOP_SC_W) begin
 			mw_local_exclusive_reserved <= 1'b0;
