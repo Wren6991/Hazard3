@@ -44,6 +44,8 @@ reg              src_active_dph;
 reg              src_write_dph;
 reg [W_ADDR-1:0] src_addr_dph;
 reg [2:0]        src_size_dph;
+reg              src_excl_dph;
+reg              global_reservation_valid;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -51,11 +53,16 @@ always @ (posedge clk or negedge rst_n) begin
 		src_write_dph <= 1'b0;
 		src_addr_dph <= {W_ADDR{1'b0}};
 		src_size_dph <= 3'h0;
+		src_excl_dph <= 1'b0;
+		global_reservation_valid <= 1'b0;
 	end else if (src_hready) begin
 		src_active_dph <= src_htrans[1];
 		src_write_dph <= src_hwrite;
 		src_addr_dph <= src_haddr;
 		src_size_dph <= src_hsize;
+		src_excl_dph <= src_hexcl && src_htrans[1];
+		if (src_excl_dph)
+			global_reservation_valid <= src_hexokay && !src_write_dph;
 	end
 end
 
@@ -87,6 +94,9 @@ always @ (posedge clk) if (rst_n) begin: dst_ahbl_req_properties
 		// this only supports INCRx bursts)
 		if (src_htrans == 2'b11)
 			assert(src_haddr == src_addr_dph + W_DATA / 8);
+		// No pipelining of exclusive transfers
+		if (src_excl_dph)
+			assert(!src_hexcl);
 	end
 
 	// Data phase properties:
@@ -94,6 +104,9 @@ always @ (posedge clk) if (rst_n) begin: dst_ahbl_req_properties
 		// Write data stable during write data phase
 		if (src_write_dph && !$past(src_hready))
 			assert($stable(src_hwdata));
+		// An exclusive write must match a prior exclusive read which was HEXOKAY=1
+		if (src_write_dph && src_excl_dph)
+			assert(global_reservation_valid);
 	end
 end
 
