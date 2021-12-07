@@ -576,7 +576,8 @@ always @ (*) begin
 			1'b1,              // Integer ISA
 			5'd0,              // H...D, no
 			|EXTENSION_C,
-			2'b0
+			1'b0,
+			|EXTENSION_A
 		};
 	end
 	MVENDORID: if (CSR_M_MANDATORY) begin

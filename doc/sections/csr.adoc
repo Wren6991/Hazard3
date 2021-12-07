@@ -85,6 +85,7 @@ Read-only, constant. Value depends on which ISA extensions Hazard3 is configured
 | 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
 | 12 | `m` | 1 if the M extension is present, otherwise 0.
 | 2 | `c` | 1 if the C extension is present, otherwise 0.
+| 0 | `a` | 1 if the A extension is present, otherwise 0.
 |===
 
 === Standard M-mode Trap Handling CSRs
