@@ -1040,14 +1040,24 @@ assign trap_addr =
 assign trap_is_irq = DEBUG_SUPPORT && (want_halt_except || want_halt_irq) ?
 	!want_halt_except : !exception_req_any;
 
+// When there is a loadstore dphase pending, we block off the IRQ trap
+// request, but still assert the trap_enter_soon flag. This blocks issue of
+// further load/stores which have not yet been locked into aphase, so the IRQ
+// can eventually go through. It's not safe to enter an IRQ when a dphase is
+// in progress, because that dphase could subsequently except, and sample the
+// IRQ vector PC instead of the load/store instruction PC.
+
 // delay_irq_entry also applies to IRQ-like debug entries.
 assign trap_enter_vld =
 	CSR_M_TRAP && (exception_req_any ||
-		!delay_irq_entry && !debug_mode && irq_active) ||
+		!delay_irq_entry && !debug_mode && irq_active && !loadstore_dphase_pending) ||
 	DEBUG_SUPPORT && (
 		(!delay_irq_entry && want_halt_irq) || want_halt_except || pending_dbg_resume);
 
-assign trap_enter_soon = trap_enter_vld || (DEBUG_SUPPORT && want_halt_irq_if_no_exception);
+assign trap_enter_soon = trap_enter_vld || (
+	|DEBUG_SUPPORT && want_halt_irq_if_no_exception ||
+	!delay_irq_entry && !debug_mode && irq_active && loadstore_dphase_pending
+);
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
@@ -1105,10 +1115,18 @@ always @ (posedge clk) begin
 	//   and an exception by e.g. a left-behind store data phase would sample the
 	//   wrong PC.
 	//
-	// - Except -> IRQ: would need to re-set mstatus.mie first
+	// - Except -> IRQ: would need to re-set mstatus.mie first, shouldn't happen
+	//
+	// Sole exclusion is mret. We can return from an interrupt/exception and take
+	// a new interrupt on the next cycle.
 
-	if ($past(trap_enter_vld && trap_enter_rdy))
+	if ($past(trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET))
 		assert(!(trap_enter_vld && trap_enter_rdy));
+
+	// Just to stress that this is the the only case:
+	if (trap_enter_vld && trap_enter_rdy && $past(trap_enter_vld && trap_enter_rdy))
+		assert($past(except == EXCEPT_MRET));
+
 end
 
 `endif

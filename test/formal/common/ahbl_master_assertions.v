@@ -96,7 +96,7 @@ always @ (posedge clk) if (rst_n) begin: dst_ahbl_req_properties
 			assert(src_haddr == src_addr_dph + W_DATA / 8);
 		// No pipelining of exclusive transfers
 		if (src_excl_dph)
-			assert(!src_hexcl);
+			assert(!(src_hexcl && src_htrans[1]));
 	end
 
 	// Data phase properties:
