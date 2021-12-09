@@ -862,7 +862,8 @@ always @ (*) begin
 		{MEMOP_LBU , 2'b01}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[15: 8]};
 		{MEMOP_LBU , 2'b10}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[23:16]};
 		{MEMOP_LBU , 2'b11}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[31:24]};
-		default:             m_rdata_pick_sext = bus_rdata_d;
+		{MEMOP_LW  , 2'bzz}: m_rdata_pick_sext = bus_rdata_d;
+		default:             m_rdata_pick_sext = 32'hxxxx_xxxx;
 	endcase
 
 	if (|EXTENSION_A && xm_memop == MEMOP_SC_W) begin
