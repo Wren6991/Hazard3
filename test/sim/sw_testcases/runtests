@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+import os
+import subprocess
+import sys
+
+testlist = []
+
+for path in os.listdir():
+	if os.path.isfile(path) and path.endswith(".c"):
+		testlist.append(path[:-2])
+
+testlist = sorted(testlist)
+
+tb_build_ret = subprocess.run(
+	["make", "-C", "../tb_cxxrtl", "tb"],
+	timeout=120
+)
+if tb_build_ret.returncode != 0:
+	sys.exit("Failed.")
+
+all_passed = True
+
+for test in testlist:
+	sys.stdout.write(f"{test:<30}")
+
+	test_build_ret = subprocess.run(
+		["make", f"APP={test}", f"tmp/{test}.bin"],
+		stdout=subprocess.DEVNULL
+	)
+	if test_build_ret.returncode != 0:
+		print("\033[33m[MK ERR]\033[39m")
+		all_passed = False
+		continue
+
+	test_run_ret = subprocess.run(
+		["../tb_cxxrtl/tb", f"tmp/{test}.bin", f"tmp/{test}_run.vcd", "--cycles", "1000000"],
+		stdout = subprocess.PIPE,
+		timeout=10
+	)
+	with open(f"tmp/{test}.log", "wb") as f:
+		f.write(test_run_ret.stdout)
+
+	# Testbench itself should always exit successfully.
+	if test_run_ret.returncode != 0:
+		sys.exit("Negative return code from testbench!")
+
+	# Pass if the program under test has zero exit code AND its output matches
+	# the expected output (if there is an expected_output file)
+
+	output_lines = test_run_ret.stdout.decode("utf-8").strip().splitlines()
+	returncode = -1
+	if len(output_lines) >= 2:
+		exit_line = output_lines[-2]
+		if exit_line.startswith("CPU requested halt"):
+			try:
+				returncode = int(exit_line.split(" ")[-1])
+			except:
+				pass
+	if returncode != 0:
+		print("\033[31m[BADRET]\033[39m")
+		all_passed = False
+		continue
+
+	if os.path.exists(f"{test}.expected_output"):
+		expected_lines = open(f"{test}.expected_output").read().strip().splitlines()
+		if expected_lines != output_lines[:-2]:
+			print("\033[31m[BADOUT]\033[39m")
+			all_passed = False
+			continue
+
+	print("\033[32m[PASSED]\033[39m")
+
+sys.exit(not all_passed)
+
+

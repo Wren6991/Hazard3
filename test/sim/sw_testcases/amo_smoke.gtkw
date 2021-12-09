@@ -2,10 +2,9 @@
 [*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
 [*] Sat Dec  4 23:25:19 2021
 [*]
-[dumpfile] "/home/luke/proj/hazard3/test/sim/amo_smoke/amo_smoke_run.vcd"
+[dumpfile] "tmp/amo_smoke_run.vcd"
 [dumpfile_mtime] "Sat Dec  4 23:21:36 2021"
 [dumpfile_size] 6246687
-[savefile] "/home/luke/proj/hazard3/test/sim/amo_smoke/amo_smoke.gtkw"
 [timestart] 420
 [size] 1975 1095
 [pos] -1 -1

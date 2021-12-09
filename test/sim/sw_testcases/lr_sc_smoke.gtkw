@@ -2,10 +2,9 @@
 [*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
 [*] Sat Dec  4 14:31:51 2021
 [*]
-[dumpfile] "/home/luke/proj/hazard3/test/sim/lr_sc_smoke/lr_sc_smoke_run.vcd"
+[dumpfile] "tmp/lr_sc_smoke_run.vcd"
 [dumpfile_mtime] "Sat Dec  4 14:20:04 2021"
 [dumpfile_size] 2577335
-[savefile] "/home/luke/proj/hazard3/test/sim/lr_sc_smoke/lr_sc_smoke.gtkw"
 [timestart] 842
 [size] 1975 1095
 [pos] -1 -1

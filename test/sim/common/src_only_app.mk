@@ -12,6 +12,7 @@ CROSS_PREFIX ?= riscv32-unknown-elf-
 TBDIR        ?= ../tb_cxxrtl
 INCDIR       ?= ../common
 MAX_CYCLES   ?= 100000
+TMP_PREFIX   ?= tmp/
 
 ###############################################################################
 
@@ -20,29 +21,30 @@ MAX_CYCLES   ?= 100000
 
 all: run
 
-run: $(APP).bin
-	$(TBDIR)/tb $(APP).bin $(APP)_run.vcd --cycles $(MAX_CYCLES)
+run: $(TMP_PREFIX)$(APP).bin
+	$(TBDIR)/tb $(TMP_PREFIX)$(APP).bin $(TMP_PREFIX)$(APP)_run.vcd --cycles $(MAX_CYCLES)
 
 view: run
-	gtkwave $(APP)_run.vcd
+	gtkwave $(TMP_PREFIX)$(APP)_run.vcd
 
-bin: $(APP).bin
+bin: $(TMP_PREFIX)$(APP).bin
 
 tb:
 	$(MAKE) -C $(TBDIR) tb
 
 clean:
-	rm -f $(APP).elf $(APP).bin $(APP).dis $(APP)_run.vcd
+	rm -rf $(TMP_PREFIX)
 
 clean_tb: clean
 	$(MAKE) -C $(TBDIR) clean
 
 ###############################################################################
 
-$(APP).bin: $(APP).elf
+$(TMP_PREFIX)$(APP).bin: $(TMP_PREFIX)$(APP).elf
 	$(CROSS_PREFIX)objcopy -O binary $^ $@
-	$(CROSS_PREFIX)objdump -h $(APP).elf > $(APP).dis
-	$(CROSS_PREFIX)objdump -d $(APP).elf >> $(APP).dis
+	$(CROSS_PREFIX)objdump -h $^ > $(TMP_PREFIX)$(APP).dis
+	$(CROSS_PREFIX)objdump -d $^ >> $(TMP_PREFIX)$(APP).dis
 
-$(APP).elf: $(SRCS) $(wildcard %.h)
-	$(CROSS_PREFIX)gcc $(CCFLAGS) $(SRCS) -T $(LDSCRIPT) $(addprefix -I,$(INCDIR)) -o $(APP).elf
+$(TMP_PREFIX)$(APP).elf: $(SRCS) $(wildcard %.h)
+	mkdir -p $(TMP_PREFIX)
+	$(CROSS_PREFIX)gcc $(CCFLAGS) $(SRCS) -T $(LDSCRIPT) $(addprefix -I,$(INCDIR)) -o $@

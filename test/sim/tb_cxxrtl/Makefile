@@ -16,7 +16,7 @@ MUL_FAST         := 1
 MULH_FAST        := 1
 REDUCED_BYPASS   := 0
 
-.PHONY: clean tb all
+.PHONY: clean all
 
 all: tb
 
@@ -36,7 +36,7 @@ SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
 SYNTH_CMD += chparam -set MULH_FAST $(MULH_FAST) $(TOP);
 SYNTH_CMD += write_cxxrtl dut.cpp
 
-dut.cpp:
+dut.cpp: $(shell listfiles ../../../hdl/hazard3.f);
 	yosys -p "$(SYNTH_CMD)" 2>&1 > cxxrtl.log
 
 clean::

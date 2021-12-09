@@ -3,8 +3,6 @@
 
 volatile uint32_t scratch[2];
 
-#define test_assert(cond, ...) if (!(cond)) {tb_printf(__VA_ARGS__); return -1;}
-
 int main() {
 
 	scratch[0] = 0;

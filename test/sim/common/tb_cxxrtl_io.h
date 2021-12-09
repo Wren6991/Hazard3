@@ -55,4 +55,6 @@ static inline void tb_printf(const char *fmt, ...) {
 	va_end(args);
 }
 
+#define tb_assert(cond, ...) if (!(cond)) {tb_printf(__VA_ARGS__); tb_exit(-1);}
+
 #endif
