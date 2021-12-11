@@ -894,10 +894,13 @@ always @ (posedge clk or negedge rst_n) begin
 `endif
 		if (d_memop_is_amo) begin
 			mw_local_exclusive_reserved <= 1'b0;
-		end else if (xm_memop == MEMOP_SC_W) begin
+		end else if (xm_memop == MEMOP_SC_W && bus_dph_ready_d) begin
 			mw_local_exclusive_reserved <= 1'b0;
-		end else if (xm_memop == MEMOP_LR_W) begin
-			mw_local_exclusive_reserved <= bus_dph_exokay_d;
+		end else if (xm_memop == MEMOP_LR_W && bus_dph_ready_d) begin
+			// In theory, the bus should never report HEXOKAY when HRESP is asserted.
+			// Still might happen (e.g. if HEXOKAY is tied high), so mask HEXOKAY with
+			// HREADY to be sure a failed lr.w clears the monitor.
+			mw_local_exclusive_reserved <= bus_dph_exokay_d && !bus_dph_err_d;
 		end
 	end
 end

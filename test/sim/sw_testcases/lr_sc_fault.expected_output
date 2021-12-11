@@ -1,0 +1,10 @@
+Failed load, suppressed store
+-> exception, mcause = 5
+exception instr: 100627af
+sc.w result: 0
+Good load, failed store
+-> exception, mcause = 7
+exception instr: 18a5a52f
+sc.w result: 123
+Repeated failed store
+sc.w result: 0
