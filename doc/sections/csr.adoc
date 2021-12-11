@@ -263,13 +263,15 @@ Address: `0xb00`
 
 Lower half of the 64-bit cycle counter. Readable and writable by software. Increments every cycle, unless `mcountinhibit.cy` is 1, or the processor is in Debug Mode (as <<reg-dcsr>>.`stopcount` is hardwired to 1).
 
-If written with a value `n` and read on the very next cycle, the value read will be exactly `n + 1` (ignoring wrapping).
+If written with a value `n` and read on the very next cycle, the value read will be exactly `n`. The RISC-V spec says this about `mcycle`: "Any CSR write takes effect after the writing instruction has otherwise completed."
 
 ==== mcycleh
 
 Address: `0xb80`
 
-Upper half of the 64-bit cycle counter. Readable and writable by software. Increments every time `mcycle` wraps from `0xffffffff` to `0x00000000` upon increment.
+Upper half of the 64-bit cycle counter. Readable and writable by software. Increments on cycles where `mcycle` has the value `0xffffffff`, unless `mcountinhibit.cy` is 1, or the processor is in Debug Mode.
+
+This includes when `mcycle` is written on that same cycle, since RISC-V specifies the CSR write takes place _after_ the increment for that cycle.
 
 ==== minstret
 
