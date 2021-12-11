@@ -1,15 +1,7 @@
 #include "tb_cxxrtl_io.h"
-
+#include "hazard3_csr.h"
 
 #include <stdint.h>
-
-#define read_csr(csrname) ({ \
-  uint32_t __csr_tmp_u32; \
-  asm volatile ("csrr %0, " #csrname : "=r" (__csr_tmp_u32)); \
-  __csr_tmp_u32; \
-})
-
-#define write_csr(csrname, val) __asm__ ("csrw " #csrname ", %0" : : "r" (val))
 
 void __attribute__((interrupt)) handle_exception() {
 	uint32_t call_num;

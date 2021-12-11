@@ -1,15 +1,5 @@
 #include "tb_cxxrtl_io.h"
-
-#define read_csr(csrname) ({ \
-  uint32_t __csr_tmp_u32; \
-  asm volatile ("csrr %0, " #csrname : "=r" (__csr_tmp_u32)); \
-  __csr_tmp_u32; \
-})
-
-#define write_csr(csrname, data) ({ \
-	asm volatile ("csrw " #csrname ", %0" : : "r" (data)); \
-})
-
+#include "hazard3_csr.h"
 
 int main() {
 	tb_puts("1: defined illegal all-zeroes\n");
