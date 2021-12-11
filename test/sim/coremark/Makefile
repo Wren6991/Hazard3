@@ -1,7 +1,7 @@
 APP          := coremark
 MAX_CYCLES   := 100000000
 
-CROSS_PREFIX ?= /opt/riscv/unstable/bin/riscv32-unknown-elf-
+CROSS_PREFIX ?= riscv32-unknown-elf-
 TBDIR        ?= ../tb_cxxrtl
 
 
@@ -13,7 +13,7 @@ TBDIR        ?= ../tb_cxxrtl
 all: run
 
 run: $(APP).bin
-	$(TBDIR)/tb $(APP).bin --cycles $(MAX_CYCLES)
+	$(TBDIR)/tb --bin $(APP).bin --cycles $(MAX_CYCLES)
 
 waves: $(APP).bin
 	$(TBDIR)/tb $(APP).bin $(APPNAME)_run.vcd --cycles $(MAX_CYCLES)
