@@ -1,0 +1,6 @@
+mvendorid:  deadbeef
+marchid:    0000001b
+mimpid:     12345678
+mhartid:    00000000
+mconfigptr: 9abcdef0
+misa:       40801105

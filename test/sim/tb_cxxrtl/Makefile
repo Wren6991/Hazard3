@@ -15,6 +15,10 @@ MUL_FAST         := 1
 MULH_FAST        := 1
 REDUCED_BYPASS   := 0
 
+MVENDORID_VAL    := 32'hdeadbeef
+MIMPID_VAL       := 32'h12345678
+MCONFIGPTR_VAL   := 32'h9abcdef0
+
 .PHONY: clean all
 
 all: tb
@@ -33,6 +37,9 @@ SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
 SYNTH_CMD += chparam -set MULDIV_UNROLL $(MULDIV_UNROLL) $(TOP);
 SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
 SYNTH_CMD += chparam -set MULH_FAST $(MULH_FAST) $(TOP);
+SYNTH_CMD += chparam -set MVENDORID_VAL $(MVENDORID_VAL) $(TOP);
+SYNTH_CMD += chparam -set MIMPID_VAL $(MIMPID_VAL) $(TOP);
+SYNTH_CMD += chparam -set MCONFIGPTR_VAL $(MCONFIGPTR_VAL) $(TOP);
 SYNTH_CMD += hierarchy -top $(TOP);
 SYNTH_CMD += write_cxxrtl dut.cpp
 
