@@ -50,7 +50,7 @@ void __attribute__((interrupt)) handle_exception() {
 	tb_printf("Exception, mcause = %u\n", mcause);
 
 	uint16_t i0 = *(uint16_t*)mepc;
-	if (i0 & 0x3u == 0x3u) {
+	if ((i0 & 0x3u) == 0x3u) {
 		uint16_t i1 = *(uint16_t*)(mepc + 2);
 		tb_printf("32-bit illegal instruction: %04x%04x\n", i1, i0);
 		mepc += 4;

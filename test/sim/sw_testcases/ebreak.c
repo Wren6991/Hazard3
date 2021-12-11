@@ -51,7 +51,7 @@ int main() {
 void __attribute__((interrupt)) handle_exception() {
 	tb_printf("mcause = %u\n", read_csr(mcause));
 	tb_printf("Offset into test: %u, ", read_csr(mepc) - (uintptr_t)&test);
-	if (*(uint16_t*)read_csr(mepc) & 0x3 == 0x3) {
+	if ((*(uint16_t*)read_csr(mepc) & 0x3) == 0x3) {
 		tb_puts("32-bit ebreak\n");
 		write_csr(mepc, read_csr(mepc) + 4);
 	}

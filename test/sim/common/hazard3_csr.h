@@ -5,10 +5,10 @@
 #include "stdint.h"
 #endif
 
-#define hazard3_csr_midcr 0xbc0
-#define hazard3_csr_meie0 0xbe0 // External interrupt enable IRQ0 -> 31
-#define hazard3_csr_meip0 0xfe0 // External interrupt pending IRQ0 -> 31
-#define hazard3_csr_mlei  0xfe4 // Lowest external interrupt (pending & enabled)
+#define hazard3_csr_dmdata0 0xbff // Debug-mode shadow CSR for DM data transfer
+#define hazard3_csr_meie0   0xbe0 // External interrupt enable IRQ0 -> 31
+#define hazard3_csr_meip0   0xfe0 // External interrupt pending IRQ0 -> 31
+#define hazard3_csr_mlei    0xfe4 // Lowest external interrupt (pending & enabled)
 
 #define _read_csr(csrname) ({ \
   uint32_t __csr_tmp_u32; \

@@ -68,7 +68,7 @@ void __attribute__((interrupt)) handle_exception() {
 	tb_printf("-> exception, mcause = %u\n", read_csr(mcause));
 	write_csr(mcause, 0);
 	uint32_t mepc = read_csr(mepc);
-	if (*(uint16_t*)mepc & 0x3 == 0x3) {
+	if ((*(uint16_t*)mepc & 0x3) == 0x3) {
 		tb_printf("exception instr: %04x%04x\n", *(uint16_t*)(mepc + 2), *(uint16_t*)mepc);
 		write_csr(mepc, mepc + 4);
 	}

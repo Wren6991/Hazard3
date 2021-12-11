@@ -37,7 +37,7 @@ int main() {
 void __attribute__((interrupt)) handle_exception() {
 	tb_printf("-> exception, mcause = %u\n", read_csr(mcause));
 	write_csr(mcause, 0);
-	if (*(uint16_t*)read_csr(mepc) & 0x3 == 0x3) {
+	if ((*(uint16_t*)read_csr(mepc) & 0x3) == 0x3) {
 		write_csr(mepc, read_csr(mepc) + 4);
 	}
 	else {

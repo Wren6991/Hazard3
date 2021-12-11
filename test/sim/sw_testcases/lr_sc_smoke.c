@@ -24,6 +24,8 @@ int main() {
 		"lr.w %0, (%2)\n"
 		"nop\n"
 		"sc.w %1, %3, (%2)\n"
+		// Note the "&": this marks an "earlyclobber" operand, telling GCC it can't
+		// allocate this output to an input register. (particularly, %0 to %2)
 		: "=&r" (load_result), "=r" (success)
 		: "r" (&scratch[0]), "r" (0x5678)
 	);
