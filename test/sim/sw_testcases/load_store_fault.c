@@ -4,6 +4,28 @@
 // Check load/stores which generate a bus fault generate an exception, and
 // report the correct mcause and mepc.
 
+/*EXPECTED-OUTPUT***************************************************************
+
+-> exception, mcause = 7
+exception instr: 0007a023
+-> exception, mcause = 7
+exception instr: 00079023
+-> exception, mcause = 7
+exception instr: 00078023
+-> exception, mcause = 5
+exception instr: 0007a003
+-> exception, mcause = 5
+exception instr: 00079003
+-> exception, mcause = 5
+exception instr: 0007d003
+-> exception, mcause = 5
+exception instr: 00078003
+-> exception, mcause = 5
+exception instr: 0007c003
+Done.
+
+*******************************************************************************/
+
 int main() {
 	// Word-aligned address which generates an access fault. Constrained to a
 	// particular register, because the instructions appear in the test log to

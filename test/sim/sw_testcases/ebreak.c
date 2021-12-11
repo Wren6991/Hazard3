@@ -1,6 +1,21 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
+/*EXPECTED-OUTPUT***************************************************************
+
+Entering test section
+mcause = 3
+Offset into test: 0, 32-bit ebreak
+mcause = 3
+Offset into test: 4, 16-bit ebreak
+mcause = 3
+Offset into test: 6, 32-bit ebreak
+mcause = 3
+Offset into test: 10, 16-bit ebreak
+Done
+
+*******************************************************************************/
+
 // This is naked so we can take its address and get accurate offsets for the
 // breakpoints, which we can then check. Otherwise, we would have issues with
 // the size of the prologue potentially varying between builds etc.

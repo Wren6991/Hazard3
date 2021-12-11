@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 
+/*EXPECTED-OUTPUT***************************************************************
+
+mcause = 1
+mepc = 56789abc
+
+*******************************************************************************/
+
 int main() {
 	uintptr_t illegal_addr = 0x56789abc;
 	asm volatile ("jr %0" : : "r" (illegal_addr));

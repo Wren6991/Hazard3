@@ -1,6 +1,29 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
+/*EXPECTED-OUTPUT***************************************************************
+
+Load halfword signed, 1 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load halfword signed, 3 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load halfword signed aligned (sanity check)
+Result: ffffcdef
+Result: 00001234
+Load halfword unsigned, 1 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load halfword unsigned, 3 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load halfword unsigned aligned (sanity check)
+Result: 0000cdef
+Result: 00001234
+
+*******************************************************************************/
+
 int main() {
 	volatile uint32_t target_word = 0x1234cdefu;
 	volatile uint32_t result_word = 0;

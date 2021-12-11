@@ -1,6 +1,24 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
+// Check misaligned word stores generate exception with correct mcause
+
+/*EXPECTED-OUTPUT***************************************************************
+
+Store word, 1 byte offset
+-> exception, mcause = 6
+Target value: ffffffff
+Store word, 2 byte offset
+-> exception, mcause = 6
+Target value: ffffffff
+Store word, 3 byte offset
+-> exception, mcause = 6
+Target value: ffffffff
+Aligned store word, sanity check
+Target value: 00000000
+
+*******************************************************************************/
+
 int main() {
 	volatile uint32_t target_word = -1u;
 	tb_puts("Store word, 1 byte offset\n");

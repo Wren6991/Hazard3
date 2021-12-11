@@ -4,6 +4,17 @@
 // This is a new CSR for priv-1.12. Most compilers (maybe binutils?) don't know about it.
 #define mconfigptr 0xf15
 
+/*EXPECTED-OUTPUT***************************************************************
+
+mvendorid:  deadbeef
+marchid:    0000001b
+mimpid:     12345678
+mhartid:    00000000
+mconfigptr: 9abcdef0
+misa:       40801105
+
+*******************************************************************************/
+
 int main() {
 	// Expected value: 32'hdeadbeef, set in tb Makefile
 	tb_printf("mvendorid:  %08x\n", read_csr(mvendorid ));

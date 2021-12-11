@@ -1,6 +1,22 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
+// Check misaligned halfword stores generate exception with correct mcause
+
+/*EXPECTED-OUTPUT***************************************************************
+
+Store halfword, 1 byte offset
+-> exception, mcause = 6
+Target value: ffffffff
+Store halfword, 3 byte offset
+-> exception, mcause = 6
+Target value: ffffffff
+Aligned store halfword, sanity check
+Target value: ffff0000
+Target value: 00000000
+
+*******************************************************************************/
+
 int main() {
 	volatile uint32_t target_word = -1u;
 	tb_puts("Store halfword, 1 byte offset\n");

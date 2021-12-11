@@ -1,6 +1,22 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
+/*EXPECTED-OUTPUT***************************************************************
+
+Load word, 1 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load word, 2 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load word, 3 byte offset
+-> exception, mcause = 4
+Result: 00000000
+Load word aligned (sanity check)
+Result: ffffffff
+
+*******************************************************************************/
+
 int main() {
 	volatile uint32_t target_word = -1u;
 	volatile uint32_t result_word = 0;

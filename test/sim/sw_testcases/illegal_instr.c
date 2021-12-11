@@ -1,6 +1,26 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
+/*EXPECTED-OUTPUT***************************************************************
+
+1: defined illegal all-zeroes
+Exception, mcause = 2
+16-bit illegal instruction: 0000
+2: defined illegal all-ones
+Exception, mcause = 2
+32-bit illegal instruction: ffffffff
+3: unimplemented CSR 0xfff
+Exception, mcause = 2
+32-bit illegal instruction: fff027f3
+4: write to read-only CSR
+Exception, mcause = 2
+32-bit illegal instruction: f1101073
+5: unimplemented instruction (F extension)
+Exception, mcause = 2
+32-bit illegal instruction: 00052087
+
+*******************************************************************************/
+
 int main() {
 	tb_puts("1: defined illegal all-zeroes\n");
 	asm volatile (".hword 0x0000");

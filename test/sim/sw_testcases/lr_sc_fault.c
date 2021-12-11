@@ -1,10 +1,27 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
 
-// Check lr/sc which generate a bus fault generate an exception, and
-// report the correct mcause and mepc.
+// Check lr/sc which encounter bus faults generate exceptions, and report the
+// correct mcause and mepc.
 
-// Calling convention abuse to get stable register allocation without cursed register keyword
+/*EXPECTED-OUTPUT***************************************************************
+
+Failed load, suppressed store
+-> exception, mcause = 5
+exception instr: 100627af
+sc.w result: 0
+Good load, failed store
+-> exception, mcause = 7
+exception instr: 18a5a52f
+sc.w result: 123
+Repeated failed store
+sc.w result: 0
+
+*******************************************************************************/
+
+// Calling convention abuse to get stable register allocation without cursed
+// register keyword. We need stable registers because the excepting
+// instructions are in the test log.
 uint32_t __attribute__((naked)) do_lr_sc(uint32_t initial_sc, uint32_t *dst, const uint32_t *src) {
 	asm volatile (
 		// a5 used as a dumpster

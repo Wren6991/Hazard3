@@ -3,6 +3,22 @@
 
 #include <stdint.h>
 
+/*EXPECTED-OUTPUT***************************************************************
+
+mcause initial value:
+00000000
+Handling ecall. Call number:
+00000123
+Handling ecall. Call number:
+00000456
+Handling ecall. Call number:
+deadbeef
+Finished making calls.
+mcause final value:
+0000000b
+
+*******************************************************************************/
+
 void __attribute__((interrupt)) handle_exception() {
 	uint32_t call_num;
 	asm volatile ("mv %0, a7" : "=r" (call_num));

@@ -62,9 +62,22 @@ for test in testlist:
 		all_passed = False
 		continue
 
-	if os.path.exists(f"{test}.expected_output"):
-		expected_lines = open(f"{test}.expected_output").read().strip().splitlines()
-		if expected_lines != output_lines[:-2]:
+	test_src = open(f"{test}.c").read()
+	if "/*EXPECTED-OUTPUT" in test_src:
+		good_output = True
+		try:
+			expected_start = test_src.find("/*EXPECTED-OUTPUT")
+			expected_end = test_src.find("*/", expected_start)
+			expected_lines = test_src[expected_start:expected_end + 1].splitlines()[1:-1]
+			while expected_lines[0].strip() == "":
+				del expected_lines[0]
+			while expected_lines[-1].strip() == "":
+				del expected_lines[-1]
+			if expected_lines != output_lines[:-2]:
+				good_output = False
+		except:
+			good_output = False
+		if not good_output:
 			print("\033[31m[BADOUT]\033[39m")
 			all_passed = False
 			continue

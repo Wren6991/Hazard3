@@ -1,9 +1,0 @@
-Store halfword, 1 byte offset
--> exception, mcause = 6
-Target value: ffffffff
-Store halfword, 3 byte offset
--> exception, mcause = 6
-Target value: ffffffff
-Aligned store halfword, sanity check
-Target value: ffff0000
-Target value: 00000000
