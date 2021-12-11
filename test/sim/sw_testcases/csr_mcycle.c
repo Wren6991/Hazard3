@@ -63,7 +63,7 @@ int main() {
 	asm volatile (
 		"csrw mcycle, zero \n"
 		"csrw mcycleh, zero\n" // in-cycle register values:
-		"csrw mcycle,%3    \n" // mcycle ==  0, mcycleh == 0
+		"csrw mcycle,%3    \n" // mcycle ==  1, mcycleh == 0
 		"csrw mcycle,%3    \n" // mcycle == -1, mcycleh == 0
 		"csrw mcycle,%3    \n" // mcycle == -1, mcycleh == 1
 		"csrw mcycle,%3    \n" // mcycle == -1, mcycleh == 2
