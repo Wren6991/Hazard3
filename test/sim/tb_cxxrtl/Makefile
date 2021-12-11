@@ -1,6 +1,6 @@
 TOP              := tb
 
-CPU_RESET_VECTOR := 32'hc0
+CPU_RESET_VECTOR := 32'h40
 
 EXTENSION_C      := 1
 EXTENSION_M      := 1

@@ -49,11 +49,6 @@ j \name
 	VEC .halt
 	VEC .halt
 
-// TODO remove (update ldscripts first)
-.rept 32
-.word 0
-.endr
-
 // ----------------------------------------------------------------------------
 // Reset handler
 
