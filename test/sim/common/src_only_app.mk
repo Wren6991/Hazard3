@@ -22,7 +22,7 @@ TMP_PREFIX   ?= tmp/
 all: run
 
 run: $(TMP_PREFIX)$(APP).bin
-	$(TBDIR)/tb $(TMP_PREFIX)$(APP).bin $(TMP_PREFIX)$(APP)_run.vcd --cycles $(MAX_CYCLES)
+	$(TBDIR)/tb --bin $(TMP_PREFIX)$(APP).bin --vcd $(TMP_PREFIX)$(APP)_run.vcd --cycles $(MAX_CYCLES)
 
 view: run
 	gtkwave $(TMP_PREFIX)$(APP)_run.vcd

@@ -6,8 +6,7 @@
 #define IO_EXIT       (IO_BASE + 0x8)
 
 // Provide trap vector table, reset handler and weak default trap handlers for
-// Hazard5. This is not a crt0: the reset handler calls an external _start
-
+// Hazard3. This is not a crt0: the reset handler calls an external _start
 
 .option push
 .option norelax

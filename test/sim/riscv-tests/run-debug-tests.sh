@@ -1,6 +1,6 @@
 set -e
 
-make -C ../openocd/ clean tb
+make -C ../tb_cxxrtl/ tb
 cd riscv-tests/debug
 
 # Clean up old logs and test binaries
@@ -11,7 +11,7 @@ done
 
 # Only applicable tests are included
 ./gdbserver.py \
-	--sim_cmd ../../../openocd/tb \
+	--sim_cmd "../../../tb_cxxrtl/tb --port 9824" \
 	--server_cmd riscv-openocd \
 	--gdb riscv32-unknown-elf-gdb \
 	--gcc riscv32-unknown-elf-gcc \

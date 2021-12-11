@@ -34,7 +34,7 @@ for test in testlist:
 		continue
 
 	test_run_ret = subprocess.run(
-		["../tb_cxxrtl/tb", f"tmp/{test}.bin", f"tmp/{test}_run.vcd", "--cycles", "1000000"],
+		["../tb_cxxrtl/tb", "--bin", f"tmp/{test}.bin", "--vcd", f"tmp/{test}_run.vcd", "--cycles", "1000000"],
 		stdout = subprocess.PIPE,
 		timeout=10
 	)

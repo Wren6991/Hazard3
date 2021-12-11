@@ -4,9 +4,7 @@
 `default_nettype none
 
 module tb #(
-	parameter W_DATA = 32,
-	parameter W_ADDR = 32,
-	parameter NUM_IRQ = 16
+`include "hazard3_config.vh"
 ) (
 	// Global signals
 	input wire               clk,
@@ -183,21 +181,7 @@ assign sys_reset_done = rst_n_cpu;
 assign hart_reset_done = rst_n_cpu;
 
 hazard3_cpu_2port #(
-	.RESET_VECTOR    (32'hc0),
-	.MTVEC_INIT      (32'h00),
-	.EXTENSION_C     (1),
-	.EXTENSION_M     (1),
-	.CSR_M_MANDATORY (1),
-	.CSR_M_TRAP      (1),
-	.CSR_COUNTER     (1),
-	.DEBUG_SUPPORT   (1),
-	.NUM_IRQ         (NUM_IRQ),
-	.MVENDORID_VAL   (32'hdeadbeef),
-	.MIMPID_VAL      (32'h12345678),
-	.MHARTID_VAL     (32'h0),
-	.REDUCED_BYPASS  (0),
-	.MULDIV_UNROLL   (2),
-	.MUL_FAST        (1),
+`include "hazard3_config_inst.vh"
 ) cpu (
 	.clk                        (clk),
 	.rst_n                      (rst_n_cpu),

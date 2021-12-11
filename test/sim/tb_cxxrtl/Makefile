@@ -1,5 +1,4 @@
-TOP              := hazard3_cpu_2port
-CDEFINES         := DUAL_PORT
+TOP              := tb
 
 CPU_RESET_VECTOR := 32'hc0
 
@@ -9,7 +8,7 @@ EXTENSION_ZBA    := 1
 EXTENSION_ZBB    := 1
 EXTENSION_ZBC    := 1
 EXTENSION_ZBS    := 1
-DEBUG_SUPPORT    := 0
+DEBUG_SUPPORT    := 1
 
 MULDIV_UNROLL    := 2
 MUL_FAST         := 1
@@ -20,7 +19,7 @@ REDUCED_BYPASS   := 0
 
 all: tb
 
-SYNTH_CMD += read_verilog -I ../../../hdl $(shell listfiles ../../../hdl/hazard3.f);
+SYNTH_CMD += read_verilog -I ../../../hdl $(shell listfiles tb.f);
 SYNTH_CMD += chparam -set EXTENSION_C $(EXTENSION_C) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_M $(EXTENSION_M) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_ZBA $(EXTENSION_ZBA) $(TOP);
@@ -34,13 +33,14 @@ SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
 SYNTH_CMD += chparam -set MULDIV_UNROLL $(MULDIV_UNROLL) $(TOP);
 SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
 SYNTH_CMD += chparam -set MULH_FAST $(MULH_FAST) $(TOP);
+SYNTH_CMD += hierarchy -top $(TOP);
 SYNTH_CMD += write_cxxrtl dut.cpp
 
-dut.cpp: $(shell listfiles ../../../hdl/hazard3.f);
+dut.cpp: $(shell listfiles tb.f)
 	yosys -p "$(SYNTH_CMD)" 2>&1 > cxxrtl.log
 
 clean::
 	rm -f dut.cpp cxxrtl.log tb
 
-tb: dut.cpp
+tb: dut.cpp tb.cpp
 	clang++ -O3 -std=c++14 $(addprefix -D,$(CDEFINES)) -I $(shell yosys-config --datdir)/include tb.cpp -o tb

@@ -55,7 +55,7 @@ define make-test-target
 	$(CROSS_PREFIX)objdump -h tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).elf > tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).dis
 	$(CROSS_PREFIX)objdump -d tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).elf >> tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).dis
 	$(CROSS_PREFIX)objcopy -O binary tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).elf tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).bin
-	$(SIM_EXEC) tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).bin tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).vcd --dump 0x400000 0x401000 > tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).log
+	$(SIM_EXEC) --bin tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).bin --vcd tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).vcd --dump 0x400000 0x401000 --cycles 1000000 > tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).log
 	./compare_testvec tmp/$(TEST_ARCH)-$1-on-$(BIN_ARCH).log riscv-arch-test/riscv-test-suite/rv32i_m/$(TEST_ARCH)/references/$1.reference_output
 endef
 
