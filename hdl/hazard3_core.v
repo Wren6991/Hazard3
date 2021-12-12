@@ -936,7 +936,7 @@ end
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mw_local_exclusive_reserved <= 1'b0;
-	end else if (|EXTENSION_A && !m_stall) begin
+	end else if (|EXTENSION_A && (!m_stall || bus_dph_err_d)) begin
 `ifdef FORMAL
 		// AMOs should handle the entire bus transfer in stage X.
 		assert(xm_memop != MEMOP_AMOADD_W);
