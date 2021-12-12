@@ -409,7 +409,7 @@ hazard3_alu #(
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		x_amo_phase <= 3'h0;
-	end else if (|EXTENSION_A && (bus_aph_ready_d || bus_dph_ready_d || m_trap_enter_vld)) begin
+	end else if (|EXTENSION_A && (bus_aph_ready_d || bus_dph_ready_d || m_trap_enter_vld || x_unaligned_addr)) begin
 		if (!d_memop_is_amo) begin
 			x_amo_phase <= 3'h0;
 		end else if (x_stall_on_raw) begin
@@ -419,8 +419,12 @@ always @ (posedge clk or negedge rst_n) begin
 			assert(x_amo_phase == 3'h0);
 `endif
 			x_amo_phase <= 3'h0;
-		end else if (m_trap_enter_vld) begin
+		end else if (m_trap_enter_vld && (x_amo_phase != 3'h4 || m_trap_enter_rdy)) begin
+			// If AMO caused the exception (amo_phase is 4) wait for rdy.
+			// Otherwise bail out to 0 to squash the in-progress AMO.
 			x_amo_phase <= 3'h0;
+		end else if (x_unaligned_addr) begin
+			x_amo_phase <= 3'h4;			
 		end else if (x_amo_phase == 3'h1 && !bus_dph_exokay_d) begin
 			// Load reserve fail indicates the memory region does not support
 			// exclusives, so we will never succeed at store. Exception.
@@ -620,11 +624,12 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
-	x_csr_illegal_access                                ? EXCEPT_INSTR_ILLEGAL :
-	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo ? EXCEPT_STORE_ALIGN   :
-	|EXTENSION_A && x_amo_phase == 3'h4                 ? EXCEPT_STORE_FAULT   :
-	x_unaligned_addr &&  x_memop_write                  ? EXCEPT_STORE_ALIGN   :
-	x_unaligned_addr && !x_memop_write                  ? EXCEPT_LOAD_ALIGN    : d_except;
+	x_csr_illegal_access                                   ? EXCEPT_INSTR_ILLEGAL :
+	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo    ? EXCEPT_STORE_ALIGN   :
+	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr? EXCEPT_STORE_ALIGN   :
+	|EXTENSION_A && x_amo_phase == 3'h4                    ? EXCEPT_STORE_FAULT   :
+	x_unaligned_addr &&  x_memop_write                     ? EXCEPT_STORE_ALIGN   :
+	x_unaligned_addr && !x_memop_write                     ? EXCEPT_LOAD_ALIGN    : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
