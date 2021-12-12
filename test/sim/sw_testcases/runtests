@@ -73,6 +73,14 @@ for test in testlist:
 				del expected_lines[0]
 			while expected_lines[-1].strip() == "":
 				del expected_lines[-1]
+
+			# Allow single-line comments within the expected output, in case some of
+			# the output needs explanation inline in the test source. If the line is
+			# empty after stripping comments, still don't remove the line.
+			for i, l in enumerate(expected_lines):
+				if "//" in l:
+					expected_lines[i] = l.split("//")[0].rstrip()
+
 			if expected_lines != output_lines[:-2]:
 				good_output = False
 		except:

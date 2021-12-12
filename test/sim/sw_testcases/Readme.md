@@ -22,7 +22,7 @@ int main() {
 }
 ```
 
-The contents of the `EXPECTED-OUTPUT` comment is simply compared with the logged text from `tb_puts`, `tb_printf` etc. Tests might log a range of output here, such as `mcause` values in exceptions.
+The contents of the `EXPECTED-OUTPUT` comment is simply compared with the logged text from `tb_puts`, `tb_printf` etc. Tests might log a range of output here, such as `mcause` values in exceptions. The contents of this comment may have inline `//` comments embedded within, and these are stripped by the test script before comparing with the output. This is useful if some of the test output requires some brief inline explanation in the test source. 
 
 To run the tests:
 
