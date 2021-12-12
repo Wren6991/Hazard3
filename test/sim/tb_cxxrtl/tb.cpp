@@ -18,13 +18,17 @@ uint8_t mem[MEM_SIZE];
 
 static const unsigned int IO_BASE = 0x80000000;
 enum {
-	IO_PRINT_CHAR = 0x000,
-	IO_PRINT_U32  = 0x004,
-	IO_EXIT       = 0x008,
-	IO_MTIME      = 0x100,
-	IO_MTIMEH     = 0x104,
-	IO_MTIMECMP   = 0x108,
-	IO_MTIMECMPH  = 0x10c
+	IO_PRINT_CHAR  = 0x000,
+	IO_PRINT_U32   = 0x004,
+	IO_EXIT        = 0x008,
+	IO_SET_SOFTIRQ = 0x010,
+	IO_CLR_SOFTIRQ = 0x014,
+	IO_SET_IRQ     = 0x020,
+	IO_CLR_IRQ     = 0x030,
+	IO_MTIME       = 0x100,
+	IO_MTIMEH      = 0x104,
+	IO_MTIMECMP    = 0x108,
+	IO_MTIMECMPH   = 0x10c
 };
 
 static const int TCP_BUF_SIZE = 256;
@@ -300,6 +304,18 @@ int main(int argc, char **argv) {
 					printf("Ran for %ld cycles\n", cycle + 1);
 					break;
 				}
+				else if (bus_addr == IO_BASE + IO_SET_SOFTIRQ) {
+					top.p_soft__irq.set<bool>(true);
+				}
+				else if (bus_addr == IO_BASE + IO_CLR_SOFTIRQ) {
+					top.p_soft__irq.set<bool>(false);
+				}
+				else if (bus_addr == IO_BASE + IO_SET_IRQ) {
+					top.p_irq.set<uint32_t>(top.p_irq.get<uint32_t>() | wdata);
+				}
+				else if (bus_addr == IO_BASE + IO_CLR_IRQ) {
+					top.p_irq.set<uint32_t>(top.p_irq.get<uint32_t>() & ~wdata);
+				}
 				else if (bus_addr == IO_BASE + IO_MTIME) {
 					mtime = (mtime & 0xffffffff00000000u) | wdata;
 				}
@@ -324,6 +340,12 @@ int main(int argc, char **argv) {
 						mem[bus_addr + 1] << 8 |
 						mem[bus_addr + 2] << 16 |
 						mem[bus_addr + 3] << 24;
+				}
+				else if (bus_addr == IO_BASE + IO_SET_SOFTIRQ || bus_addr == IO_BASE + IO_CLR_SOFTIRQ) {
+					rdata = top.p_soft__irq.get<bool>();
+				}
+				else if (bus_addr == IO_BASE + IO_SET_IRQ || bus_addr == IO_BASE + IO_CLR_IRQ) {
+					rdata = top.p_irq.get<uint32_t>();
 				}
 				else if (bus_addr == IO_BASE + IO_MTIME) {
 					rdata = mtime;
