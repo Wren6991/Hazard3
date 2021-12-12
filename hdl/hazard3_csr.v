@@ -266,24 +266,15 @@ localparam DMDATA0        = 12'hbff; // Custom read/write
 // Names are (reg)_(field)
 
 // Generic update logic for write/set/clear of an entire CSR:
-function [XLEN-1:0] update;
-	input [XLEN-1:0] prev;
-begin
-	update =
-		wtype == CSR_WTYPE_C ? prev & ~wdata :
-		wtype == CSR_WTYPE_S ? prev | wdata :
-		wdata;
-end
-endfunction
+wire [XLEN-1:0] wdata_update =
+		wtype == CSR_WTYPE_C ? rdata & ~wdata :
+		wtype == CSR_WTYPE_S ? rdata |  wdata : wdata;
 
 function [XLEN-1:0] update_nonconst;
 	input [XLEN-1:0] prev;
 	input [XLEN-1:0] nonconst;
 begin
-	update_nonconst = ((
-		wtype == CSR_WTYPE_C ? prev & ~wdata :
-		wtype == CSR_WTYPE_S ? prev | wdata :
-		wdata) & nonconst) | (prev & ~nonconst) ;
+		update_nonconst = (wdata_update & nonconst) | (prev & ~nonconst) ;
 end
 endfunction
 
@@ -322,10 +313,7 @@ always @ (posedge clk or negedge rst_n) begin
 				mstatus_mie <= 1'b0;
 			end
 		end else if (wen && addr == MSTATUS) begin
-			{mstatus_mpie, mstatus_mie} <=
-				wtype == CSR_WTYPE_C ? {mstatus_mpie, mstatus_mie} & ~{wdata[7], wdata[3]} :
-				wtype == CSR_WTYPE_S ? {mstatus_mpie, mstatus_mie} |  {wdata[7], wdata[3]} :
-				                                                      {wdata[7], wdata[3]} ;
+			{mstatus_mpie, mstatus_mie} <= {wdata_update[7], wdata_update[3]};
 		end
 	end
 end
@@ -337,7 +325,7 @@ always @ (posedge clk or negedge rst_n) begin
 		mscratch <= X0;
 	end else if (CSR_M_TRAP) begin
 		if (wen && addr == MSCRATCH)
-			mscratch <= update(mscratch);
+			mscratch <= wdata_update;
 	end
 end
 
@@ -367,7 +355,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
 			mepc <= mepc_in & MEPC_MASK;
 		end else if (wen && addr == MEPC) begin
-			mepc <= update(mepc) & MEPC_MASK;
+			mepc <= wdata_update & MEPC_MASK;
 		end
 	end
 end
@@ -409,10 +397,7 @@ always @ (posedge clk or negedge rst_n) begin
 			mcause_irq <= mcause_irq_next;
 			mcause_code <= mcause_code_next;
 		end else if (wen && addr == MCAUSE) begin
-			{mcause_irq, mcause_code} <=
-				wtype == CSR_WTYPE_C ? {mcause_irq, mcause_code} & ~{wdata[31], wdata[5:0]} :
-				wtype == CSR_WTYPE_S ? {mcause_irq, mcause_code} |  {wdata[31], wdata[5:0]} :
-				                                                    {wdata[31], wdata[5:0]} ;
+			{mcause_irq, mcause_code} <= {wdata_update[31], wdata_update[5:0]};
 		end
 	end
 end
@@ -448,13 +433,6 @@ reg [XLEN-1:0] mcycle;
 reg [XLEN-1:0] minstreth;
 reg [XLEN-1:0] minstret;
 
-wire [XLEN-1:0] ctr_update = update(
-	{addr[7], addr[1]} == 2'b00 ? mcycle   :
-	{addr[7], addr[1]} == 2'b01 ? minstret :
-	{addr[7], addr[1]} == 2'b10 ? mcycleh  :
-	                              minstreth
-);
-
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mcycleh <= X0;
@@ -475,18 +453,15 @@ always @ (posedge clk or negedge rst_n) begin
 				| ({minstreth, minstret} & ({2*XLEN{1'b1}} << W_COUNTER));
 		if (wen) begin
 			if (addr == MCYCLEH)
-				mcycleh <= ctr_update;
+				mcycleh <= wdata_update;
 			if (addr == MCYCLE)
-				mcycle <= ctr_update;
+				mcycle <= wdata_update;
 			if (addr == MINSTRETH)
-				minstreth <= ctr_update;
+				minstreth <= wdata_update;
 			if (addr == MINSTRET)
-				minstret <= ctr_update;
+				minstret <= wdata_update;
 			if (addr == MCOUNTINHIBIT) begin
-				{mcountinhibit_ir, mcountinhibit_cy} <=
-					wtype == CSR_WTYPE_C ? {mcountinhibit_ir, mcountinhibit_cy} & ~{wdata[2], wdata[0]} :
-					wtype == CSR_WTYPE_S ? {mcountinhibit_ir, mcountinhibit_cy} |  {wdata[2], wdata[0]} :
-					                                                               {wdata[2], wdata[0]} ;
+				{mcountinhibit_ir, mcountinhibit_cy} <= {wdata_update[2], wdata_update[0]};
 			end
 		end
 	end
@@ -519,10 +494,7 @@ always @ (posedge clk or negedge rst_n) begin
 		dcsr_cause <= 3'h0;
 	end else if (DEBUG_SUPPORT) begin
 		if (debug_mode && wen && addr == DCSR) begin
-			{dcsr_ebreakm, dcsr_step} <=
-				wtype == CSR_WTYPE_C ? {dcsr_ebreakm, dcsr_step} & ~{wdata[15], wdata[2]} :
-				wtype == CSR_WTYPE_S ? {dcsr_ebreakm, dcsr_step} |  {wdata[15], wdata[2]} :
-				                                                    {wdata[15], wdata[2]} ;
+			{dcsr_ebreakm, dcsr_step} <= {wdata_update[15], wdata_update[2]};
 		end
 		if (enter_debug_mode) begin
 			dcsr_cause <= dcause_next;
@@ -540,7 +512,7 @@ always @ (posedge clk or negedge rst_n) begin
 			dpc <= mepc_in;
 		else if (debug_mode && wen && addr == DPC)
 			// 1 or 2 LSBs are hardwired to 0, depending on IALIGN.
-			dpc <= update(dpc) & (~X0 << 2 - EXTENSION_C);
+			dpc <= wdata_update & (~X0 << 2 - EXTENSION_C);
 	end
 end
 
