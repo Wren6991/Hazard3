@@ -440,8 +440,8 @@ always @ (posedge clk or negedge rst_n) begin
 		minstreth <= X0;
 		minstret <= X0;
 		// Counters inhibited by default to save energy
-		mcountinhibit_cy <= 1'b0;
-		mcountinhibit_ir <= 1'b0;
+		mcountinhibit_cy <= 1'b1;
+		mcountinhibit_ir <= 1'b1;
 	end else if (CSR_COUNTER) begin
 		// Optionally hold the top (2 * XLEN - W_COUNTER) bits constant to
 		// save gates (noncompliant if enabled)

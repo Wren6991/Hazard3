@@ -310,8 +310,8 @@ Counter inhibit. Read-write. The table below lists the fields which are _not_ ha
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 2 | `ir` | When 1, inhibit counting of `minstret`/`minstreth`
-| 0 | `cy` | When 1, inhibit counting of `mcycle`/`mcycleh`
+| 2 | `ir` | When 1, inhibit counting of `minstret`/`minstreth`. Resets to 1.
+| 0 | `cy` | When 1, inhibit counting of `mcycle`/`mcycleh`. Resets to 1.
 |===
 
 ==== mhpmevent3...31

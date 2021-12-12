@@ -54,10 +54,19 @@ j \name
 
 
 .reset_handler:
-	la sp, __stack_top
-	// mtvec LSB enables vectoring
+	// Set counters running, as they are off by default. This may trap if counters
+	// are unimplemented, so catch the trap and continue.
+	la a0, 1f
+	csrw mtvec, a0
+	csrci mcountinhibit, 0x5
+.p2align 2
+1:
+	// Set up trap vector table. mtvec LSB enables vectoring
 	la t0, .vector_table + 1
 	csrw mtvec, t0
+
+	// Set up stack pointer before doing anything else
+	la sp, __stack_top
 
 	// newlib _start expects argc, argv on the stack. Leave stack 16-byte aligned.
 	addi sp, sp, -16
