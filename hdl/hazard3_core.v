@@ -409,22 +409,40 @@ hazard3_alu #(
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		x_amo_phase <= 3'h0;
-	end else if (|EXTENSION_A && (bus_aph_ready_d || bus_dph_ready_d || m_trap_enter_vld || x_unaligned_addr)) begin
-		if (!d_memop_is_amo) begin
+	end else if (|EXTENSION_A && d_memop_is_amo && (
+		bus_aph_ready_d || bus_dph_ready_d ||
+		m_trap_enter_vld || x_unaligned_addr ||
+		x_amo_phase == 3'h4
+	)) begin
+		if (m_trap_enter_vld) begin
+			// Bail out, squash the in-progress AMO.
 			x_amo_phase <= 3'h0;
-		end else if (x_stall_on_raw) begin
+`ifdef FORMAL
+			// Should only happen during an address phase, *or* the fault phase.
+			assert(x_amo_phase == 3'h0 || x_amo_phase == 3'h2 || x_amo_phase == 3'h4);
+			// The fault phase only holds when we have a misaligned AMO directly behind
+			// a regular memory access that subsequently excepts, and the AMO has gone
+			// straight to fault phase due to misalignment.
+			if (x_amo_phase == 3'h4)
+				assert(x_unaligned_addr);
+`endif
+		end else if (x_stall_on_raw || x_stall_on_exclusive_overlap || m_trap_enter_soon) begin
 			// First address phase stalled due to address dependency on
 			// previous load/mul/etc. Shouldn't be possible in later phases.
+			x_amo_phase <= 3'h0;
 `ifdef FORMAL
 			assert(x_amo_phase == 3'h0);
 `endif
-			x_amo_phase <= 3'h0;
-		end else if (m_trap_enter_vld && (x_amo_phase != 3'h4 || m_trap_enter_rdy)) begin
-			// If AMO caused the exception (amo_phase is 4) wait for rdy.
-			// Otherwise bail out to 0 to squash the in-progress AMO.
-			x_amo_phase <= 3'h0;
+		end else if (x_amo_phase == 3'h4) begin
+			// Clear fault phase once it goes through to stage 3 and excepts
+			if (!x_stall)
+				x_amo_phase <= 3'h0;
+`ifdef FORMAL
+			// This should only happen when we are stalled on an older load/store etc
+			assert(!(x_stall && !m_stall));
+`endif
 		end else if (x_unaligned_addr) begin
-			x_amo_phase <= 3'h4;			
+			x_amo_phase <= 3'h4;
 		end else if (x_amo_phase == 3'h1 && !bus_dph_exokay_d) begin
 			// Load reserve fail indicates the memory region does not support
 			// exclusives, so we will never succeed at store. Exception.
@@ -436,10 +454,32 @@ always @ (posedge clk or negedge rst_n) begin
 			// We're done!
 			x_amo_phase <= 3'h0;
 		end else begin
+			// Default progression: read addr -> read data -> write addr -> write data
 			x_amo_phase <= x_amo_phase + 3'h1;
 		end
 	end
 end
+
+`ifdef FORMAL
+always @ (posedge clk) if (rst_n) begin
+	// Other states should be unreachable
+	assert(x_amo_phase <= 3'h4);
+	// First state should be 0 -- don't want anything carried from one AMO to the next.
+	if (x_stall_on_amo && !$past(x_stall_on_amo))
+		assert(x_amo_phase == 3'h0);
+	// Should be in resting state between AMOs
+	if (!d_memop_is_amo)
+		assert(x_amo_phase == 3'h0);
+	// Error phase should never block, so it can always pass to stage 3 to raise
+	// excepting trap entry.
+	if (amo_phase == 3'h4)
+		assert(!x_stall);
+	// Error phase is either due to a bus response, or a misaligned address.
+	// Neither of these are write-address-phase.
+	if (amo_phase == 3'h4)
+		assert($past(amo_phase) != 3'h2);
+end
+`endif
 
 reg mw_local_exclusive_reserved;
 
@@ -611,10 +651,14 @@ always @ (posedge clk or negedge rst_n) begin
 		// IRQ entry, before its address phase can begin.
 
 		// Also hold off on AMOs, unless the AMO is transitioning to an address
-		// phase or completing. (This excludes transitions to error phase.)
+		// phase or completing. ("completing" excludes transitions to error phase.)
 
 		xm_delay_irq_entry <= bus_aph_req_d && !bus_aph_ready_d ||
-			d_memop_is_amo && !((x_amo_phase == 3'h1 || x_amo_phase == 3'h3) && bus_dph_ready_d && !bus_dph_err_d);
+			d_memop_is_amo && !(
+				x_amo_phase == 3'h3 && bus_dph_ready_d && !bus_dph_err_d ||
+				// Read reservation failure failure also generates error
+				x_amo_phase == 3'h1 & bus_dph_ready_d && !bus_dph_err_d && bus_dph_exokay_d
+			);
 
 		if (!x_stall)
 			prev_instr_was_32_bit <= df_cir_use == 2'd2;
@@ -899,7 +943,7 @@ always @ (posedge clk or negedge rst_n) begin
 `endif
 		if (d_memop_is_amo) begin
 			mw_local_exclusive_reserved <= 1'b0;
-		end else if (xm_memop == MEMOP_SC_W && bus_dph_ready_d) begin
+		end else if (xm_memop == MEMOP_SC_W && (bus_dph_ready_d || bus_dph_err_d)) begin
 			mw_local_exclusive_reserved <= 1'b0;
 		end else if (xm_memop == MEMOP_LR_W && bus_dph_ready_d) begin
 			// In theory, the bus should never report HEXOKAY when HRESP is asserted.

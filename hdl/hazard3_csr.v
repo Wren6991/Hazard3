@@ -81,10 +81,10 @@ module hazard3_csr #(
 	output wire                trap_is_irq,
 	output wire                trap_enter_vld,
 	input  wire                trap_enter_rdy,
-	// True when we are about to trap into debug mode, but are waiting for an
-	// excepting or potentially-excepting instruction to clear M first. The
-	// instruction in X is suppressed, X PC does not increment but still
-	// tracks exception addresses.
+	// True when we are about to trap, but are waiting for an excepting or
+	// potentially-excepting instruction to clear M first. The instruction in X
+	// is suppressed, X PC does not increment but still tracks exception
+	// addresses.
 	output wire                trap_enter_soon,
 	// We need to know about load/stores in data phase because their exception
 	// status is still unknown, so we fence off on them before entering debug
@@ -1098,6 +1098,13 @@ always @ (posedge clk) begin
 	// Just to stress that this is the the only case:
 	if (trap_enter_vld && trap_enter_rdy && $past(trap_enter_vld && trap_enter_rdy))
 		assert($past(except == EXCEPT_MRET));
+
+	if (rst_n && $past(trap_enter_vld && !trap_enter_rdy && !trap_is_irq)) begin
+		// Exception which didn't go through should not disappear
+		assert(trap_enter_vld);
+		// Exception should not be replaced by IRQ
+		assert(!trap_is_irq);
+	end
 
 end
 
