@@ -1,19 +1,7 @@
-/**********************************************************************
- * DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE     *
- *                    Version 3, April 2008                           *
- *                                                                    *
- * Copyright (C) 2021 Luke Wren                                       *
- *                                                                    *
- * Everyone is permitted to copy and distribute verbatim or modified  *
- * copies of this license document and accompanying software, and     *
- * changing either is allowed.                                        *
- *                                                                    *
- *   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION  *
- *                                                                    *
- * 0. You just DO WHAT THE FUCK YOU WANT TO.                          *
- * 1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.             *
- *                                                                    *
- *********************************************************************/
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
 
 // A 2FF synchronizer to mitigate metastabilities. This is a baseline
 // implementation -- you should replace it with cells specific to your

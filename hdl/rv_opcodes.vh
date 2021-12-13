@@ -1,3 +1,8 @@
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
+
 localparam RV_RS1_LSB = 15;
 localparam RV_RS1_BITS = 5;
 localparam RV_RS2_LSB = 20;

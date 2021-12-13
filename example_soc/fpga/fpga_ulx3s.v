@@ -1,19 +1,7 @@
-/**********************************************************************
- * DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE     *
- *                    Version 3, April 2008                           *
- *                                                                    *
- * Copyright (C) 2021 Luke Wren                                       *
- *                                                                    *
- * Everyone is permitted to copy and distribute verbatim or modified  *
- * copies of this license document and accompanying software, and     *
- * changing either is allowed.                                        *
- *                                                                    *
- *   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION  *
- *                                                                    *
- * 0. You just DO WHAT THE FUCK YOU WANT TO.                          *
- * 1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.             *
- *                                                                    *
- *********************************************************************/
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
 
 `default_nettype none
 
@@ -45,13 +33,18 @@ fpga_reset #(
 
 example_soc #(
 	.DTM_TYPE      ("ECP5"),
-	.SRAM_DEPTH    (1 << 15),
+	.SRAM_DEPTH    (1 << 12),
 
-	.EXTENSION_C   (0),
 	.EXTENSION_M   (1),
-	.CSR_COUNTER   (1),
-	.MUL_FAST      (1),
-	.MULDIV_UNROLL (2)
+	.EXTENSION_A   (1),
+	.EXTENSION_C   (0),
+	.EXTENSION_ZBA (0),
+	.EXTENSION_ZBB (0),
+	.EXTENSION_ZBC (0),
+	.EXTENSION_ZBS (0),
+	.CSR_COUNTER   (0),
+	.MUL_FAST      (0),
+	.MULDIV_UNROLL (1)
 ) soc_u (
 	.clk     (clk_sys),
 	.rst_n   (rst_n_sys),

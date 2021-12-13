@@ -1,3 +1,8 @@
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
+
 // Hazard3 CPU configuration parameters
 
 // To configure Hazard3 you can either edit this file, or set parameters on

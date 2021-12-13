@@ -1,19 +1,7 @@
-/**********************************************************************
- * DO WHAT THE FUCK YOU WANT TO AND DON'T BLAME US PUBLIC LICENSE     *
- *                    Version 3, April 2008                           *
- *                                                                    *
- * Copyright (C) 2021 Luke Wren                                       *
- *                                                                    *
- * Everyone is permitted to copy and distribute verbatim or modified  *
- * copies of this license document and accompanying software, and     *
- * changing either is allowed.                                        *
- *                                                                    *
- *   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION  *
- *                                                                    *
- * 0. You just DO WHAT THE FUCK YOU WANT TO.                          *
- * 1. We're NOT RESPONSIBLE WHEN IT DOESN'T FUCKING WORK.             *
- *                                                                    *
- *********************************************************************/
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
 
 // APB-to-APB asynchronous bridge for connecting DTM to DM, in case DTM is in
 // a different clock domain (e.g. running directly from crystal to get a

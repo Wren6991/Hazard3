@@ -1,3 +1,8 @@
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
+
 // Pass-through of parameters defined in hazard3_config.vh, so that these can
 // be set at instantiation rather than editing the config file, and will flow
 // correctly down through the hierarchy.

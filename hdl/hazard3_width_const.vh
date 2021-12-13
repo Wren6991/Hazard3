@@ -1,3 +1,8 @@
+/*****************************************************************************\
+|                        Copyright (C) 2021 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
+
 // These really ought to be localparams, but are occasionally needed for
 // passing flags around between modules, so are made available as parameters
 // instead. It's ugly, but better scope hygiene than the preprocessor. These
