@@ -93,6 +93,10 @@ j \name
 	beqz a0, .core1_wait_loop
 	la sp, __stack_top - 0x10000
 	jalr a0
+.core1_finish:
+	wfi
+	j .core1_finish
+
 .p2align 2
 .global core1_entry_vector
 core1_entry_vector:

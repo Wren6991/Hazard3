@@ -18,7 +18,8 @@ typedef struct {
 	uint32_t _pad0;
 	volatile uint32_t set_softirq;
 	volatile uint32_t clr_softirq;
-	uint32_t _pad1[2];
+	volatile uint32_t globmon_en;
+	uint32_t _pad1[1];
 	volatile uint32_t set_irq;
 	uint32_t _pad2[3];
 	volatile uint32_t clr_irq;
@@ -83,6 +84,10 @@ static inline bool tb_get_softirq(int idx) {
 	return (bool)(mm_io->set_softirq & (1u << idx));
 }
 
+static inline void tb_enable_global_monitor(bool en) {
+	mm_io->globmon_en = en;
+}
+
 static inline void tb_set_irq_masked(uint32_t mask) {
 	mm_io->set_irq = mask;
 }
@@ -93,6 +98,13 @@ static inline void tb_clr_irq_masked(uint32_t mask) {
 
 static inline uint32_t tb_get_irq_mask() {
 	return mm_io->set_irq;
+}
+
+extern volatile uintptr_t core1_entry_vector;
+
+static inline void tb_launch_core1(void (*entry)(void)) {
+	core1_entry_vector = (uintptr_t)entry;
+	tb_set_softirq(1);
 }
 
 #endif

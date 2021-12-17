@@ -14,7 +14,9 @@
 
 // -----------------------------------------------------------------------------
 
-static const unsigned int MEM_SIZE = 16 * 1024 * 1024;
+static const int MEM_SIZE = 16 * 1024 * 1024;
+static const int N_RESERVATIONS = 2;
+static const uint32_t RESERVATION_ADDR_MASK = 0xfffffff8u;
 
 static const unsigned int IO_BASE = 0x80000000;
 enum {
@@ -23,6 +25,7 @@ enum {
 	IO_EXIT        = 0x008,
 	IO_SET_SOFTIRQ = 0x010,
 	IO_CLR_SOFTIRQ = 0x014,
+	IO_GLOBMON_EN  = 0x018,
 	IO_SET_IRQ     = 0x020,
 	IO_CLR_IRQ     = 0x030,
 	IO_MTIME       = 0x100,
@@ -40,11 +43,20 @@ struct mem_io_state {
 
 	uint8_t *mem;
 
+	bool monitor_enabled;
+	bool reservation_valid[2];
+	uint32_t reservation_addr[2];
+
 	mem_io_state() {
 		mtime = 0;
 		mtimecmp = 0;
 		exit_req = false;
 		exit_code = 0;
+		monitor_enabled = false;
+		for (int i = 0; i < N_RESERVATIONS; ++i) {
+			reservation_valid[i] = false;
+			reservation_addr[i] = 0;
+		}
 		mem = new uint8_t[MEM_SIZE];
 		for (size_t i = 0; i < MEM_SIZE; ++i)
 			mem[i] = 0;
@@ -71,7 +83,8 @@ struct bus_request {
 	bool write;
 	bool excl;
 	uint32_t wdata;
-	bus_request(): addr(0), size(SIZE_BYTE), write(0), excl(0), wdata(0) {}
+	int reservation_id;
+	bus_request(): addr(0), size(SIZE_BYTE), write(0), excl(0), wdata(0), reservation_id(0) {}
 };
 
 struct bus_response {
@@ -85,8 +98,50 @@ struct bus_response {
 bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_request req) {
 	bus_response resp;
 
+	// Global monitor. When monitor is not enabled, HEXOKAY is tied high
+	if (memio.monitor_enabled) {
+		if (req.excl) {
+			// Always set reservation on read. Always clear reservation on
+			// write. On successful write, clear others' matching reservations.
+			if (req.write) {
+				resp.exokay = memio.reservation_valid[req.reservation_id] &&
+					memio.reservation_addr[req.reservation_id] == (req.addr & RESERVATION_ADDR_MASK);
+				memio.reservation_valid[req.reservation_id] = false;
+				if (resp.exokay) {
+					for (int i = 0; i < N_RESERVATIONS; ++i) {
+						if (i == req.reservation_id)
+							continue;
+						if (memio.reservation_addr[i] == (req.addr & RESERVATION_ADDR_MASK))
+							memio.reservation_valid[i] = false;
+					}
+				}
+			}
+			else {
+				resp.exokay = true;
+				memio.reservation_valid[req.reservation_id] = true;
+				memio.reservation_addr[req.reservation_id] = req.addr & RESERVATION_ADDR_MASK;
+			}
+		}
+		else {
+			resp.exokay = false;
+			// Non-exclusive write still clears others' reservations
+			if (req.write) {
+				for (int i = 0; i < N_RESERVATIONS; ++i) {
+					if (i == req.reservation_id)
+						continue;
+					if (memio.reservation_addr[i] == (req.addr & RESERVATION_ADDR_MASK))
+						memio.reservation_valid[i] = false;
+				}
+			}
+		}
+	}
+
+
 	if (req.write) {
-		if (req.addr <= MEM_SIZE - 4u) {
+		if (memio.monitor_enabled && req.excl && !resp.exokay) {
+			// Failed exclusive write; do nothing
+		}
+		else if (req.addr <= MEM_SIZE - 4u) {
 			unsigned int n_bytes = 1u << (int)req.size;
 			// Note we are relying on hazard3's byte lane replication
 			for (unsigned int i = 0; i < n_bytes; ++i) {
@@ -110,6 +165,9 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		}
 		else if (req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
 			tb.p_soft__irq.set<uint8_t>(tb.p_soft__irq.get<uint8_t>() & ~req.wdata);
+		}
+		else if (req.addr == IO_BASE + IO_GLOBMON_EN) {
+			memio.monitor_enabled = req.wdata;
 		}
 		else if (req.addr == IO_BASE + IO_SET_IRQ) {
 			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() | req.wdata);
@@ -163,6 +221,9 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		else {
 			resp.err = true;
 		}
+	}
+	if (resp.err) {
+		resp.exokay = false;
 	}
 	return resp;
 }
@@ -326,6 +387,8 @@ int main(int argc, char **argv) {
 	bus_request req_d;
 	bool req_i_vld = false;
 	bool req_d_vld = false;
+	req_i.reservation_id = 0;
+	req_d.reservation_id = 1;
 
 	// Set bus interfaces to generate good IDLE responses at first
 	top.p_i__hready.set<bool>(true);
@@ -428,6 +491,8 @@ int main(int argc, char **argv) {
 			bus_response resp;
 			if (req_d_vld)
 				resp = mem_access(top, memio, req_d);
+			else
+				resp.exokay = !memio.monitor_enabled;
 			if (resp.err) {
 				// Phase 1 of error response
 				top.p_d__hready.set<bool>(false);
@@ -457,6 +522,8 @@ int main(int argc, char **argv) {
 			bus_response resp;
 			if (req_i_vld)
 				resp = mem_access(top, memio, req_i);
+			else
+				resp.exokay = !memio.monitor_enabled;
 			if (resp.err) {
 				// Phase 1 of error response
 				top.p_i__hready.set<bool>(false);
