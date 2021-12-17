@@ -1,4 +1,5 @@
 TOP              := tb
+DOTF             := tb.f
 
 CPU_RESET_VECTOR := 32'h40
 
@@ -23,7 +24,7 @@ MCONFIGPTR_VAL   := 32'h9abcdef0
 
 all: tb
 
-SYNTH_CMD += read_verilog -I ../../../hdl $(shell listfiles tb.f);
+SYNTH_CMD += read_verilog -I ../../../hdl $(shell listfiles $(DOTF));
 SYNTH_CMD += chparam -set EXTENSION_C $(EXTENSION_C) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_M $(EXTENSION_M) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_ZBA $(EXTENSION_ZBA) $(TOP);
@@ -43,7 +44,7 @@ SYNTH_CMD += chparam -set MCONFIGPTR_VAL $(MCONFIGPTR_VAL) $(TOP);
 SYNTH_CMD += hierarchy -top $(TOP);
 SYNTH_CMD += write_cxxrtl dut.cpp
 
-dut.cpp: $(shell listfiles tb.f)
+dut.cpp: $(shell listfiles $(DOTF))
 	yosys -p "$(SYNTH_CMD)" 2>&1 > cxxrtl.log
 
 clean::
