@@ -171,8 +171,8 @@ wire [W_ALUOP-1:0]   d_aluop;
 wire [W_MEMOP-1:0]   d_memop;
 wire [W_MULOP-1:0]   d_mulop;
 wire [W_BCOND-1:0]   d_branchcond;
-wire [W_ADDR-1:0]    d_jump_offs;
-wire                 d_jump_is_regoffs;
+wire [W_ADDR-1:0]    d_addr_offs;
+wire                 d_addr_is_regoffs;
 wire [W_ADDR-1:0]    d_pc;
 wire [W_EXCEPT-1:0]  d_except;
 wire                 d_wfi;
@@ -218,8 +218,8 @@ hazard3_decode #(
 	.d_csr_wtype          (d_csr_wtype),
 	.d_csr_w_imm          (d_csr_w_imm),
 	.d_branchcond         (d_branchcond),
-	.d_jump_offs          (d_jump_offs),
-	.d_jump_is_regoffs    (d_jump_is_regoffs),
+	.d_addr_offs          (d_addr_offs),
+	.d_addr_is_regoffs    (d_addr_is_regoffs),
 	.d_except             (d_except),
 	.d_wfi                (d_wfi)
 );
@@ -243,7 +243,6 @@ reg   [W_DATA-1:0]   x_rs2_bypass;
 reg   [W_DATA-1:0]   x_op_a;
 reg   [W_DATA-1:0]   x_op_b;
 wire  [W_DATA-1:0]   x_alu_result;
-wire  [W_DATA-1:0]   x_alu_add;
 wire                 x_alu_cmp;
 
 wire [W_DATA-1:0]    m_trap_addr;
@@ -257,6 +256,7 @@ reg  [W_REGADDR-1:0] xm_rs2;
 reg  [W_REGADDR-1:0] xm_rd;
 reg  [W_DATA-1:0]    xm_result;
 reg  [W_DATA-1:0]    xm_store_data;
+reg  [1:0]           xm_addr_align;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_wfi;
@@ -385,7 +385,6 @@ hazard3_alu #(
 	.op_a       (x_op_a),
 	.op_b       (x_op_b),
 	.result     (x_alu_result),
-	.result_add (x_alu_add),
 	.cmp        (x_alu_cmp)
 );
 
@@ -493,9 +492,15 @@ assign bus_aph_excl_d = |EXTENSION_A && (
 	d_memop_is_amo
 );
 
+// This adder is used for both branch targets and load/store addresses.
+// Supporting all branch types already requires rs1 + I-fmt, and pc + B-fmt.
+// B-fmt are almost identical to S-fmt, so we rs1 + S-fmt is almost free.
+
+wire [W_ADDR-1:0] x_addr_sum = (d_addr_is_regoffs ? x_rs1_bypass : d_pc) + d_addr_offs;
+
 always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
-	bus_haddr_d = x_alu_add;
+	bus_haddr_d = x_addr_sum;
 	bus_hwrite_d = x_memop_write;
 	case (d_memop)
 		MEMOP_LW:  bus_hsize_d = HSIZE_WORD;
@@ -766,6 +771,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_result <= {W_DATA{1'b0}};
 		xm_store_data <= {W_DATA{1'b0}};
+		xm_addr_align <= 2'b00;
 	end else if (!m_stall) begin
 		xm_result <=
 			d_csr_ren                               ? x_csr_rdata :
@@ -773,6 +779,7 @@ always @ (posedge clk or negedge rst_n) begin
 			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
 			                                          x_alu_result;
 		xm_store_data <= x_rs2_bypass;
+		xm_addr_align <= x_addr_sum[1:0];
 
 	end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
 		xm_store_data <= x_rs2_bypass;
@@ -782,7 +789,7 @@ end
 // Branch handling
 
 // For JALR, the LSB of the result must be cleared by hardware
-wire [W_ADDR-1:0] x_jump_target = ((d_jump_is_regoffs ? x_rs1_bypass : d_pc) + d_jump_offs) & ~32'h1;
+wire [W_ADDR-1:0] x_jump_target = x_addr_sum & ~32'h1;
 
 // Be careful not to take branches whose comparisons depend on a load result
 assign x_jump_req = !x_stall_on_raw && (
@@ -886,7 +893,7 @@ always @ (*) begin
 	if (|EXTENSION_A && m_amo_wdata_valid)
 		bus_wdata_d = m_amo_wdata;
 
-	casez ({xm_memop, xm_result[1:0]})
+	casez ({xm_memop, xm_addr_align[1:0]})
 		{MEMOP_LH  , 2'b0z}: m_rdata_pick_sext = {{16{bus_rdata_d[15]}}, bus_rdata_d[15: 0]};
 		{MEMOP_LH  , 2'b1z}: m_rdata_pick_sext = {{16{bus_rdata_d[31]}}, bus_rdata_d[31:16]};
 		{MEMOP_LHU , 2'b0z}: m_rdata_pick_sext = {{16{1'b0           }}, bus_rdata_d[15: 0]};

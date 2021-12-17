@@ -42,8 +42,8 @@ module hazard3_decode #(
 	output reg  [1:0]           d_csr_wtype,
 	output reg                  d_csr_w_imm,
 	output reg  [W_BCOND-1:0]   d_branchcond,
-	output reg  [W_ADDR-1:0]    d_jump_offs,
-	output reg                  d_jump_is_regoffs,
+	output reg  [W_ADDR-1:0]    d_addr_offs,
+	output reg                  d_addr_is_regoffs,
 	output reg  [W_EXCEPT-1:0]  d_except,
 	output reg                  d_wfi
 );
@@ -147,14 +147,16 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+
 always @ (*) begin
-	// JAL is major opcode 1101111,
-	// JALR is             1100111,
-	// branches are        1100011.
-	casez (d_instr[3:2])
-	2'b1z:   d_jump_offs = d_imm_j;
-	2'b01:   d_jump_offs = d_imm_i;
-	default: d_jump_offs = d_imm_b;
+	casez ({|EXTENSION_A, d_instr[6:2]})
+	{1'bz, 5'b11011}: d_addr_offs = d_imm_j      ; // JAL
+	{1'bz, 5'b11000}: d_addr_offs = d_imm_b      ; // Branches
+	{1'bz, 5'b01000}: d_addr_offs = d_imm_s      ; // Store
+	{1'bz, 5'b11001}: d_addr_offs = d_imm_i      ; // JALR
+	{1'bz, 5'b00000}: d_addr_offs = d_imm_i      ; // Loads
+	{1'b1, 5'b01011}: d_addr_offs = 32'h0000_0000; // Atomics
+	default:          d_addr_offs = 32'hxxxx_xxxx;
 	endcase
 end
 
@@ -179,7 +181,7 @@ always @ (*) begin
 	d_csr_wtype = CSR_WTYPE_W;
 	d_csr_w_imm = 1'b0;
 	d_branchcond = BCOND_NEVER;
-	d_jump_is_regoffs = 1'b0;
+	d_addr_is_regoffs = 1'b0;
 	d_invalid_32bit = 1'b0;
 	d_except = EXCEPT_NONE;
 	d_wfi = 1'b0;
@@ -191,7 +193,7 @@ always @ (*) begin
 	RV_BGE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_ZERO; end
 	RV_BLTU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_NZERO; end
 	RV_BGEU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_ZERO; end
-	RV_JALR:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_jump_is_regoffs = 1'b1; d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
+	RV_JALR:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
 	RV_JAL:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_rs1 = X0;               d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
 	RV_LUI:       begin d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_rs1 = X0; end
 	RV_AUIPC:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_alusrc_a = ALUSRCA_PC;  d_rs1 = X0; end
@@ -214,14 +216,14 @@ always @ (*) begin
 	RV_SRA:       begin d_aluop = ALUOP_SRA; end
 	RV_OR:        begin d_aluop = ALUOP_OR;  end
 	RV_AND:       begin d_aluop = ALUOP_AND; end
-	RV_LB:        begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LB;  end
-	RV_LH:        begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LH;  end
-	RV_LW:        begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LW;  end
-	RV_LBU:       begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LBU; end
-	RV_LHU:       begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_memop = MEMOP_LHU; end
-	RV_SB:        begin d_aluop = ALUOP_ADD; d_imm = d_imm_s; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SB;  d_rd = X0; end
-	RV_SH:        begin d_aluop = ALUOP_ADD; d_imm = d_imm_s; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SH;  d_rd = X0; end
-	RV_SW:        begin d_aluop = ALUOP_ADD; d_imm = d_imm_s; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SW;  d_rd = X0; end
+	RV_LB:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LB;  end
+	RV_LH:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LH;  end
+	RV_LW:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LW;  end
+	RV_LBU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LBU; end
+	RV_LHU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LHU; end
+	RV_SB:        begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_SB;  d_rd = X0; end
+	RV_SH:        begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_SH;  d_rd = X0; end
+	RV_SW:        begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_SW;  d_rd = X0; end
 
 	RV_MUL:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MUL;    end else begin d_invalid_32bit = 1'b1; end
 	RV_MULH:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULH;   end else begin d_invalid_32bit = 1'b1; end
@@ -232,17 +234,17 @@ always @ (*) begin
 	RV_REM:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
 	RV_REMU:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
 
-	RV_LR_W:      if (EXTENSION_A) begin d_rs2 = X0;                                       d_memop = MEMOP_LR_W;      end else begin d_invalid_32bit = 1'b1; end
-	RV_SC_W:      if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_SC_W;      end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOSWAP_W: if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOSWAP_W; end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOADD_W:  if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOADD_W;  end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOXOR_W:  if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOXOR_W;  end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOAND_W:  if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOAND_W;  end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOOR_W:   if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOOR_W;   end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOMIN_W:  if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOMIN_W;  end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOMAX_W:  if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOMAX_W;  end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOMINU_W: if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOMINU_W; end else begin d_invalid_32bit = 1'b1; end
-	RV_AMOMAXU_W: if (EXTENSION_A) begin d_imm = {W_DATA{1'b0}}; d_alusrc_b = ALUSRCB_IMM; d_memop = MEMOP_AMOMAXU_W; end else begin d_invalid_32bit = 1'b1; end
+	RV_LR_W:      if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_LR_W; d_rs2 = X0; end else begin d_invalid_32bit = 1'b1; end
+	RV_SC_W:      if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_SC_W;             end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOSWAP_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOSWAP_W;        end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOADD_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOADD_W;         end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOXOR_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOXOR_W;         end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOAND_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOAND_W;         end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOOR_W:   if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOOR_W;          end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMIN_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOMIN_W;         end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMAX_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOMAX_W;         end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMINU_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOMINU_W;        end else begin d_invalid_32bit = 1'b1; end
+	RV_AMOMAXU_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMOMAXU_W;        end else begin d_invalid_32bit = 1'b1; end
 
 	RV_SH1ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH1ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
 	RV_SH2ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH2ADD;                                                        end else begin d_invalid_32bit = 1'b1; end

@@ -14,7 +14,6 @@ module hazard3_alu #(
 	input  wire [W_DATA-1:0]  op_a,
 	input  wire [W_DATA-1:0]  op_b,
 	output reg  [W_DATA-1:0]  result,
-	output wire [W_DATA-1:0]  result_add,
 	output wire               cmp
 );
 
@@ -22,9 +21,6 @@ module hazard3_alu #(
 
 // ----------------------------------------------------------------------------
 // Fiddle around with add/sub, comparisons etc (all related).
-
-// This adder is exposed directly on the result_add port, since it may be used
-// for load/store addresses.
 
 function msb;
 input [W_DATA-1:0] x;
@@ -60,7 +56,6 @@ wire lt = msb(op_a) == msb(op_b) ? msb(sum)  :
                                    msb(op_a) ;
 
 assign cmp = aluop == ALUOP_SUB ? |op_xor : lt;
-assign result_add = sum;
 
 
 // ----------------------------------------------------------------------------
