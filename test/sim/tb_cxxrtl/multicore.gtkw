@@ -1,0 +1,77 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Wed Dec 15 09:37:16 2021
+[*]
+[dumpfile] "/home/luke/proj/hazard3/test/sim/tb_cxxrtl/waves.vcd"
+[dumpfile_mtime] "Wed Dec 15 09:24:58 2021"
+[dumpfile_size] 9773165
+[savefile] "/home/luke/proj/hazard3/test/sim/tb_cxxrtl/multicore.gtkw"
+[timestart] 0
+[size] 2509 1368
+[pos] -1 -1
+*-13.000000 9780 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 233
+[signals_width] 238
+[sst_expanded] 1
+[sst_vpaned_height] 410
+@200
+-JTAG
+@28
+tck
+tdi
+tdo
+tms
+@200
+-
+@28
+dm.hartsel
+@200
+-
+-Core 0 debug
+@28
+cpu0.dbg_req_halt
+cpu0.dbg_req_resume
+cpu0.dbg_halted
+@200
+-
+@28
+cpu0.dbg_instr_data_vld
+cpu0.dbg_instr_data_rdy
+@22
+cpu0.dbg_instr_data[31:0]
+@28
+cpu0.dbg_instr_caught_ebreak
+cpu0.dbg_instr_caught_exception
+@200
+-
+@22
+cpu0.dbg_data0_rdata[31:0]
+cpu0.dbg_data0_wdata[31:0]
+@28
+cpu0.dbg_data0_wen
+@200
+-
+-Core 1 debug
+@28
+cpu1.dbg_req_halt
+cpu1.dbg_req_resume
+cpu1.dbg_halted
+@200
+-
+@28
+cpu1.dbg_instr_data_vld
+cpu1.dbg_instr_data_rdy
+@22
+cpu1.dbg_instr_data[31:0]
+@28
+cpu1.dbg_instr_caught_ebreak
+cpu1.dbg_instr_caught_exception
+@200
+-
+@22
+cpu1.dbg_data0_rdata[31:0]
+cpu1.dbg_data0_wdata[31:0]
+@28
+cpu1.dbg_data0_wen
+[pattern_trace] 1
+[pattern_trace] 0

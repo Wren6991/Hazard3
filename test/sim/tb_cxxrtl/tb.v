@@ -21,12 +21,14 @@ module tb #(
 	output wire [W_ADDR-1:0] i_haddr,
 	output wire              i_hwrite,
 	output wire [1:0]        i_htrans,
+	output wire              i_hexcl,
 	output wire [2:0]        i_hsize,
 	output wire [2:0]        i_hburst,
 	output wire [3:0]        i_hprot,
 	output wire              i_hmastlock,
 	input  wire              i_hready,
 	input  wire              i_hresp,
+	input  wire              i_hexokay,
 	output wire [W_DATA-1:0] i_hwdata,
 	input  wire [W_DATA-1:0] i_hrdata,
 
@@ -232,5 +234,7 @@ hazard3_cpu_2port #(
 	.soft_irq                   (soft_irq),
 	.timer_irq                  (timer_irq)
 );
+
+assign i_hexcl = 1'b0;
 
 endmodule

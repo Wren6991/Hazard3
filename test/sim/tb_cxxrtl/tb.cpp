@@ -2,7 +2,6 @@
 #include <fstream>
 #include <cstdint>
 #include <string>
-#include <algorithm>
 #include <stdio.h>
 
 #include <unistd.h>
@@ -13,8 +12,9 @@
 #include "dut.cpp"
 #include <backends/cxxrtl/cxxrtl_vcd.h>
 
+// -----------------------------------------------------------------------------
+
 static const unsigned int MEM_SIZE = 16 * 1024 * 1024;
-uint8_t mem[MEM_SIZE];
 
 static const unsigned int IO_BASE = 0x80000000;
 enum {
@@ -31,7 +31,143 @@ enum {
 	IO_MTIMECMPH   = 0x10c
 };
 
-static const int TCP_BUF_SIZE = 256;
+struct mem_io_state {
+	uint64_t mtime;
+	uint64_t mtimecmp;
+
+	bool exit_req;
+	uint32_t exit_code;
+
+	uint8_t *mem;
+
+	mem_io_state() {
+		mtime = 0;
+		mtimecmp = 0;
+		exit_req = false;
+		exit_code = 0;
+		mem = new uint8_t[MEM_SIZE];
+		for (size_t i = 0; i < MEM_SIZE; ++i)
+			mem[i] = 0;
+	}
+
+	// Where we're going we don't need a destructor B-)
+
+	void step(cxxrtl_design::p_tb &tb) {
+		// Default update logic for mtime, mtimecmp
+		++mtime;
+		tb.p_timer__irq.set<bool>(mtime >= mtimecmp);
+	}
+};
+
+typedef enum {
+	SIZE_BYTE = 0,
+	SIZE_HWORD = 1,
+	SIZE_WORD = 2
+} bus_size_t;
+
+struct bus_request {
+	uint32_t addr;
+	bus_size_t size;
+	bool write;
+	bool excl;
+	uint32_t wdata;
+	bus_request(): addr(0), size(SIZE_BYTE), write(0), excl(0), wdata(0) {}
+};
+
+struct bus_response {
+	uint32_t rdata;
+	int stall_cycles;
+	bool err;
+	bool exokay;
+	bus_response(): rdata(0), stall_cycles(0), err(false), exokay(true) {}
+};
+
+bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_request req) {
+	bus_response resp;
+
+	if (req.write) {
+		if (req.addr <= MEM_SIZE - 4u) {
+			unsigned int n_bytes = 1u << (int)req.size;
+			// Note we are relying on hazard3's byte lane replication
+			for (unsigned int i = 0; i < n_bytes; ++i) {
+				memio.mem[req.addr + i] = req.wdata >> (8 * i) & 0xffu;
+			}
+		}
+		else if (req.addr == IO_BASE + IO_PRINT_CHAR) {
+			putchar(req.wdata);
+		}
+		else if (req.addr == IO_BASE + IO_PRINT_U32) {
+			printf("%08x\n", req.wdata);
+		}
+		else if (req.addr == IO_BASE + IO_EXIT) {
+			if (!memio.exit_req) {
+				memio.exit_req = true;
+				memio.exit_code = req.wdata;
+			}
+		}
+		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ) {
+			tb.p_soft__irq.set<bool>(true);
+		}
+		else if (req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
+			tb.p_soft__irq.set<bool>(false);
+		}
+		else if (req.addr == IO_BASE + IO_SET_IRQ) {
+			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() | req.wdata);
+		}
+		else if (req.addr == IO_BASE + IO_CLR_IRQ) {
+			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() & ~req.wdata);
+		}
+		else if (req.addr == IO_BASE + IO_MTIME) {
+			memio.mtime = (memio.mtime & 0xffffffff00000000u) | req.wdata;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMEH) {
+			memio.mtime = (memio.mtime & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMP) {
+			memio.mtimecmp = (memio.mtimecmp & 0xffffffff00000000u) | req.wdata;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMPH) {
+			memio.mtimecmp = (memio.mtimecmp & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
+		}
+		else {
+			resp.err = true;
+		}
+	}
+	else {
+		if (req.addr <= MEM_SIZE - (1u << (int)req.size)) {
+			req.addr &= ~0x3u;
+			resp.rdata =
+				(uint32_t)memio.mem[req.addr] |
+				memio.mem[req.addr + 1] << 8 |
+				memio.mem[req.addr + 2] << 16 |
+				memio.mem[req.addr + 3] << 24;
+		}
+		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ || req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
+			resp.rdata = tb.p_soft__irq.get<bool>();
+		}
+		else if (req.addr == IO_BASE + IO_SET_IRQ || req.addr == IO_BASE + IO_CLR_IRQ) {
+			resp.rdata = tb.p_irq.get<uint32_t>();
+		}
+		else if (req.addr == IO_BASE + IO_MTIME) {
+			resp.rdata = memio.mtime;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMEH) {
+			resp.rdata = memio.mtime >> 32;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMP) {
+			resp.rdata = memio.mtimecmp;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMPH) {
+			resp.rdata = memio.mtimecmp >> 32;
+		}
+		else {
+			resp.err = true;
+		}
+	}
+	return resp;
+}
+
+// -----------------------------------------------------------------------------
 
 const char *help_str =
 "Usage: tb [--bin x.bin] [--vcd x.vcd] [--dump start end] [--cycles n] [--port n]\n"
@@ -49,6 +185,8 @@ void exit_help(std::string errtext = "") {
 	std::cerr << errtext << help_str;
 	exit(-1);
 }
+
+static const int TCP_BUF_SIZE = 256;
 
 int main(int argc, char **argv) {
 
@@ -109,22 +247,6 @@ int main(int argc, char **argv) {
 	if (!(load_bin || port != 0))
 		exit_help("At least one of --bin or --port must be specified.\n");
 
-	std::fill(std::begin(mem), std::end(mem), 0);
-	if (load_bin) {
-		std::ifstream fd(bin_path, std::ios::binary | std::ios::ate);
-		if (!fd){
-			std::cerr << "Failed to open \"" << bin_path << "\"\n";
-			return -1;
-		}
-		std::streamsize bin_size = fd.tellg();
-		if (bin_size > MEM_SIZE) {
-			std::cerr << "Binary file (" << bin_size << " bytes) is larger than memory (" << MEM_SIZE << " bytes)\n";
-			return -1;
-		}
-		fd.seekg(0, std::ios::beg);
-		fd.read((char*)mem, bin_size);
-	}
-
 	int server_fd, sock_fd;
 	struct sockaddr_in sock_addr;
 	int sock_opt = 1;
@@ -170,6 +292,23 @@ int main(int argc, char **argv) {
 		printf("Connected\n");
 	}
 
+	mem_io_state memio;
+
+	if (load_bin) {
+		std::ifstream fd(bin_path, std::ios::binary | std::ios::ate);
+		if (!fd){
+			std::cerr << "Failed to open \"" << bin_path << "\"\n";
+			return -1;
+		}
+		std::streamsize bin_size = fd.tellg();
+		if (bin_size > MEM_SIZE) {
+			std::cerr << "Binary file (" << bin_size << " bytes) is larger than memory (" << MEM_SIZE << " bytes)\n";
+			return -1;
+		}
+		fd.seekg(0, std::ios::beg);
+		fd.read((char*)memio.mem, bin_size);
+	}
+
 	cxxrtl_design::p_tb top;
 
 	std::ofstream waves_fd;
@@ -182,21 +321,18 @@ int main(int argc, char **argv) {
 		vcd.add(all_debug_items);
 	}
 
-	bool bus_trans = false;
-	bool bus_write = false;
-	bool bus_trans_i = false;
-	uint32_t bus_addr_i = 0;
-	uint32_t bus_addr = 0;
-	uint8_t bus_size = 0;
-	// Never generate bus stalls
+	// Loop-carried address-phase requests
+	bus_request req_i;
+	bus_request req_d;
+	bool req_i_vld = false;
+	bool req_d_vld = false;
+
+	// Set bus interfaces to generate good IDLE responses at first
 	top.p_i__hready.set<bool>(true);
 	top.p_d__hready.set<bool>(true);
-	top.p_d__hexokay.set<bool>(true);
-
-	uint64_t mtime = 0;
-	uint64_t mtimecmp = 0;
 
 	// Reset + initial clock pulse
+
 	top.step();
 	top.p_clk.set<bool>(true);
 	top.p_tck.set<bool>(true);
@@ -274,107 +410,38 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		// Default update logic for mtime, mtimecmp
-		++mtime;
-		top.p_timer__irq.set<bool>(mtime >= mtimecmp);
+		memio.step(top);
+
+		// The two bus ports are handled identically. This enables swapping out of
+		// various `tb.v` hardware integration files containing:
+		//
+		// - A single, dual-ported processor (instruction fetch, load/store ports)
+		// - A single, single-ported processor (instruction fetch + load/store muxed internally)
+		// - A pair of single-ported processors, for dual-core debug tests
 
 		if (top.p_d__hready.get<bool>()) {
 			// Clear bus error by default
 			top.p_d__hresp.set<bool>(false);
+
 			// Handle current data phase
-			uint32_t rdata = 0;
-			bool bus_err = false;
-			if (bus_trans && bus_write) {
-				uint32_t wdata = top.p_d__hwdata.get<uint32_t>();
-				if (bus_addr <= MEM_SIZE - 4u) {
-					unsigned int n_bytes = 1u << bus_size;
-					// Note we are relying on hazard3's byte lane replication
-					for (unsigned int i = 0; i < n_bytes; ++i) {
-						mem[bus_addr + i] = wdata >> (8 * i) & 0xffu;
-					}
-				}
-				else if (bus_addr == IO_BASE + IO_PRINT_CHAR) {
-					putchar(wdata);
-				}
-				else if (bus_addr == IO_BASE + IO_PRINT_U32) {
-					printf("%08x\n", wdata);
-				}
-				else if (bus_addr == IO_BASE + IO_EXIT) {
-					printf("CPU requested halt. Exit code %d\n", wdata);
-					printf("Ran for %ld cycles\n", cycle + 1);
-					break;
-				}
-				else if (bus_addr == IO_BASE + IO_SET_SOFTIRQ) {
-					top.p_soft__irq.set<bool>(true);
-				}
-				else if (bus_addr == IO_BASE + IO_CLR_SOFTIRQ) {
-					top.p_soft__irq.set<bool>(false);
-				}
-				else if (bus_addr == IO_BASE + IO_SET_IRQ) {
-					top.p_irq.set<uint32_t>(top.p_irq.get<uint32_t>() | wdata);
-				}
-				else if (bus_addr == IO_BASE + IO_CLR_IRQ) {
-					top.p_irq.set<uint32_t>(top.p_irq.get<uint32_t>() & ~wdata);
-				}
-				else if (bus_addr == IO_BASE + IO_MTIME) {
-					mtime = (mtime & 0xffffffff00000000u) | wdata;
-				}
-				else if (bus_addr == IO_BASE + IO_MTIMEH) {
-					mtime = (mtime & 0x00000000ffffffffu) | ((uint64_t)wdata << 32);
-				}
-				else if (bus_addr == IO_BASE + IO_MTIMECMP) {
-					mtimecmp = (mtimecmp & 0xffffffff00000000u) | wdata;
-				}
-				else if (bus_addr == IO_BASE + IO_MTIMECMPH) {
-					mtimecmp = (mtimecmp & 0x00000000ffffffffu) | ((uint64_t)wdata << 32);
-				}
-				else {
-					bus_err = true;
-				}
-			}
-			else if (bus_trans && !bus_write) {
-				if (bus_addr <= MEM_SIZE - (1u << bus_size)) {
-					bus_addr &= ~0x3u;
-					rdata =
-						(uint32_t)mem[bus_addr] |
-						mem[bus_addr + 1] << 8 |
-						mem[bus_addr + 2] << 16 |
-						mem[bus_addr + 3] << 24;
-				}
-				else if (bus_addr == IO_BASE + IO_SET_SOFTIRQ || bus_addr == IO_BASE + IO_CLR_SOFTIRQ) {
-					rdata = top.p_soft__irq.get<bool>();
-				}
-				else if (bus_addr == IO_BASE + IO_SET_IRQ || bus_addr == IO_BASE + IO_CLR_IRQ) {
-					rdata = top.p_irq.get<uint32_t>();
-				}
-				else if (bus_addr == IO_BASE + IO_MTIME) {
-					rdata = mtime;
-				}
-				else if (bus_addr == IO_BASE + IO_MTIMEH) {
-					rdata = mtime >> 32;
-				}
-				else if (bus_addr == IO_BASE + IO_MTIMECMP) {
-					rdata = mtimecmp;
-				}
-				else if (bus_addr == IO_BASE + IO_MTIMECMPH) {
-					rdata = mtimecmp >> 32;
-				}
-				else {
-					bus_err = true;
-				}
-			}
-			if (bus_err) {
+			req_d.wdata = top.p_d__hwdata.get<uint32_t>();
+			bus_response resp;
+			if (req_d_vld)
+				resp = mem_access(top, memio, req_d);
+			if (resp.err) {
 				// Phase 1 of error response
 				top.p_d__hready.set<bool>(false);
 				top.p_d__hresp.set<bool>(true);
 			}
-			top.p_d__hrdata.set<uint32_t>(rdata);
+			top.p_d__hrdata.set<uint32_t>(resp.rdata);
+			top.p_d__hexokay.set<bool>(resp.exokay);
 
 			// Progress current address phase to data phase
-			bus_trans = top.p_d__htrans.get<uint8_t>() >> 1;
-			bus_write = top.p_d__hwrite.get<bool>();
-			bus_size = top.p_d__hsize.get<uint8_t>();
-			bus_addr = top.p_d__haddr.get<uint32_t>();
+			req_d_vld = top.p_d__htrans.get<uint8_t>() >> 1;
+			req_d.write = top.p_d__hwrite.get<bool>();
+			req_d.size = (bus_size_t)top.p_d__hsize.get<uint8_t>();
+			req_d.addr = top.p_d__haddr.get<uint32_t>();
+			req_d.excl = top.p_d__hexcl.get<bool>();
 		}
 		else {
 			// hready=0. Currently this only happens when we're in the first
@@ -382,27 +449,32 @@ int main(int argc, char **argv) {
 			top.p_d__hready.set<bool>(true);
 		}
 
+
 		if (top.p_i__hready.get<bool>()) {
 			top.p_i__hresp.set<bool>(false);
-			if (bus_trans_i) {
-				bus_addr_i &= ~0x3u;
-				if (bus_addr_i < MEM_SIZE) {
-					top.p_i__hrdata.set<uint32_t>(
-						(uint32_t)mem[bus_addr_i] |
-						mem[bus_addr_i + 1] << 8 |
-						mem[bus_addr_i + 2] << 16 |
-						mem[bus_addr_i + 3] << 24
-					);
-				}
-				else {
-					top.p_i__hready.set<bool>(false);
-					top.p_i__hresp.set<bool>(true);
-				}
+
+			req_i.wdata = top.p_i__hwdata.get<uint32_t>();
+			bus_response resp;
+			if (req_i_vld)
+				resp = mem_access(top, memio, req_i);
+			if (resp.err) {
+				// Phase 1 of error response
+				top.p_i__hready.set<bool>(false);
+				top.p_i__hresp.set<bool>(true);
 			}
-			bus_trans_i = top.p_i__htrans.get<uint8_t>() >> 1;
-			bus_addr_i = top.p_i__haddr.get<uint32_t>();
+			top.p_i__hrdata.set<uint32_t>(resp.rdata);
+			top.p_i__hexokay.set<bool>(resp.exokay);
+
+			// Progress current address phase to data phase
+			req_i_vld = top.p_i__htrans.get<uint8_t>() >> 1;
+			req_i.write = top.p_i__hwrite.get<bool>();
+			req_i.size = (bus_size_t)top.p_i__hsize.get<uint8_t>();
+			req_i.addr = top.p_i__haddr.get<uint32_t>();
+			req_i.excl = top.p_i__hexcl.get<bool>();
 		}
 		else {
+			// hready=0. Currently this only happens when we're in the first
+			// phase of an error response, so go to phase 2.
 			top.p_i__hready.set<bool>(true);
 		}
 
@@ -415,6 +487,11 @@ int main(int argc, char **argv) {
 			vcd.buffer.clear();
 		}
 
+		if (memio.exit_req) {
+			printf("CPU requested halt. Exit code %d\n", memio.exit_code);
+			printf("Ran for %ld cycles\n", cycle + 1);
+			break;
+		}
 		if (cycle + 1 == max_cycles)
 			printf("Max cycles reached\n");
 		if (got_exit_cmd)
@@ -426,7 +503,7 @@ int main(int argc, char **argv) {
 	for (auto r : dump_ranges) {
 		printf("Dumping memory from %08x to %08x:\n", r.first, r.second);
 		for (int i = 0; i < r.second - r.first; ++i)
-			printf("%02x%c", mem[r.first + i], i % 16 == 15 ? '\n' : ' ');
+			printf("%02x%c", memio.mem[r.first + i], i % 16 == 15 ? '\n' : ' ');
 		printf("\n");
 	}
 
