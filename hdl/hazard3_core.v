@@ -295,7 +295,7 @@ wire x_stall_on_exclusive_overlap = |EXTENSION_A && (
 
 reg [2:0] x_amo_phase;
 wire x_stall_on_amo = |EXTENSION_A && d_memop_is_amo && !m_trap_enter_soon && (
-	x_amo_phase < 3'h3 || (x_amo_phase == 3'h3 && (!bus_dph_ready_d || bus_dph_err_d))
+	x_amo_phase < 3'h3 || (x_amo_phase == 3'h3 && (!bus_dph_ready_d || !bus_dph_exokay_d || bus_dph_err_d))
 );
 
 // Read-after-write hazard detection (e.g. load-use)
@@ -439,7 +439,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// Bus fault. Exception.
 			x_amo_phase <= 3'h4;
 		end else if (x_amo_phase == 3'h3) begin
-			// We're done!
+			// Either we're done, or the write failed. Either way, back to the start.
 			x_amo_phase <= 3'h0;
 		end else begin
 			// Default progression: read addr -> read data -> write addr -> write data
