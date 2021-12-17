@@ -62,8 +62,12 @@ j \name
 .p2align 2
 1:
 	// Set up trap vector table. mtvec LSB enables vectoring
-	la t0, .vector_table + 1
-	csrw mtvec, t0
+	la a0, .vector_table + 1
+	csrw mtvec, a0
+
+	// Put spare cores to sleep before setting up core 0 stack
+	csrr a0, mhartid
+	bnez a0, .core1_wait
 
 	// Set up stack pointer before doing anything else
 	la sp, __stack_top
@@ -77,6 +81,22 @@ j \name
 
 	jal _start
 	j .halt
+
+.core1_wait:
+	// IRQs disabled, but soft IRQ unmasked -> soft IRQ will exit WFI.
+	csrci mstatus, 0x8
+	csrw mie, 0x8
+.core1_wait_loop:
+	wfi
+	la a0, core1_entry_vector
+	lw a0, (a0)
+	beqz a0, .core1_wait_loop
+	la sp, __stack_top - 0x10000
+	jalr a0
+.p2align 2
+.global core1_entry_vector
+core1_entry_vector:
+	.word 0
 
 .global _exit
 _exit:

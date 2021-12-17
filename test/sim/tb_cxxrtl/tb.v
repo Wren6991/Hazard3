@@ -49,7 +49,7 @@ module tb #(
 
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
-	input wire               soft_irq,  // -> mip.msip
+	input wire [1:0]         soft_irq,  // -> mip.msip
 	input wire               timer_irq  // -> mip.mtip
 );
 
@@ -231,7 +231,7 @@ hazard3_cpu_2port #(
 	.dbg_instr_caught_ebreak    (hart_instr_caught_ebreak),
 
 	.irq                        (irq),
-	.soft_irq                   (soft_irq),
+	.soft_irq                   (soft_irq[0]),
 	.timer_irq                  (timer_irq)
 );
 

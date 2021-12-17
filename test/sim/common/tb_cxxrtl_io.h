@@ -71,16 +71,16 @@ static inline void tb_printf(const char *fmt, ...) {
 
 #define tb_assert(cond, ...) if (!(cond)) {tb_printf(__VA_ARGS__); tb_exit(-1);}
 
-static inline void tb_set_softirq() {
-	mm_io->set_softirq = 1;
+static inline void tb_set_softirq(int idx) {
+	mm_io->set_softirq = 1u << idx;
 }
 
-static inline void tb_clr_softirq() {
-	mm_io->clr_softirq = 1;
+static inline void tb_clr_softirq(int idx) {
+	mm_io->clr_softirq = 1u << idx;
 }
 
-static inline bool tb_get_softirq() {
-	return (bool)mm_io->set_softirq;
+static inline bool tb_get_softirq(int idx) {
+	return (bool)(mm_io->set_softirq & (1u << idx));
 }
 
 static inline void tb_set_irq_masked(uint32_t mask) {

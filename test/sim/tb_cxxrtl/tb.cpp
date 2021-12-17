@@ -106,10 +106,10 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 			}
 		}
 		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ) {
-			tb.p_soft__irq.set<bool>(true);
+			tb.p_soft__irq.set<uint8_t>(tb.p_soft__irq.get<uint8_t>() | req.wdata);
 		}
 		else if (req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
-			tb.p_soft__irq.set<bool>(false);
+			tb.p_soft__irq.set<uint8_t>(tb.p_soft__irq.get<uint8_t>() & ~req.wdata);
 		}
 		else if (req.addr == IO_BASE + IO_SET_IRQ) {
 			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() | req.wdata);
@@ -143,7 +143,7 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 				memio.mem[req.addr + 3] << 24;
 		}
 		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ || req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
-			resp.rdata = tb.p_soft__irq.get<bool>();
+			resp.rdata = tb.p_soft__irq.get<uint8_t>();
 		}
 		else if (req.addr == IO_BASE + IO_SET_IRQ || req.addr == IO_BASE + IO_CLR_IRQ) {
 			resp.rdata = tb.p_irq.get<uint32_t>();

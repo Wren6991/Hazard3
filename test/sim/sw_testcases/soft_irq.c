@@ -23,12 +23,12 @@ int main() {
 	tb_assert(!(read_csr(mip) & mip_msip), "mip.msip should be clear at start of test\n");
 
 	tb_puts("Dry run\n");
-	tb_set_softirq();
-	tb_assert(tb_get_softirq(), "Failed to set soft_irq through tb\n");
+	tb_set_softirq(0);
+	tb_assert(tb_get_softirq(0), "Failed to set soft_irq through tb\n");
 	tb_assert(read_csr(mip) & mip_msip, "soft_irq not reflected in mip\n");
 
-	tb_clr_softirq();
-	tb_assert(!tb_get_softirq(), "Failed to clear soft_irq through tb\n");
+	tb_clr_softirq(0);
+	tb_assert(!tb_get_softirq(0), "Failed to clear soft_irq through tb\n");
 	tb_assert(!(read_csr(mip) & mip_msip), "soft_irq clear not reflected in mip\n");
 
 	tb_puts("Set mie only\n");
@@ -37,18 +37,18 @@ int main() {
 	// IRQ should not fire yet.
 
 	tb_puts("Then set IRQ\n");
-	tb_set_softirq(); 
+	tb_set_softirq(0); 
 	tb_assert(!(read_csr(mip) & mip_msip), "soft_irq should have been cleared by IRQ\n");
 	tb_puts("Returned from IRQ\n");
 
 	tb_puts("Clear mie, do another dry run\n");
 	write_csr(mie, 0);
-	tb_set_softirq();
-	tb_assert(tb_get_softirq(), "Failed to set soft_irq through tb\n");
+	tb_set_softirq(0);
+	tb_assert(tb_get_softirq(0), "Failed to set soft_irq through tb\n");
 	tb_assert(read_csr(mip) & mip_msip, "soft_irq not reflected in mip\n");
 
-	tb_clr_softirq();
-	tb_assert(!tb_get_softirq(), "Failed to clear soft_irq through tb\n");
+	tb_clr_softirq(0);
+	tb_assert(!tb_get_softirq(0), "Failed to clear soft_irq through tb\n");
 	tb_assert(!(read_csr(mip) & mip_msip), "soft_irq clear not reflected in mip\n");
 
 	return 0;
@@ -58,7 +58,7 @@ void __attribute__((interrupt)) isr_machine_softirq() {
 	tb_puts("-> handle_soft_irq\n");
 	tb_printf("mip     = %08x\n", read_csr(mip));
 	tb_printf("mie     = %08x\n", read_csr(mie));
-	tb_clr_softirq();
+	tb_clr_softirq(0);
 	tb_printf("mcause  = %08x\n", read_csr(mcause));
 	tb_printf("mstatus = %08x\n", read_csr(mstatus));
 }
