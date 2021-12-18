@@ -62,7 +62,7 @@ activity_led #(
 );
 
 example_soc #(
-	.EXTENSION_A   (0),
+	.EXTENSION_A   (1),
 	.EXTENSION_C   (0),
 	.EXTENSION_M   (1),
 	.MUL_FAST      (0),

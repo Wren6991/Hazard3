@@ -34,7 +34,7 @@ wire sub = !(aluop == ALUOP_ADD || (|EXTENSION_ZBA && (
 )));
 
 wire inv_op_b = sub && !(
-	aluop == ALUOP_AND || aluop == ALUOP_OR || aluop == ALUOP_XOR
+	aluop == ALUOP_AND || aluop == ALUOP_OR || aluop == ALUOP_XOR || aluop == ALUOP_RS2
 );
 
 wire [W_DATA-1:0] op_a_shifted =
@@ -133,54 +133,60 @@ reg [W_DATA-1:0] bitwise;
 always @ (*) begin: bitwise_ops
 	case (aluop[1:0])
 		ALUOP_AND[1:0]: bitwise = op_a & op_b_inv;
-		ALUOP_OR[1:0]:  bitwise = op_a | op_b_inv;
-		default:        bitwise = op_a ^ op_b_inv;
+		ALUOP_OR [1:0]: bitwise = op_a | op_b_inv;
+		ALUOP_XOR[1:0]: bitwise = op_a ^ op_b_inv;
+		ALUOP_RS2[1:0]: bitwise =        op_b_inv;
 	endcase
 end
 
 wire [W_DATA-1:0] zbs_mask = {{W_DATA-1{1'b0}}, 1'b1} << op_b[W_SHAMT-1:0];
 
 always @ (*) begin
-	casez ({|EXTENSION_ZBA, |EXTENSION_ZBB, |EXTENSION_ZBC, |EXTENSION_ZBS, aluop})
+	casez ({|EXTENSION_A, |EXTENSION_ZBA, |EXTENSION_ZBB, |EXTENSION_ZBC, |EXTENSION_ZBS, aluop})
 		// Base ISA
-		{4'bzzzz, ALUOP_ADD    }: result = sum;
-		{4'bzzzz, ALUOP_SUB    }: result = sum;
-		{4'bzzzz, ALUOP_LT     }: result = {{W_DATA-1{1'b0}}, lt};
-		{4'bzzzz, ALUOP_LTU    }: result = {{W_DATA-1{1'b0}}, lt};
-		{4'bzzzz, ALUOP_SRL    }: result = shift_dout;
-		{4'bzzzz, ALUOP_SRA    }: result = shift_dout;
-		{4'bzzzz, ALUOP_SLL    }: result = shift_dout;
+		{5'bzzzzz, ALUOP_ADD    }: result = sum;
+		{5'bzzzzz, ALUOP_SUB    }: result = sum;
+		{5'bzzzzz, ALUOP_LT     }: result = {{W_DATA-1{1'b0}}, lt};
+		{5'bzzzzz, ALUOP_LTU    }: result = {{W_DATA-1{1'b0}}, lt};
+		{5'bzzzzz, ALUOP_SRL    }: result = shift_dout;
+		{5'bzzzzz, ALUOP_SRA    }: result = shift_dout;
+		{5'bzzzzz, ALUOP_SLL    }: result = shift_dout;
+		// A (duplicates of Zbb)
+		{5'b1zzzz, ALUOP_MAX    }: result = lt ? op_b : op_a;
+		{5'b1zzzz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
+		{5'b1zzzz, ALUOP_MIN    }: result = lt ? op_a : op_b;
+		{5'b1zzzz, ALUOP_MINU   }: result = lt ? op_a : op_b;
 		// Zba
-		{4'b1zzz, ALUOP_SH1ADD }: result = sum;
-		{4'b1zzz, ALUOP_SH2ADD }: result = sum;
-		{4'b1zzz, ALUOP_SH3ADD }: result = sum;
+		{5'bz1zzz, ALUOP_SH1ADD }: result = sum;
+		{5'bz1zzz, ALUOP_SH2ADD }: result = sum;
+		{5'bz1zzz, ALUOP_SH3ADD }: result = sum;
 		// Zbb
-		{4'bz1zz, ALUOP_ANDN   }: result = bitwise;
-		{4'bz1zz, ALUOP_ORN    }: result = bitwise;
-		{4'bz1zz, ALUOP_XNOR   }: result = bitwise;
-		{4'bz1zz, ALUOP_CLZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
-		{4'bz1zz, ALUOP_CTZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
-		{4'bz1zz, ALUOP_CPOP   }: result = {{W_DATA-W_SHAMT-1{1'b0}}, cpop};
-		{4'bz1zz, ALUOP_MAX    }: result = lt ? op_b : op_a;
-		{4'bz1zz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
-		{4'bz1zz, ALUOP_MIN    }: result = lt ? op_a : op_b;
-		{4'bz1zz, ALUOP_MINU   }: result = lt ? op_a : op_b;
-		{4'bz1zz, ALUOP_SEXT_B }: result = {{W_DATA-8{op_a[7]}}, op_a[7:0]};
-		{4'bz1zz, ALUOP_SEXT_H }: result = {{W_DATA-16{op_a[15]}}, op_a[15:0]};
-		{4'bz1zz, ALUOP_ZEXT_H }: result = {{W_DATA-16{1'b0}}, op_a[15:0]};
-		{4'bz1zz, ALUOP_ORC_B  }: result = {{8{|op_a[31:24]}}, {8{|op_a[23:16]}}, {8{|op_a[15:8]}}, {8{|op_a[7:0]}}};
-		{4'bz1zz, ALUOP_REV8   }: result = {op_a[7:0], op_a[15:8], op_a[23:16], op_a[31:24]};
-		{4'bz1zz, ALUOP_ROL    }: result = shift_dout;
-		{4'bz1zz, ALUOP_ROR    }: result = shift_dout;
+		{5'bzz1zz, ALUOP_ANDN   }: result = bitwise;
+		{5'bzz1zz, ALUOP_ORN    }: result = bitwise;
+		{5'bzz1zz, ALUOP_XNOR   }: result = bitwise;
+		{5'bzz1zz, ALUOP_CLZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
+		{5'bzz1zz, ALUOP_CTZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
+		{5'bzz1zz, ALUOP_CPOP   }: result = {{W_DATA-W_SHAMT-1{1'b0}}, cpop};
+		{5'bzz1zz, ALUOP_MAX    }: result = lt ? op_b : op_a;
+		{5'bzz1zz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
+		{5'bzz1zz, ALUOP_MIN    }: result = lt ? op_a : op_b;
+		{5'bzz1zz, ALUOP_MINU   }: result = lt ? op_a : op_b;
+		{5'bzz1zz, ALUOP_SEXT_B }: result = {{W_DATA-8{op_a[7]}}, op_a[7:0]};
+		{5'bzz1zz, ALUOP_SEXT_H }: result = {{W_DATA-16{op_a[15]}}, op_a[15:0]};
+		{5'bzz1zz, ALUOP_ZEXT_H }: result = {{W_DATA-16{1'b0}}, op_a[15:0]};
+		{5'bzz1zz, ALUOP_ORC_B  }: result = {{8{|op_a[31:24]}}, {8{|op_a[23:16]}}, {8{|op_a[15:8]}}, {8{|op_a[7:0]}}};
+		{5'bzz1zz, ALUOP_REV8   }: result = {op_a[7:0], op_a[15:8], op_a[23:16], op_a[31:24]};
+		{5'bzz1zz, ALUOP_ROL    }: result = shift_dout;
+		{5'bzz1zz, ALUOP_ROR    }: result = shift_dout;
 		// Zbc
-		{4'bzz1z, ALUOP_CLMUL  }: result = clmul[W_DATA-1:0];
-		{4'bzz1z, ALUOP_CLMULH }: result = clmul[2*W_DATA-1:W_DATA];
-		{4'bzz1z, ALUOP_CLMULR }: result = clmul[2*W_DATA-2:W_DATA-1];
+		{5'bzzz1z, ALUOP_CLMUL  }: result = clmul[W_DATA-1:0];
+		{5'bzzz1z, ALUOP_CLMULH }: result = clmul[2*W_DATA-1:W_DATA];
+		{5'bzzz1z, ALUOP_CLMULR }: result = clmul[2*W_DATA-2:W_DATA-1];
 		// Zbs
-		{4'bzzz1, ALUOP_BCLR   }: result = op_a & ~zbs_mask;
-		{4'bzzz1, ALUOP_BSET   }: result = op_a |  zbs_mask;
-		{4'bzzz1, ALUOP_BINV   }: result = op_a ^  zbs_mask;
-		{4'bzzz1, ALUOP_BEXT   }: result = {{W_DATA-1{1'b0}}, shift_dout[0]};
+		{5'bzzzz1, ALUOP_BCLR   }: result = op_a & ~zbs_mask;
+		{5'bzzzz1, ALUOP_BSET   }: result = op_a |  zbs_mask;
+		{5'bzzzz1, ALUOP_BINV   }: result = op_a ^  zbs_mask;
+		{5'bzzzz1, ALUOP_BEXT   }: result = {{W_DATA-1{1'b0}}, shift_dout[0]};
 
 		default:                  result = bitwise;
 	endcase

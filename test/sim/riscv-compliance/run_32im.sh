@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 make TEST_ARCH=M BIN_ARCH=rv32imc TESTLIST=" \
 	div-01 \
 	divu-01 \

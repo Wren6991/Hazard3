@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 make TEST_ARCH=C BIN_ARCH=rv32ic TESTLIST=" \
 	cadd-01 \
 	caddi16sp-01 \

@@ -255,12 +255,14 @@ reg  [W_REGADDR-1:0] xm_rs1;
 reg  [W_REGADDR-1:0] xm_rs2;
 reg  [W_REGADDR-1:0] xm_rd;
 reg  [W_DATA-1:0]    xm_result;
-reg  [W_DATA-1:0]    xm_store_data;
 reg  [1:0]           xm_addr_align;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_wfi;
 reg                  xm_delay_irq_entry;
+
+// Registered load data, routed back through ALU. AMOs were a mistake
+reg [W_DATA-1:0]     mx_amo_load_data;
 
 // ----------------------------------------------------------------------------
 // Stall logic
@@ -275,9 +277,7 @@ wire x_stall_on_trap = m_trap_enter_vld && !m_trap_enter_rdy ||
 // sequences). Note we don't check for AMOs in stage M, because AMOs fully
 // fence off on their own completion before passing down the pipe.
 
-wire d_memop_is_amo = |EXTENSION_A && (
-	d_memop >= MEMOP_AMOSWAP_W && d_memop <= MEMOP_AMOMAXU_W
-);
+wire d_memop_is_amo = |EXTENSION_A && d_memop == MEMOP_AMO;
 
 wire x_stall_on_exclusive_overlap = |EXTENSION_A && (
 	(d_memop_is_amo || d_memop == MEMOP_SC_W || d_memop == MEMOP_LR_W) &&
@@ -367,7 +367,9 @@ always @ (*) begin
 		x_rs2_bypass = x_rdata2;
 	end
 
-	if (|d_alusrc_a)
+	if (|EXTENSION_A && x_amo_phase == 3'h2)
+		x_op_a = mx_amo_load_data;
+	else if (|d_alusrc_a)
 		x_op_a = d_pc;
 	else
 		x_op_a = x_rs1_bypass;
@@ -459,12 +461,12 @@ always @ (posedge clk) if (rst_n) begin
 		assert(x_amo_phase == 3'h0);
 	// Error phase should never block, so it can always pass to stage 3 to raise
 	// excepting trap entry.
-	if (amo_phase == 3'h4)
+	if (x_amo_phase == 3'h4)
 		assert(!x_stall);
 	// Error phase is either due to a bus response, or a misaligned address.
 	// Neither of these are write-address-phase.
-	if (amo_phase == 3'h4)
-		assert($past(amo_phase) != 3'h2);
+	if (x_amo_phase == 3'h4)
+		assert($past(x_amo_phase) != 3'h2);
 end
 `endif
 
@@ -738,7 +740,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
-			// Likewise, AMOs are handled entirely in X (well it's ambiguous; anyway different logic & stalls)
+			// Likewise, AMO memop logic is entirely in X, we squash the memop as it passes to M.
 			xm_memop <= x_unaligned_addr || d_memop_is_amo ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
 			xm_wfi <= d_wfi;
@@ -764,25 +766,18 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-reg [W_DATA-1:0]  amo_load_data;
-
 // Datapath flops
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_result <= {W_DATA{1'b0}};
-		xm_store_data <= {W_DATA{1'b0}};
 		xm_addr_align <= 2'b00;
-	end else if (!m_stall) begin
+	end else if (!m_stall || (d_memop_is_amo && x_amo_phase == 3'h2 && bus_dph_ready_d)) begin
 		xm_result <=
 			d_csr_ren                               ? x_csr_rdata :
-			|EXTENSION_A && d_memop_is_amo          ? amo_load_data :
+			|EXTENSION_A && x_amo_phase == 3'h3     ? mx_amo_load_data :
 			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
 			                                          x_alu_result;
-		xm_store_data <= x_rs2_bypass;
 		xm_addr_align <= x_addr_sum[1:0];
-
-	end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
-		xm_store_data <= x_rs2_bypass;
 	end
 end
 
@@ -833,56 +828,12 @@ assign m_exception_return_addr = d_pc - (
 
 // Load/store data handling
 
-wire [W_DATA-1:0] m_amo_wdata;
-wire              m_amo_wdata_valid;
-
-generate
-if (EXTENSION_A) begin: has_amo_alu
-
-	reg [W_MEMOP-1:0] amo_memop;
-	reg               m_amo_wdata_valid_r;
-
-	assign m_amo_wdata_valid = m_amo_wdata_valid_r;
-
-	always @ (posedge clk or negedge rst_n) begin
-		if (!rst_n) begin
-			amo_memop <= MEMOP_NONE;
-			amo_load_data <= {W_DATA{1'b0}};
-			m_amo_wdata_valid_r <= 1'b0;
-		end else if (x_amo_phase == 3'h4 || (x_amo_phase == 3'h3 && bus_dph_ready_d) || m_trap_enter_soon) begin
-			// Higher precedence to make sure trap always clears the valid bit
-			m_amo_wdata_valid_r <= 1'b0;
-		end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
-			amo_memop <= d_memop;
-			amo_load_data <= bus_rdata_d;
-			m_amo_wdata_valid_r <= 1'b1;
-		end
-	end
-
-	hazard3_amo_alu #(
-	`include "hazard3_config_inst.vh"
-	) amo_alu (
-		.op    (amo_memop),
-		.op_rs1(amo_load_data),
-		.op_rs2(xm_store_data),
-		.result(m_amo_wdata)
-	);
-
-end else begin: no_amo_alu
-
-	assign m_amo_wdata = {W_DATA{1'b0}};
-	assign m_amo_wdata_valid = 1'b0;
-	always @ (*) amo_load_data = {W_DATA{1'b0}};
-
-end
-endgenerate
-
 always @ (*) begin
 	// Local forwarding of store data
 	if (|mw_rd && xm_rs2 == mw_rd && !REDUCED_BYPASS) begin
 		m_wdata = mw_result;
 	end else begin
-		m_wdata = xm_store_data;
+		m_wdata = xm_result;
 	end
 	// Replicate store data to ensure appropriate byte lane is driven
 	case (xm_memop)
@@ -890,8 +841,6 @@ always @ (*) begin
 		MEMOP_SB: bus_wdata_d = {4{m_wdata[7:0]}};
 		default:  bus_wdata_d = m_wdata;
 	endcase
-	if (|EXTENSION_A && m_amo_wdata_valid)
-		bus_wdata_d = m_amo_wdata;
 
 	casez ({xm_memop, xm_addr_align[1:0]})
 		{MEMOP_LH  , 2'b0z}: m_rdata_pick_sext = {{16{bus_rdata_d[15]}}, bus_rdata_d[15: 0]};
@@ -922,6 +871,29 @@ always @ (*) begin
 		m_result = xm_result;
 	end
 end
+
+// Capture load data in read data phase of AMO. Passes back to stage X for AMO
+// calculation during AMO write address phase, using the regular ALU. Then
+// registered into xm_result like a regular store, to be driven out onto
+// hwdata during AMO write data phase.
+
+generate
+if (EXTENSION_A) begin: has_amo_load_reg
+
+	always @ (posedge clk or negedge rst_n) begin
+		if (!rst_n) begin
+			mx_amo_load_data <= {W_DATA{1'b0}};
+		end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
+			mx_amo_load_data <= bus_rdata_d;
+		end
+	end
+
+end else begin: no_amo_load_reg
+
+	always @ (*) mx_amo_load_data = {W_DATA{1'b0}};
+
+end
+endgenerate
 
 // Local monitor update.
 // - Set on a load-reserved with good response from global monitor

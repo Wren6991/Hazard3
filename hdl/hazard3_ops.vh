@@ -16,7 +16,8 @@ localparam ALUOP_SRL     = 6'h09;
 localparam ALUOP_SRA     = 6'h0a;
 localparam ALUOP_SLL     = 6'h0b;
 localparam ALUOP_MULDIV  = 6'h0c;
-// Bitmanip ALU operations:
+localparam ALUOP_RS2     = 6'h0d; // differs from AND/OR/XOR in [1:0]
+// Bitmanip ALU operations (some also used by AMOs):
 localparam ALUOP_SH1ADD  = 6'h20;
 localparam ALUOP_SH2ADD  = 6'h21;
 localparam ALUOP_SH3ADD  = 6'h22;
@@ -56,27 +57,19 @@ localparam ALUSRCA_PC  = 1'h1;
 localparam ALUSRCB_RS2 = 1'h0;
 localparam ALUSRCB_IMM = 1'h1;
 
-localparam MEMOP_LW        = 5'h00;
-localparam MEMOP_LH        = 5'h01;
-localparam MEMOP_LB        = 5'h02;
-localparam MEMOP_LHU       = 5'h03;
-localparam MEMOP_LBU       = 5'h04;
-localparam MEMOP_SW        = 5'h05;
-localparam MEMOP_SH        = 5'h06;
-localparam MEMOP_SB        = 5'h07;
+localparam MEMOP_LW   = 5'h00;
+localparam MEMOP_LH   = 5'h01;
+localparam MEMOP_LB   = 5'h02;
+localparam MEMOP_LHU  = 5'h03;
+localparam MEMOP_LBU  = 5'h04;
+localparam MEMOP_SW   = 5'h05;
+localparam MEMOP_SH   = 5'h06;
+localparam MEMOP_SB   = 5'h07;
 
-localparam MEMOP_LR_W      = 5'h08;
-localparam MEMOP_SC_W      = 5'h09;
-localparam MEMOP_AMOSWAP_W = 5'h0a;
-localparam MEMOP_AMOADD_W  = 5'h0b;
-localparam MEMOP_AMOXOR_W  = 5'h0c;
-localparam MEMOP_AMOAND_W  = 5'h0d;
-localparam MEMOP_AMOOR_W   = 5'h0e;
-localparam MEMOP_AMOMIN_W  = 5'h0f;
-localparam MEMOP_AMOMAX_W  = 5'h10;
-localparam MEMOP_AMOMINU_W = 5'h11;
-localparam MEMOP_AMOMAXU_W = 5'h12;
-localparam MEMOP_NONE      = 5'h1f;
+localparam MEMOP_LR_W = 5'h08;
+localparam MEMOP_SC_W = 5'h09;
+localparam MEMOP_AMO  = 5'h0a;
+localparam MEMOP_NONE = 5'h10;
 
 localparam BCOND_NEVER  = 2'h0;
 localparam BCOND_ALWAYS = 2'h1;
