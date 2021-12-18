@@ -458,10 +458,14 @@ always @ (posedge clk) if (rst_n) begin
 	// Should be in resting state between AMOs
 	if (!d_memop_is_amo)
 		assert(x_amo_phase == 3'h0);
-	// Error phase should never block, so it can always pass to stage 3 to raise
-	// excepting trap entry.
+	// Error phase should have no stage 2 blockers, so it can pass to stage 3 to
+	// raise exception entry. It's ok to block behind a younger instruction, but..
 	if (x_amo_phase == 3'h4)
-		assert(!x_stall);
+		assert(!x_stall || m_stall);
+	// ..the only way to reach AMO error phase without stage 3 clearing out should
+	// be an unaligned AMO address, which goes straight to error phase.
+	if (x_amo_phase == 3'h4 && m_stall)
+		assert(x_unaligned_addr);
 	// Error phase is either due to a bus response, or a misaligned address.
 	// Neither of these are write-address-phase.
 	if (x_amo_phase == 3'h4)
@@ -770,7 +774,10 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_result <= {W_DATA{1'b0}};
 		xm_addr_align <= 2'b00;
-	end else if (!m_stall || (d_memop_is_amo && x_amo_phase == 3'h2 && bus_dph_ready_d)) begin
+	end else if (!m_stall && !(|EXTENSION_A && x_amo_phase == 3'h3 && !bus_dph_ready_d)) begin
+		// AMOs need special attention (of course):
+		// - Steer captured read phase data in mw_result back through xm_result at end of AMO
+		// - Make sure xm_result (store data) doesn't transition during stalled write dphase
 		xm_result <=
 			d_csr_ren                               ? x_csr_rdata :
 			|EXTENSION_A && x_amo_phase == 3'h3     ? mw_result :
