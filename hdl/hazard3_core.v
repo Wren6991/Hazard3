@@ -470,6 +470,9 @@ always @ (posedge clk) if (rst_n) begin
 	// Neither of these are write-address-phase.
 	if (x_amo_phase == 3'h4)
 		assert($past(x_amo_phase) != 3'h2);
+	// Make sure M is unstalled for passing store data through in phase 2
+	if (x_amo_phase == 3'h2)
+		assert(!m_stall);
 end
 `endif
 
@@ -768,6 +771,14 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
+
+`ifdef FORMAL
+always @ (posedge clk) if (rst_n) begin
+	// D bus errors must always squash younger load/stores
+	if ($past(bus_dph_err_d && !bus_dph_ready_d))
+		assert(!bus_aph_req_d);
+end
+`endif
 
 // Datapath flops
 always @ (posedge clk or negedge rst_n) begin

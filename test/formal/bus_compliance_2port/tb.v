@@ -53,7 +53,9 @@ localparam W_DATA = 32;
 (* keep *) wire              dbg_instr_caught_exception;
 (* keep *) wire              dbg_instr_caught_ebreak;
 
-(* keep *) wire [15:0]       irq;
+(* keep *) wire [31:0]       irq;
+(* keep *) wire              soft_irq;
+(* keep *) wire              timer_irq;
 
 hazard3_cpu_2port dut (
 	.clk                        (clk),
@@ -99,7 +101,9 @@ hazard3_cpu_2port dut (
 	.dbg_instr_caught_exception (dbg_instr_caught_exception),
 	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
 
-	.irq                        (irq)
+	.irq                        (irq),
+	.soft_irq                   (soft_irq),
+	.timer_irq                  (timer_irq)
 );
 
 // ----------------------------------------------------------------------------

@@ -152,7 +152,7 @@ always @ (posedge clk or negedge rst_n) begin
 		bus_hold_aph <= 1'b0;
 		bus_gnt_id_prev <= 2'h0;
 	end else begin
-		bus_hold_aph <= ahblm_htrans[1] && !ahblm_hready;
+		bus_hold_aph <= ahblm_htrans[1] && !ahblm_hready && !ahblm_hresp;
 		bus_gnt_id_prev <= {bus_gnt_i, bus_gnt_d};
 	end
 end

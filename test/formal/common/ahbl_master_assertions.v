@@ -64,7 +64,7 @@ always @ (posedge clk) if (rst_n) begin: dst_ahbl_req_properties
 		// HSIZE appropriate for bus width
 		assert(8 << src_hsize <= W_DATA);
 		// No deassertion or change of active request
-		if ($past(src_htrans[1] && !src_hready)) begin
+		if ($past(src_htrans[1] && !src_hready && !src_hresp)) begin
 			assert($stable({
 				src_htrans,
 				src_hwrite,
