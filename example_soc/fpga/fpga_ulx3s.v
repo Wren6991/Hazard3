@@ -33,7 +33,7 @@ fpga_reset #(
 
 example_soc #(
 	.DTM_TYPE      ("ECP5"),
-	.SRAM_DEPTH    (1 << 12),
+	.SRAM_DEPTH    (1 << 15),
 
 	.EXTENSION_M   (1),
 	.EXTENSION_A   (1),
@@ -43,7 +43,7 @@ example_soc #(
 	.EXTENSION_ZBC (0),
 	.EXTENSION_ZBS (0),
 	.CSR_COUNTER   (0),
-	.MUL_FAST      (0),
+	.MUL_FAST      (1),
 	.MULDIV_UNROLL (1)
 ) soc_u (
 	.clk     (clk_sys),
