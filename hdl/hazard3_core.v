@@ -261,9 +261,6 @@ reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_wfi;
 reg                  xm_delay_irq_entry;
 
-// Registered load data, routed back through ALU. AMOs were a mistake
-reg [W_DATA-1:0]     mx_amo_load_data;
-
 // ----------------------------------------------------------------------------
 // Stall logic
 
@@ -367,8 +364,10 @@ always @ (*) begin
 		x_rs2_bypass = x_rdata2;
 	end
 
+	// AMO captures rdata into mw_result at end of read data phase, so we can
+	// feed back through the ALU.
 	if (|EXTENSION_A && x_amo_phase == 3'h2)
-		x_op_a = mx_amo_load_data;
+		x_op_a = mw_result;
 	else if (|d_alusrc_a)
 		x_op_a = d_pc;
 	else
@@ -673,6 +672,7 @@ wire [W_EXCEPT-1:0] x_except =
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
 wire x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
+wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 
 hazard3_csr #(
 	.XLEN            (W_DATA),
@@ -713,7 +713,7 @@ hazard3_csr #(
 	.trap_enter_soon            (m_trap_enter_soon),
 	.trap_enter_vld             (m_trap_enter_vld),
 	.trap_enter_rdy             (m_trap_enter_rdy),
-	.loadstore_dphase_pending   (xm_memop != MEMOP_NONE),
+	.loadstore_dphase_pending   (m_dphase_in_flight),
 	.mepc_in                    (m_exception_return_addr),
 	.wfi_stall_clear            (m_wfi_stall_clear),
 
@@ -740,8 +740,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
-			// Likewise, AMO memop logic is entirely in X, we squash the memop as it passes to M.
-			xm_memop <= x_unaligned_addr || d_memop_is_amo ? MEMOP_NONE : d_memop;
+			xm_memop <= x_unaligned_addr ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
 			xm_wfi <= d_wfi;
 			if (x_stall || m_trap_enter_soon) begin
@@ -774,7 +773,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (!m_stall || (d_memop_is_amo && x_amo_phase == 3'h2 && bus_dph_ready_d)) begin
 		xm_result <=
 			d_csr_ren                               ? x_csr_rdata :
-			|EXTENSION_A && x_amo_phase == 3'h3     ? mx_amo_load_data :
+			|EXTENSION_A && x_amo_phase == 3'h3     ? mw_result :
 			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
 			                                          x_alu_result;
 		xm_addr_align <= x_addr_sum[1:0];
@@ -808,7 +807,7 @@ assign x_jump_not_except = !m_trap_enter_vld;
 // - Cycle 0: hresp asserted, hready low. We set the exception to squash behind us. Bus stall high.
 // - Cycle 1: hready high. For whatever reason, the frontend can't accept the trap address this cycle.
 // - Cycle 2: Our dataphase has ended, so bus_dph_ready_d doesn't pulse again. m_bus_stall stuck high.
-wire m_bus_stall = xm_memop != MEMOP_NONE && !bus_dph_ready_d && xm_except == EXCEPT_NONE && !(
+wire m_bus_stall = m_dphase_in_flight && !bus_dph_ready_d && xm_except == EXCEPT_NONE && !(
 	|EXTENSION_A && xm_memop == MEMOP_SC_W && !mw_local_exclusive_reserved
 );
 
@@ -860,7 +859,13 @@ always @ (*) begin
 		default:             m_rdata_pick_sext = 32'hxxxx_xxxx;
 	endcase
 
-	if (|EXTENSION_A && xm_memop == MEMOP_SC_W) begin
+	if (|EXTENSION_A && x_amo_phase == 3'h1) begin
+		// Capture AMO read data into mw_result for feeding back through the ALU.
+		m_result = bus_rdata_d;
+	end else if (|EXTENSION_A && (x_amo_phase[1] || xm_memop == MEMOP_AMO)) begin
+		// Hold the captured load data in writeback until the AMO catches up with it.
+		m_result = mw_result;
+	end else if (|EXTENSION_A && xm_memop == MEMOP_SC_W) begin
 		// sc.w may fail due to negative response from either local or global monitor.
 		m_result = {31'h0, mw_local_exclusive_reserved && bus_dph_exokay_d};
 	end else if (xm_memop != MEMOP_NONE) begin
@@ -871,29 +876,6 @@ always @ (*) begin
 		m_result = xm_result;
 	end
 end
-
-// Capture load data in read data phase of AMO. Passes back to stage X for AMO
-// calculation during AMO write address phase, using the regular ALU. Then
-// registered into xm_result like a regular store, to be driven out onto
-// hwdata during AMO write data phase.
-
-generate
-if (EXTENSION_A) begin: has_amo_load_reg
-
-	always @ (posedge clk or negedge rst_n) begin
-		if (!rst_n) begin
-			mx_amo_load_data <= {W_DATA{1'b0}};
-		end else if (d_memop_is_amo && x_amo_phase == 3'h1 && bus_dph_ready_d) begin
-			mx_amo_load_data <= bus_rdata_d;
-		end
-	end
-
-end else begin: no_amo_load_reg
-
-	always @ (*) mx_amo_load_data = {W_DATA{1'b0}};
-
-end
-endgenerate
 
 // Local monitor update.
 // - Set on a load-reserved with good response from global monitor
@@ -940,10 +922,27 @@ always @ (posedge clk) begin
 end
 //synthesis translate_on
 
-// No need to reset result register, as reset on mw_rd protects register file from it
-always @ (posedge clk)
-	if (m_reg_wen_if_nonzero)
+`ifdef FORMAL
+// We borrow mw_result during an AMO to capture rdata and feed back through
+// the ALU, since it already has the right paths. Make sure this is safe.
+// (Whatever instruction is in M ahead of AMO should have passed through by
+// the time AMO has reached read dphase)
+always @ (posedge clk) if (rst_n) begin
+	if (x_amo_phase == 3'h1)
+		assert(m_reg_wen_if_nonzero);
+	if (x_amo_phase == 3'h1)
+		assert(~|xm_rd);
+end
+`endif
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		mw_result <= {W_DATA{1'b0}};
+	end else if (m_reg_wen_if_nonzero) begin
 		mw_result <= m_result;
+	end
+end
+
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
