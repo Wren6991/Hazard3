@@ -862,13 +862,10 @@ always @ (*) begin
 	if (|EXTENSION_A && x_amo_phase == 3'h1) begin
 		// Capture AMO read data into mw_result for feeding back through the ALU.
 		m_result = bus_rdata_d;
-	end else if (|EXTENSION_A && (x_amo_phase[1] || xm_memop == MEMOP_AMO)) begin
-		// Hold the captured load data in writeback until the AMO catches up with it.
-		m_result = mw_result;
 	end else if (|EXTENSION_A && xm_memop == MEMOP_SC_W) begin
 		// sc.w may fail due to negative response from either local or global monitor.
 		m_result = {31'h0, mw_local_exclusive_reserved && bus_dph_exokay_d};
-	end else if (xm_memop != MEMOP_NONE) begin
+	end else if (xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO) begin
 		m_result = m_rdata_pick_sext;
 	end else if (MUL_FAST && m_fast_mul_result_vld) begin
 		m_result = m_fast_mul_result;
@@ -886,10 +883,6 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mw_local_exclusive_reserved <= 1'b0;
 	end else if (|EXTENSION_A && (!m_stall || bus_dph_err_d)) begin
-`ifdef FORMAL
-		// AMOs should handle the entire bus transfer in stage X.
-		assert(xm_memop != MEMOP_AMOADD_W);
-`endif
 		if (d_memop_is_amo) begin
 			mw_local_exclusive_reserved <= 1'b0;
 		end else if (xm_memop == MEMOP_SC_W && (bus_dph_ready_d || bus_dph_err_d)) begin
@@ -938,11 +931,11 @@ end
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mw_result <= {W_DATA{1'b0}};
-	end else if (m_reg_wen_if_nonzero) begin
+	end else if (m_reg_wen_if_nonzero && !(|EXTENSION_A && x_amo_phase[1])) begin
+		// (don't trash the captured AMO read phase data during stage 2/3 of AMO -- we need it!)
 		mw_result <= m_result;
 	end
 end
-
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
