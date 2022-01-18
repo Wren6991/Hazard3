@@ -38,35 +38,35 @@ parameter MTVEC_INIT      = 32'h00000000,
 
 // EXTENSION_A: Support for atomic read/modify/write instructions
 // (currently, only lr.w/sc.w are supported)
-parameter EXTENSION_A     = 1,
+parameter EXTENSION_A     = 0,
 
 // EXTENSION_C: Support for compressed (variable-width) instructions
-parameter EXTENSION_C     = 1,
+parameter EXTENSION_C     = 0,
 
 // EXTENSION_M: Support for hardware multiply/divide/modulo instructions
-parameter EXTENSION_M     = 1,
+parameter EXTENSION_M     = 0,
 
 // EXTENSION_ZBA: Support for Zba address generation instructions
-parameter EXTENSION_ZBA   = 1,
+parameter EXTENSION_ZBA   = 0,
 
 // EXTENSION_ZBB: Support for Zbb basic bit manipulation instructions
-parameter EXTENSION_ZBB   = 1,
+parameter EXTENSION_ZBB   = 0,
 
 // EXTENSION_ZBC: Support for Zbc carry-less multiplication instructions
-parameter EXTENSION_ZBC   = 1,
+parameter EXTENSION_ZBC   = 0,
 
 // EXTENSION_ZBS: Support for Zbs single-bit manipulation instructions
-parameter EXTENSION_ZBS   = 1,
+parameter EXTENSION_ZBS   = 0,
 
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.
-parameter CSR_M_MANDATORY = 1,
+parameter CSR_M_MANDATORY = 0,
 
 // CSR_M_TRAP: Include M-mode trap-handling CSRs, and enable trap support.
-parameter CSR_M_TRAP      = 1,
+parameter CSR_M_TRAP      = 0,
 
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
-parameter CSR_COUNTER     = 1,
+parameter CSR_COUNTER     = 0,
 
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.

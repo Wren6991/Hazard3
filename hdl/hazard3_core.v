@@ -972,18 +972,10 @@ end
 
 
 hazard3_regfile_1w2r #(
-	.FAKE_DUALPORT(0),
-`ifdef SIM
-	.RESET_REGS(1),
-`elsif FORMAL
-	.RESET_REGS(1),
-`elsif FPGA
-	.RESET_REGS(0),
-`else
-	.RESET_REGS(1),
-`endif
-	.N_REGS(32),
-	.W_DATA(W_DATA)
+	.FAKE_DUALPORT (0),
+	.RESET_REGS    (0),
+	.N_REGS        (32),
+	.W_DATA        (W_DATA)
 ) inst_regfile_1w2r (
 	.clk    (clk),
 	.rst_n  (rst_n),
