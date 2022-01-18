@@ -391,6 +391,30 @@ hazard3_alu #(
 
 // AHB transaction request
 
+wire x_unaligned_addr = d_memop != MEMOP_NONE && (
+	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
+	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0]
+);
+
+reg mw_local_exclusive_reserved;
+
+wire x_memop_vld = d_memop != MEMOP_NONE && !(
+	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved ||
+	|EXTENSION_A && d_memop_is_amo && x_amo_phase != 3'h0 && x_amo_phase != 3'h2
+);
+
+wire x_memop_write =
+	d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB ||
+	|EXTENSION_A && d_memop == MEMOP_SC_W ||
+	|EXTENSION_A && d_memop_is_amo && x_amo_phase == 3'h2;
+
+// Always query the global monitor, except for store-conditional suppressed by local monitor.
+assign bus_aph_excl_d = |EXTENSION_A && (
+	d_memop == MEMOP_LR_W ||
+	d_memop == MEMOP_SC_W ||
+	d_memop_is_amo
+);
+
 // AMO stalls the pipe, then generates two bus transfers per 4-cycle
 // iteration, unless it bails out due to a bus fault or failed load
 // reservation.
@@ -475,30 +499,6 @@ always @ (posedge clk) if (rst_n) begin
 		assert(!m_stall);
 end
 `endif
-
-reg mw_local_exclusive_reserved;
-
-wire x_memop_vld = d_memop != MEMOP_NONE && !(
-	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved ||
-	|EXTENSION_A && d_memop_is_amo && x_amo_phase != 3'h0 && x_amo_phase != 3'h2
-);
-
-wire x_memop_write =
-	d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB ||
-	|EXTENSION_A && d_memop == MEMOP_SC_W ||
-	|EXTENSION_A && d_memop_is_amo && x_amo_phase == 3'h2;
-
-wire x_unaligned_addr = d_memop != MEMOP_NONE && (
-	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
-	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0]
-);
-
-// Always query the global monitor, except for store-conditional suppressed by local monitor.
-assign bus_aph_excl_d = |EXTENSION_A && (
-	d_memop == MEMOP_LR_W ||
-	d_memop == MEMOP_SC_W ||
-	d_memop_is_amo
-);
 
 // This adder is used for both branch targets and load/store addresses.
 // Supporting all branch types already requires rs1 + I-fmt, and pc + B-fmt.

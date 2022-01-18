@@ -70,7 +70,7 @@ end else if (RESET_REGS) begin: real_dualport_reset
 end else begin: real_dualport_noreset
 	// This should be inference-compatible on FPGAs with dual-port BRAMs
 	reg [W_DATA-1:0] mem [0:N_REGS-1];
- 
+
 	always @ (posedge clk) begin
 		if (wen) begin
 			mem[waddr] <= wdata;
