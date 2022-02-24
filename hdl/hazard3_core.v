@@ -144,7 +144,7 @@ hazard3_frontend #(
 // Pipe Stage X (Decode Logic)
 
 // X-check on pieces of instruction which frontend claims are valid
-//synthesis translate_off
+`ifdef HAZARD3_X_CHECKS
 always @ (posedge clk) begin
 	if (rst_n) begin
 		if (|fd_cir_vld && (^fd_cir[15:0] === 1'bx)) begin
@@ -157,7 +157,7 @@ always @ (posedge clk) begin
 		end
 	end
 end
-//synthesis translate_on
+`endif
 
 // To X
 wire                 d_starved;
@@ -922,7 +922,7 @@ end
 wire m_reg_wen_if_nonzero = !m_bus_stall && xm_except == EXCEPT_NONE;
 wire m_reg_wen = |xm_rd && m_reg_wen_if_nonzero;
 
-//synthesis translate_off
+`ifdef HAZARD3_X_CHECKS
 always @ (posedge clk) begin
 	if (rst_n) begin
 		if (m_reg_wen && (^m_result === 1'bX)) begin
@@ -931,7 +931,7 @@ always @ (posedge clk) begin
 		end
 	end
 end
-//synthesis translate_on
+`endif
 
 `ifdef FORMAL
 // We borrow mw_result during an AMO to capture rdata and feed back through
@@ -959,12 +959,12 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mw_rd <= {W_REGADDR{1'b0}};
 	end else begin
-		//synthesis translate_off
+`ifdef HAZARD3_X_CHECKS
 		if (!m_stall && ^bus_wdata_d === 1'bX) begin
 			$display("Writing Xs to memory!");
 			$finish;
 		end
-		//synthesis translate_on
+`endif
 		if (m_reg_wen_if_nonzero)
 			mw_rd <= xm_rd;
 	end
