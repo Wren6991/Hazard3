@@ -108,9 +108,9 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		fifo_valid <= {FIFO_DEPTH+1{1'b0}};
 	end else if (jump_now) begin
-		fifo_valid[FIFO_DEPTH-1:0] <= {FIFO_DEPTH{1'b0}};
+		fifo_valid <= {FIFO_DEPTH+1{1'b0}};
 	end else if (fifo_push || fifo_pop || fifo_dbg_inject) begin
-		fifo_valid[FIFO_DEPTH-1:0] <= ~(~fifo_valid << (fifo_push || fifo_dbg_inject)) >> fifo_pop;
+		fifo_valid <= {1'b0, ~(~fifo_valid << (fifo_push || fifo_dbg_inject)) >> fifo_pop};
 	end
 end
 
