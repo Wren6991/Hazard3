@@ -837,20 +837,30 @@ assign illegal = (wen_soon || ren_soon) && !decode_match;
 // ----------------------------------------------------------------------------
 // Debug run/halt
 
+// req_resume_prev is to cut an in->out path from request to trap addr.
 reg have_just_reset;
 reg step_halt_req;
+reg dbg_req_resume_prev;
+reg dbg_req_halt_prev;
 reg pending_dbg_resume_prev;
 
-wire pending_dbg_resume = (pending_dbg_resume_prev || dbg_req_resume) && debug_mode;
+wire pending_dbg_resume = (pending_dbg_resume_prev || dbg_req_resume_prev) && debug_mode;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		have_just_reset <= |DEBUG_SUPPORT;
 		step_halt_req <= 1'b0;
+		dbg_req_resume_prev <= 1'b0;
+		dbg_req_halt_prev <= 1'b0;
 		pending_dbg_resume_prev <= 1'b0;
 	end else if (DEBUG_SUPPORT) begin
 		if (instr_ret)
 			have_just_reset <= 1'b0;
+
+		// Just a delayed version of the request from outside of the core.
+		// Delay is fine because the DM awaits ack before deasserting.
+		dbg_req_resume_prev <= dbg_req_resume;
+		dbg_req_halt_prev <= dbg_req_halt;
 
 		if (debug_mode) begin
 			step_halt_req <= 1'b0;
@@ -898,7 +908,7 @@ wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
 // load/store address phase) because at that point we can't suppress the bus
 // access..
 wire want_halt_irq_if_no_exception = DEBUG_SUPPORT && !debug_mode && !want_halt_except && (
-	(dbg_req_halt && !delay_irq_entry) ||
+	(dbg_req_halt_prev && !delay_irq_entry) ||
 	(dbg_req_halt_on_reset && have_just_reset) ||
 	step_halt_req
 );
@@ -911,9 +921,9 @@ wire want_halt_irq = want_halt_irq_if_no_exception && !halt_delayed_by_exception
 
 assign dcause_next =
 	// Trigger would be highest priority if implemented
-	except == EXCEPT_EBREAK                                    ? 3'h1 : // ebreak (priority 3)
-	dbg_req_halt || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
-	                                                             3'h4;  // single-step (priority 0)
+	except == EXCEPT_EBREAK                                         ? 3'h1 : // ebreak (priority 3)
+	dbg_req_halt_prev || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
+	                                                                  3'h4;  // single-step (priority 0)
 
 assign enter_debug_mode = !debug_mode && (want_halt_irq || want_halt_except) && trap_enter_rdy;
 
