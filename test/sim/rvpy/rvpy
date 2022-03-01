@@ -141,7 +141,7 @@ class RVCSR:
 		elif addr == RVCSR.MSCRATCH:
 			return self.mscratch
 		else:
-			return None
+			return 0
 
 	def write(self, addr, data, op=0):
 		if op == RVCSR.WRITE_CLEAR:
@@ -155,7 +155,7 @@ class RVCSR:
 
 class RVCore:
 
-	def __init__(self, mem, reset_vector=0xc0):
+	def __init__(self, mem, reset_vector=0x40):
 		self.regs = [0] * 32
 		self.mem = mem
 		self.pc = reset_vector
