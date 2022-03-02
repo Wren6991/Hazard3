@@ -55,7 +55,6 @@ module hazard3_frontend #(
 	// cycle. These go straight to the register file read ports.
 	output wire [4:0]        next_regs_rs1,
 	output wire [4:0]        next_regs_rs2,
-	output wire              next_regs_vld,
 
 	// Debugger instruction injection: instruction fetch is suppressed when in
 	// debug halt state, and the DM can then inject instructions into the last
@@ -388,8 +387,6 @@ assign cir_err = cir_bus_err[1:0];
 
 wire [31:0] next_instr = instr_data_plus_fetch[31:0];
 wire next_instr_is_32bit = next_instr[1:0] == 2'b11;
-
-assign next_regs_vld = next_instr_is_32bit ? buf_level_next[1] : |buf_level_next;
 
 assign next_regs_rs1 =
 	next_instr_is_32bit                                     ? next_instr[19:15]       : // 32-bit R, S, B formats

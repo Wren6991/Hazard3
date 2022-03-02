@@ -89,7 +89,6 @@ wire                 f_jump_rdy;
 wire                 f_jump_now = f_jump_req && f_jump_rdy;
 
 // Predecoded register numbers, for register file access
-wire                 f_regnum_vld;
 wire [W_REGADDR-1:0] f_rs1;
 wire [W_REGADDR-1:0] f_rs2;
 
@@ -132,7 +131,6 @@ hazard3_frontend #(
 
 	.next_regs_rs1      (f_rs1),
 	.next_regs_rs2      (f_rs2),
-	.next_regs_vld      (f_regnum_vld),
 
 	.debug_mode         (debug_mode),
 	.dbg_instr_data     (dbg_instr_data),
@@ -344,21 +342,41 @@ wire m_wfi_stall_clear;
 
 // ALU, operand muxes and bypass
 
+// Approximate regnums were predecoded in stage 1, for regfile read.
+// (Approximate in the sense that they are invalid when the instruction
+// doesn't *have* a register operand on that port.) These aren't usable for
+// hazard checking but are fine for bypass, and make the bypass mux
+// independent of stage 2 decode.
+
+reg [W_REGADDR-1:0] d_rs1_predecoded;
+reg [W_REGADDR-1:0] d_rs2_predecoded;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		d_rs1_predecoded <= {W_REGADDR{1'b0}};
+		d_rs2_predecoded <= {W_REGADDR{1'b0}};
+	end else if (!x_stall) begin
+		d_rs1_predecoded <= f_rs1;
+		d_rs2_predecoded <= f_rs2;
+	end
+end
+
 always @ (*) begin
 	if (~|d_rs1) begin
+		// Note the predecoded version is not sufficiently precise for zeroing
 		x_rs1_bypass = {W_DATA{1'b0}};
-	end else if (xm_rd == d_rs1) begin
+	end else if (xm_rd == d_rs1_predecoded) begin
 		x_rs1_bypass = xm_result;
-	end else if (mw_rd == d_rs1 && !REDUCED_BYPASS) begin
+	end else if (mw_rd == d_rs1_predecoded && !REDUCED_BYPASS) begin
 		x_rs1_bypass = mw_result;
 	end else begin
 		x_rs1_bypass = x_rdata1;
 	end
 	if (~|d_rs2) begin
 		x_rs2_bypass = {W_DATA{1'b0}};
-	end else if (xm_rd == d_rs2) begin
+	end else if (xm_rd == d_rs2_predecoded) begin
 		x_rs2_bypass = xm_result;
-	end else if (mw_rd == d_rs2 && !REDUCED_BYPASS) begin
+	end else if (mw_rd == d_rs2_predecoded && !REDUCED_BYPASS) begin
 		x_rs2_bypass = mw_result;
 	end else begin
 		x_rs2_bypass = x_rdata2;
