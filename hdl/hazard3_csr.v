@@ -233,7 +233,13 @@ localparam MHPMEVENT31    = 12'h33f; // WARL (we tie to 0)
 
 // Custom M-mode CSRs:
 localparam MEIE0          = 12'hbe0; // External interrupt enable register 0
+localparam MEIE1          = 12'hbe1; // External interrupt enable register 1
+localparam MEIE2          = 12'hbe2; // External interrupt enable register 2
+localparam MEIE3          = 12'hbe3; // External interrupt enable register 3
 localparam MEIP0          = 12'hfe0; // External interrupt pending register 0
+localparam MEIP1          = 12'hfe1; // External interrupt pending register 1
+localparam MEIP2          = 12'hfe2; // External interrupt pending register 2
+localparam MEIP3          = 12'hfe3; // External interrupt pending register 3
 localparam MLEI           = 12'hfe4; // Lowest external interrupt number
 
 // ----------------------------------------------------------------------------
@@ -390,25 +396,47 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// Custom external interrupt enable register (would be at top of mie, but that
+// Custom external interrupt enable registers (would be at top of mie, but that
 // only leaves room for 16 external interrupts)
 
-localparam MEIE0_WMASK = ~({XLEN{1'b1}} << NUM_IRQ);
+localparam N_IRQ_REG0 = NUM_IRQ >= 32  ? 32 :                     NUM_IRQ     ;
+localparam N_IRQ_REG1 = NUM_IRQ >= 64  ? 32 : NUM_IRQ <= 32 ? 0 : NUM_IRQ - 32;
+localparam N_IRQ_REG2 = NUM_IRQ >= 96  ? 32 : NUM_IRQ <= 64 ? 0 : NUM_IRQ - 64;
+localparam N_IRQ_REG3 = NUM_IRQ >= 128 ? 32 : NUM_IRQ <= 96 ? 0 : NUM_IRQ - 96;
+
+localparam MEIE0_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG0);
+localparam MEIE1_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG1);
+localparam MEIE2_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG2);
+localparam MEIE3_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG3);
 
 reg [XLEN-1:0] meie0;
+reg [XLEN-1:0] meie1;
+reg [XLEN-1:0] meie2;
+reg [XLEN-1:0] meie3;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		// All-ones for implemented IRQs
 		meie0 <= X0;
+		meie1 <= X0;
+		meie2 <= X0;
+		meie3 <= X0;
 	end else if (wen && addr == MEIE0) begin
 		meie0 <= update_nonconst(meie0, MEIE0_WMASK);
+	end else if (wen && addr == MEIE1) begin
+		meie1 <= update_nonconst(meie1, MEIE1_WMASK);
+	end else if (wen && addr == MEIE2) begin
+		meie2 <= update_nonconst(meie2, MEIE2_WMASK);
+	end else if (wen && addr == MEIE3) begin
+		meie3 <= update_nonconst(meie3, MEIE3_WMASK);
 	end
 end
 
 // Assigned later:
 wire [XLEN-1:0] meip0;
-wire [4:0] mlei;
+wire [XLEN-1:0] meip1;
+wire [XLEN-1:0] meip2;
+wire [XLEN-1:0] meip3;
+wire [6:0] mlei;
 
 // ----------------------------------------------------------------------------
 // Counters
@@ -813,19 +841,49 @@ always @ (*) begin
     // ------------------------------------------------------------------------
 	// Custom CSRs
 
-	MEIE0: if (CSR_M_TRAP) begin
+	MEIE0: if (CSR_M_TRAP && N_IRQ_REG0 > 0) begin
 		decode_match = 1'b1;
 		rdata = meie0;
 	end
 
-	MEIP0: if (CSR_M_TRAP) begin
+	MEIE1: if (CSR_M_TRAP && N_IRQ_REG1 > 0) begin
+		decode_match = 1'b1;
+		rdata = meie1;
+	end
+
+	MEIE2: if (CSR_M_TRAP && N_IRQ_REG2 > 0) begin
+		decode_match = 1'b1;
+		rdata = meie2;
+	end
+
+	MEIE3: if (CSR_M_TRAP && N_IRQ_REG3 > 0) begin
+		decode_match = 1'b1;
+		rdata = meie3;
+	end
+
+	MEIP0: if (CSR_M_TRAP && N_IRQ_REG0 > 0) begin
 		decode_match = !wen_soon;
 		rdata = meip0;
 	end
 
+	MEIP1: if (CSR_M_TRAP && N_IRQ_REG1 > 0) begin
+		decode_match = !wen_soon;
+		rdata = meip1;
+	end
+
+	MEIP2: if (CSR_M_TRAP && N_IRQ_REG2 > 0) begin
+		decode_match = !wen_soon;
+		rdata = meip2;
+	end
+
+	MEIP3: if (CSR_M_TRAP && N_IRQ_REG3 > 0) begin
+		decode_match = !wen_soon;
+		rdata = meip3;
+	end
+
 	MLEI: if (CSR_M_TRAP) begin
 		decode_match = !wen_soon;
-		rdata = {{XLEN-7{1'b0}}, mlei, 2'b00};
+		rdata = {{XLEN-9{1'b0}}, mlei, 2'b00};
 	end
 
 	default: begin end
@@ -956,8 +1014,13 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-assign meip0 = {{XLEN-NUM_IRQ{1'b0}}, irq_r};
-wire external_irq_pending = |(meie0 & meip0);
+localparam MAX_IRQ = 128;
+wire [MAX_IRQ-1:0] meip = {{MAX_IRQ-NUM_IRQ{1'b0}}, irq_r};
+wire [MAX_IRQ-1:0] meie = {meie3, meie2, meie1, meie0};
+
+assign {meip3, meip2, meip1, meip0} = meip;
+
+wire external_irq_pending = |(meie & meip);
 
 assign mip = {
 	20'h0,                // Reserved
@@ -975,12 +1038,12 @@ wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
 // Additionally, wfi is treated as a nop during single-stepping and D-mode.
 assign wfi_stall_clear = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
 
-wire [4:0] external_irq_num;
+wire [6:0] external_irq_num;
 wire [3:0] standard_irq_num;
 assign mlei = external_irq_num;
 
 hazard3_priority_encode #(
-	.W_REQ (32)
+	.W_REQ (MAX_IRQ)
 ) mlei_priority_encode (
 	.req (meie0 & meip0),
 	.gnt (external_irq_num)

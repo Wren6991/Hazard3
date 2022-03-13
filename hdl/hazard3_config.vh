@@ -73,7 +73,7 @@ parameter CSR_COUNTER     = 1,
 parameter DEBUG_SUPPORT   = 0,
 
 // NUM_IRQ: Number of external IRQs implemented in meie0 and meip0.
-// Minimum 1 (if CSR_M_TRAP = 1), maximum 32.
+// Minimum 1 (if CSR_M_TRAP = 1), maximum 128.
 parameter NUM_IRQ         = 32,
 
 // ----------------------------------------------------------------------------
