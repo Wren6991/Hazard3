@@ -1045,7 +1045,7 @@ assign mlei = external_irq_num;
 hazard3_priority_encode #(
 	.W_REQ (MAX_IRQ)
 ) mlei_priority_encode (
-	.req (meie0 & meip0),
+	.req (meie & meip),
 	.gnt (external_irq_num)
 );
 
