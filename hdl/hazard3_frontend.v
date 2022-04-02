@@ -256,19 +256,18 @@ always @ (posedge clk or negedge rst_n)
 
 reg [W_ADDR-1:0] mem_addr_r;
 reg mem_addr_vld_r;
-reg mem_size_r;
 
+// Downstream accesses are always word-sized word-aligned.
 assign mem_addr = mem_addr_r;
 assign mem_addr_vld = mem_addr_vld_r && !reset_holdoff;
-assign mem_size = mem_size_r;
+assign mem_size = 1'b1;
 
 always @ (*) begin
 	mem_addr_r = {W_ADDR{1'b0}};
 	mem_addr_vld_r = 1'b1;
-	mem_size_r = 1'b1; // almost all accesses are 32 bit
 	case (1'b1)
-		mem_addr_hold               : begin mem_addr_r = {fetch_addr[W_ADDR-1:2], unaligned_jump_aph, 1'b0}; mem_size_r = !unaligned_jump_aph; end
-		jump_target_vld             : begin mem_addr_r = jump_target; mem_size_r = !unaligned_jump_now; end
+		mem_addr_hold               : begin mem_addr_r = fetch_addr; end
+		jump_target_vld             : begin mem_addr_r = {jump_target[W_ADDR-1:2], 2'b00}; end
 		DEBUG_SUPPORT && debug_mode : begin mem_addr_vld_r = 1'b0; end
 		!fetch_stall                : begin mem_addr_r = fetch_addr; end
 		default                     : begin mem_addr_vld_r = 1'b0; end

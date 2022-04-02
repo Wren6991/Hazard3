@@ -2,7 +2,7 @@
 [*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
 [*] Sat May 22 08:36:50 2021
 [*]
-[dumpfile] "/home/luke/proj/hazard3/test/riscv-compliance/tmp/C-cbeqz-01-on-rv32ic.vcd"
+[dumpfile] "./tmp/I-beq-01-on-rv32i.vcd"
 [dumpfile_mtime] "Sat May 22 08:33:31 2021"
 [dumpfile_size] 1008774
 [savefile] "/home/luke/proj/hazard3/test/riscv-compliance/test.gtkw"
