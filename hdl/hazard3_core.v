@@ -355,11 +355,22 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		d_rs1_predecoded <= {W_REGADDR{1'b0}};
 		d_rs2_predecoded <= {W_REGADDR{1'b0}};
-	end else if (!x_stall) begin
+	end else if (d_starved || !x_stall) begin
 		d_rs1_predecoded <= f_rs1;
 		d_rs2_predecoded <= f_rs2;
 	end
 end
+
+`ifdef FORMAL
+always @ (posedge clk) begin
+	if (rst_n && !x_stall) begin
+		if (~|d_rs1_predecoded)
+			assert(~|d_rs1);
+		if (~|d_rs2_predecoded)
+			assert(~|d_rs2);
+	end
+end
+`endif
 
 always @ (*) begin
 	if (~|d_rs1) begin
@@ -508,6 +519,10 @@ always @ (posedge clk) if (rst_n) begin
 	// be an unaligned AMO address, which goes straight to error phase.
 	if (x_amo_phase == 3'h4 && m_stall)
 		assert(x_unaligned_addr);
+	// Should be impossible to get an unaligned address in the write address
+	// phase, since it would be picked up in the read address phase
+	if (x_amo_phase == 3'h2)
+		assert(!x_unaligned_addr);
 	// Error phase is either due to a bus response, or a misaligned address.
 	// Neither of these are write-address-phase.
 	if (x_amo_phase == 3'h4)
