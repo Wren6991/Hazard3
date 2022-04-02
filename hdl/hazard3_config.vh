@@ -117,7 +117,7 @@ parameter MULH_FAST       = 0,
 // FAST_BRANCHCMP: Instantiate a separate comparator (eq/lt/ltu) for branch
 // resolution, rather than using the ALU. May improve fetch address delay.
 // (Especially if Zba extension is enabled)
-parameter FAST_BRANCHCMP  = 0,
+parameter FAST_BRANCHCMP  = 1,
 
 // MTVEC_WMASK: Mask of which bits in MTVEC are modifiable. Save gates by
 // making trap vector base partly fixed (legal, as it's WARL).
