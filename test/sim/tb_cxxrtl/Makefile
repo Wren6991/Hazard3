@@ -14,6 +14,7 @@ DEBUG_SUPPORT    := 1
 MULDIV_UNROLL    := 2
 MUL_FAST         := 1
 MULH_FAST        := 1
+FAST_BRANCHCMP   := 1
 REDUCED_BYPASS   := 0
 
 MVENDORID_VAL    := 32'hdeadbeef
@@ -38,6 +39,7 @@ SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
 SYNTH_CMD += chparam -set MULDIV_UNROLL $(MULDIV_UNROLL) $(TOP);
 SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
 SYNTH_CMD += chparam -set MULH_FAST $(MULH_FAST) $(TOP);
+SYNTH_CMD += chparam -set FAST_BRANCHCMP $(FAST_BRANCHCMP) $(TOP);
 SYNTH_CMD += chparam -set MVENDORID_VAL $(MVENDORID_VAL) $(TOP);
 SYNTH_CMD += chparam -set MIMPID_VAL $(MIMPID_VAL) $(TOP);
 SYNTH_CMD += chparam -set MCONFIGPTR_VAL $(MCONFIGPTR_VAL) $(TOP);

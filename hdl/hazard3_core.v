@@ -835,14 +835,33 @@ end
 
 // For JALR, the LSB of the result must be cleared by hardware
 wire [W_ADDR-1:0] x_jump_target = x_addr_sum & ~32'h1;
+wire              x_branch_cmp;
+
+generate
+if (~|FAST_BRANCHCMP) begin: alu_branchcmp
+
+	assign x_branch_cmp = x_alu_cmp;
+
+end else begin: fast_branchcmp
+
+	hazard3_branchcmp #(
+	`include "hazard3_config_inst.vh"
+	) branchcmp_u (
+		.aluop      (d_aluop),
+		.op_a       (x_rs1_bypass),
+		.op_b       (x_rs2_bypass),
+		.cmp        (x_branch_cmp)
+	);
+
+end
+endgenerate
 
 // Be careful not to take branches whose comparisons depend on a load result
 assign x_jump_req = !x_stall_on_raw && (
 	d_branchcond == BCOND_ALWAYS ||
-	d_branchcond == BCOND_ZERO && !x_alu_cmp ||
-	d_branchcond == BCOND_NZERO && x_alu_cmp
+	d_branchcond == BCOND_ZERO && !x_branch_cmp ||
+	d_branchcond == BCOND_NZERO && x_branch_cmp
 );
-
 // ----------------------------------------------------------------------------
 //                               Pipe Stage M
 
