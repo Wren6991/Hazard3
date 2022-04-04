@@ -389,11 +389,9 @@ wire next_instr_is_32bit = next_instr[1:0] == 2'b11;
 
 assign next_regs_rs1 =
 	next_instr_is_32bit                                     ? next_instr[19:15]       : // 32-bit R, S, B formats
-	next_instr[1:0] == 2'b00 && next_instr[15:13] == 3'b000 ? 5'd2                    : // c.addi4spn
-	next_instr[1:0] == 2'b01 && next_instr[15:13] == 3'b011 ? 5'd2                    : // c.addi16sp
-	next_instr[1:0] == 2'b10 && next_instr[15:13] == 3'b010 ? 5'd2                    : // c.lwsp
-	next_instr[1:0] == 2'b10 && next_instr[15:13] == 3'b110 ? 5'd2                    : // c.swsp
-	next_instr[1:0] == 2'b01 && next_instr[15:13] == 3'b000 ? next_instr[11:7]        : // c.addi
+	next_instr[1:0] == 2'b00 && next_instr[14:13] == 2'b00  ? 5'd2                    : // c.addi4spn + don't care
+	next_instr[1:0] == 2'b01 && next_instr[15   ] == 1'b0   ? next_instr[11:7]        : // c.addi, c.addi16sp + don't care (jal, li)
+	next_instr[1:0] == 2'b10 && next_instr[14   ] == 1'b1   ? 5'd2                    : // c.lwsp, c.lwsp + don't care
 	next_instr[1:0] == 2'b10                                ? next_instr[11:7]        :
 	                                                          {2'b01, next_instr[9:7]};
 
