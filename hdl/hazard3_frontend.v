@@ -51,10 +51,16 @@ module hazard3_frontend #(
 	                                  // from being trashed by incoming fetch data;
 	                                  // jump instructions have other side effects besides jumping!
 
-	// Provide the rs1/rs2 register numbers which will be in CIR on the next
-	// cycle. These go straight to the register file read ports.
-	output wire [4:0]        next_regs_rs1,
-	output wire [4:0]        next_regs_rs2,
+	// Provide the rs1/rs2 register numbers which will be in CIR next cycle.
+	// Coarse: valid if this instruction has a nonzero register operand.
+	// (suitable for regfile read)
+	output reg  [4:0]        predecode_rs1_coarse,
+	output reg  [4:0]        predecode_rs2_coarse,
+	// Fine: same as coarse, but more accurate zeroing when e.g. the operand is implicit.
+	// (suitable for bypass)
+	output reg  [4:0]        predecode_rs1_fine,
+	output reg  [4:0]        predecode_rs2_fine,
+
 
 	// Debugger instruction injection: instruction fetch is suppressed when in
 	// debug halt state, and the DM can then inject instructions into the last
@@ -64,6 +70,8 @@ module hazard3_frontend #(
 	input  wire              dbg_instr_data_vld,
 	output wire              dbg_instr_data_rdy
 );
+
+`include "rv_opcodes.vh"
 
 localparam W_BUNDLE = W_DATA / 2;
 parameter W_FIFO_LEVEL = $clog2(FIFO_DEPTH + 1);
@@ -385,19 +393,53 @@ assign cir_err = cir_bus_err[1:0];
 // Register number predecode
 
 wire [31:0] next_instr = instr_data_plus_fetch[31:0];
-wire next_instr_is_32bit = next_instr[1:0] == 2'b11;
+wire next_instr_is_32bit = next_instr[1:0] == 2'b11 || ~|EXTENSION_C;
 
-assign next_regs_rs1 =
-	next_instr_is_32bit                                     ? next_instr[19:15]       : // 32-bit R, S, B formats
-	next_instr[1:0] == 2'b00 && next_instr[14:13] == 2'b00  ? 5'd2                    : // c.addi4spn + don't care
-	next_instr[1:0] == 2'b01 && next_instr[15   ] == 1'b0   ? next_instr[11:7]        : // c.addi, c.addi16sp + don't care (jal, li)
-	next_instr[1:0] == 2'b10 && next_instr[14   ] == 1'b1   ? 5'd2                    : // c.lwsp, c.lwsp + don't care
-	next_instr[1:0] == 2'b10                                ? next_instr[11:7]        :
-	                                                          {2'b01, next_instr[9:7]};
+always @ (*) begin
 
-assign next_regs_rs2 =
-	next_instr_is_32bit      ? next_instr[24:20] :
-	next_instr[1:0] == 2'b10 ? next_instr[6:2]   : {2'b01, next_instr[4:2]};
+	casez ({next_instr_is_32bit, next_instr[1:0], next_instr[15:13]})
+	{1'b1, 2'bzz, 3'bzzz}: predecode_rs1_coarse = next_instr[19:15]; // 32-bit R, S, B formats
+	{1'b0, 2'b00, 3'bz00}: predecode_rs1_coarse = 5'd2;              // c.addi4spn + don't care
+	{1'b0, 2'b01, 3'b0zz}: predecode_rs1_coarse = next_instr[11:7];  // c.addi, c.addi16sp + don't care (jal, li)
+	{1'b0, 2'b10, 3'bz1z}: predecode_rs1_coarse = 5'd2;              // c.lwsp, c.lwsp + don't care
+	{1'b0, 2'b10, 3'bz0z}: predecode_rs1_coarse = next_instr[11:7];
+	default:               predecode_rs1_coarse = {2'b01, next_instr[9:7]};
+	endcase
+
+	casez ({next_instr_is_32bit, next_instr[1:0]})
+	{1'b1, 2'bzz}: predecode_rs2_coarse = next_instr[24:20];
+	{1'b0, 2'b10}: predecode_rs2_coarse = next_instr[6:2];
+	default:       predecode_rs2_coarse = {2'b01, next_instr[4:2]};
+	endcase
+
+	// The "fine" predecode targets those instructions which either:
+	// - Have an implicit zero-register operand in their expanded form (e.g. c.beqz)
+	// - Do not have a register operand on that port, but rely on the port being 0
+	// We don't care about instructions which ignore the reg ports, e.g. ebreak
+
+	casez ({|EXTENSION_C, next_instr})
+	// -> addi rd, x0, imm:
+	{1'b1, 16'hzzzz, RV_C_LI  }: predecode_rs1_fine = 5'd0;
+	{1'b1, 16'hzzzz, RV_C_MV  }: begin
+		if (next_instr[6:2] == 5'd0) begin
+			// c.jr has rs1 as normal
+			predecode_rs1_fine = predecode_rs1_coarse;
+		end else begin
+			// -> add rd, x0, rs2:
+			predecode_rs1_fine = 5'd0;
+		end
+	end
+	default: predecode_rs1_fine = predecode_rs1_coarse;
+	endcase
+
+	casez ({|EXTENSION_C, next_instr})
+	{1'b1, 16'hzzzz, RV_C_BEQZ}: predecode_rs2_fine = 5'd0;    // -> beq rs1, x0, label
+	{1'b1, 16'hzzzz, RV_C_BNEZ}: predecode_rs2_fine = 5'd0;    // -> bne rs1, x0, label
+	default:                     predecode_rs2_fine = predecode_rs2_coarse;
+	endcase
+
+
+end
 
 endmodule
 

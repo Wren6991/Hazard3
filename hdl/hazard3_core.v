@@ -89,8 +89,10 @@ wire                 f_jump_rdy;
 wire                 f_jump_now = f_jump_req && f_jump_rdy;
 
 // Predecoded register numbers, for register file access
-wire [W_REGADDR-1:0] f_rs1;
-wire [W_REGADDR-1:0] f_rs2;
+wire [W_REGADDR-1:0] f_rs1_coarse;
+wire [W_REGADDR-1:0] f_rs2_coarse;
+wire [W_REGADDR-1:0] f_rs1_fine;
+wire [W_REGADDR-1:0] f_rs2_fine;
 
 wire [31:0]          fd_cir;
 wire [1:0]           fd_cir_err;
@@ -107,35 +109,37 @@ hazard3_frontend #(
 	.FIFO_DEPTH(2),
 `include "hazard3_config_inst.vh"
 ) frontend (
-	.clk                (clk),
-	.rst_n              (rst_n),
+	.clk                  (clk),
+	.rst_n                (rst_n),
 
-	.mem_size           (f_mem_size),
-	.mem_addr           (bus_haddr_i),
-	.mem_addr_vld       (bus_aph_req_i),
-	.mem_addr_rdy       (bus_aph_ready_i),
+	.mem_size             (f_mem_size),
+	.mem_addr             (bus_haddr_i),
+	.mem_addr_vld         (bus_aph_req_i),
+	.mem_addr_rdy         (bus_aph_ready_i),
 
-	.mem_data           (bus_rdata_i),
-	.mem_data_err       (bus_dph_err_i),
-	.mem_data_vld       (bus_dph_ready_i),
+	.mem_data             (bus_rdata_i),
+	.mem_data_err         (bus_dph_err_i),
+	.mem_data_vld         (bus_dph_ready_i),
 
-	.jump_target        (f_jump_target),
-	.jump_target_vld    (f_jump_req),
-	.jump_target_rdy    (f_jump_rdy),
+	.jump_target          (f_jump_target),
+	.jump_target_vld      (f_jump_req),
+	.jump_target_rdy      (f_jump_rdy),
 
-	.cir                (fd_cir),
-	.cir_err            (fd_cir_err),
-	.cir_vld            (fd_cir_vld),
-	.cir_use            (df_cir_use),
-	.cir_lock           (df_cir_lock),
+	.cir                  (fd_cir),
+	.cir_err              (fd_cir_err),
+	.cir_vld              (fd_cir_vld),
+	.cir_use              (df_cir_use),
+	.cir_lock             (df_cir_lock),
 
-	.next_regs_rs1      (f_rs1),
-	.next_regs_rs2      (f_rs2),
+	.predecode_rs1_coarse (f_rs1_coarse),
+	.predecode_rs2_coarse (f_rs2_coarse),
+	.predecode_rs1_fine   (f_rs1_fine),
+	.predecode_rs2_fine   (f_rs2_fine),
 
-	.debug_mode         (debug_mode),
-	.dbg_instr_data     (dbg_instr_data),
-	.dbg_instr_data_vld (dbg_instr_data_vld),
-	.dbg_instr_data_rdy (dbg_instr_data_rdy)
+	.debug_mode           (debug_mode),
+	.dbg_instr_data       (dbg_instr_data),
+	.dbg_instr_data_vld   (dbg_instr_data_vld),
+	.dbg_instr_data_rdy   (dbg_instr_data_rdy)
 );
 
 // ----------------------------------------------------------------------------
@@ -356,8 +360,8 @@ always @ (posedge clk or negedge rst_n) begin
 		d_rs1_predecoded <= {W_REGADDR{1'b0}};
 		d_rs2_predecoded <= {W_REGADDR{1'b0}};
 	end else if (d_starved || !x_stall) begin
-		d_rs1_predecoded <= f_rs1;
-		d_rs2_predecoded <= f_rs2;
+		d_rs1_predecoded <= f_rs1_fine;
+		d_rs2_predecoded <= f_rs2_fine;
 	end
 end
 
@@ -373,8 +377,7 @@ end
 `endif
 
 always @ (*) begin
-	if (~|d_rs1) begin
-		// Note the predecoded version is not sufficiently precise for zeroing
+	if (~|d_rs1_predecoded) begin
 		x_rs1_bypass = {W_DATA{1'b0}};
 	end else if (xm_rd == d_rs1_predecoded) begin
 		x_rs1_bypass = xm_result;
@@ -383,7 +386,7 @@ always @ (*) begin
 	end else begin
 		x_rs1_bypass = x_rdata1;
 	end
-	if (~|d_rs2) begin
+	if (~|d_rs2_predecoded) begin
 		x_rs2_bypass = {W_DATA{1'b0}};
 	end else if (xm_rd == d_rs2_predecoded) begin
 		x_rs2_bypass = xm_result;
@@ -1041,9 +1044,9 @@ hazard3_regfile_1w2r #(
 	.rst_n  (rst_n),
 	// On downstream stall, we feed D's addresses back into regfile
 	// so that output does not change.
-	.raddr1 (x_stall && !d_starved ? d_rs1 : f_rs1),
+	.raddr1 (x_stall && !d_starved ? d_rs1 : f_rs1_coarse),
 	.rdata1 (x_rdata1),
-	.raddr2 (x_stall && !d_starved ? d_rs2 : f_rs2),
+	.raddr2 (x_stall && !d_starved ? d_rs2 : f_rs2_coarse),
 	.rdata2 (x_rdata2),
 
 	.waddr  (xm_rd),
