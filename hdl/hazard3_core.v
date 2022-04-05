@@ -82,7 +82,6 @@ assign dbg_running = DEBUG_SUPPORT && !debug_mode;
 // ----------------------------------------------------------------------------
 // Pipe Stage F
 
-
 wire                 f_jump_req;
 wire [W_ADDR-1:0]    f_jump_target;
 wire                 f_jump_rdy;
@@ -366,13 +365,17 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 `ifdef FORMAL
-always @ (posedge clk) begin
-	if (rst_n && !x_stall) begin
-		if (~|d_rs1_predecoded)
-			assert(~|d_rs1);
-		if (~|d_rs2_predecoded)
-			assert(~|d_rs2);
-	end
+always @ (posedge clk) if (rst_n && !x_stall) begin
+	// If stage 2 sees a reg operand, it must have been correctly predecoded too.
+	if (|d_rs1)
+		assert(d_rs1_predecoded == d_rs1);
+	if (|d_rs2)
+		assert(d_rs2_predecoded == d_rs2);
+	// If no reg was predecoded, stage 2 decode must agree there is no reg operand.
+	if (~|d_rs1_predecoded)
+		assert(~|d_rs1);
+	if (~|d_rs2_predecoded)
+		assert(~|d_rs2);
 end
 `endif
 
@@ -850,10 +853,10 @@ end else begin: fast_branchcmp
 	hazard3_branchcmp #(
 	`include "hazard3_config_inst.vh"
 	) branchcmp_u (
-		.aluop      (d_aluop),
-		.op_a       (x_rs1_bypass),
-		.op_b       (x_rs2_bypass),
-		.cmp        (x_branch_cmp)
+		.aluop (d_aluop),
+		.op_a  (x_rs1_bypass),
+		.op_b  (x_rs2_bypass),
+		.cmp   (x_branch_cmp)
 	);
 
 end
@@ -865,6 +868,7 @@ assign x_jump_req = !x_stall_on_raw && (
 	d_branchcond == BCOND_ZERO && !x_branch_cmp ||
 	d_branchcond == BCOND_NZERO && x_branch_cmp
 );
+
 // ----------------------------------------------------------------------------
 //                               Pipe Stage M
 

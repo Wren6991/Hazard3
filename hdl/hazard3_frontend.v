@@ -53,11 +53,11 @@ module hazard3_frontend #(
 
 	// Provide the rs1/rs2 register numbers which will be in CIR next cycle.
 	// Coarse: valid if this instruction has a nonzero register operand.
-	// (suitable for regfile read)
+	// (Suitable for regfile read)
 	output reg  [4:0]        predecode_rs1_coarse,
 	output reg  [4:0]        predecode_rs2_coarse,
-	// Fine: same as coarse, but more accurate zeroing when e.g. the operand is implicit.
-	// (suitable for bypass)
+	// Fine: like coarse, but accurate zeroing when the operand is implicit.
+	// (Suitable for bypass. Still not precise enough for stall logic.)
 	output reg  [4:0]        predecode_rs1_fine,
 	output reg  [4:0]        predecode_rs2_fine,
 
