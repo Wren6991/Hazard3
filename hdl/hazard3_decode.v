@@ -149,14 +149,15 @@ end
 
 
 always @ (*) begin
-	casez ({|EXTENSION_A, d_instr[6:2]})
-	{1'bz, 5'b11011}: d_addr_offs = d_imm_j      ; // JAL
-	{1'bz, 5'b11000}: d_addr_offs = d_imm_b      ; // Branches
-	{1'bz, 5'b01000}: d_addr_offs = d_imm_s      ; // Store
-	{1'bz, 5'b11001}: d_addr_offs = d_imm_i      ; // JALR
-	{1'bz, 5'b00000}: d_addr_offs = d_imm_i      ; // Loads
-	{1'b1, 5'b01011}: d_addr_offs = 32'h0000_0000; // Atomics
-	default:          d_addr_offs = 32'hxxxx_xxxx;
+	casez ({|EXTENSION_A, |EXTENSION_ZIFENCEI, d_instr[6:2]})
+	{1'bz, 1'bz, 5'b11011}: d_addr_offs = d_imm_j      ; // JAL
+	{1'bz, 1'bz, 5'b11000}: d_addr_offs = d_imm_b      ; // Branches
+	{1'bz, 1'bz, 5'b01000}: d_addr_offs = d_imm_s      ; // Store
+	{1'bz, 1'bz, 5'b11001}: d_addr_offs = d_imm_i      ; // JALR
+	{1'bz, 1'bz, 5'b00000}: d_addr_offs = d_imm_i      ; // Loads
+	{1'b1, 1'bz, 5'b01011}: d_addr_offs = 32'h0000_0000; // Atomics
+	{1'bz, 1'b1, 5'b00011}: d_addr_offs = 32'h0000_0004; // Zifencei
+	default:                d_addr_offs = 32'hxxxx_xxxx;
 	endcase
 end
 
@@ -282,8 +283,8 @@ always @ (*) begin
 	RV_BSET:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
 	RV_BSETI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 
-	RV_FENCE:     begin d_rd = X0; end  // NOP
-	RV_FENCE_I:   begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_rs1 = X0; d_rs2 = X0; d_branchcond = BCOND_NZERO; d_imm[31] = 1'b1; end // FIXME this is probably busted now. Maybe implement as an exception?
+	RV_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
+	RV_FENCE_I:   if (EXTENSION_ZIFENCEI) begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
 	RV_CSRRW:     if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRS:     if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRC:     if (HAVE_CSR) begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end

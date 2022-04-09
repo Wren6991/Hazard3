@@ -37,44 +37,50 @@ parameter MTVEC_INIT      = 32'h00000000,
 // RISC-V ISA and CSR support
 
 // EXTENSION_A: Support for atomic read/modify/write instructions
-parameter EXTENSION_A     = 1,
+parameter EXTENSION_A         = 1,
 
 // EXTENSION_C: Support for compressed (variable-width) instructions
-parameter EXTENSION_C     = 1,
+parameter EXTENSION_C         = 1,
 
 // EXTENSION_M: Support for hardware multiply/divide/modulo instructions
-parameter EXTENSION_M     = 1,
+parameter EXTENSION_M         = 1,
 
 // EXTENSION_ZBA: Support for Zba address generation instructions
-parameter EXTENSION_ZBA   = 1,
+parameter EXTENSION_ZBA       = 1,
 
 // EXTENSION_ZBB: Support for Zbb basic bit manipulation instructions
-parameter EXTENSION_ZBB   = 1,
+parameter EXTENSION_ZBB       = 1,
 
 // EXTENSION_ZBC: Support for Zbc carry-less multiplication instructions
-parameter EXTENSION_ZBC   = 1,
+parameter EXTENSION_ZBC       = 1,
 
 // EXTENSION_ZBS: Support for Zbs single-bit manipulation instructions
-parameter EXTENSION_ZBS   = 1,
+parameter EXTENSION_ZBS       = 1,
+
+// EXTENSION_ZIFENCEI: Support for the fence.i instruction
+// Optional, since a plain branch/jump will also flush the prefetch queue.
+parameter EXTENSION_ZIFENCEI  = 1,
+
+// Note the Zicsr extension is implied by any of the following CSR support:
 
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.
-parameter CSR_M_MANDATORY = 1,
+parameter CSR_M_MANDATORY     = 1,
 
 // CSR_M_TRAP: Include M-mode trap-handling CSRs, and enable trap support.
-parameter CSR_M_TRAP      = 1,
+parameter CSR_M_TRAP          = 1,
 
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
-parameter CSR_COUNTER     = 1,
+parameter CSR_COUNTER         = 1,
 
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.
 // Requires: CSR_M_MANDATORY, CSR_M_TRAP.
-parameter DEBUG_SUPPORT   = 0,
+parameter DEBUG_SUPPORT       = 0,
 
 // NUM_IRQ: Number of external IRQs implemented in meie0 and meip0.
 // Minimum 1 (if CSR_M_TRAP = 1), maximum 128.
-parameter NUM_IRQ         = 32,
+parameter NUM_IRQ             = 32,
 
 // ----------------------------------------------------------------------------
 // ID registers
@@ -82,42 +88,42 @@ parameter NUM_IRQ         = 32,
 // JEDEC JEP106-compliant vendor ID, can be left at 0 if "not implemented or
 // [...] this is a non-commercial implementation" (RISC-V spec).
 // 31:7 is continuation code count, 6:0 is ID. Parity bit is not stored.
-parameter MVENDORID_VAL   = 32'h0,
+parameter MVENDORID_VAL       = 32'h0,
 
 // Implementation ID for this specific version of Hazard3. Git hash is perfect.
-parameter MIMPID_VAL      = 32'h0,
+parameter MIMPID_VAL          = 32'h0,
 
 // Each core has a single hardware thread. Multiple cores should have unique IDs.
-parameter MHARTID_VAL     = 32'h0,
+parameter MHARTID_VAL         = 32'h0,
 
 // Pointer to configuration structure blob, or all-zeroes. Must be at least
 // 4-byte-aligned.
-parameter MCONFIGPTR_VAL  = 32'h0,
+parameter MCONFIGPTR_VAL      = 32'h0,
 
 // ----------------------------------------------------------------------------
 // Performance/size options
 
 // REDUCED_BYPASS: Remove all forwarding paths except X->X (so back-to-back
 // ALU ops can still run at 1 CPI), to save area.
-parameter REDUCED_BYPASS  = 0,
+parameter REDUCED_BYPASS      = 0,
 
 // MULDIV_UNROLL: Bits per clock for multiply/divide circuit, if present. Must
 // be a power of 2.
-parameter MULDIV_UNROLL   = 1,
+parameter MULDIV_UNROLL       = 1,
 
 // MUL_FAST: Use single-cycle multiply circuit for MUL instructions, retiring
 // to stage M. The sequential multiply/divide circuit is still used for MULH*
-parameter MUL_FAST        = 0,
+parameter MUL_FAST            = 0,
 
 // MULH_FAST: extend the fast multiply circuit to also cover MULH*, and remove
 // the multiply functionality from the sequential multiply/divide circuit.
 // Requires; MUL_FAST
-parameter MULH_FAST       = 0,
+parameter MULH_FAST           = 0,
 
 // FAST_BRANCHCMP: Instantiate a separate comparator (eq/lt/ltu) for branch
-// resolution, rather than using the ALU. May improve fetch address delay.
-// (Especially if Zba extension is enabled)
-parameter FAST_BRANCHCMP  = 1,
+// comparisons, rather than using the ALU. Improves fetch address delay,
+// especially if Zba extension is enabled. Disabling may save area.
+parameter FAST_BRANCHCMP      = 1,
 
 // MTVEC_WMASK: Mask of which bits in MTVEC are modifiable. Save gates by
 // making trap vector base partly fixed (legal, as it's WARL).
@@ -126,10 +132,10 @@ parameter FAST_BRANCHCMP  = 1,
 //
 // - Note the entire vector table must always be aligned to its size, rounded
 //   up to a power of two, so careful with the low-order bits.
-parameter MTVEC_WMASK     = 32'hfffffffd,
+parameter MTVEC_WMASK         = 32'hfffffffd,
 
 // ----------------------------------------------------------------------------
 // Port size parameters (do not modify)
 
-parameter W_ADDR          = 32,   // Do not modify
-parameter W_DATA          = 32    // Do not modify
+parameter W_ADDR              = 32,   // Do not modify
+parameter W_DATA              = 32    // Do not modify
