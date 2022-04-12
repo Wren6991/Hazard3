@@ -32,9 +32,6 @@ module rvfi_wrapper (
 (* keep *) wire               [31:0]  d_hwdata;
 (* keep *) `rvformal_rand_reg [31:0]  d_hrdata;
 
-
-
-
 `ifdef RISCV_FORMAL_FAIRNESS
 localparam MAX_BUS_STALL = 8;
 `else
@@ -91,44 +88,100 @@ ahbl_slave_assumptions #(
 // nonsequential pc_wdata when an instruction is followed by an interrupt
 // (and the rvfi_intr signal doesn't do anything)
 
-wire [15:0] irq = 0;
+wire [31:0] irq = 0;
+wire        soft_irq = 0;
+wire        timer_irq = 0;
 // (* keep *) `rvformal_rand_reg [15:0] irq;
 
+localparam W_DATA = 32;
+
+(* keep *) wire              dbg_req_halt;
+(* keep *) wire              dbg_req_halt_on_reset;
+(* keep *) wire              dbg_req_resume;
+(* keep *) wire              dbg_halted;
+(* keep *) wire              dbg_running;
+(* keep *) wire [W_DATA-1:0] dbg_data0_rdata;
+(* keep *) wire [W_DATA-1:0] dbg_data0_wdata;
+(* keep *) wire              dbg_data0_wen;
+(* keep *) wire [W_DATA-1:0] dbg_instr_data;
+(* keep *) wire              dbg_instr_data_vld;
+(* keep *) wire              dbg_instr_data_rdy;
+(* keep *) wire              dbg_instr_caught_exception;
+(* keep *) wire              dbg_instr_caught_ebreak;
+
 hazard3_cpu_2port #(
-	.RESET_VECTOR  (0),
-	.EXTENSION_C   (1),
-	.EXTENSION_M   (1),
-	.MUL_FAST      (1),
-	.MULDIV_UNROLL (2)
+	.RESET_VECTOR       (0),
+
+	.EXTENSION_M        (1),
+	.EXTENSION_A        (0), // FIXME
+	.EXTENSION_C        (1),
+
+	.EXTENSION_ZBA      (0),
+	.EXTENSION_ZBB      (0),
+	.EXTENSION_ZBC      (0),
+	.EXTENSION_ZBS      (0),
+
+	.CSR_M_MANDATORY    (1),
+	.CSR_M_TRAP         (1),
+	.CSR_COUNTER        (1),
+	.DEBUG_SUPPORT      (0), // FIXME
+
+	.NUM_IRQ            (32),
+
+	.EXTENSION_ZIFENCEI (1),
+
+	.REDUCED_BYPASS     (0),
+	.FAST_BRANCHCMP     (1),
+	.MUL_FAST           (1),
+	.MULH_FAST          (1),
+	.MULDIV_UNROLL      (2)
 ) dut (
-	.clk         (clock),
-	.rst_n       (!reset),
+	.clk                        (clock),
+	.rst_n                      (!reset),
 
-	.i_haddr     (i_haddr),
-	.i_hwrite    (i_hwrite),
-	.i_htrans    (i_htrans),
-	.i_hsize     (i_hsize),
-	.i_hburst    (i_hburst),
-	.i_hprot     (i_hprot),
-	.i_hmastlock (i_hmastlock),
-	.i_hready    (i_hready),
-	.i_hresp     (i_hresp),
-	.i_hwdata    (i_hwdata),
-	.i_hrdata    (i_hrdata),
+	.i_haddr                    (i_haddr),
+	.i_hwrite                   (i_hwrite),
+	.i_htrans                   (i_htrans),
+	.i_hsize                    (i_hsize),
+	.i_hburst                   (i_hburst),
+	.i_hprot                    (i_hprot),
+	.i_hmastlock                (i_hmastlock),
+	.i_hready                   (i_hready),
+	.i_hresp                    (i_hresp),
+	.i_hwdata                   (i_hwdata),
+	.i_hrdata                   (i_hrdata),
 
-	.d_haddr     (d_haddr),
-	.d_hwrite    (d_hwrite),
-	.d_htrans    (d_htrans),
-	.d_hsize     (d_hsize),
-	.d_hburst    (d_hburst),
-	.d_hprot     (d_hprot),
-	.d_hmastlock (d_hmastlock),
-	.d_hready    (d_hready),
-	.d_hresp     (d_hresp),
-	.d_hwdata    (d_hwdata),
-	.d_hrdata    (d_hrdata),
+	.d_haddr                    (d_haddr),
+	.d_hwrite                   (d_hwrite),
+	.d_htrans                   (d_htrans),
+	.d_hexcl                    (/* FIXME */),
+	.d_hsize                    (d_hsize),
+	.d_hburst                   (d_hburst),
+	.d_hprot                    (d_hprot),
+	.d_hmastlock                (d_hmastlock),
+	.d_hready                   (d_hready),
+	.d_hresp                    (d_hresp),
+	.d_hexokay                  (1'b1), // FIXME
+	.d_hwdata                   (d_hwdata),
+	.d_hrdata                   (d_hrdata),
 
-	.irq         (irq),
+	.dbg_req_halt               (dbg_req_halt),
+	.dbg_req_halt_on_reset      (dbg_req_halt_on_reset),
+	.dbg_req_resume             (dbg_req_resume),
+	.dbg_halted                 (dbg_halted),
+	.dbg_running                (dbg_running),
+	.dbg_data0_rdata            (dbg_data0_rdata),
+	.dbg_data0_wdata            (dbg_data0_wdata),
+	.dbg_data0_wen              (dbg_data0_wen),
+	.dbg_instr_data             (dbg_instr_data),
+	.dbg_instr_data_vld         (dbg_instr_data_vld),
+	.dbg_instr_data_rdy         (dbg_instr_data_rdy),
+	.dbg_instr_caught_exception (dbg_instr_caught_exception),
+	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
+
+	.irq                        (irq),
+	.soft_irq                   (soft_irq),
+	.timer_irq                  (timer_irq),
 
 	`RVFI_CONN
 );
