@@ -80,7 +80,8 @@ assign rvfi_halt = 1'b0; // TODO
 reg [31:0] rvfm_xm_pc;
 reg [31:0] rvfm_xm_pc_next;
 
-// Get a strange error from Yosys with $past() on this signal (possibly due to comb terms), so just flop it explicitly
+// Get a strange error from Yosys with $past() on this signal (possibly due to
+// comb terms), so just flop it explicitly
 reg rvfm_past_df_cir_lock;
 always @ (posedge clk or negedge rst_n)
 	if (!rst_n)
@@ -122,12 +123,17 @@ assign rvfi_rd_wdata = mw_rd ? mw_result : 32'h0;
 // it correctly here but incorrectly in core.
 
 reg [31:0] rvfm_xm_rdata1;
+reg [31:0] rvfm_xm_rdata2;
 
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
 		rvfm_xm_rdata1 <= 32'h0;
-	else if (!x_stall)
+		rvfm_xm_rdata2 <= 32'h0;
+	end else if (!x_stall) begin
 		rvfm_xm_rdata1 <= x_rs1_bypass;
+		rvfm_xm_rdata2 <= x_rs2_bypass;
+	end
+end
 
 reg [4:0]  rvfi_rs1_addr_r;
 reg [4:0]  rvfi_rs2_addr_r;
@@ -149,7 +155,7 @@ always @ (posedge clk or negedge rst_n) begin
 		rvfi_rs1_addr_r <= m_stall ? 5'h0 : xm_rs1;
 		rvfi_rs2_addr_r <= m_stall ? 5'h0 : xm_rs2;
 		rvfi_rs1_rdata_r <= rvfm_xm_rdata1;
-		rvfi_rs2_rdata_r <= m_wdata;
+		rvfi_rs2_rdata_r <= rvfm_xm_rdata2;
 	end
 end
 
