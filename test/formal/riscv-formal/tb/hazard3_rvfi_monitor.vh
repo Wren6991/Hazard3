@@ -41,8 +41,14 @@ always @ (posedge clk or negedge rst_n) begin
 		rvfi_insn_r <= 32'h0;
 	end else begin
 		if (!x_stall) begin
-			// X instruction squashed by any trap, as it's in the branch shadow
-			rvfm_m_valid <= |df_cir_use && !m_trap_enter_vld;
+			// X instruction squashed by any trap, as it's in the branch
+			// shadow. Also blank out instructions which experienced a fetch
+			// fault.(These shouldn't have side effects, and if they do, this
+			// will be revealed in consistency failures in other tests.)
+			rvfm_m_valid <= |df_cir_use && !m_trap_enter_vld && !(
+				d_except == EXCEPT_INSTR_FAULT ||
+				d_except == EXCEPT_INSTR_MISALIGN
+			);
 			rvfm_m_instr <= {fd_cir[31:16] & {16{df_cir_use[1]}}, fd_cir[15:0]};
 		end else if (!m_stall) begin
 			rvfm_m_valid <= 1'b0;
