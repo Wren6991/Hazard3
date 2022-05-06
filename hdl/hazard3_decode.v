@@ -247,41 +247,47 @@ always @ (*) begin
 	RV_AMOMINU_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_MINU; end else begin d_invalid_32bit = 1'b1; end
 	RV_AMOMAXU_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_MAXU; end else begin d_invalid_32bit = 1'b1; end
 
-	RV_SH1ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH1ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
-	RV_SH2ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH2ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
-	RV_SH3ADD:    if (EXTENSION_ZBA) begin d_aluop = ALUOP_SH3ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
+	RV_SH1ADD:    if (EXTENSION_ZBA)  begin d_aluop = ALUOP_SH1ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
+	RV_SH2ADD:    if (EXTENSION_ZBA)  begin d_aluop = ALUOP_SH2ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
+	RV_SH3ADD:    if (EXTENSION_ZBA)  begin d_aluop = ALUOP_SH3ADD;                                                        end else begin d_invalid_32bit = 1'b1; end
 
-	RV_ANDN:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_ANDN;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_CLZ:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_CLZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_CPOP:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_CPOP;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_CTZ:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_CTZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_MAX:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_MAX;                                                           end else begin d_invalid_32bit = 1'b1; end
-	RV_MAXU:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_MAXU;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_MIN:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_MIN;                                                           end else begin d_invalid_32bit = 1'b1; end
-	RV_MINU:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_MINU;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_ORC_B:     if (EXTENSION_ZBB) begin d_aluop = ALUOP_ORC_B;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_ORN:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_ORN;                                                           end else begin d_invalid_32bit = 1'b1; end
-	RV_REV8:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_REV8;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_ROL:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_ROL;                                                           end else begin d_invalid_32bit = 1'b1; end
-	RV_ROR:       if (EXTENSION_ZBB) begin d_aluop = ALUOP_ROR;                                                           end else begin d_invalid_32bit = 1'b1; end
-	RV_RORI:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_ROR;    d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_SEXT_B:    if (EXTENSION_ZBB) begin d_aluop = ALUOP_SEXT_B; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_SEXT_H:    if (EXTENSION_ZBB) begin d_aluop = ALUOP_SEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	RV_XNOR:      if (EXTENSION_ZBB) begin d_aluop = ALUOP_XNOR;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_ZEXT_H:    if (EXTENSION_ZBB) begin d_aluop = ALUOP_ZEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_ANDN:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ANDN;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_CLZ:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_CLZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_CPOP:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_CPOP;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_CTZ:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_CTZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_MAX:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MAX;                                                           end else begin d_invalid_32bit = 1'b1; end
+	RV_MAXU:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MAXU;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_MIN:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MIN;                                                           end else begin d_invalid_32bit = 1'b1; end
+	RV_MINU:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MINU;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_ORC_B:     if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ORC_B;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_ORN:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ORN;                                                           end else begin d_invalid_32bit = 1'b1; end
+	RV_REV8:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_REV8;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_ROL:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ROL;                                                           end else begin d_invalid_32bit = 1'b1; end
+	RV_ROR:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ROR;                                                           end else begin d_invalid_32bit = 1'b1; end
+	RV_RORI:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ROR;    d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_SEXT_B:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_SEXT_B; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_SEXT_H:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_SEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_XNOR:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_XNOR;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_ZEXT_H:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ZEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 
-	RV_CLMUL:     if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
-	RV_CLMULH:    if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMULH;                                                        end else begin d_invalid_32bit = 1'b1; end
-	RV_CLMULR:    if (EXTENSION_ZBC) begin d_aluop = ALUOP_CLMULR;                                                        end else begin d_invalid_32bit = 1'b1; end
+	RV_CLMUL:     if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
+	RV_CLMULH:    if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMULH;                                                        end else begin d_invalid_32bit = 1'b1; end
+	RV_CLMULR:    if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMULR;                                                        end else begin d_invalid_32bit = 1'b1; end
 
-	RV_BCLR:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BCLR;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BCLRI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BCLR;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_BEXT:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BEXT;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BEXTI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BEXT;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_BINV:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BINV;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BINVI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BINV;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	RV_BSET:      if (EXTENSION_ZBS) begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
-	RV_BSETI:     if (EXTENSION_ZBS) begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BCLR:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BCLR;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BCLRI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BCLR;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BEXT:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BEXT;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BEXTI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BEXT;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BINV:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BINV;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BINVI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BINV;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	RV_BSET:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_BSETI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+
+	RV_PACK:      if (EXTENSION_ZBKB) begin d_aluop = ALUOP_PACK;                                                          end else begin d_invalid_32bit = 1'b1; end
+	RV_PACKH:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_PACKH;                                                         end else begin d_invalid_32bit = 1'b1; end
+	RV_REV_B:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_REV_B;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_UNZIP:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_UNZIP;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_ZIP:       if (EXTENSION_ZBKB) begin d_aluop = ALUOP_ZIP;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 
 	RV_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
 	RV_FENCE_I:   if (EXTENSION_ZIFENCEI) begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction

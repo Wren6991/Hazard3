@@ -57,6 +57,10 @@ parameter EXTENSION_ZBC       = 1,
 // EXTENSION_ZBS: Support for Zbs single-bit manipulation instructions
 parameter EXTENSION_ZBS       = 1,
 
+// EXTENSION_ZBKB: Support for Zbkb basic bit manipulation for cryptography
+// Requires: Zbb. (This flag enables instructions in Zbkb which aren't in Zbb.)
+parameter EXTENSION_ZBKB      = 1,
+
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.
 parameter EXTENSION_ZIFENCEI  = 1,
