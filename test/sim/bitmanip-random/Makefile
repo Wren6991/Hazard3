@@ -1,4 +1,4 @@
-BIN_ARCH     = rv32imc_zba_zbb_zbc_zbs
+BIN_ARCH     = rv32imc_zba_zbb_zbc_zbs_zicsr
 SIM_EXEC     = ../tb_cxxrtl/tb
 
 CROSS_PREFIX = /opt/riscv/bin/riscv32-unknown-elf-
