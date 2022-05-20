@@ -50,7 +50,7 @@ localparam ALUOP_BSET    = 6'h3a;
 
 localparam ALUOP_PACK    = 6'h3b;
 localparam ALUOP_PACKH   = 6'h3c;
-localparam ALUOP_REV_B   = 6'h3d;
+localparam ALUOP_BREV8   = 6'h3d;
 localparam ALUOP_ZIP     = 6'h3e;
 localparam ALUOP_UNZIP   = 6'h3f;
 

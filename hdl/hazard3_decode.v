@@ -285,7 +285,7 @@ always @ (*) begin
 
 	RV_PACK:      if (EXTENSION_ZBKB) begin d_aluop = ALUOP_PACK;                                                          end else begin d_invalid_32bit = 1'b1; end
 	RV_PACKH:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_PACKH;                                                         end else begin d_invalid_32bit = 1'b1; end
-	RV_REV_B:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_REV_B;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	RV_BREV8:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_BREV8;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	RV_UNZIP:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_UNZIP;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	RV_ZIP:       if (EXTENSION_ZBKB) begin d_aluop = ALUOP_ZIP;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 

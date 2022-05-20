@@ -201,11 +201,11 @@ always @ (*) begin
 		// Zbkb
 		{6'bzzzzz1, ALUOP_PACK   }: result = {op_b[15:0], op_a[15:0]};
 		{6'bzzzzz1, ALUOP_PACKH  }: result = {{W_DATA-16{1'b0}}, op_b[7:0], op_a[7:0]};
-		{6'bzzzzz1, ALUOP_REV_B  }: result = op_a_rev;
+		{6'bzzzzz1, ALUOP_BREV8  }: result = {op_a_rev[7:0], op_a_rev[15:8], op_a_rev[23:16], op_a_rev[31:24]};
 		{6'bzzzzz1, ALUOP_UNZIP  }: result = unzip;
 		{6'bzzzzz1, ALUOP_ZIP    }: result = zip;
 
-		default:                  result = bitwise;
+		default:                    result = bitwise;
 	endcase
 end
 
