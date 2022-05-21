@@ -27,6 +27,9 @@ instr_one_operand = [
 	("sext.b" , [*all_onehot0_neg, *get_random()]),
 	("sext.h" , [*all_onehot0_neg, *get_random()]),
 	("zext.h" , [*all_onehot0_neg, *get_random()]),
+	("zip"    , [*all_onehot0_neg, *get_random()]),
+	("unzip"  , [*all_onehot0_neg, *get_random()]),
+	("brev8"   , [*all_onehot0_neg, *get_random()]),
 ]
 
 instr_reg_reg = [
@@ -49,6 +52,8 @@ instr_reg_reg = [
 	("bext"   , [*all_onehot0_neg, *get_random()], [*all_onehot0_neg, *all_shamt, *get_random()]),
 	("binv"   , [*all_onehot0_neg, *get_random()], [*all_onehot0_neg, *all_shamt, *get_random()]),
 	("bset"   , [*all_onehot0_neg, *get_random()], [*all_onehot0_neg, *all_shamt, *get_random()]),
+	("pack"   , [*all_onehot0_neg, *get_random()], [*all_onehot0_neg,             *get_random()]),
+	("packh"  , [*all_onehot0_neg, *get_random()], [*all_onehot0_neg,             *get_random()]),
 ]
 
 instr_reg_imm = [

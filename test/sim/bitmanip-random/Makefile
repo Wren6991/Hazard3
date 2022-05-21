@@ -1,7 +1,8 @@
-BIN_ARCH     = rv32imc_zba_zbb_zbc_zbs_zicsr
+BIN_ARCH     = rv32imac_zba_zbb_zbc_zbs_zbkb_zicsr
 SIM_EXEC     = ../tb_cxxrtl/tb
 
-CROSS_PREFIX = /opt/riscv/bin/riscv32-unknown-elf-
+RISCV        = /opt/riscv
+CROSS_PREFIX = $(RISCV)/bin/riscv32-unknown-elf-
 SPIKE        = spike
 PK           = $(RISCV)/riscv32-unknown-elf/bin/pk
 
