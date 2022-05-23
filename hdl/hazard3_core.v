@@ -708,12 +708,13 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
-	x_csr_illegal_access                                   ? EXCEPT_INSTR_ILLEGAL :
-	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo    ? EXCEPT_STORE_ALIGN   :
-	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr? EXCEPT_STORE_ALIGN   :
-	|EXTENSION_A && x_amo_phase == 3'h4                    ? EXCEPT_STORE_FAULT   :
-	x_unaligned_addr &&  x_memop_write                     ? EXCEPT_STORE_ALIGN   :
-	x_unaligned_addr && !x_memop_write                     ? EXCEPT_LOAD_ALIGN    : d_except;
+	~|EXTENSION_C && d_pc[1]                               ? EXCEPT_INSTR_MISALIGN :
+	x_csr_illegal_access                                   ? EXCEPT_INSTR_ILLEGAL  :
+	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo    ? EXCEPT_STORE_ALIGN    :
+	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr? EXCEPT_STORE_ALIGN    :
+	|EXTENSION_A && x_amo_phase == 3'h4                    ? EXCEPT_STORE_FAULT    :
+	x_unaligned_addr &&  x_memop_write                     ? EXCEPT_STORE_ALIGN    :
+	x_unaligned_addr && !x_memop_write                     ? EXCEPT_LOAD_ALIGN     : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
