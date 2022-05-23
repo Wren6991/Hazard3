@@ -339,8 +339,8 @@ end
 
 // Exception program counter
 reg [XLEN-1:0] mepc;
-// LSB is always 0
-localparam MEPC_MASK = {{XLEN-1{1'b1}}, 1'b0};
+// mepc only holds values aligned to instruction alignment
+localparam MEPC_MASK = {{XLEN-2{1'b1}}, |EXTENSION_C, 1'b0};
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
