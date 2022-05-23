@@ -667,6 +667,41 @@ end else begin: no_muldiv
 end
 endgenerate
 
+// Branch handling
+
+// For JALR, the LSB of the result must be cleared by hardware
+wire [W_ADDR-1:0] x_jump_target = x_addr_sum & ~32'h1;
+wire              x_jump_misaligned = ~|EXTENSION_C && x_addr_sum[1];
+wire              x_branch_cmp;
+
+generate
+if (~|FAST_BRANCHCMP) begin: alu_branchcmp
+
+	assign x_branch_cmp = x_alu_cmp;
+
+end else begin: fast_branchcmp
+
+	hazard3_branchcmp #(
+	`include "hazard3_config_inst.vh"
+	) branchcmp_u (
+		.aluop (d_aluop),
+		.op_a  (x_rs1_bypass),
+		.op_b  (x_rs2_bypass),
+		.cmp   (x_branch_cmp)
+	);
+
+end
+endgenerate
+
+// Be careful not to take branches whose comparisons depend on a load result
+wire x_jump_req_if_aligned = !x_stall_on_raw && (
+	d_branchcond == BCOND_ALWAYS ||
+	d_branchcond == BCOND_ZERO && !x_branch_cmp ||
+	d_branchcond == BCOND_NZERO && x_branch_cmp
+);
+
+assign x_jump_req = x_jump_req_if_aligned && !x_jump_misaligned;
+
 // CSRs and Trap Handling
 
 wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
@@ -708,7 +743,7 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
-	~|EXTENSION_C && d_pc[1]                               ? EXCEPT_INSTR_MISALIGN :
+	x_jump_req_if_aligned && x_jump_misaligned             ? EXCEPT_INSTR_MISALIGN :
 	x_csr_illegal_access                                   ? EXCEPT_INSTR_ILLEGAL  :
 	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo    ? EXCEPT_STORE_ALIGN    :
 	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr? EXCEPT_STORE_ALIGN    :
@@ -837,38 +872,6 @@ always @ (posedge clk or negedge rst_n) begin
 		xm_addr_align <= x_addr_sum[1:0];
 	end
 end
-
-// Branch handling
-
-// For JALR, the LSB of the result must be cleared by hardware
-wire [W_ADDR-1:0] x_jump_target = x_addr_sum & ~32'h1;
-wire              x_branch_cmp;
-
-generate
-if (~|FAST_BRANCHCMP) begin: alu_branchcmp
-
-	assign x_branch_cmp = x_alu_cmp;
-
-end else begin: fast_branchcmp
-
-	hazard3_branchcmp #(
-	`include "hazard3_config_inst.vh"
-	) branchcmp_u (
-		.aluop (d_aluop),
-		.op_a  (x_rs1_bypass),
-		.op_b  (x_rs2_bypass),
-		.cmp   (x_branch_cmp)
-	);
-
-end
-endgenerate
-
-// Be careful not to take branches whose comparisons depend on a load result
-assign x_jump_req = !x_stall_on_raw && (
-	d_branchcond == BCOND_ALWAYS ||
-	d_branchcond == BCOND_ZERO && !x_branch_cmp ||
-	d_branchcond == BCOND_NZERO && x_branch_cmp
-);
 
 // ----------------------------------------------------------------------------
 //                               Pipe Stage M
