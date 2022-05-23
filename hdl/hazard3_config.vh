@@ -77,6 +77,14 @@ parameter CSR_M_TRAP          = 1,
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
 parameter CSR_COUNTER         = 1,
 
+// U_MODE: support for the U (user, unprivileged) execution mode. If U_MODE is
+// 1, PMP support is recommended.
+parameter U_MODE              = 0,
+
+// PMP_REGIONS: Number of physical memory protection regions, or 0 for no PMP.
+// PMP is more useful if U mode is supported, but has use on M-only systems.
+parameter PMP_REGIONS         = 0,
+
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.
 // Requires: CSR_M_MANDATORY, CSR_M_TRAP.

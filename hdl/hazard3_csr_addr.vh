@@ -38,7 +38,21 @@ localparam PMPCFG1        = 12'h3a1; // Physical memory protection configuration
 localparam PMPCFG2        = 12'h3a2; // Physical memory protection configuration.
 localparam PMPCFG3        = 12'h3a3; // Physical memory protection configuration, RV32 only.
 localparam PMPADDR0       = 12'h3b0; // Physical memory protection address register.
-localparam PMPADDR1       = 12'h3b1; // Physical memory protection address register.
+localparam PMPADDR1       = 12'h3b1; // ...
+localparam PMPADDR2       = 12'h3b2;
+localparam PMPADDR3       = 12'h3b3;
+localparam PMPADDR4       = 12'h3b4;
+localparam PMPADDR5       = 12'h3b5;
+localparam PMPADDR6       = 12'h3b6;
+localparam PMPADDR7       = 12'h3b7;
+localparam PMPADDR8       = 12'h3b8;
+localparam PMPADDR9       = 12'h3b9;
+localparam PMPADDR10      = 12'h3ba;
+localparam PMPADDR11      = 12'h3bb;
+localparam PMPADDR12      = 12'h3bc;
+localparam PMPADDR13      = 12'h3bd;
+localparam PMPADDR14      = 12'h3be;
+localparam PMPADDR15      = 12'h3bf;
 
 // Performance counters (RW)
 localparam MCYCLE         = 12'hb00; // Raw cycles since start of day
