@@ -1032,19 +1032,10 @@ end
 
 
 hazard3_regfile_1w2r #(
-	.FAKE_DUALPORT(0),
-`ifdef SIM
-	.RESET_REGS(1),
-`elsif FORMAL
-	.RESET_REGS(1),
-`elsif FPGA
-	.RESET_REGS(0),
-`else
-	.RESET_REGS(1),
-`endif
-	.N_REGS(32),
-	.W_DATA(W_DATA)
-) inst_regfile_1w2r (
+	.RESET_REGS (RESET_REGFILE),
+	.N_REGS     (32),
+	.W_DATA     (W_DATA)
+) regs (
 	.clk    (clk),
 	.rst_n  (rst_n),
 	// On downstream stall, we feed D's addresses back into regfile

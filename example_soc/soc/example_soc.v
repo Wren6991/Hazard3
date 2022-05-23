@@ -227,6 +227,7 @@ hazard3_cpu_1port #(
 	.CSR_M_TRAP      (1),
 	.DEBUG_SUPPORT   (1),
 	.NUM_IRQ         (1),
+	.RESET_REGFILE   (0),
 	// Can be overridden from the defaults in hazard3_config.vh during
 	// instantiation of example_soc():
 	.EXTENSION_A     (EXTENSION_A),

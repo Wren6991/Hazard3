@@ -129,6 +129,11 @@ parameter MULH_FAST           = 0,
 // especially if Zba extension is enabled. Disabling may save area.
 parameter FAST_BRANCHCMP      = 1,
 
+// RESET_REGFILE: whether to support reset of the general purpose registers.
+// There are around 1k bits in the register file, so the reset can be
+// disabled e.g. to permit block-RAM inference on FPGA.
+parameter RESET_REGFILE       = 1,
+
 // MTVEC_WMASK: Mask of which bits in MTVEC are modifiable. Save gates by
 // making trap vector base partly fixed (legal, as it's WARL).
 //

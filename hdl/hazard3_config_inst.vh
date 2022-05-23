@@ -33,5 +33,6 @@
 .MULH_FAST          (MULH_FAST),
 .FAST_BRANCHCMP     (FAST_BRANCHCMP),
 .MTVEC_WMASK        (MTVEC_WMASK),
+.RESET_REGFILE      (RESET_REGFILE),
 .W_ADDR             (W_ADDR),
 .W_DATA             (W_DATA)
