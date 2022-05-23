@@ -6,15 +6,9 @@
 // Register file
 // Single write port, dual read port
 
-// FAKE_DUALPORT: if 1, implement regfile with pair of memories.
-// Write ports are ganged together, read ports operate independently.
-// This allows BRAM inference on FPGAs with single-read-port BRAMs.
-// (Looking at you iCE40)
-
 `default_nettype none
 
 module hazard3_regfile_1w2r #(
-	parameter FAKE_DUALPORT = 0,
 	parameter RESET_REGS = 0,	// Unsupported for FAKE_DUALPORT
 	parameter N_REGS = 16,
 	parameter W_DATA = 32,
@@ -35,19 +29,7 @@ module hazard3_regfile_1w2r #(
 );
 
 generate
-if (FAKE_DUALPORT) begin: fake_dualport
-	reg [W_DATA-1:0] mem1 [0:N_REGS-1];
-	reg [W_DATA-1:0] mem2 [0:N_REGS-1];
-
-	always @ (posedge clk) begin
-		if (wen) begin
-			mem1[waddr] <= wdata;
-			mem2[waddr] <= wdata;
-		end
-		rdata1 <= mem1[raddr1];
-		rdata2 <= mem2[raddr2];
-	end
-end else if (RESET_REGS) begin: real_dualport_reset
+if (RESET_REGS) begin: real_dualport_reset
 	// This will presumably always be implemented with flops
 	reg [W_DATA-1:0] mem [0:N_REGS-1];
 
