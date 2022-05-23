@@ -1039,7 +1039,6 @@ wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
 assign wfi_stall_clear = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
 
 wire [6:0] external_irq_num;
-wire [3:0] standard_irq_num;
 assign mlei = external_irq_num;
 
 hazard3_priority_encode #(
@@ -1049,12 +1048,11 @@ hazard3_priority_encode #(
 	.gnt (external_irq_num)
 );
 
-hazard3_priority_encode #(
-	.W_REQ (16)
-) irq_priority (
-	.req (mip[15:0] & mie[15:0]),
-	.gnt (standard_irq_num)
-);
+// Priority order from priv spec: external > software > timer
+wire [3:0] standard_irq_num =
+	mip[11] && mie[11] ? 4'd11 :
+	mip[3]  && mie[3]  ? 4'd3  :
+	mip[7]  && mie[7]  ? 4'd7  : 4'd0;
 
 // ebreak may be treated as a halt-to-debugger or a regular M-mode exception,
 // depending on dcsr.ebreakm.
