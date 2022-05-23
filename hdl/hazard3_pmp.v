@@ -218,7 +218,7 @@ always @ (*) begin: check_i_match
 	i_partial_match = 1'b0;
 	i_l = 1'b0;
 	i_x = 1'b0;
-	for (i = PMP_REGIONS - 1; i >= 0; i = i + 1) begin
+	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
 		match_hw0 = |pmpcfg_a[i] && (i_addr     & match_mask[i]) == match_addr[i];
 		match_hw1 = |pmpcfg_a[i] && (i_addr_hw1 & match_mask[i]) == match_addr[i];
 		if (match_hw0 || match_hw1) begin
