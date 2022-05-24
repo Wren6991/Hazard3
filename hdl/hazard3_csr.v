@@ -495,22 +495,22 @@ always @ (*) begin
 	MSTATUS: if (CSR_M_MANDATORY || CSR_M_TRAP) begin
 		decode_match = match_mrw;
 		rdata = {
-			1'b0,         // Never any dirty state besides GPRs
-			8'd0,         // (WPRI)
-			1'b0,         // TSR (Trap SRET), tied 0 if no S mode.
-			1'b0,         // TW (Timeout Wait), tied 0 if only M mode.
-			1'b0,         // TVM (trap virtual memory), tied 0 if no S mode.
-			1'b0,         // MXR (Make eXecutable Readable), tied 0 if not S mode.
-			1'b0,         // SUM, tied 0, we have no S or U mode
-			mstatus_mprv, // MPRV (modify privilege)
-			4'd0,         // XS, FS always "off" (no extension state to clear!)
-			{2{m_mode}},  // MPP (M-mode previous privilege), only M and U supported
-			2'd0,         // (WPRI)
-			1'b0,         // SPP, tied 0 if S mode not supported
-			mstatus_mpie, // Previous interrupt enable
-			3'd0,         // No S, U
-			mstatus_mie,  // Interrupt enable
-			3'd0          // No S, U
+			1'b0,             // Never any dirty state besides GPRs
+			8'd0,             // (WPRI)
+			1'b0,             // TSR (Trap SRET), tied 0 if no S mode.
+			1'b0,             // TW (Timeout Wait), tied 0 if only M mode.
+			1'b0,             // TVM (trap virtual memory), tied 0 if no S mode.
+			1'b0,             // MXR (Make eXecutable Readable), tied 0 if not S mode.
+			1'b0,             // SUM, tied 0, we have no S or U mode
+			mstatus_mprv,     // MPRV (modify privilege)
+			4'd0,             // XS, FS always "off" (no extension state to clear!)
+			{2{mstatus_mpp}}, // MPP (M-mode previous privilege), only M and U supported
+			2'd0,             // (WPRI)
+			1'b0,             // SPP, tied 0 if S mode not supported
+			mstatus_mpie,     // Previous interrupt enable
+			3'd0,             // No S, U
+			mstatus_mie,      // Interrupt enable
+			3'd0              // No S, U
 		};
 	end
 
