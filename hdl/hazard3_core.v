@@ -187,11 +187,13 @@ wire                 d_csr_wen;
 wire [1:0]           d_csr_wtype;
 wire                 d_csr_w_imm;
 
-wire x_jump_not_except;
+wire                 x_jump_not_except;
+wire                 x_mmode_execution;
+wire                 x_permit_wfi;
 
 hazard3_decode #(
 `include "hazard3_config_inst.vh"
-) inst_hazard3_decode (
+) decode_u (
 	.clk                  (clk),
 	.rst_n                (rst_n),
 
@@ -204,6 +206,8 @@ hazard3_decode #(
 	.x_jump_not_except    (x_jump_not_except),
 
 	.debug_mode           (debug_mode),
+	.m_mode               (x_mmode_execution),
+	.permit_wfi           (x_permit_wfi),
 
 	.d_starved            (d_starved),
 	.x_stall              (x_stall),
@@ -257,8 +261,6 @@ wire                 m_trap_enter_vld;
 wire                 m_trap_enter_soon;
 wire                 m_trap_enter_rdy = f_jump_rdy;
 
-// Privilege state outputs from CSR block
-wire                 x_mmode_execution;
 wire                 x_mmode_loadstore;
 wire                 m_mmode_trap_entry;
 
@@ -821,7 +823,7 @@ wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 hazard3_csr #(
 	.XLEN            (W_DATA),
 `include "hazard3_config_inst.vh"
-) inst_hazard3_csr (
+) csr_u (
 	.clk                        (clk),
 	.rst_n                      (rst_n),
 
@@ -878,6 +880,7 @@ hazard3_csr #(
 	.pmp_cfg_rdata              (x_pmp_cfg_rdata),
 
 	// Other CSR-specific signalling
+	.permit_wfi                 (x_permit_wfi),
 	.instr_ret                  (|x_instr_ret)
 );
 

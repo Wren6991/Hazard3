@@ -102,6 +102,7 @@ module hazard3_csr #(
 	input  wire [W_DATA-1:0]   pmp_cfg_rdata,
 
 	// Other CSR-specific signalling
+	output wire                permit_wfi,
 	input  wire                instr_ret
 );
 
@@ -146,13 +147,14 @@ end
 
 wire debug_suppresses_trap_update = DEBUG_SUPPORT && (debug_mode || enter_debug_mode);
 
-
-// Two-level interrupt enable stack, shuffled on entry/exit:
+// Core execution state, 1 -> M-mode, 0 -> U-mode (if implemented)
 reg m_mode;
+
 reg mstatus_mpie;
 reg mstatus_mie;
 reg mstatus_mpp; // only MSB is implemented
 reg mstatus_mprv;
+reg mstatus_tw;
 
 wire wen_m_mode = wen && (m_mode || debug_mode);
 
@@ -163,6 +165,7 @@ always @ (posedge clk or negedge rst_n) begin
 		mstatus_mie <= 1'b0;
 		mstatus_mpp <= 1'b1;
 		mstatus_mprv <= 1'b0;
+		mstatus_tw <= 1'b0;
 	end else if (CSR_M_TRAP) begin
 		if (trap_enter_vld && trap_enter_rdy && !debug_suppresses_trap_update) begin
 			if (except == EXCEPT_MRET) begin
@@ -184,7 +187,8 @@ always @ (posedge clk or negedge rst_n) begin
 			mstatus_mie  <= wdata_update[3];
 			mstatus_mprv <= wdata_update[17];
 			// Note only the MSB of MPP is implemented. It reads back as 11 or 00.
-			mstatus_mpp  <= wdata_update[12];
+			mstatus_mpp  <= wdata_update[12] || !U_MODE;
+			mstatus_tw   <= wdata_update[21] && U_MODE;
 		end else if (wen && debug_mode && addr == DCSR && U_MODE && DEBUG_SUPPORT) begin
 			// Debugger can change/observe core state directly through
 			// dcsr.prv (this doesn't affect debugger operation, as all
@@ -194,6 +198,9 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
+
+// Simply trap all U-mode WFIs if timeout bit is set
+assign permit_wfi = m_mode || !mstatus_tw;
 
 reg [XLEN-1:0] mscratch;
 
@@ -510,10 +517,10 @@ always @ (*) begin
 			1'b0,             // Never any dirty state besides GPRs
 			8'd0,             // (WPRI)
 			1'b0,             // TSR (Trap SRET), tied 0 if no S mode.
-			1'b0,             // TW (Timeout Wait), tied 0 if only M mode.
+			mstatus_tw,       // TW (Timeout Wait)
 			1'b0,             // TVM (trap virtual memory), tied 0 if no S mode.
-			1'b0,             // MXR (Make eXecutable Readable), tied 0 if not S mode.
-			1'b0,             // SUM, tied 0, we have no S or U mode
+			1'b0,             // MXR (Make eXecutable Readable), tied 0 if no S mode.
+			1'b0,             // SUM, tied 0 if no S mode
 			mstatus_mprv,     // MPRV (modify privilege)
 			4'd0,             // XS, FS always "off" (no extension state to clear!)
 			{2{mstatus_mpp}}, // MPP (M-mode previous privilege), only M and U supported
