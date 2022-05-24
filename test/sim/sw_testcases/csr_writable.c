@@ -30,6 +30,14 @@ CSR was 302
 CSR was 303
 -> exception, mcause = 2 // write to medeleg, unimplemented
 CSR was 303
+-> exception, mcause = 2 // write to cycle, read-only
+CSR was c00
+-> exception, mcause = 2 // write to cycleh, read-only
+CSR was c80
+-> exception, mcause = 2 // write to instret, read-only
+CSR was c02
+-> exception, mcause = 2 // write to instreth, read-only
+CSR was c82
 -> exception, mcause = 2 // write to tselect, unimplemented but we permit reads as a workaround for an OpenOCD bug
 CSR was 7a0
 -> exception, mcause = 2 // read of tdata1, unimplemented
@@ -147,6 +155,11 @@ int main() {
 	write_csr(mhpmcounter29h,      read_csr(mhpmcounter29h     ));
 	write_csr(mhpmcounter30h,      read_csr(mhpmcounter30h     ));
 	write_csr(mhpmcounter31h,      read_csr(mhpmcounter31h     ));
+
+	write_csr(cycle,               read_csr(cycle              ));
+	write_csr(cycleh,              read_csr(cycleh             ));
+	write_csr(instret,             read_csr(instret            ));
+	write_csr(instreth,            read_csr(instreth           ));
 
 	write_csr(mcountinhibit,       read_csr(mcountinhibit      ));
 	write_csr(mhpmevent3,          read_csr(mhpmevent3         ));

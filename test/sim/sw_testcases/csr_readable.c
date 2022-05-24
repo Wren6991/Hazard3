@@ -123,6 +123,11 @@ int main() {
 	(void)read_csr(mhpmcounter30h);
 	(void)read_csr(mhpmcounter31h);
 
+	(void)read_csr(cycle);
+	(void)read_csr(cycleh);
+	(void)read_csr(instret);
+	(void)read_csr(instreth);
+
 	(void)read_csr(mcountinhibit);
 	(void)read_csr(mhpmevent3);
 	(void)read_csr(tselect);

@@ -715,7 +715,7 @@ always @ (*) begin
     	decode_match = mcounteren_cy ? match_uro : match_mro;
     	rdata = mcycle;
     end
-    CYCLEH: if (CSR_COUNTER && U_MODE) begin
+    CYCLEH: if (CSR_COUNTER) begin
     	decode_match = mcounteren_cy ? match_uro : match_mro;
     	rdata = mcycleh;
     end
