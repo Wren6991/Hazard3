@@ -17,7 +17,7 @@ testlist = sorted(testlist)
 
 tb_build_ret = subprocess.run(
 	["make", "-C", "../tb_cxxrtl", "tb"],
-	timeout=120
+	timeout=300
 )
 if tb_build_ret.returncode != 0:
 	sys.exit("Failed.")

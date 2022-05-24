@@ -9,14 +9,7 @@
 #define mconfigptr 0xf15
 #define mstatush 0x310
 
-// Exceptions here are: medeleg, mideleg, tdata1, dcsr, dpc, dscratch1,
-// dscratch0, dmdata0 (custom). medeleg/mideleg are just a couple of
-// unimplemented registers sprinkled in for a sanity check, and the remainder
-// are D-mode registers.
-//
-// Note we permit reads but not writes to tselect, to work around a logic
-// error in openocd. Planning to implement triggers at some point, so this
-// oddity will vanish.
+// Everything except for the U-mode counters should trap.
 
 /*EXPECTED-OUTPUT***************************************************************
 -> exception, mcause = 2, mpp = 0 // mvendorid
@@ -314,6 +307,10 @@ void __attribute__((naked)) ebreak_trampoline() {
 int main() {
 	// Make counters accessible to U mode
 	write_csr(mcounteren, -1u);
+
+	// Give U mode RWX permission on all of memory.
+	write_csr(pmpcfg0, 0x1fu);
+	write_csr(pmpaddr0, -1u);
 
 	// Enter function in U mode, return via ebreak trampoline
 	write_csr(mstatus, read_csr(mstatus) & ~0x1800u);
