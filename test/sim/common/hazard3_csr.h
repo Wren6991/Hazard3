@@ -20,8 +20,18 @@
 	asm volatile ("csrw " #csrname ", %0" : : "r" (data)); \
 })
 
+#define _set_csr(csrname, data) ({ \
+  asm volatile ("csrs " #csrname ", %0" : : "r" (data)); \
+})
+
+#define _clear_csr(csrname, data) ({ \
+  asm volatile ("csrc " #csrname ", %0" : : "r" (data)); \
+})
+
 // Argument macro expansion layer
 #define read_csr(csrname) _read_csr(csrname)
 #define write_csr(csrname, data) _write_csr(csrname, data)
+#define set_csr(csrname, data) _set_csr(csrname, data)
+#define clear_csr(csrname, data) _clear_csr(csrname, data)
 
 #endif
