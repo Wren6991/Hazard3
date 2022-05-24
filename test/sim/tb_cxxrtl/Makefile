@@ -9,7 +9,9 @@ EXTENSION_ZBA    := 1
 EXTENSION_ZBB    := 1
 EXTENSION_ZBC    := 1
 EXTENSION_ZBS    := 1
+
 DEBUG_SUPPORT    := 1
+U_MODE           := 1
 
 MULDIV_UNROLL    := 2
 MUL_FAST         := 1
@@ -33,6 +35,7 @@ SYNTH_CMD += chparam -set EXTENSION_ZBB $(EXTENSION_ZBB) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_ZBC $(EXTENSION_ZBC) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_ZBS $(EXTENSION_ZBS) $(TOP);
 SYNTH_CMD += chparam -set DEBUG_SUPPORT $(DEBUG_SUPPORT) $(TOP);
+SYNTH_CMD += chparam -set U_MODE $(U_MODE) $(TOP);
 SYNTH_CMD += chparam -set CSR_COUNTER 1 $(TOP);
 SYNTH_CMD += chparam -set RESET_VECTOR $(CPU_RESET_VECTOR) $(TOP);
 SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
