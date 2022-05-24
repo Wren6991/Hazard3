@@ -12,7 +12,6 @@ module hazard3_pmp #(
 ) (
 	input  wire              clk,
 	input  wire              rst_n,
-	input  wire              m_mode,
 	input  wire              mstatus_mxr, // make executable readable
 
 	// Config interface passed through CSR block
@@ -67,18 +66,18 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		end
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			if (cfg_addr == PMPCFG0 + i / 4) begin
+			if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
 				pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
 				// TOR is not supported, gets mapped to OFF:
 				pmpcfg_a[i] <= {
 					cfg_wdata[i % 4 * 8 + 4],
-					cfg_wdata[i % 4 * 8 + 3] && csr[i % 4 * 8 + 4]
+					cfg_wdata[i % 4 * 8 + 3] && cfg_wdata[i % 4 * 8 + 4]
 				};
 				pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
 				pmpcfg_w[i] <= cfg_wdata[i % 4 * 8 + 1];
 				pmpcfg_x[i] <= cfg_wdata[i % 4 * 8 + 0];
 			end
-			if (cfg_addr == PMPADDR0 + i) begin
+			if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
 				pmpaddr[i] <= cfg_wdata[W_ADDR-3:0];
 			end
 		end
@@ -218,7 +217,7 @@ always @ (*) begin: check_i_match
 	i_partial_match = 1'b0;
 	i_l = 1'b0;
 	i_x = 1'b0;
-	for (i = PMP_REGIONS - 1; i >= 0; i = i -q 1) begin
+	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
 		match_hw0 = |pmpcfg_a[i] && (i_addr     & match_mask[i]) == match_addr[i];
 		match_hw1 = |pmpcfg_a[i] && (i_addr_hw1 & match_mask[i]) == match_addr[i];
 		if (match_hw0 || match_hw1) begin
@@ -248,4 +247,6 @@ assign i_kill = i_partial_match || (
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

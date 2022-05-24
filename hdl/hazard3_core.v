@@ -434,7 +434,9 @@ hazard3_alu #(
 	.cmp        (x_alu_cmp)
 );
 
-// AHB transaction request
+// Load/store bus request
+
+wire x_loadstore_pmp_fail;
 
 wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
@@ -574,6 +576,7 @@ always @ (*) begin
 	bus_aph_req_d = x_memop_vld && !(
 		x_stall_on_raw ||
 		x_stall_on_exclusive_overlap ||
+		x_loadstore_pmp_fail ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
 		(xm_wfi && !m_wfi_stall_clear) // FIXME will cause a timing issue, better to stall til *after* clear
@@ -713,6 +716,51 @@ wire x_jump_req_if_aligned = !x_stall_on_raw && (
 
 assign x_jump_req = x_jump_req_if_aligned && !x_jump_misaligned;
 
+// Memory protection
+
+wire [11:0]       x_pmp_cfg_addr;
+wire              x_pmp_cfg_wen;
+wire [W_DATA-1:0] x_pmp_cfg_wdata;
+wire [W_DATA-1:0] x_pmp_cfg_rdata;
+
+wire x_exec_pmp_fail;
+
+generate
+if (PMP_REGIONS > 0) begin: have_pmp
+
+	hazard3_pmp #(
+	`include "hazard3_config_inst.vh"
+	) pmp (
+		.clk              (clk),
+		.rst_n            (rst_n),
+
+		.mstatus_mxr      (1'b0), // Only used when S mode present
+
+		.cfg_addr         (x_pmp_cfg_addr),
+		.cfg_wen          (x_pmp_cfg_wen),
+		.cfg_wdata        (x_pmp_cfg_wdata),
+		.cfg_rdata        (x_pmp_cfg_rdata),
+
+		.i_addr           (d_pc),
+		.i_instr_is_32bit (&fd_cir[1:0]),
+		.i_m_mode         (x_mmode_execution),
+		.i_kill           (x_exec_pmp_fail),
+
+		.d_addr           (bus_haddr_d),
+		.d_m_mode         (x_mmode_loadstore),
+		.d_write          (bus_hwrite_d),
+		.d_kill           (x_loadstore_pmp_fail)
+	);
+
+end else begin: no_pmp
+
+	assign x_pmp_cfg_rdata = 1'b0;
+	assign x_loadstore_pmp_fail = 1'b0;
+	assign x_exec_pmp_fail = 1'b0;
+
+end
+endgenerate
+
 // CSRs and Trap Handling
 
 wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
@@ -754,13 +802,16 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
-	x_jump_req_if_aligned && x_jump_misaligned             ? EXCEPT_INSTR_MISALIGN :
-	x_csr_illegal_access                                   ? EXCEPT_INSTR_ILLEGAL  :
-	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo    ? EXCEPT_STORE_ALIGN    :
-	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr? EXCEPT_STORE_ALIGN    :
-	|EXTENSION_A && x_amo_phase == 3'h4                    ? EXCEPT_STORE_FAULT    :
-	x_unaligned_addr &&  x_memop_write                     ? EXCEPT_STORE_ALIGN    :
-	x_unaligned_addr && !x_memop_write                     ? EXCEPT_LOAD_ALIGN     : d_except;
+	x_jump_req_if_aligned && x_jump_misaligned               ? EXCEPT_INSTR_MISALIGN :
+	x_exec_pmp_fail                                          ? EXCEPT_INSTR_FAULT    :
+	x_csr_illegal_access                                     ? EXCEPT_INSTR_ILLEGAL  :
+	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo      ? EXCEPT_STORE_ALIGN    :
+	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr  ? EXCEPT_STORE_ALIGN    :
+	|EXTENSION_A && x_amo_phase == 3'h4                      ? EXCEPT_STORE_FAULT    :
+	x_unaligned_addr &&  x_memop_write                       ? EXCEPT_STORE_ALIGN    :
+	x_unaligned_addr && !x_memop_write                       ? EXCEPT_LOAD_ALIGN     :
+	x_loadstore_pmp_fail && (d_memop_is_amo || bus_hwrite_d) ? EXCEPT_STORE_FAULT    :
+	x_loadstore_pmp_fail                                     ? EXCEPT_LOAD_FAULT     : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
@@ -820,6 +871,11 @@ hazard3_csr #(
 	.irq_software               (soft_irq),
 	.irq_timer                  (timer_irq),
 	.except                     (xm_except),
+
+	.pmp_cfg_addr               (x_pmp_cfg_addr),
+	.pmp_cfg_wen                (x_pmp_cfg_wen),
+	.pmp_cfg_wdata              (x_pmp_cfg_wdata),
+	.pmp_cfg_rdata              (x_pmp_cfg_rdata),
 
 	// Other CSR-specific signalling
 	.instr_ret                  (|x_instr_ret)
@@ -1080,4 +1136,6 @@ hazard3_regfile_1w2r #(
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

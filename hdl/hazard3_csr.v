@@ -82,9 +82,9 @@ module hazard3_csr #(
 	output wire                wfi_stall_clear,
 
 	// Each of these may be performed at a different privilege level from the others:
-	output wire m_mode_execution,
-	output wire m_mode_trap_entry,
-	output wire m_mode_loadstore,
+	output wire                m_mode_execution,
+	output wire                m_mode_trap_entry,
+	output wire                m_mode_loadstore,
 
 	// Exceptions must *not* be a function of bus stall.
 	input  wire [W_EXCEPT-1:0] except,
@@ -95,6 +95,11 @@ module hazard3_csr #(
 	input  wire                irq_software,
 	input  wire                irq_timer,
 
+	// PMP config interface
+	output wire [11:0]         pmp_cfg_addr,
+	output reg                 pmp_cfg_wen,
+	output wire [W_DATA-1:0]   pmp_cfg_wdata,
+	input  wire [W_DATA-1:0]   pmp_cfg_rdata,
 
 	// Other CSR-specific signalling
 	input  wire                instr_ret
@@ -451,6 +456,7 @@ wire match_uro = U_MODE && !wen_soon;
 always @ (*) begin
 	decode_match = 1'b0;
 	rdata = {XLEN{1'b0}};
+	pmp_cfg_wen = 1'b0;
 	case (addr)
 
     // ------------------------------------------------------------------------
@@ -710,6 +716,112 @@ always @ (*) begin
 			mcounteren_tm,
 			mcounteren_cy
 		};
+	end
+
+    // ------------------------------------------------------------------------
+    // PMP CSRs (bridge to PMP config interface)
+
+    // If PMP is present, all 16 registers are present, but some may be WARL'd
+    // to 0 depending on how many regions are actually implemented.
+	PMPCFG0:   if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPCFG1:   if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPCFG2:   if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPCFG3:   if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR0:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR1:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR2:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR3:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR4:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR5:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR6:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR7:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR8:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR9:  if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR10: if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR11: if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR12: if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR13: if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR14: if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
+	end
+	PMPADDR15: if (PMP_REGIONS > 0) begin
+		decode_match = match_mrw;
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
 	end
 
     // ------------------------------------------------------------------------
@@ -1035,6 +1147,9 @@ assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
 
 // ----------------------------------------------------------------------------
 // Privilege state outputs
+
+assign pmp_cfg_addr = addr;
+assign pmp_cfg_wdata = wdata_update;
 
 // Effective privilege for execution. Used for:
 // - Privilege level of branch target fetches (frontend keeps fetch privilege

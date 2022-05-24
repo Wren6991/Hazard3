@@ -274,7 +274,7 @@ reg              mem_addr_vld_r;
 
 // Downstream accesses are always word-sized word-aligned.
 assign mem_addr = mem_addr_r;
-assign mem_priv = mem_addr_r;
+assign mem_priv = mem_priv_r;
 assign mem_addr_vld = mem_addr_vld_r && !reset_holdoff;
 assign mem_size = 1'b1;
 
