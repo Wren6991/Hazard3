@@ -4,9 +4,15 @@ import os
 import subprocess
 import sys
 
+args = sys.argv[1:]
 
-if len(sys.argv) > 1:
-	testlist = sys.argv[1:]
+generate_vcd = False
+if "--vcd" in args:
+	generate_vcd = True
+	del args[args.index("--vcd")]
+
+if len(args) > 0:
+	testlist = args
 else:
 	testlist = []
 	for path in os.listdir():
@@ -36,8 +42,12 @@ for test in testlist:
 		all_passed = False
 		continue
 
+	cmdline = ["../tb_cxxrtl/tb", "--bin", f"tmp/{test}.bin", "--cycles", "1000000"]
+	if generate_vcd:
+		cmdline += ["--vcd", f"tmp/{test}.vcd"]
+
 	test_run_ret = subprocess.run(
-		["../tb_cxxrtl/tb", "--bin", f"tmp/{test}.bin", "--cycles", "1000000", "--vcd", f"tmp/{test}.vcd"],
+		cmdline,
 		stdout = subprocess.PIPE,
 		stderr = subprocess.PIPE,
 		timeout=10

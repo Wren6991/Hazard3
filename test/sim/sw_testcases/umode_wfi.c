@@ -29,7 +29,7 @@ void __attribute__((naked)) do_ecall() {
 // /!\ Unconventional control flow ahead
 
 // Call function in U mode, from M mode. Catch exception, or break back to M
-// mode if the function returned normally, and then return.
+// mode if the function returned normally (via dummy ecall), and then return.
 static inline void umode_call_and_catch(void (*f)(void)) {
 	clear_csr(mstatus, 0x1800u);
 	write_csr(mepc, f);
