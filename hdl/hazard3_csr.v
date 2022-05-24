@@ -118,7 +118,6 @@ begin
 end
 endfunction
 
-
 wire enter_debug_mode;
 wire exit_debug_mode;
 
@@ -130,30 +129,57 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+
 // ----------------------------------------------------------------------------
 // Trap-handling CSRs
 
 wire debug_suppresses_trap_update = DEBUG_SUPPORT && (debug_mode || enter_debug_mode);
 
+
 // Two-level interrupt enable stack, shuffled on entry/exit:
+reg m_mode;
 reg mstatus_mpie;
 reg mstatus_mie;
+reg mstatus_mpp; // only MSB is implemented
+reg mstatus_mprv;
+
+wire wen_m_mode = wen && (m_mode || debug_mode);
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
+		m_mode <= 1'b1;
 		mstatus_mpie <= 1'b0;
 		mstatus_mie <= 1'b0;
+		mstatus_mpp <= 1'b1;
+		mstatus_mprv <= 1'b0;
 	end else if (CSR_M_TRAP) begin
 		if (trap_enter_vld && trap_enter_rdy && !debug_suppresses_trap_update) begin
 			if (except == EXCEPT_MRET) begin
 				mstatus_mpie <= 1'b1;
 				mstatus_mie <= mstatus_mpie;
+				if (U_MODE) begin
+					m_mode <= mstatus_mpp;
+				end
 			end else begin
 				mstatus_mpie <= mstatus_mie;
 				mstatus_mie <= 1'b0;
+				if (U_MODE) begin
+					m_mode <= 1'b1;
+					mstatus_mpp <= m_mode;
+				end
 			end
-		end else if (wen && addr == MSTATUS) begin
-			{mstatus_mpie, mstatus_mie} <= {wdata_update[7], wdata_update[3]};
+		end else if (wen_m_mode && addr == MSTATUS) begin
+			mstatus_mpie <= wdata_update[7];
+			mstatus_mie  <= wdata_update[3];
+			mstatus_mprv <= wdata_update[17];
+			// Note only the MSB of MPP is implemented. It reads back as 11 or 00.
+			mstatus_mpp  <= wdata_update[12];
+		end else if (wen && debug_mode && addr == DCSR && U_MODE && DEBUG_SUPPORT) begin
+			// Debugger can change/observe core state directly through
+			// dcsr.prv (this doesn't affect debugger operation, as all
+			// operations have an effective level of M-mode whilst the core
+			// is halted for debug.)
+			m_mode <= wdata_update[1];
 		end
 	end
 end
@@ -164,7 +190,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mscratch <= X0;
 	end else if (CSR_M_TRAP) begin
-		if (wen && addr == MSCRATCH)
+		if (wen_m_mode && addr == MSCRATCH)
 			mscratch <= wdata_update;
 	end
 end
@@ -178,7 +204,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mtvec_reg <= MTVEC_INIT;
 	end else if (CSR_M_TRAP) begin
-		if (wen && addr == MTVEC)
+		if (wen_m_mode && addr == MTVEC)
 			mtvec_reg <= update_nonconst(mtvec_reg, MTVEC_WMASK);
 	end
 end
@@ -194,7 +220,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (CSR_M_TRAP) begin
 		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
 			mepc <= mepc_in & MEPC_MASK;
-		end else if (wen && addr == MEPC) begin
+		end else if (wen_m_mode && addr == MEPC) begin
 			mepc <= wdata_update & MEPC_MASK;
 		end
 	end
@@ -208,7 +234,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mie <= X0;
 	end else if (CSR_M_TRAP) begin
-		if (wen && addr == MIE)
+		if (wen_m_mode && addr == MIE)
 			mie <= update_nonconst(mie, MIE_WMASK);
 	end
 end
@@ -236,7 +262,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
 			mcause_irq <= mcause_irq_next;
 			mcause_code <= mcause_code_next;
-		end else if (wen && addr == MCAUSE) begin
+		end else if (wen_m_mode && addr == MCAUSE) begin
 			{mcause_irq, mcause_code} <= {wdata_update[31], wdata_update[5:0]};
 		end
 	end
@@ -266,13 +292,13 @@ always @ (posedge clk or negedge rst_n) begin
 		meie1 <= X0;
 		meie2 <= X0;
 		meie3 <= X0;
-	end else if (wen && addr == MEIE0) begin
+	end else if (wen_m_mode && addr == MEIE0) begin
 		meie0 <= update_nonconst(meie0, MEIE0_WMASK);
-	end else if (wen && addr == MEIE1) begin
+	end else if (wen_m_mode && addr == MEIE1) begin
 		meie1 <= update_nonconst(meie1, MEIE1_WMASK);
-	end else if (wen && addr == MEIE2) begin
+	end else if (wen_m_mode && addr == MEIE2) begin
 		meie2 <= update_nonconst(meie2, MEIE2_WMASK);
-	end else if (wen && addr == MEIE3) begin
+	end else if (wen_m_mode && addr == MEIE3) begin
 		meie3 <= update_nonconst(meie3, MEIE3_WMASK);
 	end
 end
@@ -313,7 +339,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (!(mcountinhibit_ir || debug_mode) && instr_ret)
 			{minstreth, minstret} <= (({minstreth, minstret} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
 				| ({minstreth, minstret} & ({2*XLEN{1'b1}} << W_COUNTER));
-		if (wen) begin
+		if (wen_m_mode) begin
 			if (addr == MCYCLEH)
 				mcycleh <= wdata_update;
 			if (addr == MCYCLE)
@@ -326,6 +352,27 @@ always @ (posedge clk or negedge rst_n) begin
 				{mcountinhibit_ir, mcountinhibit_cy} <= {wdata_update[2], wdata_update[0]};
 			end
 		end
+	end
+end
+
+// Note we still implement tm, even though the time/timeh CSRs are
+// unimplemented. The tm bit provides a standard way to configure whether
+// M-mode software permits the trapped access to reach the timer registers.
+// (This is in fact required by the RVM-CSI platform spec.)
+reg mcounteren_cy;
+reg mcounteren_tm;
+reg mcounteren_ir;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		mcounteren_cy <= 1'b0;
+		mcounteren_tm <= 1'b0;
+		mcounteren_ir <= 1'b0;
+	end else if (CSR_COUNTER && U_MODE && wen_m_mode && addr == MCOUNTEREN) begin
+		// Note this register only exists when U mode is implemented.
+		mcounteren_cy <= wdata_update[0];
+		mcounteren_tm <= wdata_update[1];
+		mcounteren_ir <= wdata_update[2];
 	end
 end
 
@@ -387,6 +434,14 @@ assign dbg_data0_wen = debug_mode && wen && addr == DMDATA0;
 
 reg decode_match;
 
+// Address match conditions -- certain CSRs are inaccessible if their
+// conditions are not met:
+wire match_drw = DEBUG_SUPPORT && debug_mode;
+wire match_mrw = m_mode || debug_mode;
+wire match_mro = (m_mode || debug_mode) && !wen_soon;
+wire match_urw = U_MODE && 1'b1;
+wire match_uro = U_MODE && !wen_soon;
+
 always @ (*) begin
 	decode_match = 1'b0;
 	rdata = {XLEN{1'b0}};
@@ -397,7 +452,7 @@ always @ (*) begin
 
 	MISA: if (CSR_M_MANDATORY) begin
 		// WARL, so it is legal to be tied constant
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = {
 			2'h1,              // MXL: 32-bit
 			{XLEN-28{1'b0}},   // WLRL
@@ -415,47 +470,47 @@ always @ (*) begin
 		};
 	end
 	MVENDORID: if (CSR_M_MANDATORY) begin
-		decode_match = !wen_soon; // MRO
+		decode_match = match_mro;
 		rdata = MVENDORID_VAL;
 	end
 	MARCHID: if (CSR_M_MANDATORY) begin
-		decode_match = !wen_soon; // MRO
+		decode_match = match_mro;
 		// Hazard3's open source architecture ID
 		rdata = 32'd27;
 	end
 	MIMPID: if (CSR_M_MANDATORY) begin
-		decode_match = !wen_soon; // MRO
+		decode_match = match_mro;
 		rdata = MIMPID_VAL;
 	end
 	MHARTID: if (CSR_M_MANDATORY) begin
-		decode_match = !wen_soon; // MRO
+		decode_match = match_mro;
 		rdata = MHARTID_VAL;
 	end
 
 	MCONFIGPTR: if (CSR_M_MANDATORY) begin
-		decode_match = !wen_soon; // MRO
+		decode_match = match_mro;
 		rdata = MCONFIGPTR_VAL;
 	end
 
 	MSTATUS: if (CSR_M_MANDATORY || CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = {
-			1'b0,    // Never any dirty state besides GPRs
-			8'd0,    // (WPRI)
-			1'b0,    // TSR (Trap SRET), tied 0 if no S mode.
-			1'b0,    // TW (Timeout Wait), tied 0 if only M mode.
-			1'b0,    // TVM (trap virtual memory), tied 0 if no S mode.
-			1'b0,    // MXR (Make eXecutable Readable), tied 0 if not S mode.
-			1'b0,    // SUM, tied 0, we have no S or U mode
-			1'b0,    // MPRV (modify privilege), tied 0 if no U mode
-			4'd0,    // XS, FS always "off" (no extension state to clear!)
-			2'b11,   // MPP (M-mode previous privilege), we are always M-mode
-			2'd0,    // (WPRI)
-			1'b0,    // SPP, tied 0 if S mode not supported
-			mstatus_mpie,
-			3'd0,    // No S, U
-			mstatus_mie,
-			3'd0     // No S, U
+			1'b0,         // Never any dirty state besides GPRs
+			8'd0,         // (WPRI)
+			1'b0,         // TSR (Trap SRET), tied 0 if no S mode.
+			1'b0,         // TW (Timeout Wait), tied 0 if only M mode.
+			1'b0,         // TVM (trap virtual memory), tied 0 if no S mode.
+			1'b0,         // MXR (Make eXecutable Readable), tied 0 if not S mode.
+			1'b0,         // SUM, tied 0, we have no S or U mode
+			mstatus_mprv, // MPRV (modify privilege)
+			4'd0,         // XS, FS always "off" (no extension state to clear!)
+			{2{m_mode}},  // MPP (M-mode previous privilege), only M and U supported
+			2'd0,         // (WPRI)
+			1'b0,         // SPP, tied 0 if S mode not supported
+			mstatus_mpie, // Previous interrupt enable
+			3'd0,         // No S, U
+			mstatus_mie,  // Interrupt enable
+			3'd0          // No S, U
 		};
 	end
 
@@ -464,7 +519,7 @@ always @ (*) begin
 	// unimplemented in this case, but now it must be decoded even if
 	// hardwired to 0.
 	MSTATUSH: if (CSR_M_MANDATORY || CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 	end
 
 	// MEDELEG, MIDELEG should not exist for M-only implementations. Will raise
@@ -476,17 +531,17 @@ always @ (*) begin
 	// This is a 32 bit synthesised register with set/clear/write/read, don't
 	// turn it on unless we really have to
 	MSCRATCH: if (CSR_M_TRAP && CSR_M_MANDATORY) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = mscratch;
 	end
 
 	MEPC: if (CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = mepc;
 	end
 
 	MCAUSE: if (CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = {
 			mcause_irq,      // Sign bit is 1 for IRQ, 0 for exception
 			{26{1'b0}},      // Padding
@@ -495,23 +550,23 @@ always @ (*) begin
 	end
 
 	MTVAL: if (CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		// Hardwired to 0
 	end
 
 	MIE: if (CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = mie;
 	end
 
 	MIP: if (CSR_M_TRAP) begin
 		// Writes are permitted, but ignored.
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = mip;
 	end
 
 	MTVEC: if (CSR_M_TRAP) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = {
 			mtvec[XLEN-1:2],  // BASE
 			1'b0,             // Reserved mode bit gets WARL'd to 0
@@ -523,98 +578,98 @@ always @ (*) begin
 	// Counter CSRs
 
 	// Get the tied WARLs out the way first
-	MHPMCOUNTER3:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER4:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER5:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER6:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER7:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER8:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER9:   if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER10:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER11:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER12:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER13:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER14:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER15:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER16:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER17:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER18:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER19:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER20:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER21:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER22:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER23:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER24:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER25:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER26:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER27:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER28:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER29:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER30:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER31:  if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER3:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER4:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER5:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER6:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER7:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER8:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER9:   if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER10:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER11:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER12:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER13:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER14:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER15:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER16:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER17:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER18:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER19:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER20:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER21:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER22:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER23:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER24:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER25:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER26:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER27:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER28:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER29:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER30:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER31:  if (CSR_COUNTER) begin decode_match = match_mrw; end
 
-	MHPMCOUNTER3H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER4H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER5H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER6H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER7H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER8H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER9H:  if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER10H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER11H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER12H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER13H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER14H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER15H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER16H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER17H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER18H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER19H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER20H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER21H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER22H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER23H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER24H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER25H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER26H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER27H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER28H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER29H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER30H: if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMCOUNTER31H: if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMCOUNTER3H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER4H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER5H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER6H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER7H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER8H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER9H:  if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER10H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER11H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER12H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER13H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER14H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER15H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER16H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER17H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER18H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER19H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER20H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER21H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER22H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER23H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER24H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER25H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER26H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER27H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER28H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER29H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER30H: if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMCOUNTER31H: if (CSR_COUNTER) begin decode_match = match_mrw; end
 
-	MHPMEVENT3:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT4:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT5:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT6:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT7:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT8:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT9:     if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT10:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT11:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT12:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT13:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT14:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT15:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT16:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT17:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT18:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT19:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT20:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT21:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT22:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT23:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT24:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT25:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT26:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT27:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT28:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT29:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT30:    if (CSR_COUNTER) begin decode_match = 1'b1; end
-	MHPMEVENT31:    if (CSR_COUNTER) begin decode_match = 1'b1; end
+	MHPMEVENT3:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT4:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT5:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT6:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT7:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT8:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT9:     if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT10:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT11:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT12:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT13:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT14:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT15:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT16:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT17:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT18:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT19:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT20:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT21:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT22:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT23:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT24:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT25:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT26:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT27:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT28:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT29:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT30:    if (CSR_COUNTER) begin decode_match = match_mrw; end
+	MHPMEVENT31:    if (CSR_COUNTER) begin decode_match = match_mrw; end
 
 	MCOUNTINHIBIT:  if (CSR_COUNTER) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = {
 			29'd0,
 			mcountinhibit_ir,
@@ -624,22 +679,55 @@ always @ (*) begin
 	end
 
 	MCYCLE: if (CSR_COUNTER) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = mcycle;
 	end
 	MINSTRET: if (CSR_COUNTER) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = minstret;
 	end
 
 	MCYCLEH: if (CSR_COUNTER) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = mcycleh;
 	end
 	MINSTRETH: if (CSR_COUNTER) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = minstreth;
 	end
+
+	MCOUNTEREN: if (CSR_COUNTER && U_MODE) begin
+		decode_match = match_mrw;
+		rdata = {
+			29'd0,
+			mcounteren_ir,
+			mcounteren_tm,
+			mcounteren_cy
+		};
+	end
+
+    // ------------------------------------------------------------------------
+    // U-mode CSRs
+
+    // The read-only counters are always visible to M mode, and are visible to
+    // U mode if the corresponding mcounteren bit is set.
+    CYCLE: if (CSR_COUNTER) begin
+    	decode_match = mcounteren_cy ? match_uro : match_mro;
+    	rdata = mcycle;
+    end
+    CYCLEH: if (CSR_COUNTER && U_MODE) begin
+    	decode_match = mcounteren_cy ? match_uro : match_mro;
+    	rdata = mcycleh;
+    end
+
+    INSTRET: if (CSR_COUNTER) begin
+    	decode_match = mcounteren_ir ? match_uro : match_mro;
+    	rdata = minstret;
+    end
+    INSTRETH: if (CSR_COUNTER) begin
+    	decode_match = mcounteren_ir ? match_uro : match_mro;
+    	rdata = minstreth;
+    end
 
 	// ------------------------------------------------------------------------
 	// Trigger Module CSRs
@@ -649,14 +737,14 @@ always @ (*) begin
 	// - tselect must raise an exception when written to
 	// Otherwise it returns an error instead of 0 count when enumerating triggers
 	TSELECT: if (DEBUG_SUPPORT) begin
-		decode_match = !wen_soon;
+		decode_match = match_mro;
 	end
 
 	// ------------------------------------------------------------------------
 	// Debug CSRs
 
-	DCSR: if (DEBUG_SUPPORT && debug_mode) begin
-		decode_match = 1'b1;
+	DCSR: if (DEBUG_SUPPORT) begin
+		decode_match = match_drw;
 		rdata = {
 			4'h4,         // xdebugver = 4, for 0.13.2 debug spec
 			12'd0,        // reserved
@@ -667,20 +755,20 @@ always @ (*) begin
 			1'b1,         // stoptime = 0, no core-local timer increment in debug mode
 			dcsr_cause,
 			1'b0,         // reserved
-			1'b0,         // mprven = 0, we don't have MPRV support
+			1'b0,         // mprven = 0, debugger always acts as M-mode
 			1'b0,         // nmip = 0, we have no NMI
 			dcsr_step,
-			2'h3          // prv = 3, we only have M mode
+			{2{m_mode}}   // priv = M or U, report the core state directly
 		};
 	end
 
-	DPC: if (DEBUG_SUPPORT && debug_mode) begin
-		decode_match = 1'b1;
+	DPC: if (DEBUG_SUPPORT) begin
+		decode_match = match_drw;
 		rdata = dpc;
 	end
 
-	DMDATA0: if (DEBUG_SUPPORT && debug_mode) begin
-		decode_match = 1'b1;
+	DMDATA0: if (DEBUG_SUPPORT) begin
+		decode_match = match_drw;
 		rdata = dbg_data0_rdata;
 	end
 
@@ -688,47 +776,47 @@ always @ (*) begin
 	// Custom CSRs
 
 	MEIE0: if (CSR_M_TRAP && N_IRQ_REG0 > 0) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = meie0;
 	end
 
 	MEIE1: if (CSR_M_TRAP && N_IRQ_REG1 > 0) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = meie1;
 	end
 
 	MEIE2: if (CSR_M_TRAP && N_IRQ_REG2 > 0) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = meie2;
 	end
 
 	MEIE3: if (CSR_M_TRAP && N_IRQ_REG3 > 0) begin
-		decode_match = 1'b1;
+		decode_match = match_mrw;
 		rdata = meie3;
 	end
 
 	MEIP0: if (CSR_M_TRAP && N_IRQ_REG0 > 0) begin
-		decode_match = !wen_soon;
+		decode_match = match_mro;
 		rdata = meip0;
 	end
 
 	MEIP1: if (CSR_M_TRAP && N_IRQ_REG1 > 0) begin
-		decode_match = !wen_soon;
+		decode_match = match_mro;
 		rdata = meip1;
 	end
 
 	MEIP2: if (CSR_M_TRAP && N_IRQ_REG2 > 0) begin
-		decode_match = !wen_soon;
+		decode_match = match_mro;
 		rdata = meip2;
 	end
 
 	MEIP3: if (CSR_M_TRAP && N_IRQ_REG3 > 0) begin
-		decode_match = !wen_soon;
+		decode_match = match_mro;
 		rdata = meip3;
 	end
 
 	MLEI: if (CSR_M_TRAP) begin
-		decode_match = !wen_soon;
+		decode_match = match_mro;
 		rdata = {{XLEN-9{1'b0}}, mlei, 2'b00};
 	end
 

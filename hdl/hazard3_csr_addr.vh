@@ -162,6 +162,17 @@ localparam MEIP3          = 12'hfe3; // External interrupt pending register 3
 localparam MLEI           = 12'hfe4; // Lowest external interrupt number
 
 // ----------------------------------------------------------------------------
+// U-mode CSRs
+
+// Read-only aliases of M-mode counter CSRs:
+localparam CYCLE          = 12'hc00;
+localparam TIME           = 12'hc01;
+localparam INSTRET        = 12'hc02;
+localparam CYCLEH         = 12'hc80;
+localparam TIMEH          = 12'hc81;
+localparam INSTRETH       = 12'hc82;
+
+// ----------------------------------------------------------------------------
 // Trigger Module
 
 localparam TSELECT       = 12'h7a0;
