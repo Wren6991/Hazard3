@@ -556,7 +556,7 @@ int main(int argc, char **argv) {
 
 		if (memio.exit_req) {
 			printf("CPU requested halt. Exit code %d\n", memio.exit_code);
-			printf("Ran for %ld cycles\n", cycle + 1);
+			printf("Ran for %lld cycles\n", cycle + 1);
 			break;
 		}
 		if (cycle + 1 == max_cycles)
