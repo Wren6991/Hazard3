@@ -4,11 +4,14 @@ import os
 import subprocess
 import sys
 
-testlist = []
 
-for path in os.listdir():
-	if os.path.isfile(path) and path.endswith(".c"):
-		testlist.append(path[:-2])
+if len(sys.argv) > 1:
+	testlist = sys.argv[1:]
+else:
+	testlist = []
+	for path in os.listdir():
+		if os.path.isfile(path) and path.endswith(".c"):
+			testlist.append(path[:-2])
 
 testlist = sorted(testlist)
 
@@ -34,8 +37,9 @@ for test in testlist:
 		continue
 
 	test_run_ret = subprocess.run(
-		["../tb_cxxrtl/tb", "--bin", f"tmp/{test}.bin", "--cycles", "1000000"],
+		["../tb_cxxrtl/tb", "--bin", f"tmp/{test}.bin", "--cycles", "1000000", "--vcd", f"tmp/{test}.vcd"],
 		stdout = subprocess.PIPE,
+		stderr = subprocess.PIPE,
 		timeout=10
 	)
 	with open(f"tmp/{test}.log", "wb") as f:
