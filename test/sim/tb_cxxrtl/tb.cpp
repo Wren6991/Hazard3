@@ -12,6 +12,13 @@
 #include "dut.cpp"
 #include <backends/cxxrtl/cxxrtl_vcd.h>
 
+// There must be a better way
+#ifdef __x86_64__
+#define I64_FMT "%ld"
+#else
+#define I64_FMT "%lld"
+#endif
+
 // -----------------------------------------------------------------------------
 
 static const int MEM_SIZE = 16 * 1024 * 1024;
@@ -556,7 +563,7 @@ int main(int argc, char **argv) {
 
 		if (memio.exit_req) {
 			printf("CPU requested halt. Exit code %d\n", memio.exit_code);
-			printf("Ran for %lld cycles\n", cycle + 1);
+			printf("Ran for " I64_FMT " cycles\n", cycle + 1);
 			break;
 		}
 		if (cycle + 1 == max_cycles)
