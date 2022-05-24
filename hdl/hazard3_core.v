@@ -25,8 +25,9 @@ module hazard3_core #(
 	input  wire              bus_dph_ready_i,
 	input  wire              bus_dph_err_i,
 
-	output wire [2:0]        bus_hsize_i,
 	output wire [W_ADDR-1:0] bus_haddr_i,
+	output wire [2:0]        bus_hsize_i,
+	output wire              bus_priv_i,
 	input  wire [W_DATA-1:0] bus_rdata_i,
 
 	// Load/store port
@@ -39,6 +40,7 @@ module hazard3_core #(
 
 	output reg  [W_ADDR-1:0] bus_haddr_d,
 	output reg  [2:0]        bus_hsize_d,
+	output reg               bus_priv_d,
 	output reg               bus_hwrite_d,
 	output reg  [W_DATA-1:0] bus_wdata_d,
 	input  wire [W_DATA-1:0] bus_rdata_d,
@@ -78,6 +80,9 @@ localparam HSIZE_BYTE  = 3'd0;
 wire debug_mode;
 assign dbg_halted = DEBUG_SUPPORT && debug_mode;
 assign dbg_running = DEBUG_SUPPORT && !debug_mode;
+
+assign bus_priv_i = 1'b1;
+always @ (*) bus_priv_d = 1'b1;
 
 // ----------------------------------------------------------------------------
 // Pipe Stage F

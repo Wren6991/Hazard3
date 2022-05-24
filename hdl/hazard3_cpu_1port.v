@@ -68,8 +68,9 @@ wire              core_aph_ready_i;
 wire              core_dph_ready_i;
 wire              core_dph_err_i;
 
-wire [2:0]        core_hsize_i;
 wire [W_ADDR-1:0] core_haddr_i;
+wire [2:0]        core_hsize_i;
+wire              core_priv_i;
 wire [W_DATA-1:0] core_rdata_i;
 
 
@@ -83,6 +84,7 @@ wire              core_dph_exokay_d;
 
 wire [W_ADDR-1:0] core_haddr_d;
 wire [2:0]        core_hsize_d;
+wire              core_priv_d;
 wire              core_hwrite_d;
 wire [W_DATA-1:0] core_wdata_d;
 wire [W_DATA-1:0] core_rdata_d;
@@ -103,8 +105,9 @@ hazard3_core #(
 	.bus_aph_ready_i            (core_aph_ready_i),
 	.bus_dph_ready_i            (core_dph_ready_i),
 	.bus_dph_err_i              (core_dph_err_i),
-	.bus_hsize_i                (core_hsize_i),
 	.bus_haddr_i                (core_haddr_i),
+	.bus_hsize_i                (core_hsize_i),
+	.bus_priv_i                 (core_priv_i),
 	.bus_rdata_i                (core_rdata_i),
 
 	.bus_aph_req_d              (core_aph_req_d),
@@ -115,6 +118,7 @@ hazard3_core #(
 	.bus_dph_exokay_d           (core_dph_exokay_d),
 	.bus_haddr_d                (core_haddr_d),
 	.bus_hsize_d                (core_hsize_d),
+	.bus_priv_d                 (core_priv_d),
 	.bus_hwrite_d               (core_hwrite_d),
 	.bus_wdata_d                (core_wdata_d),
 	.bus_rdata_d                (core_rdata_d),
@@ -184,9 +188,17 @@ end
 localparam HTRANS_IDLE = 2'b00;
 localparam HTRANS_NSEQ = 2'b10;
 
-// Noncacheable nonbufferable privileged data/instr:
-localparam HPROT_DATA  = 4'b0011;
-localparam HPROT_INSTR = 4'b0010;
+wire [3:0] hprot_data  = {
+	2'b00,                  // Noncacheable/nonbufferable
+	core_priv_d,            // Privileged or Normal as per core state
+	1'b1                    // Data access
+};
+
+wire [3:0] hprot_instr = {
+	2'b00,                  // Noncacheable/nonbufferable
+	core_priv_i,            // Privileged or Normal as per core state
+	1'b0                    // Instruction access
+};
 
 assign ahblm_hburst = 3'b000;   // HBURST_SINGLE
 assign ahblm_hmastlock = 1'b0;
@@ -198,14 +210,14 @@ always @ (*) begin
 		ahblm_haddr  = core_haddr_d;
 		ahblm_hsize  = core_hsize_d;
 		ahblm_hwrite = core_hwrite_d;
-		ahblm_hprot  = HPROT_DATA;
+		ahblm_hprot  = hprot_data;
 	end else if (bus_gnt_i) begin
 		ahblm_htrans = HTRANS_NSEQ;
 		ahblm_hexcl  = 1'b0;
 		ahblm_haddr  = core_haddr_i;
 		ahblm_hsize  = core_hsize_i;
 		ahblm_hwrite = 1'b0;
-		ahblm_hprot  = HPROT_INSTR;
+		ahblm_hprot  = hprot_instr;
 	end else begin
 		ahblm_htrans = HTRANS_IDLE;
 		ahblm_hexcl  = 1'b0;
