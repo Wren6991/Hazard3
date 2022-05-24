@@ -21,6 +21,7 @@ module hazard3_frontend #(
 	// may not be used to compute combinational outputs.
 	output wire              mem_size, // 1'b1 -> 32 bit access
 	output wire [W_ADDR-1:0] mem_addr,
+	output wire              mem_priv,
 	output wire              mem_addr_vld,
 	input  wire              mem_addr_rdy,
 	input  wire [W_DATA-1:0] mem_data,
@@ -32,6 +33,7 @@ module hazard3_frontend #(
 	// unless rdy is high. Processor *may* alter request during this time.
 	// Inputs must not be a function of hready.
 	input  wire [W_ADDR-1:0] jump_target,
+	input  wire              jump_priv,
 	input  wire              jump_target_vld,
 	output wire              jump_target_rdy,
 
@@ -179,14 +181,18 @@ end
 
 // Fetch addr runs ahead of the PC, in word increments.
 reg [W_ADDR-1:0] fetch_addr;
+reg              fetch_priv;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		fetch_addr <= RESET_VECTOR;
+		// M-mode at reset:
+		fetch_priv <= 1'b1;
 	end else begin
 		if (jump_now) begin
 			// Post-increment if jump request is going straight through
 			fetch_addr <= {jump_target[W_ADDR-1:2] + (mem_addr_rdy && !mem_addr_hold), 2'b00};
+			fetch_priv <= jump_priv || !U_MODE;
 		end else if (mem_addr_vld && mem_addr_rdy) begin
 			fetch_addr <= fetch_addr + 32'h4;
 		end
@@ -247,7 +253,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// Make sure these clear properly (have been subtle historic bugs here)
 			assert(!unaligned_jump_aph);
 			assert(!unaligned_jump_dph);
-		end		
+		end
 	end
 end
 `endif
@@ -263,19 +269,25 @@ always @ (posedge clk or negedge rst_n)
 		reset_holdoff <= 1'b0;
 
 reg [W_ADDR-1:0] mem_addr_r;
-reg mem_addr_vld_r;
+reg              mem_priv_r;
+reg              mem_addr_vld_r;
 
 // Downstream accesses are always word-sized word-aligned.
 assign mem_addr = mem_addr_r;
+assign mem_priv = mem_addr_r;
 assign mem_addr_vld = mem_addr_vld_r && !reset_holdoff;
 assign mem_size = 1'b1;
 
 always @ (*) begin
 	mem_addr_r = {W_ADDR{1'b0}};
+	mem_priv_r = fetch_priv;
 	mem_addr_vld_r = 1'b1;
 	case (1'b1)
 		mem_addr_hold               : begin mem_addr_r = fetch_addr; end
-		jump_target_vld             : begin mem_addr_r = {jump_target[W_ADDR-1:2], 2'b00}; end
+		jump_target_vld             : begin
+		                                    mem_addr_r = {jump_target[W_ADDR-1:2], 2'b00};
+		                                    mem_priv_r = jump_priv || !U_MODE;
+		end
 		DEBUG_SUPPORT && debug_mode : begin mem_addr_vld_r = 1'b0; end
 		!fetch_stall                : begin mem_addr_r = fetch_addr; end
 		default                     : begin mem_addr_vld_r = 1'b0; end
@@ -443,4 +455,6 @@ end
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

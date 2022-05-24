@@ -81,14 +81,12 @@ wire debug_mode;
 assign dbg_halted = DEBUG_SUPPORT && debug_mode;
 assign dbg_running = DEBUG_SUPPORT && !debug_mode;
 
-assign bus_priv_i = 1'b1;
-always @ (*) bus_priv_d = 1'b1;
-
 // ----------------------------------------------------------------------------
 // Pipe Stage F
 
 wire                 f_jump_req;
 wire [W_ADDR-1:0]    f_jump_target;
+wire                 f_jump_priv;
 wire                 f_jump_rdy;
 wire                 f_jump_now = f_jump_req && f_jump_rdy;
 
@@ -118,6 +116,7 @@ hazard3_frontend #(
 
 	.mem_size             (f_mem_size),
 	.mem_addr             (bus_haddr_i),
+	.mem_priv             (bus_priv_i),
 	.mem_addr_vld         (bus_aph_req_i),
 	.mem_addr_rdy         (bus_aph_ready_i),
 
@@ -126,6 +125,7 @@ hazard3_frontend #(
 	.mem_data_vld         (bus_dph_ready_i),
 
 	.jump_target          (f_jump_target),
+	.jump_priv            (f_jump_priv),
 	.jump_target_vld      (f_jump_req),
 	.jump_target_rdy      (f_jump_rdy),
 
@@ -256,6 +256,11 @@ wire                 m_trap_is_irq;
 wire                 m_trap_enter_vld;
 wire                 m_trap_enter_soon;
 wire                 m_trap_enter_rdy = f_jump_rdy;
+
+// Privilege state outputs from CSR block
+wire                 x_mmode_execution;
+wire                 x_mmode_loadstore;
+wire                 m_mmode_trap_entry;
 
 reg  [W_REGADDR-1:0] xm_rs1;
 reg  [W_REGADDR-1:0] xm_rs2;
@@ -554,6 +559,7 @@ always @ (*) begin
 	// Need to be careful not to use anything hready-sourced to gate htrans!
 	bus_haddr_d = x_addr_sum;
 	bus_hwrite_d = x_memop_write;
+	bus_priv_d = x_mmode_loadstore;
 	case (d_memop)
 		MEMOP_LW:  bus_hsize_d = HSIZE_WORD;
 		MEMOP_SW:  bus_hsize_d = HSIZE_WORD;
@@ -804,6 +810,10 @@ hazard3_csr #(
 	.mepc_in                    (m_exception_return_addr),
 	.wfi_stall_clear            (m_wfi_stall_clear),
 
+	.m_mode_execution           (x_mmode_execution),
+	.m_mode_loadstore           (x_mmode_loadstore),
+	.m_mode_trap_entry          (m_mmode_trap_entry),
+
 	// IRQ and exception requests
 	.delay_irq_entry            (xm_delay_irq_entry),
 	.irq                        (irq),
@@ -887,6 +897,7 @@ reg [W_DATA-1:0] m_result;
 
 assign f_jump_req = x_jump_req || m_trap_enter_vld;
 assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
+assign f_jump_priv = m_trap_enter_vld ? m_mmode_trap_entry : x_mmode_execution;
 assign x_jump_not_except = !m_trap_enter_vld;
 
 // EXCEPT_NONE clause is needed in the following sequence:

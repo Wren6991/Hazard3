@@ -81,6 +81,11 @@ module hazard3_csr #(
 	input  wire [XLEN-1:0]     mepc_in,
 	output wire                wfi_stall_clear,
 
+	// Each of these may be performed at a different privilege level from the others:
+	output wire m_mode_execution,
+	output wire m_mode_trap_entry,
+	output wire m_mode_loadstore,
+
 	// Exceptions must *not* be a function of bus stall.
 	input  wire [W_EXCEPT-1:0] except,
 
@@ -89,6 +94,7 @@ module hazard3_csr #(
 	input  wire [NUM_IRQ-1:0]  irq,
 	input  wire                irq_software,
 	input  wire                irq_timer,
+
 
 	// Other CSR-specific signalling
 	input  wire                instr_ret
@@ -1026,6 +1032,32 @@ assign trap_enter_soon = trap_enter_vld || (
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
+
+// ----------------------------------------------------------------------------
+// Privilege state outputs
+
+// Effective privilege for execution. Used for:
+// - Privilege level of branch target fetches (frontend keeps fetch privilege
+//   constant during sequential fetch)
+// - Checking PC against PMP execute permission
+
+assign m_mode_execution = !U_MODE || debug_mode || m_mode;
+
+// Effective privilege for trap entry. Used for:
+// - Privilege level of trap target fetches (frontend keeps fetch privilege
+//   constant during sequential fetch)
+
+assign m_mode_trap_entry = !U_MODE || (
+	except == EXCEPT_MRET ? mstatus_mpp : 1'b1
+);
+
+// Effective privilege for load/stores. Used for:
+// - Privilege level of load/stores on the bus
+// - Checking load/stores against PMP read/write permission
+
+assign m_mode_loadstore = !U_MODE || debug_mode || ( // FIXME how does this interact with load/store racing against debug entry?
+	mstatus_mprv ? mstatus_mpp : m_mode
+);
 
 // ----------------------------------------------------------------------------
 // Properties
