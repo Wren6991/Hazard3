@@ -478,7 +478,9 @@ always @ (*) begin
 
 			2'd0,              // Z, Y, no
 			|CSR_M_TRAP,       // X is set for our non-standard interrupt enable CSRs
-			10'd0,             // W...N, no
+			2'd0,              // V, W, no
+			|U_MODE,
+			7'd0,              // T...N, no
 			|EXTENSION_M,
 			3'd0,              // L...J, no
 			1'b1,              // Integer ISA
