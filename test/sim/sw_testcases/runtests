@@ -13,6 +13,10 @@ if "--vcd" in args:
 
 if len(args) > 0:
 	testlist = args
+	# This happens a lot when autocomplete is used:
+	for i, n in enumerate(testlist):
+		if n.endswith(".c"):
+			testlist[i] = n[:-2]
 else:
 	testlist = []
 	for path in os.listdir():
