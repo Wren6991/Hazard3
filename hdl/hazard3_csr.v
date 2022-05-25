@@ -158,6 +158,14 @@ reg mstatus_tw;
 
 wire wen_m_mode = wen && (m_mode || debug_mode);
 
+// Spec text from priv-1.12:
+// "An MRET or SRET instruction is used to return from a trap in M-mode or
+//  S-mode respectively. When executing an xRET instruction, supposing xPP
+//  holds the value y, xIE is set to xPIE; the privilege mode is changed to
+//  y; xPIE is set to 1; and xPP is set to the least-privileged supported
+//  mode (U if U-mode is implemented, else M). If xPP=M, xRET also sets
+//  MPRV=0."
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		m_mode <= 1'b1;
@@ -173,6 +181,10 @@ always @ (posedge clk or negedge rst_n) begin
 				mstatus_mie <= mstatus_mpie;
 				if (U_MODE) begin
 					m_mode <= mstatus_mpp;
+					mstatus_mpp <= 1'b0;
+					if (!mstatus_mpp) begin
+						mstatus_mprv <= 1'b0;
+					end
 				end
 			end else begin
 				mstatus_mpie <= mstatus_mie;
