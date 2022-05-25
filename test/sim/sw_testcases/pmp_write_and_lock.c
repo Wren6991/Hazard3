@@ -6,6 +6,53 @@
 // prevents further writes.
 
 /*EXPECTED-OUTPUT***************************************************************
+
+Reset value check
+00: cfg = 00, addr = 00000000
+01: cfg = 00, addr = 00000000
+02: cfg = 00, addr = 00000000
+03: cfg = 00, addr = 00000000
+04: cfg = 00, addr = 00000000
+05: cfg = 00, addr = 00000000
+06: cfg = 00, addr = 00000000
+07: cfg = 00, addr = 00000000
+08: cfg = 00, addr = 00000000
+09: cfg = 00, addr = 00000000
+10: cfg = 00, addr = 00000000
+11: cfg = 00, addr = 00000000
+12: cfg = 00, addr = 00000000
+13: cfg = 00, addr = 00000000
+14: cfg = 00, addr = 00000000
+15: cfg = 00, addr = 00000000
+Write all ones (except lock bit)
+00: cfg = 1f, addr = 3fffffff    // Note bits 31:30 aren't writable as the address is
+01: cfg = 1f, addr = 3fffffff    // left-shifted by 2 and we only have a 4 GiB
+02: cfg = 1f, addr = 3fffffff    // physical address space.
+03: cfg = 1f, addr = 3fffffff
+04: cfg = 00, addr = 00000000
+05: cfg = 00, addr = 00000000
+06: cfg = 00, addr = 00000000
+07: cfg = 00, addr = 00000000
+08: cfg = 00, addr = 00000000
+09: cfg = 00, addr = 00000000
+10: cfg = 00, addr = 00000000
+11: cfg = 00, addr = 00000000
+12: cfg = 00, addr = 00000000
+13: cfg = 00, addr = 00000000
+14: cfg = 00, addr = 00000000
+15: cfg = 00, addr = 00000000
+Write unique values
+00: cfg = 00, addr = 11111111
+01: cfg = 01, addr = 22222222
+02: cfg = 02, addr = 33333333
+03: cfg = 03, addr = 04444444
+Set lock bits
+Try to set all-ones again
+00: cfg = 80, addr = 11111111
+01: cfg = 80, addr = 22222222
+02: cfg = 80, addr = 33333333
+03: cfg = 80, addr = 04444444
+
 *******************************************************************************/
 
 // Number of implemented regions configured in the testbench
