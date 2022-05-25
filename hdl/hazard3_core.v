@@ -579,6 +579,7 @@ always @ (*) begin
 		x_stall_on_raw ||
 		x_stall_on_exclusive_overlap ||
 		x_loadstore_pmp_fail ||
+		x_exec_pmp_fail ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
 		(xm_wfi && !m_wfi_stall_clear) // FIXME will cause a timing issue, better to stall til *after* clear
@@ -898,10 +899,10 @@ always @ (posedge clk or negedge rst_n) begin
 	end else begin
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
-			// If the transfer is unaligned, make sure it is completely NOP'd on the bus
-			xm_memop <= x_unaligned_addr ? MEMOP_NONE : d_memop;
+			// If some X-sourced exception has squashed the address phase, need to squash the data phase too.
+			xm_memop <= x_unaligned_addr || x_exec_pmp_fail || x_loadstore_pmp_fail ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
-			xm_wfi <= d_wfi;
+			xm_wfi <= d_wfi && !x_exec_pmp_fail;
 			// Note the d_starved term is required because it is possible
 			// (e.g. PMP X permission fail) to except when the frontend is
 			// starved, and we get a bad mepc if we let this jump ahead:
@@ -932,6 +933,11 @@ always @ (posedge clk) if (rst_n) begin
 	// D bus errors must always squash younger load/stores
 	if ($past(bus_dph_err_d && !bus_dph_ready_d))
 		assert(!bus_aph_req_d);
+	// Nonsensical to have an active stage 3 memop aligned with a
+	// stage-2-generated exception -- ought to be squashed. The outlier is an
+	// M-generated exception, i.e. a dataphase bus fault. Also AMOs are different.
+	if (xm_except != EXCEPT_NONE && !(bus_dph_err_d || $past(!m_trap_enter_rdy)))
+		assert(xm_memop == MEMOP_NONE || xm_memop == MEMOP_AMO);
 end
 `endif
 
