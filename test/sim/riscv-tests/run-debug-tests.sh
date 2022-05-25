@@ -38,9 +38,11 @@ MemTestBlock0 \
 MemTestBlock1 \
 MemTestBlock2 \
 MemTestReadInvalid \
+PrivChange \
 PrivRw \
 ProgramSwWatchpoint \
 Registers \
+RepeatReadTest \
 Semihosting \
 SimpleF18Test \
 SimpleNoExistTest \
