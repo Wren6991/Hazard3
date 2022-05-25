@@ -730,6 +730,9 @@ wire x_exec_pmp_fail;
 generate
 if (PMP_REGIONS > 0) begin: have_pmp
 
+	wire x_loadstore_pmp_badperm;
+	assign x_loadstore_pmp_fail = x_loadstore_pmp_badperm && x_memop_vld;
+
 	hazard3_pmp #(
 	`include "hazard3_config_inst.vh"
 	) pmp (
@@ -751,7 +754,7 @@ if (PMP_REGIONS > 0) begin: have_pmp
 		.d_addr           (bus_haddr_d),
 		.d_m_mode         (x_mmode_loadstore),
 		.d_write          (bus_hwrite_d),
-		.d_kill           (x_loadstore_pmp_fail)
+		.d_kill           (x_loadstore_pmp_badperm)
 	);
 
 end else begin: no_pmp
@@ -899,7 +902,10 @@ always @ (posedge clk or negedge rst_n) begin
 			xm_memop <= x_unaligned_addr ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
 			xm_wfi <= d_wfi;
-			if (x_stall || m_trap_enter_soon) begin
+			// Note the d_starved term is required because it is possible
+			// (e.g. PMP X permission fail) to except when the frontend is
+			// starved, and we get a bad mepc if we let this jump ahead:
+			if (x_stall || d_starved || m_trap_enter_soon) begin
 				// Insert bubble
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
