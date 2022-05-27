@@ -439,6 +439,7 @@ hazard3_alu #(
 // Load/store bus request
 
 wire x_loadstore_pmp_fail;
+wire x_exec_pmp_fail;
 
 wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
@@ -725,8 +726,6 @@ wire [11:0]       x_pmp_cfg_addr;
 wire              x_pmp_cfg_wen;
 wire [W_DATA-1:0] x_pmp_cfg_wdata;
 wire [W_DATA-1:0] x_pmp_cfg_rdata;
-
-wire x_exec_pmp_fail;
 
 generate
 if (PMP_REGIONS > 0) begin: have_pmp
