@@ -6,6 +6,9 @@
 // the lowest-numbered matching region. Check that partial region matches
 // cause failure no matter the permission, unless there is a lower-numbered
 // fully matching region.
+//
+// Check that jumping to a branch in non-X-permitted memory points mepc at the
+// branch, not its target (known corner case)
 
 /*EXPECTED-OUTPUT***************************************************************
 
@@ -27,6 +30,8 @@ Full match under partial match, negative overhang
 mcause = 11
 Partial match under full match, negative overhang
 mcause = 1
+Jump to bad jump
+OK
 
 *******************************************************************************/
 
@@ -60,6 +65,26 @@ void __attribute__((aligned(4), naked)) do_nops() {
 		"nop\n"
 		".option pop\n"
 		"ecall\n"
+	);
+}
+
+void __attribute__((naked)) do_jump() {
+	asm (
+		"j 1f\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"nop\n"
+		"1:\n"
+		"ret\n"
 	);
 }
 
@@ -174,6 +199,13 @@ int main() {
 	tb_printf("mcause = %u\n", read_csr(mcause));
 	tb_assert(read_csr(mcause) == MCAUSE_INSTR_FAULT, "Should get instruction fault on partial match\n");
 	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 2, "Bad mepc\n");
+
+	tb_puts("Jump to bad jump\n");
+	write_pmpcfg(0, 0);
+	write_pmpcfg(1, 0);
+	enter_umode(&do_jump);
+	tb_assert(read_csr(mepc) == (uint32_t)&do_jump, "Bad mepc\n");
+	tb_puts("OK\n");
 
 	return 0;
 }

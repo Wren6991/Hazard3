@@ -712,13 +712,13 @@ end
 endgenerate
 
 // Be careful not to take branches whose comparisons depend on a load result
-wire x_jump_req_if_aligned = !x_stall_on_raw && (
+wire x_jump_req_unchecked = !x_stall_on_raw && (
 	d_branchcond == BCOND_ALWAYS ||
 	d_branchcond == BCOND_ZERO && !x_branch_cmp ||
 	d_branchcond == BCOND_NZERO && x_branch_cmp
 );
 
-assign x_jump_req = x_jump_req_if_aligned && !x_jump_misaligned;
+assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail;
 
 // Memory protection
 
@@ -807,8 +807,8 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
-	x_jump_req_if_aligned && x_jump_misaligned               ? EXCEPT_INSTR_MISALIGN :
 	x_exec_pmp_fail                                          ? EXCEPT_INSTR_FAULT    :
+	x_jump_req_unchecked && x_jump_misaligned                ? EXCEPT_INSTR_MISALIGN :
 	x_csr_illegal_access                                     ? EXCEPT_INSTR_ILLEGAL  :
 	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo      ? EXCEPT_STORE_ALIGN    :
 	|EXTENSION_A && x_amo_phase == 3'h4 && x_unaligned_addr  ? EXCEPT_STORE_ALIGN    :
