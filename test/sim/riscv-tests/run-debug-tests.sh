@@ -24,7 +24,9 @@ DebugExit \
 DebugFunctionCall \
 DebugSymbols \
 DebugTurbostep \
+DisconnectTest \
 DownloadTest \
+EbreakTest \
 InfoTest \
 InterruptTest \
 CrashLoop \
