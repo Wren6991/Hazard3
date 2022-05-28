@@ -9,13 +9,13 @@
 Failed load, suppressed store
 -> exception, mcause = 5
 exception instr: 100627af
-sc.w result: 0
+sc.w result: 1
 Good load, failed store
 -> exception, mcause = 7
 exception instr: 18a5a52f
 sc.w result: 123
 Repeated failed store
-sc.w result: 0
+sc.w result: 1
 
 *******************************************************************************/
 
@@ -42,7 +42,7 @@ int main() {
 	// suppressing the sc.w.
 	tb_puts("Failed load, suppressed store\n");
 	sc_result = do_lr_sc(123, bad_addr, bad_addr);
-	// Failing sc.w must write 0 to the success register.
+	// Failing sc.w must write 1 to the success register.
 	tb_printf("sc.w result: %u\n", sc_result);
 
 	// This time the sc.w should fault, after the successful lr.w.
@@ -58,7 +58,7 @@ int main() {
 		"sc.w %0, zero, (%1)\n"
 		: "+r" (sc_result) : "r" (bad_addr)
 	);
-	// Failing sc.w must write 0 to result register.
+	// Failing sc.w must write 1 to result register.
 	tb_printf("sc.w result: %u\n", sc_result);
 
 	return 0;

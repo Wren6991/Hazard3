@@ -7,9 +7,9 @@
 /*EXPECTED-OUTPUT***************************************************************
 
 lr -> mv: 12345678
-lr -> sc: sc returned 1
+lr -> sc: sc returned 0
 scratch[1] = deadbeef
-sc -> mv: sc returned 0
+sc -> mv: sc returned 1
 scratch[0] = 5678a5a5
 
 *******************************************************************************/

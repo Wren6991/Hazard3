@@ -1036,7 +1036,8 @@ always @ (*) begin
 		m_result = bus_rdata_d;
 	end else if (|EXTENSION_A && xm_memop == MEMOP_SC_W) begin
 		// sc.w may fail due to negative response from either local or global monitor.
-		m_result = {31'h0, mw_local_exclusive_reserved && bus_dph_exokay_d};
+		// Note the polarity of the result: 0 for success, 1 for failure.
+		m_result = {31'h0, !(mw_local_exclusive_reserved && bus_dph_exokay_d)};
 	end else if (xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO) begin
 		m_result = m_rdata_pick_sext;
 	end else if (MUL_FAST && m_fast_mul_result_vld) begin
