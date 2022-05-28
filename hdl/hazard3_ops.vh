@@ -103,8 +103,9 @@ localparam EXCEPT_LOAD_ALIGN     = 4'h4;
 localparam EXCEPT_LOAD_FAULT     = 4'h5;
 localparam EXCEPT_STORE_ALIGN    = 4'h6;
 localparam EXCEPT_STORE_FAULT    = 4'h7;
+localparam EXCEPT_ECALL_U        = 4'h8;
 localparam EXCEPT_MRET           = 4'ha; // Not really an exception, but handled like one
-localparam EXCEPT_ECALL          = 4'hb;
+localparam EXCEPT_ECALL_M        = 4'hb;
 
 // Operations for M extension (these are just instr[14:12])
 

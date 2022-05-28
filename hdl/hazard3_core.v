@@ -819,7 +819,12 @@ wire [W_EXCEPT-1:0] x_except =
 	x_loadstore_pmp_fail                                     ? EXCEPT_LOAD_FAULT     : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
-wire x_except_counts_as_retire = x_except == EXCEPT_EBREAK || x_except == EXCEPT_MRET || x_except == EXCEPT_ECALL;
+wire x_except_counts_as_retire =
+	x_except == EXCEPT_EBREAK  ||
+	x_except == EXCEPT_MRET    ||
+	x_except == EXCEPT_ECALL_M ||
+	x_except == EXCEPT_ECALL_U;
+
 wire x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
 wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 

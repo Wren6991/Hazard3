@@ -15,19 +15,19 @@
 Initial
 mcause = 1
 4-byte region
-mcause = 11
+mcause = 8
 Large region
-mcause = 11
+mcause = 8
 X under !X
-mcause = 11
+mcause = 8
 !X under X
 mcause = 1
 Full match under partial match, positive overhang
-mcause = 11
+mcause = 8
 Partial match under full match, positive overhang
 mcause = 1
 Full match under partial match, negative overhang
-mcause = 11
+mcause = 8
 Partial match under full match, negative overhang
 mcause = 1
 Jump to bad jump
@@ -89,7 +89,7 @@ void __attribute__((naked)) do_jump() {
 }
 
 #define MCAUSE_INSTR_FAULT 1
-#define MCAUSE_ECALL 11
+#define MCAUSE_ECALL_UMODE 8
 
 int main() {
 	// Initially, there are no permissions active in the PMP, so we should get
@@ -107,7 +107,7 @@ int main() {
 
 	enter_umode(&do_ecall);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_ECALL, "Should successfully execute ecall\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should successfully execute ecall\n");
 	tb_assert(read_csr(mepc) == (uint32_t)&do_ecall, "Bad mepc\n");
 
 	// Make the region larger (all of memory) -- should still pass.
@@ -117,7 +117,7 @@ int main() {
 
 	enter_umode(&do_ecall);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_ECALL, "Should successfully execute ecall\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should successfully execute ecall\n");
 	tb_assert(read_csr(mepc) == (uint32_t)&do_ecall, "Bad mepc\n");
 
 	// Put another region on top, with no permissions -- should still pass
@@ -130,7 +130,7 @@ int main() {
 
 	enter_umode(&do_ecall);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_ECALL, "Should successfully execute ecall\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should successfully execute ecall\n");
 	tb_assert(read_csr(mepc) == (uint32_t)&do_ecall, "Bad mepc\n");
 
 	// Swap the two regions. Should now fail, because lower-numbered region
@@ -159,7 +159,7 @@ int main() {
 
 	enter_umode(&do_nops);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_ECALL, "Should successfully execute ecall\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should successfully execute ecall\n");
 	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 6, "Bad mepc\n");
 
 	// Now swap the order of the regions. The partial match of the
@@ -186,7 +186,7 @@ int main() {
 
 	enter_umode(&do_nops);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_ECALL, "Should successfully execute ecall\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should successfully execute ecall\n");
 	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 6, "Bad mepc\n");
 
 	tb_puts("Partial match under full match, negative overhang\n");

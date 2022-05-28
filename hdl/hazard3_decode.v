@@ -292,14 +292,14 @@ always @ (*) begin
 	RV_ZIP:       if (EXTENSION_ZBKB) begin d_aluop = ALUOP_ZIP;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 
 	RV_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
-	RV_FENCE_I:   if (EXTENSION_ZIFENCEI)    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
+	RV_FENCE_I:   if (EXTENSION_ZIFENCEI)     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
 	RV_CSRRW:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRS:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRC:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRWI:    if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRSI:    if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRCI:    if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	RV_ECALL:     if (HAVE_CSR)               begin d_except = EXCEPT_ECALL;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	RV_ECALL:     if (HAVE_CSR)               begin d_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	RV_EBREAK:    if (HAVE_CSR)               begin d_except = EXCEPT_EBREAK; d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	RV_MRET:      if (HAVE_CSR && m_mode)     begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	RV_WFI:       if (HAVE_CSR && permit_wfi) begin d_wfi = 1'b1;             d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end

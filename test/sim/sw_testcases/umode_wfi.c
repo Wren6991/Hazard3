@@ -7,7 +7,7 @@
 /*EXPECTED-OUTPUT***************************************************************
 
 Do WFI with TW=0:
-mcause = 11        // = ecall, meaning normal exit. The test also checks mepc.
+mcause = 8         // = ecall, meaning normal exit. The test also checks mepc.
 Do WFI with TW=1:
 mstatus = 00200000 // Check TW write is reflected in readback
 mcause = 2         // = illegal instruction. The test also checks mepc.
