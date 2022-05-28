@@ -238,7 +238,9 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 // -----------------------------------------------------------------------------
 
 const char *help_str =
-"Usage: tb [--bin x.bin] [--vcd x.vcd] [--dump start end] [--cycles n] [--port n]\n"
+"Usage: tb [--bin x.bin] [--port n] [--vcd x.vcd] [--dump start end] \\\n"
+"          [--cycles n] [--cpuret]\n"
+"\n"
 "    --bin x.bin      : Flat binary file loaded to address 0x0 in RAM\n"
 "    --vcd x.vcd      : Path to dump waveforms to\n"
 "    --dump start end : Print out memory contents from start to end (exclusive)\n"
@@ -247,6 +249,8 @@ const char *help_str =
 "                       Default is 0 (no maximum).\n"
 "    --port n         : Port number to listen for openocd remote bitbang. Sim\n"
 "                       runs in lockstep with JTAG bitbang, not free-running.\n"
+"    --cpuret         : Testbench's return code is the return code written to\n"
+"                       IO_EXIT by the CPU, or -1 if timed out.\n"
 ;
 
 void exit_help(std::string errtext = "") {
@@ -264,6 +268,7 @@ int main(int argc, char **argv) {
 	std::string waves_path;
 	std::vector<std::pair<uint32_t, uint32_t>> dump_ranges;
 	int64_t max_cycles = 0;
+	bool propagate_return_code = false;
 	uint16_t port = 0;
 
 	for (int i = 1; i < argc; ++i) {
@@ -306,6 +311,9 @@ int main(int argc, char **argv) {
 				exit_help("Option --port requires an argument\n");
 			port = std::stol(argv[i + 1], 0, 0);
 			i += 1;
+		}
+		else if (s == "--cpuret") {
+			propagate_return_code = true;
 		}
 		else {
 			std::cerr << "Unrecognised argument " << s << "\n";
@@ -414,6 +422,7 @@ int main(int argc, char **argv) {
 	top.step();
 	top.step(); // workaround for github.com/YosysHQ/yosys/issues/2780
 
+	bool timed_out = false;
 	for (int64_t cycle = 0; cycle < max_cycles || max_cycles == 0; ++cycle) {
 		top.p_clk.set<bool>(false);
 		top.step();
@@ -566,8 +575,10 @@ int main(int argc, char **argv) {
 			printf("Ran for " I64_FMT " cycles\n", cycle + 1);
 			break;
 		}
-		if (cycle + 1 == max_cycles)
+		if (cycle + 1 == max_cycles) {
 			printf("Max cycles reached\n");
+			timed_out = true;
+		}
 		if (got_exit_cmd)
 			break;
 	}
@@ -581,5 +592,13 @@ int main(int argc, char **argv) {
 		printf("\n");
 	}
 
-	return 0;
+	if (propagate_return_code && timed_out) {
+		return -1;
+	}
+	else if (propagate_return_code && memio.exit_req) {
+		return memio.exit_code;
+	}
+	else {
+		return 0;
+	}
 }
