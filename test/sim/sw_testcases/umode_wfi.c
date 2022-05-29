@@ -3,8 +3,9 @@
 
 // Check that U-mode execution of a wfi causes an illegal opcode exception if
 // and only if the mstatus timeout wait bit is set.
-// Also check that a U-mode WFI which fails PMP X check does not stall the
-// procesor.
+//
+// Also check that a U-mode WFI which fails PMP X check or TW=1 check does not
+// stall the processor.
 
 /*EXPECTED-OUTPUT***************************************************************
 
