@@ -3,24 +3,21 @@
 #include "pmp.h"
 
 // Check that PMP enforces U-mode read/write permissions in M-mode, if both
-// MPRV=1 and MPP=U. Check that this does not affect execute permissions.
-// Check MPRV is cleared when returning to U mode.
-
-#define MCAUSE_LOAD_FAULT 5
-#define MCAUSE_STORE_FAULT 7
-#define MCAUSE_ECALL_UMODE 8
+// MPRV=1 and MPP=U.
+//
+// Check that this does not affect execute permissions.
 
 /*EXPECTED-OUTPUT***************************************************************
 
 Enabling MPRV, with MPP=M
 Set MPP=U, then read memory
-mcause    = 5                   // load fault
-mstatus   = 00021800            // MPRV = 1 MPP = M
-mem[mepc] = 4108                // c.lw a0, (a0)
+mcause    = 5         // load fault
+mstatus   = 00021800  // mprv=1 mpp=M
+mem[mepc] = 4108      // c.lw
 Set MPP=U, then write memory
-mcause    = 7                   // store fault
-mstatus   = 00021800            // MPRV = 1 MPP = M
-mem[mepc] = c108                // c.sw a0, (a0)
+mcause    = 7         // store fault
+mstatus   = 00021800  // mprv=1 mpp=M
+mem[mepc] = c108      // c.sw
 
 *******************************************************************************/
 
@@ -30,11 +27,7 @@ volatile uint32_t scratch_word;
 #define MPP (3u << 11)
 
 int main() {
-	// Give U-mode RW permissions on testbench IO *only* (so any address >=
-	// 0x800 megabytes). This means we can always print and exit the test.
-	write_pmpcfg(0, PMPCFG_A_NAPOT << PMPCFG_A_LSB | PMPCFG_R_BITS | PMPCFG_W_BITS);
-	write_pmpaddr(0, (0x80000000u | 0x3fffffffu) >> 2);
-
+	// Leave PMP in default state (no U permissions).
 	scratch_word = 0;
 
 	tb_puts("Enabling MPRV, with MPP=M\n");
@@ -52,7 +45,7 @@ int main() {
 		"la a0, 1f\n"
 		"csrw mtvec, a0\n"
 		"la a0, scratch_word\n"
-		"la a1, 0x1800\n"
+		"li a1, 0x1800\n"
 
 		// Note the nop is to check that we have not lost X permissions. The
 		// trap should come from the lw.
@@ -76,7 +69,7 @@ int main() {
 		"la a0, 1f\n"
 		"csrw mtvec, a0\n"
 		"la a0, scratch_word\n"
-		"la a1, 0x1800\n"
+		"li a1, 0x1800\n"
 
 		"csrc mstatus, a1\n"
 		"nop\n"
