@@ -3,14 +3,20 @@
 
 // Check that U-mode execution of a wfi causes an illegal opcode exception if
 // and only if the mstatus timeout wait bit is set.
+// Also check that a U-mode WFI which fails PMP X check does not stall the
+// procesor.
 
 /*EXPECTED-OUTPUT***************************************************************
 
 Do WFI with TW=0:
-mcause = 8         // = ecall, meaning normal exit. The test also checks mepc.
+mcause = 8                            // = ecall, meaning normal exit.
 Do WFI with TW=1:
-mstatus = 00200000 // Check TW write is reflected in readback
-mcause = 2         // = illegal instruction. The test also checks mepc.
+mstatus = 00200000                    // Check TW write is reflected in readback
+mcause = 2                            // = illegal instruction
+Do WFI with TW=1, IRQs disabled:
+mcause = 2                            // = illegal instruction
+Do PMP-failed WFI, IRQs disabled:
+mcause = 1                            // = instruction access fault.
 
 *******************************************************************************/
 
@@ -68,10 +74,27 @@ int main() {
 	tb_printf("mstatus = %08x\n", read_csr(mstatus));
 	umode_call_and_catch(&do_wfi);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	if (read_csr(mepc) != (uint32_t)&do_wfi) {
-		tb_puts("mepc doesn't point to wfi\n");
-		return -1;
-	}
+	tb_assert(read_csr(mepc) == (uint32_t)&do_wfi, "mepc doesn't point to wfi\n");
+
+	tb_puts("Do WFI with TW=1, IRQs disabled:\n");
+	// Disable IRQ sources so that WFI will stall forever
+	write_csr(mie, 0);
+	// This checks that setting TW stops the WFI state from being entered, as
+	// well as just raising an exception.
+	umode_call_and_catch(&do_wfi);
+	tb_printf("mcause = %u\n", read_csr(mcause));
+	tb_assert(read_csr(mepc) == (uint32_t)&do_wfi, "mepc doesn't point to wfi\n");
+
+	// This was broken at one point: WFI which failed X permission check would
+	// still enter WFI halt state!
+	tb_puts("Do PMP-failed WFI, IRQs disabled:\n");
+	// Clear TW bit again
+	clear_csr(mstatus, 1u << 21);
+	// Revoke all U-mode PMP permissions
+	write_csr(pmpcfg0, 0);
+	umode_call_and_catch(&do_wfi);
+	tb_printf("mcause = %u\n", read_csr(mcause));
+	tb_assert(read_csr(mepc) == (uint32_t)&do_wfi, "mepc doesn't point to wfi\n");
 
 	return 0;
 }
