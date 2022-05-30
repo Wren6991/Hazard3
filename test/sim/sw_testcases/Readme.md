@@ -32,13 +32,13 @@ To run the tests:
 
 This will first rebuild the simulator (`../tb_cxxrtl/`) if needed, then build and run all the software testcases, then print out a summary of test pass/fail status. The `./run_tests` executable itself returns a successful exit code if and only if all tests passed. A printf log will be created for each test, with the same name as the test, at `tmp/test_name.log`.
 
-VCD waveform dumping is not enabled by default, because tests run faster without waves, and dumping waves for all tests uses > 1 GB of disk space. To re-run a failing test and get wave output, run:
+VCD waveform dumping is not enabled by default, because tests run faster without waves, and dumping waves for all tests uses gigabytes of disk space. To re-run a failing test `testname` and get wave output, run:
 
 ```bash
-make APP=test_name
+./runtests testname --vcd
 ```
 
-This creates a VCD file at `tmp/test_name_run.vcd`.
+This creates a VCD file at `tmp/testname_run.vcd`. If you really want, you can pass `--vcd` without naming specific tests, to generate waves for all tests.
 
 To clean up the junk:
 
