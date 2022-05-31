@@ -11,11 +11,9 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` instruction set 
 * `Zbc`: carry-less multiplication
 * `Zbs`: single-bit manipulation
 * `Zbkb`: basic bit manipulation for scalar cryptography
-* M-mode privileged instructions `ECALL`, `EBREAK`, `MRET` and the `WFI` instruction
-* The machine-mode (M-mode) privilege state, and standard M-mode CSRs
-* The user-mode (U-mode) privilege state *(experimental)*
-* Physical memory protection (PMP) with up to 16 naturally aligned regions *(experimental)*
-* Debug support, compliant with RISC-V debug specification version 0.13.2
+* Debug, Machine and User privilege/execution modes
+* Privileged instructions `ECALL`, `EBREAK`, `MRET` and `WFI`
+* Physical memory protection (PMP) with up to 16 naturally aligned regions
 
 You can [read the documentation here](doc/hazard3.pdf). (PDF link)
 
@@ -29,26 +27,27 @@ The following are planned for future implementation:
 
 Hazard3 is still under development.
 
-# Pipeline
+# Links to Specifications
 
-- `F` fetch
-	- Instruction fetch data phase
-	- Instruction alignment
-	- Decode of `rs1`/`rs2` register specifiers into register file read ports
-- `X` execute
-	- Expand compressed instructions
-	- Expand immediates
-	- Forward appropriate data and decoded operation to ALU or to load/store address phase
-	- Resolve branch conditions
-	- Instruction fetch address phase
-	- Load/store address phase
-- `M` memory
-	- Load/store data phase
-	- Some complex instructions, particularly multiply and divide
-	- Exception handling
+These are links to the ratified versions of the extensions. In general, later drafts or releases of these specifications describing the _same extension versions_ may be used for reference, and often have minor improvements to wording.
 
-This is essentially Hazard5, with the `D` and `X` stages merged and the register file brought forward. Many components are reused directly from Hazard5. The particular focus here is on shortening the branch delay, which is one of the weak points in Hazard5's IPC.
+| Extension  | Specification |
+|----------- |---------------|
+| `RV32I` v2.1 | [Unprivileged ISA 20191213](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) |
+| `M` v2.0 | [Unprivileged ISA 20191213](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) |
+| `A` v2.1 | [Unprivileged ISA 20191213](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) |
+| `C` v2.0 | [Unprivileged ISA 20191213](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) |
+| `Zicsr` v2.0 | [Unprivileged ISA 20191213](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) |
+| `Zifencei` v2.0 | [Unprivileged ISA 20191213](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) |
+| `Zba` v1.0.0 | [Bit Manipulation ISA extensions 20210628](https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf)
+| `Zbb` v1.0.0 | [Bit Manipulation ISA extensions 20210628](https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf)
+| `Zbc` v1.0.0 | [Bit Manipulation ISA extensions 20210628](https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf)
+| `Zbs` v1.0.0 | [Bit Manipulation ISA extensions 20210628](https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf)
+| `Zbkb` v1.0.1 | [Scalar Cryptography ISA extensions 20220218](https://github.com/riscv/riscv-crypto/releases/download/v1.0.1-scalar/riscv-crypto-spec-scalar-v1.0.1.pdf) |
+| Machine ISA v1.12 | [Privileged Architecture 20211203](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf) |
+| Debug v0.13.2 | [RISC-V External Debug Support 20190322](https://riscv.org/wp-content/uploads/2019/03/riscv-debug-release.pdf) |
 
+These specifications are abstract descriptions of the architectural features that Hazard3 implements. The [Hazard3 documentation](doc/hazard3.pdf) is a concrete description of how it implements them, especially in regard to the privileged ISA and debug support.
 
 # Cloning This Repository
 
@@ -57,7 +56,6 @@ For the purpose of using Hazard3 in your design, this repository is self-contain
 ```bash
 git clone --recursive https://github.com/Wren6991/Hazard3.git hazard3
 ```
-
 # Running Hello World
 
 These instructions are for Ubuntu 20.04. You will need:
