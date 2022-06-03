@@ -92,29 +92,25 @@ parameter U_MODE              = 0,
 // PMP is more useful if U mode is supported, but this is not a requirement.
 parameter PMP_REGIONS         = 0,
 
-// PMPADDR_WRITE_MASK: mask of which pmpaddr bits are writable. Can reduce
-// region granularity, or create hardwired regions. If a register is
-// partially writable, it's recommended to set PMP_NO_NA4 for that region, so
-// that PMPCFG.A only permits OFF and NAPOT values.
-parameter PMPADDR_WRITE_MASK  = PMP_REGIONS > 0 ? {PMP_REGIONS{~32'h0}} : 1'b0,
+// PMP_GRAIN: This is the "G" parameter in the privileged spec. Minimum PMP
+// region size is 1 << (G + 2) bytes.  If G > 0, PMCFG.A can not be set to
+// NA4 (will get set to OFF instead). If G > 1, the G - 1 LSBs of pmpaddr are
+// read-only-0 when PMPCFG.A is OFF, and read-only-1 when PMPCFG.A is NAPOT.
+parameter PMP_GRAIN           = 0,
 
-// PMPADDR_RESET_VAL: provide reset values for pmpaddr registers. The
-// highest-numbered PMP register is listed first in this mask. Note that
-// RISC-V pmpaddr registers are a right-shift by 2 of the physical address.
-parameter PMPADDR_RESET_VAL   = PMP_REGIONS > 0 ? {PMP_REGIONS{32'h0}} : 1'b0,
+// PMPADDR_HARDWIRED: If a bit is 1, the corresponding region's pmpaddr and
+// pmpcfg registers are read-only. PMP_GRAIN is ignored on hardwired regions.
+// It's recommended to make hardwired regions the highest-numbered, so they
+// can be overridden by lower-numbered regions.
+parameter PMP_HARDWIRED       = PMP_REGIONS > 0 ? {PMP_REGIONS{1'b0}} : 1'b0,
 
-// PMPCFG_WRITE_MASK: mask of which pmpcfg bits are writable. The reserved
-// bits [6:5] are ignored, and will never be writable.
-parameter PMPCFG_WRITE_MASK   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'hff}} : 1'b0,
+// PMPADDR_HARDWIRED_ADDR: Values of pmpaddr registers whose PMP_HARDWIRED
+// bits are set to 1. Non-hardwired regions reset to all-zeroes.
+parameter PMP_HARDWIRED_ADDR  = PMP_REGIONS > 0 ? {PMP_REGIONS{32'h0}} : 1'b0,
 
-// PMPCFG_RESET_VAL: reset values for pmpcfg registers. For regions that are
-// not fully hardwired, it's recommended to initialise A and L to 0.
-parameter PMPCFG_RESET_VAL    = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
-
-// PMP_CFG_NO_NA4: disable support for the NA4 region type on a per-region
-// basis, making the minimum region size 8 bytes. Recommended if the pmpaddr
-// register has had its LSBs tied off.
-parameter PMPCFG_NO_NA4       = PMP_REGIONS > 0 ? {PMP_REGIONS{1'b0}} : 1'b0,
+// PMPCFG_RESET_VAL: Values of pmpcfg registers whose PMP_HARDWIRED bits are
+// set to 1. Non-hardwired regions reset to all zeroes.
+parameter PMP_HARDWIRED_CFG   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
 
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.

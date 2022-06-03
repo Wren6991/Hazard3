@@ -57,44 +57,37 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 	integer i;
 	if (!rst_n) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			pmpcfg_l[i] <= PMPCFG_RESET_VAL[8 * i + 7];
-			pmpcfg_a[i] <= PMPCFG_RESET_VAL[8 * i + 3 +: 2];
-			pmpcfg_r[i] <= PMPCFG_RESET_VAL[8 * i + 2];
-			pmpcfg_w[i] <= PMPCFG_RESET_VAL[8 * i + 1];
-			pmpcfg_x[i] <= PMPCFG_RESET_VAL[8 * i + 0];
-			pmpaddr[i]  <= PMPADDR_RESET_VAL[32 * i +: 30];
+			pmpcfg_l[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 7]      : 1'b0;
+			pmpcfg_a[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 3 +: 2] : 2'h0;
+			pmpcfg_r[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 2]      : 1'b0;
+			pmpcfg_w[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 1]      : 1'b0;
+			pmpcfg_x[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 0]      : 1'b0;
+
+			pmpaddr[i]  <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_ADDR[32 * i +: 30]  :
+			               PMP_GRAIN > 1    ? ~(~30'h0 << (PMP_GRAIN - 1))      : 30'h0;
 		end
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
-
-				if (PMPCFG_WRITE_MASK[i * 8 + 7])
+			if (!PMP_HARDWIRED[i]) begin
+				if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
 					pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
-
-				// Unsupported A values are mapped to OFF (it's a WARL field).
-				pmpcfg_a[i] <=
-					cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_TOR ? PMP_A_OFF :
-					cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_NA4 && PMPCFG_NO_NA4[i] ? PMP_A_OFF :
-					cfg_wdata[i % 4 * 8 + 3 +: 2];
-
-				// Suppress changes to unwritable bits.
-				if (!PMPCFG_WRITE_MASK[i * 8 + 4])
-					pmpcfg_a[i][1] <= pmpcfg_a[i][1];
-				if (!PMPCFG_WRITE_MASK[i * 8 + 3])
-					pmpcfg_a[i][0] <= pmpcfg_a[i][0];
-
-				if (PMPCFG_WRITE_MASK[i * 8 + 2])
 					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
-				if (PMPCFG_WRITE_MASK[i * 8 + 1])
 					pmpcfg_w[i] <= cfg_wdata[i % 4 * 8 + 1];
-				if (PMPCFG_WRITE_MASK[i * 8 + 0])
 					pmpcfg_x[i] <= cfg_wdata[i % 4 * 8 + 0];
+					// Unsupported A values are mapped to OFF (it's a WARL field).
+					pmpcfg_a[i] <=
+						cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_TOR ? PMP_A_OFF :
+						cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_NA4 && PMP_GRAIN > 0 ? PMP_A_OFF :
+						cfg_wdata[i % 4 * 8 + 3 +: 2];
+				end
+				if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
+					if (PMP_GRAIN > 1) begin
+						pmpaddr[i] <= cfg_wdata[W_ADDR-3:0] | ~(~30'h0 << (PMP_GRAIN - 1));
+					end else begin
+						pmpaddr[i] <= cfg_wdata[W_ADDR-3:0];
+					end
+				end
 
-			end
-			if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
-				pmpaddr[i] <=
-					cfg_wdata[W_ADDR-3:0] & PMPADDR_WRITE_MASK[i * 32 +: 30] |
-					pmpaddr[i] & ~PMPADDR_WRITE_MASK[i * 32 +: 30];
 			end
 		end
 	end
@@ -114,7 +107,15 @@ always @ (*) begin: cfg_read
 				pmpcfg_x[i]
 			};
 		end else if (cfg_addr == PMPADDR0 + i) begin
-			cfg_rdata[W_ADDR-3:0] = pmpaddr[i];
+			// If G > 1, the G-1 LSBs of pmpaddr_i are read-only-zero when
+			// region is OFF, and read-only-one when region is NAPOT.
+			if (PMP_GRAIN > 1 && !PMP_HARDWIRED[i]) begin
+				cfg_rdata[W_ADDR-3:0] = pmpaddr[i] & ~(
+					{30{pmpcfg_a[i] != PMP_A_OFF}} & ~(~30'h0 << (PMP_GRAIN - 1))
+				);
+			end else begin
+				cfg_rdata[W_ADDR-3:0] = pmpaddr[i];
+			end
 		end
 	end
 end
