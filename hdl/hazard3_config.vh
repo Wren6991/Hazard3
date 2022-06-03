@@ -34,7 +34,7 @@ parameter RESET_VECTOR    = 32'h0,
 parameter MTVEC_INIT      = 32'h00000000,
 
 // ----------------------------------------------------------------------------
-// RISC-V ISA and CSR support
+// RISC-V ISA support
 
 // EXTENSION_A: Support for atomic read/modify/write instructions
 parameter EXTENSION_A         = 1,
@@ -65,7 +65,11 @@ parameter EXTENSION_ZBKB      = 1,
 // Optional, since a plain branch/jump will also flush the prefetch queue.
 parameter EXTENSION_ZIFENCEI  = 1,
 
-// Note the Zicsr extension is implied by any of the following CSR support:
+// Note the Zicsr extension is implied by any of CSR_M_MANDATORY, CSR_M_TRAP,
+// CSR_COUNTER.
+
+// ----------------------------------------------------------------------------
+// CSR support
 
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.
@@ -87,6 +91,30 @@ parameter U_MODE              = 0,
 // PMP_REGIONS: Number of physical memory protection regions, or 0 for no PMP.
 // PMP is more useful if U mode is supported, but this is not a requirement.
 parameter PMP_REGIONS         = 0,
+
+// PMPADDR_WRITE_MASK: mask of which pmpaddr bits are writable. Can reduce
+// region granularity, or create hardwired regions. If a register is
+// partially writable, it's recommended to set PMP_NO_NA4 for that region, so
+// that PMPCFG.A only permits OFF and NAPOT values.
+parameter PMPADDR_WRITE_MASK  = PMP_REGIONS > 0 ? {PMP_REGIONS{~32'h0}} : 1'b0,
+
+// PMPADDR_RESET_VAL: provide reset values for pmpaddr registers. The
+// highest-numbered PMP register is listed first in this mask. Note that
+// RISC-V pmpaddr registers are a right-shift by 2 of the physical address.
+parameter PMPADDR_RESET_VAL   = PMP_REGIONS > 0 ? {PMP_REGIONS{32'h0}} : 1'b0,
+
+// PMPCFG_WRITE_MASK: mask of which pmpcfg bits are writable. The reserved
+// bits [6:5] are ignored, and will never be writable.
+parameter PMPCFG_WRITE_MASK   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'hff}} : 1'b0,
+
+// PMPCFG_RESET_VAL: reset values for pmpcfg registers. For regions that are
+// not fully hardwired, it's recommended to initialise A and L to 0.
+parameter PMPCFG_RESET_VAL    = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
+
+// PMP_CFG_NO_NA4: disable support for the NA4 region type on a per-region
+// basis, making the minimum region size 8 bytes. Recommended if the pmpaddr
+// register has had its LSBs tied off.
+parameter PMPCFG_NO_NA4       = PMP_REGIONS > 0 ? {PMP_REGIONS{1'b0}} : 1'b0,
 
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.

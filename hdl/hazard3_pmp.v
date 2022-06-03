@@ -57,28 +57,44 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 	integer i;
 	if (!rst_n) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			pmpcfg_l[i] <= 1'b0;
-			pmpcfg_a[i] <= 2'd0;
-			pmpcfg_r[i] <= 1'b0;
-			pmpcfg_w[i] <= 1'b0;
-			pmpcfg_x[i] <= 1'b0;
-			pmpaddr[i]  <= {W_ADDR-2{1'b0}};
+			pmpcfg_l[i] <= PMPCFG_RESET_VAL[8 * i + 7];
+			pmpcfg_a[i] <= PMPCFG_RESET_VAL[8 * i + 3 +: 2];
+			pmpcfg_r[i] <= PMPCFG_RESET_VAL[8 * i + 2];
+			pmpcfg_w[i] <= PMPCFG_RESET_VAL[8 * i + 1];
+			pmpcfg_x[i] <= PMPCFG_RESET_VAL[8 * i + 0];
+			pmpaddr[i]  <= PMPADDR_RESET_VAL[32 * i +: 30];
 		end
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
 			if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
-				pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
-				// TOR is not supported, gets mapped to OFF:
-				pmpcfg_a[i] <= {
-					cfg_wdata[i % 4 * 8 + 4],
-					cfg_wdata[i % 4 * 8 + 3] && cfg_wdata[i % 4 * 8 + 4]
-				};
-				pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
-				pmpcfg_w[i] <= cfg_wdata[i % 4 * 8 + 1];
-				pmpcfg_x[i] <= cfg_wdata[i % 4 * 8 + 0];
+
+				if (PMPCFG_WRITE_MASK[i * 8 + 7])
+					pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
+
+				// Unsupported A values are mapped to OFF (it's a WARL field).
+				pmpcfg_a[i] <=
+					cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_TOR ? PMP_A_OFF :
+					cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_NA4 && PMPCFG_NO_NA4[i] ? PMP_A_OFF :
+					cfg_wdata[i % 4 * 8 + 3 +: 2];
+
+				// Suppress changes to unwritable bits.
+				if (!PMPCFG_WRITE_MASK[i * 8 + 4])
+					pmpcfg_a[i][1] <= pmpcfg_a[i][1];
+				if (!PMPCFG_WRITE_MASK[i * 8 + 3])
+					pmpcfg_a[i][0] <= pmpcfg_a[i][0];
+
+				if (PMPCFG_WRITE_MASK[i * 8 + 2])
+					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
+				if (PMPCFG_WRITE_MASK[i * 8 + 1])
+					pmpcfg_w[i] <= cfg_wdata[i % 4 * 8 + 1];
+				if (PMPCFG_WRITE_MASK[i * 8 + 0])
+					pmpcfg_x[i] <= cfg_wdata[i % 4 * 8 + 0];
+
 			end
 			if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
-				pmpaddr[i] <= cfg_wdata[W_ADDR-3:0];
+				pmpaddr[i] <=
+					cfg_wdata[W_ADDR-3:0] & PMPADDR_WRITE_MASK[i * 32 +: 30] |
+					pmpaddr[i] & ~PMPADDR_WRITE_MASK[i * 32 +: 30];
 			end
 		end
 	end
@@ -227,7 +243,7 @@ always @ (*) begin: check_i_match
 			i_x = pmpcfg_x[i];
 		end
 	end
-end 
+end
 
 // ----------------------------------------------------------------------------
 // Access rules
