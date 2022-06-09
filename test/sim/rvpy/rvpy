@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Minimal RISC-V interpreter, supporting RV32I + Zcsr only, with trace disassembly
+# Minimal RISC-V interpreter, RV32IM + Zicsr only, with trace disassembly
 
 import argparse
 import sys
@@ -160,8 +160,9 @@ class RVCore:
 		self.mem = mem
 		self.pc = reset_vector
 		self.csr = RVCSR()
+		self.stage3_result = None
 
-	def step(self, instr=None, log=True):
+	def step(self, instr=None, log=True, cycle_accurate=True):
 		if instr is None:
 			instr = self.mem.mem[self.pc >> 2]
 		regnum_rs1 = instr >> 15 & 0x1f
@@ -174,6 +175,8 @@ class RVCore:
 		pc_wdata = None
 		log_disasm = None
 		instr_invalid = False
+		stall_cycles = 0
+		stage3_result_next = None
 
 		opc = instr >> 2 & 0x1f
 		funct3 = instr >> 12 & 0x7
@@ -239,6 +242,7 @@ class RVCore:
 					if funct3 != 0b000:
 						mul_result >>= 32
 					rd_wdata = sext(mul_result, XLEN - 1)
+					stage3_result_next = regnum_rd
 				else:
 					if log:
 						div_instr_name = {0b100: "div", 0b101: "divu", 0b110: "rem", 0b111: "remu"}[funct3]
@@ -253,8 +257,11 @@ class RVCore:
 						rd_wdata = rs1 if rs2 == 0 else sext((rs1 & XLEN_MASK) % (rs2 & XLEN_MASK), XLEN - 1)
 					else:
 						instr_invalid = True
+					stall_cycles = 18
 			else:
 				instr_invalid = True
+			if not instr_invalid:
+				stall_cycles += regnum_rs1 == self.stage3_result or regnum_rs2 == self.stage3_result
 
 		elif opc == OPC_OP_IMM:
 			imm = (instr >> 20) - (instr >> 19 & 0x1000) # imm_i(instr)
@@ -291,19 +298,24 @@ class RVCore:
 					instr_invalid = True
 			else:
 				instr_invalid = True
+			if not instr_invalid:
+				stall_cycles += regnum_rs1 == self.stage3_result
 
 		elif opc == OPC_JAL:
 			rd_wdata = self.pc + 4
 			# pc_wdata = self.pc + imm_j(instr)
 			pc_wdata = self.pc + (instr >> 20 & 0x7fe) + (instr >> 9 & 0x800) + (instr & 0xff000) - (instr >> 11 & 0x100000)
 			if log: log_disasm = f"jal x{regnum_rd}, {pc_wdata & XLEN_MASK:08x}"
+			stall_cycles = 1
 
 		elif opc == OPC_JALR:
+			stall_cycles += regnum_rs1 == self.stage3_result
 			imm = imm_i(instr)
 			if log: log_disasm = f"jalr x{regnum_rd}, x{regnum_rs1}, {imm}"
 			rd_wdata = self.pc + 4
 			# JALR clears LSB always
 			pc_wdata = (rs1 + imm) & -2
+			stall_cycles = 1
 
 		elif opc == OPC_BRANCH:
 			# target = self.pc + imm_b(instr)
@@ -330,8 +342,11 @@ class RVCore:
 				taken = (rs1 & XLEN_MASK) >= (rs2 & XLEN_MASK)
 			else:
 				instr_invalid = True
+			if not instr_invalid:
+				stall_cycles += regnum_rs1 == self.stage3_result or regnum_rs2 == self.stage3_result
 			if taken:
 				pc_wdata = target
+				stall_cycles += 1
 
 		elif opc == OPC_LOAD:
 			imm = imm_i(instr)
@@ -357,6 +372,9 @@ class RVCore:
 				rd_wdata = self.mem.get16(load_addr)
 			else:
 				instr_invalid = True
+			if not instr_invalid:
+				stall_cycles += regnum_rs1 == self.stage3_result
+				stage3_result_next = regnum_rd
 
 		elif opc == OPC_STORE:
 			imm = imm_s(instr)
@@ -373,6 +391,8 @@ class RVCore:
 				self.mem.put32(store_addr, rs2)
 			else:
 				instr_invalid = True
+			if not instr_invalid:
+				stall_cycles += regnum_rs1 == self.stage3_result
 
 		elif opc == OPC_LUI:
 			imm = imm_u(instr)
@@ -404,6 +424,7 @@ class RVCore:
 					rd_wdata = self.csr.read(csr_addr)
 				if csr_write_op == RVCSR.WRITE or rs2 != 0:
 					self.csr.write(csr_addr, rs2, op=csr_write_op)
+				stall_cycles += regnum_rs1 == self.stage3_result
 			elif funct3 in (0b101, 0b110, 0b111):
 				if log:
 					instr_name = {0b101: "csrrwi", 0b110: "csrrsi", 0b111: "csrrci"}[funct3]
@@ -451,6 +472,9 @@ class RVCore:
 			print(f"Invalid instruction at {self.pc:08x}: {instr:08x}")
 
 		self.csr.step()
+		if cycle_accurate:
+			self.csr.mcycle += stall_cycles
+		self.stage3_result = stage3_result_next if stage3_result_next != 0 else None
 
 
 
