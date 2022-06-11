@@ -94,7 +94,7 @@ wire jump_now = jump_target_vld && jump_target_rdy;
 // can correctly speculate and flush fetch errors. The error bit moves
 // through the prefetch queue alongside the corresponding bus data. We sample
 // bus errors like an extra data bit -- fetch continues to speculate forward
-// past an error, and we eventually flush and redirect the frontent if an
+// past an error, and we eventually flush and redirect the frontend if an
 // errored fetch makes it to the execute stage.
 
 reg [W_DATA-1:0]   fifo_mem [0:FIFO_DEPTH];
@@ -199,30 +199,13 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// Using the non-registered version of pending_fetches would improve FIFO
-// utilisation, but create a combinatorial path from hready to address phase!
-wire fetch_stall = fifo_full
-	|| fifo_almost_full && |pending_fetches    // TODO causes issue with depth 1: only one in flight, so bus rate halved.
-	|| pending_fetches > 2'h1;
-
-
-// unaligned jump is handled in two different places:
-// - during address phase, offset may be applied to fetch_addr if hready was low when jump_target_vld was high
-// - during data phase, need to assemble CIR differently.
-
-
 wire unaligned_jump_now = EXTENSION_C && jump_now && jump_target[1];
-reg unaligned_jump_aph;
 reg unaligned_jump_dph;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		unaligned_jump_aph <= 1'b0;
 		unaligned_jump_dph <= 1'b0;
 	end else if (EXTENSION_C) begin
-		if (mem_addr_rdy || (jump_now && !unaligned_jump_now)) begin
-			unaligned_jump_aph <= 1'b0;
-		end
 		if ((mem_data_vld && ~|ctr_flush_pending && !cir_lock)
 			|| (jump_now && !unaligned_jump_now)) begin
 			unaligned_jump_dph <= 1'b0;
@@ -234,7 +217,6 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 		if (unaligned_jump_now) begin
 			unaligned_jump_dph <= 1'b1;
-			unaligned_jump_aph <= !mem_addr_rdy;
 		end
 	end
 end
@@ -245,13 +227,9 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		property_after_aligned_jump <= 1'b0;
 	end else begin
-		// Every unaligned jump that requires care in aphase also requires care in dphase.
-		assert(!(unaligned_jump_aph && !unaligned_jump_dph));
-
 		property_after_aligned_jump <= jump_now && !jump_target[1];
 		if (property_after_aligned_jump) begin
-			// Make sure these clear properly (have been subtle historic bugs here)
-			assert(!unaligned_jump_aph);
+			// Make sure this clears properly (have been subtle historic bugs here)
 			assert(!unaligned_jump_dph);
 		end
 	end
@@ -277,6 +255,13 @@ assign mem_addr = mem_addr_r;
 assign mem_priv = mem_priv_r;
 assign mem_addr_vld = mem_addr_vld_r && !reset_holdoff;
 assign mem_size = 1'b1;
+
+// Using the non-registered version of pending_fetches would improve FIFO
+// utilisation, but create a combinatorial path from hready to address phase!
+// This means at least a 2-word FIFO is required for full fetch throughput.
+wire fetch_stall = fifo_full
+	|| fifo_almost_full && |pending_fetches
+	|| pending_fetches > 2'h1;
 
 always @ (*) begin
 	mem_addr_r = fetch_addr;
