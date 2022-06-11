@@ -9,8 +9,8 @@ module hazard3_frontend #(
 	parameter FIFO_DEPTH = 2,  // power of 2, >= 1
 `include "hazard3_config.vh"
 ) (
-	input wire clk,
-	input wire rst_n,
+	input  wire              clk,
+	input  wire              rst_n,
 
 	// Fetch interface
 	// addr_vld may be asserted at any time, but after assertion,
@@ -240,11 +240,19 @@ end
 // Combinatorially generate the address-phase request
 
 reg reset_holdoff;
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
 		reset_holdoff <= 1'b1;
-	else
+	end else begin
 		reset_holdoff <= 1'b0;
+		// This should be impossible, but assert to be sure, because it *will*
+		// change the fetch address (and we shouldn't check it in hardware if
+		// we can prove it doesn't happen)
+`ifdef FORMAL
+		assert(!(jump_target_vld && reset_holdoff));
+`endif
+	end
+end
 
 reg [W_ADDR-1:0] mem_addr_r;
 reg              mem_priv_r;
@@ -288,6 +296,16 @@ assign jump_target_rdy = !mem_addr_hold;
 reg [1:0] buf_level;
 reg [W_BUNDLE-1:0] hwbuf;
 
+// You might wonder why we have a 48-bit instruction shifter {hwbuf, cir}.
+// What if we had a 32-bit shifter, and tracked halfword-valid status of the
+// FIFO entries? This would fail in the following case:
+//
+// - Initially CIR and FIFO are full
+// - Consume a 16-bit instruction from CIR
+// - CIR is refilled and last FIFO entry becomes half-valid.
+// - Now consume a 32-bit instruction from CIR
+// - There is not enough data in the last FIFO entry to refill it
+
 wire [W_DATA-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
 wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
 
@@ -299,7 +317,7 @@ wire [3*W_BUNDLE-1:0] instr_data_shifted =
 	cir_use[0] && EXTENSION_C ? {hwbuf, hwbuf, cir[W_BUNDLE +: W_BUNDLE]} :
 	                            {hwbuf, cir};
 
-// Saturating subtraction: on cir_lock dassertion,
+// Saturating subtraction: on cir_lock deassertion,
 // buf_level will be 0 but cir_use will be positive!
 wire [1:0] cir_use_clipped = |buf_level ? cir_use : 2'h0;
 
