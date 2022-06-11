@@ -279,7 +279,7 @@ assign mem_addr_vld = mem_addr_vld_r && !reset_holdoff;
 assign mem_size = 1'b1;
 
 always @ (*) begin
-	mem_addr_r = {W_ADDR{1'b0}};
+	mem_addr_r = fetch_addr;
 	mem_priv_r = fetch_priv;
 	mem_addr_vld_r = 1'b1;
 	case (1'b1)
