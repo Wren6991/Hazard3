@@ -6,7 +6,6 @@
 `default_nettype none
 
 module hazard3_frontend #(
-	parameter FIFO_DEPTH = 2,  // power of 2, >= 1
 `include "hazard3_config.vh"
 ) (
 	input  wire              clk,
@@ -38,11 +37,7 @@ module hazard3_frontend #(
 	output wire              jump_target_rdy,
 
 	// Interface to Decode
-	// Note reg/wire distinction
-	// => decode is providing live feedback on the CIR it is decoding,
-	//    which we fetched previously
-	// This works OK because size is decoded from 2 LSBs of instruction, so cheap.
-	output reg  [31:0]       cir,
+	output wire [31:0]       cir,
 	output reg  [1:0]        cir_vld, // number of valid halfwords in CIR
 	input  wire [1:0]        cir_use, // number of halfwords D intends to consume
 	                                  // *may* be a function of hready
@@ -75,68 +70,115 @@ module hazard3_frontend #(
 
 `include "rv_opcodes.vh"
 
+// This is the minimum size (in halfwords) for full fetch throughput, and
+// there is little benefit to increasing it:
+localparam FIFO_DEPTH = 6;
+
 localparam W_BUNDLE = W_DATA / 2;
-parameter W_FIFO_LEVEL = $clog2(FIFO_DEPTH + 1);
 
 // ----------------------------------------------------------------------------
 // Fetch Queue (FIFO)
-//
-// This is a little different from either a normal sync fifo or sync fwft fifo
-// so it's worth implementing from scratch
 
 wire jump_now = jump_target_vld && jump_target_rdy;
 
-// mem has an extra entry which is equal to next-but-last entry, and valid has
-// an extra entry which is constant-0. These are just there to handle loop
-// boundary conditions.
+// Note these registers have more than FIFO_DEPTH bits: these extras won't
+// synthesise to registers, and are just there for loop boundary conditions.
 
-// err has an error (HRESP) bit associated with each FIFO entry, so that we
-// can correctly speculate and flush fetch errors. The error bit moves
-// through the prefetch queue alongside the corresponding bus data. We sample
-// bus errors like an extra data bit -- fetch continues to speculate forward
-// past an error, and we eventually flush and redirect the frontend if an
-// errored fetch makes it to the execute stage.
+// Errors travel alongside data until the processor actually tries to decode
+// an instruction whose fetch errored. Up until this point, errors can be
+// flushed harmlessly.
 
-reg [W_DATA-1:0]   fifo_mem [0:FIFO_DEPTH];
-reg [FIFO_DEPTH:0] fifo_err;
-reg [FIFO_DEPTH:0] fifo_valid;
+reg [W_BUNDLE-1:0]    fifo_mem [0:FIFO_DEPTH+1];
+reg [FIFO_DEPTH+1:0]  fifo_err;
+reg [FIFO_DEPTH+1:-1] fifo_valid;
 
-wire [W_DATA-1:0] fifo_wdata = mem_data;
-wire [W_DATA-1:0] fifo_rdata = fifo_mem[0];
-always @ (*) fifo_mem[FIFO_DEPTH] = fifo_wdata;
+wire [1:0] mem_data_hwvalid;
 
-wire fifo_full = fifo_valid[FIFO_DEPTH - 1];
 wire fifo_empty = !fifo_valid[0];
-wire fifo_almost_full = FIFO_DEPTH == 1 || (!fifo_valid[FIFO_DEPTH - 1] && fifo_valid[FIFO_DEPTH - 2]);
+// Full: will overflow after one 32b fetch. Almost full: after two of them.
+wire fifo_full = fifo_valid[FIFO_DEPTH - 2];
+wire fifo_almost_full = fifo_valid[FIFO_DEPTH - 4];
 
 wire fifo_push;
-wire fifo_pop;
 wire fifo_dbg_inject = DEBUG_SUPPORT && dbg_instr_data_vld && dbg_instr_data_rdy;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		fifo_valid <= {FIFO_DEPTH+1{1'b0}};
-	end else if (jump_now) begin
-		fifo_valid <= {FIFO_DEPTH+1{1'b0}};
-	end else if (fifo_push || fifo_pop || fifo_dbg_inject) begin
-		fifo_valid <= {1'b0, ~(~fifo_valid << (fifo_push || fifo_dbg_inject)) >> fifo_pop};
+// Boundary conditions
+always @ (*) begin
+	fifo_mem[FIFO_DEPTH] = mem_data[31:16];
+	fifo_mem[FIFO_DEPTH + 1] = mem_data[31:16];
+	fifo_err[FIFO_DEPTH + 1 -: 2] = 2'b00;
+	fifo_valid[FIFO_DEPTH + 1 -: 2] = 2'b00;
+	fifo_valid[-1] = 1'b1;
+end
+
+// Apply fetch, then shift out data consumed by decoder
+
+reg [W_BUNDLE-1:0]   fifo_plus_fetch [0:FIFO_DEPTH+1];
+reg [W_BUNDLE-1:0]   fifo_mem_next   [0:FIFO_DEPTH-1];
+reg [FIFO_DEPTH+1:0] fifo_err_plus_fetch;
+reg [FIFO_DEPTH-1:0] fifo_err_next;
+reg [FIFO_DEPTH-1:0] fifo_valid_next;
+
+always @ (*) begin: fifo_shift
+	integer i;
+	for (i = 0; i < FIFO_DEPTH + 2; i = i + 1) begin
+		if (fifo_valid[i]) begin
+			fifo_plus_fetch[i] = fifo_mem[i];
+			fifo_err_plus_fetch[i] = fifo_err[i];
+		end else if (fifo_valid[i - 1] && mem_data_hwvalid[0]) begin
+			fifo_plus_fetch[i] = mem_data[0 * W_BUNDLE +: W_BUNDLE];
+			fifo_err_plus_fetch[i] = mem_data_err;
+		end else begin
+			fifo_plus_fetch[i] = mem_data[1 * W_BUNDLE +: W_BUNDLE];
+			fifo_err_plus_fetch[i] = mem_data_err;
+		end
+	end
+	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
+		if (cir_use[1]) begin
+			fifo_mem_next[i] = fifo_plus_fetch[i + 2];
+		end else if (cir_use[0]) begin
+			fifo_mem_next[i] = fifo_plus_fetch[i + 1];
+		end else begin
+			fifo_mem_next[i] = fifo_plus_fetch[i];
+		end
+	end
+	if (jump_now) begin
+		fifo_err_next = {FIFO_DEPTH{1'b0}};
+		if (cir_lock) begin
+			// Flush all but oldest instruction
+			fifo_valid_next = {{FIFO_DEPTH-2{1'b0}}, fifo_mem[0][1:0] == 2'b11, 1'b1};
+		end else begin
+			fifo_valid_next = {FIFO_DEPTH{1'b0}};
+		end
+	end else begin
+		fifo_valid_next = ~(~fifo_valid[FIFO_DEPTH-1:0]
+			<< (fifo_push && mem_data_hwvalid[0])
+			<< (fifo_push && mem_data_hwvalid[1])
+		) >> cir_use;
 	end
 end
 
-always @ (posedge clk) begin: fifo_data_shift
+// TODO: instruction injection.
+// TODO: CIR locking.
+
+always @ (posedge clk or negedge rst_n) begin: fifo_update
 	integer i;
-	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
-		if (fifo_pop || (fifo_push && !fifo_valid[i])) begin
-			fifo_mem[i] <= fifo_valid[i + 1] ? fifo_mem[i + 1] : fifo_wdata;
-			fifo_err[i] <= fifo_err[i + 1] ? fifo_err[i + 1] : mem_data_err;
+	if (!rst_n) begin
+		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
+			fifo_mem[i] <= {W_BUNDLE{1'b0}};
 		end
-	end
-	// Allow DM to inject instructions directly into the lowest-numbered queue
-	// entry. This mux should not extend critical path since it is balanced
-	// with the instruction-assembly muxes on the queue bypass path.
-	if (fifo_dbg_inject) begin
-		fifo_mem[0] <= dbg_instr_data;
-		fifo_err[0] <= 1'b0;
+		fifo_valid[FIFO_DEPTH-1:0] <= {FIFO_DEPTH{1'b0}};
+	end else begin
+		// Don't clock registers whose contents we won't care about on the
+		// next cycle (note: inductively, if we don't care about it now we
+		// will never care about it until we write new data to it.)
+		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
+			if (fifo_valid_next[i]) begin
+				fifo_mem[i] <= fifo_mem_next[i];
+			end
+		end
+		fifo_valid[FIFO_DEPTH-1:0] <= fifo_valid_next;
+		fifo_err[FIFO_DEPTH-1:0] <= fifo_err_next;
 	end
 end
 
@@ -153,9 +195,7 @@ wire [1:0] pending_fetches_next = pending_fetches + (mem_addr_vld && !mem_addr_h
 // Debugger only injects instructions when the frontend is at rest and empty.
 assign dbg_instr_data_rdy = DEBUG_SUPPORT && !fifo_valid[0] && ~|ctr_flush_pending;
 
-wire cir_must_refill;
-// If fetch data is forwarded past the FIFO, ensure it is not also written to it.
-assign fifo_push = mem_data_vld && ~|ctr_flush_pending && !(cir_must_refill && fifo_empty)
+assign fifo_push = mem_data_vld && ~|ctr_flush_pending
 	&& !(DEBUG_SUPPORT && debug_mode);
 
 always @ (posedge clk or negedge rst_n) begin
@@ -206,13 +246,8 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		unaligned_jump_dph <= 1'b0;
 	end else if (EXTENSION_C) begin
-		if ((mem_data_vld && ~|ctr_flush_pending && !cir_lock)
+		if ((mem_data_vld && ~|ctr_flush_pending)
 			|| (jump_now && !unaligned_jump_now)) begin
-			unaligned_jump_dph <= 1'b0;
-		end
-		if (fifo_pop) begin
-			// Following a lock/unlock of the CIR, we may have an unaligned fetch in
-			// the FIFO, rather than consuming straight from the bus.
 			unaligned_jump_dph <= 1'b0;
 		end
 		if (unaligned_jump_now) begin
@@ -236,6 +271,7 @@ always @ (posedge clk or negedge rst_n) begin
 end
 `endif
 
+assign mem_data_hwvalid = {1'b1, !unaligned_jump_dph};
 
 // Combinatorially generate the address-phase request
 
@@ -246,7 +282,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else begin
 		reset_holdoff <= 1'b0;
 		// This should be impossible, but assert to be sure, because it *will*
-		// change the fetch address (and we shouldn't check it in hardware if
+		// change the fetch address (and we can avoid checking in hardware if
 		// we can prove it doesn't happen)
 `ifdef FORMAL
 		assert(!(jump_target_vld && reset_holdoff));
@@ -292,122 +328,25 @@ assign jump_target_rdy = !mem_addr_hold;
 // ----------------------------------------------------------------------------
 // Instruction assembly yard
 
-// buf_level is the number of valid halfwords in {hwbuf, cir}.
-reg [1:0] buf_level;
-reg [W_BUNDLE-1:0] hwbuf;
-
-// You might wonder why we have a 48-bit instruction shifter {hwbuf, cir}.
-// What if we had a 32-bit shifter, and tracked halfword-valid status of the
-// FIFO entries? This would fail in the following case:
-//
-// - Initially CIR and FIFO are full
-// - Consume a 16-bit instruction from CIR
-// - CIR is refilled and last FIFO entry becomes half-valid.
-// - Now consume a 32-bit instruction from CIR
-// - There is not enough data in the last FIFO entry to refill it
-
-wire [W_DATA-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
-wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
-
-// Shift any recycled instruction data down to backfill D's consumption
-// We don't care about anything which is invalid or will be overlaid with fresh data,
-// so choose these values in a way that minimises muxes
-wire [3*W_BUNDLE-1:0] instr_data_shifted =
-	cir_use[1]                ? {hwbuf, cir[W_BUNDLE +: W_BUNDLE], hwbuf} :
-	cir_use[0] && EXTENSION_C ? {hwbuf, hwbuf, cir[W_BUNDLE +: W_BUNDLE]} :
-	                            {hwbuf, cir};
-
-// Saturating subtraction: on cir_lock deassertion,
-// buf_level will be 0 but cir_use will be positive!
-wire [1:0] cir_use_clipped = |buf_level ? cir_use : 2'h0;
-
-wire [1:0] level_next_no_fetch = buf_level - cir_use_clipped;
-
-// Overlay fresh fetch data onto the shifted/recycled instruction data
-// Again, if something won't be looked at, generate cheapest possible garbage.
-// Don't care if fetch data is valid or not, as will just retry next cycle (as long as flags set correctly)
-wire instr_fetch_overlay_blocked = cir_lock || (level_next_no_fetch[1] && !unaligned_jump_dph);
-
-wire [3*W_BUNDLE-1:0] instr_data_plus_fetch =
-	instr_fetch_overlay_blocked           ? instr_data_shifted :
-	unaligned_jump_dph     && EXTENSION_C ? {instr_data_shifted[W_BUNDLE +: 2*W_BUNDLE], fetch_data[W_BUNDLE +: W_BUNDLE]} :
-	level_next_no_fetch[0] && EXTENSION_C ? {fetch_data, instr_data_shifted[0 +: W_BUNDLE]} :
-	                         {instr_data_shifted[2*W_BUNDLE +: W_BUNDLE], fetch_data};
-
-assign cir_must_refill = !cir_lock && !level_next_no_fetch[1];
-assign fifo_pop = cir_must_refill && !fifo_empty;
-
-wire [1:0] buf_level_next =
-	jump_now || |ctr_flush_pending || cir_lock ? 2'h0 :
-	fetch_data_vld && unaligned_jump_dph ? 2'h1 :
-	buf_level + {cir_must_refill && fetch_data_vld, 1'b0} - cir_use_clipped;
-
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		buf_level <= 2'h0;
 		cir_vld <= 2'h0;
 	end else begin
 `ifdef FORMAL
 		assert(cir_vld <= 2);
  		assert(cir_use <= cir_vld);
 `endif
-		// Update CIR flags
-		buf_level <= buf_level_next;
-		if (!cir_lock)
-			cir_vld <= buf_level_next & ~(buf_level_next >> 1'b1);
-		// Update CIR contents
+		cir_vld <= {fifo_valid_next[1], fifo_valid_next[0] && !fifo_valid_next[1]};
 	end
 end
 
-// No need to reset these as they will be written before first use
-always @ (posedge clk)
-	{hwbuf, cir} <= instr_data_plus_fetch;
-
-`ifdef FORMAL
-reg [1:0] property_past_buf_level; // Workaround for weird non-constant $past reset issue
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		property_past_buf_level <= 2'h0;
-	end else begin
-		property_past_buf_level <= buf_level;
-		// We fetch 32 bits per cycle, max. If this happens it's due to negative overflow.
-		if (property_past_buf_level == 2'h0)
-			assert(buf_level != 2'h3);
-	end
-end
-`endif
-
-// Also keep track of bus errors associated with CIR contents, shifted in the
-// same way as instruction data. Errors may come straight from the bus, or
-// may be buffered in the prefetch queue.
-
-wire fetch_bus_err = fifo_empty ? mem_data_err : fifo_err[0];
-
-reg  [2:0] cir_bus_err;
-wire [2:0] cir_bus_err_shifted =
-	cir_use[1]                ? cir_bus_err >> 2 :
-	cir_use[0] && EXTENSION_C ? cir_bus_err >> 1 : cir_bus_err;
-
-wire [2:0] cir_bus_err_plus_fetch =
-	instr_fetch_overlay_blocked        ? cir_bus_err_shifted :
-	unaligned_jump_dph  && EXTENSION_C ? {cir_bus_err_shifted[2:1], fetch_bus_err} :
-	level_next_no_fetch && EXTENSION_C ? {{2{fetch_bus_err}}, cir_bus_err_shifted[0]} :
-                                         {cir_bus_err_shifted[2], {2{fetch_bus_err}}};
-
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		cir_bus_err <= 3'h0;
-	end else if (CSR_M_TRAP) begin
-		cir_bus_err <= cir_bus_err_plus_fetch;
-	end
-end
-
-assign cir_err = cir_bus_err[1:0];
+assign cir = {fifo_mem[1], fifo_mem[0]};
+assign cir_err = fifo_err[1:0];
 
 // ----------------------------------------------------------------------------
 // Register number predecode
 
-wire [31:0] next_instr = instr_data_plus_fetch[31:0];
+wire [31:0] next_instr = {fifo_mem_next[1], fifo_mem_next[0]};
 wire next_instr_is_32bit = next_instr[1:0] == 2'b11 || ~|EXTENSION_C;
 
 always @ (*) begin

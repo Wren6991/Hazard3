@@ -41,7 +41,7 @@ always @ (posedge clk)
 (*keep*) wire [1:0]        cir_vld;
 (*keep*) wire [1:0]        cir_use;
 (*keep*) wire [1:0]        cir_err;
-(*keep*) wire              cir_lock;
+(*keep*) reg               cir_lock;
 
 (*keep*) wire [4:0]        predecode_rs1_coarse;
 (*keep*) wire [4:0]        predecode_rs2_coarse;
@@ -134,6 +134,7 @@ assign jump_target[0] = 1'b0;
 // assert on it inside the frontend.
 always @ (posedge clk) assume(!(jump_target_vld && !$past(rst_n)));
 
+
 // ----------------------------------------------------------------------------
 // Properties
 
@@ -161,10 +162,5 @@ always @ (posedge clk) if (rst_n) begin
 		assert(cir[31:16] == pc[16:1] + 16'd1);
 	end
 end
-
-// FIXME remove
-
-always assume(jump_target < 100);
-always assume(pc < 100);
 
 endmodule

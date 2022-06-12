@@ -108,7 +108,6 @@ wire f_mem_size;
 assign bus_hsize_i = f_mem_size ? HSIZE_WORD : HSIZE_HWORD;
 
 hazard3_frontend #(
-	.FIFO_DEPTH(2),
 `include "hazard3_config_inst.vh"
 ) frontend (
 	.clk                  (clk),

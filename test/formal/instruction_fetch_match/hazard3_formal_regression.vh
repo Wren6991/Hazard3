@@ -56,10 +56,15 @@ wire [31:0] expect_cir;
 assign expect_cir[15:0 ] = instr_mem[ d_pc      / 4] >> (d_pc[1] ? 16 : 0 );
 assign expect_cir[31:16] = instr_mem[(d_pc + 2) / 4] >> (d_pc[1] ? 0  : 16);
 
+// Note we can get a mismatch in the upper halfword during a CIR lock of a
+// jump in the lower halfword -- the fetch will tumble into the top and this
+// is fine as long as we correctly update the PC when the lock clears.
+wire allow_upper_half_mismatch = fd_cir[15:0] == expect_cir[15:0] && fd_cir[1:0] != 2'b11;
+
 always @ (posedge clk) if (rst_n) begin
 	if (fd_cir_vld >= 2'd1)
 		assert(fd_cir[15:0] == expect_cir[15:0]);
-	if (fd_cir_vld >= 2'd2 && d_pc <= MEM_SIZE_BYTES - 4)
+	if (fd_cir_vld >= 2'd2 && d_pc <= MEM_SIZE_BYTES - 4 && !allow_upper_half_mismatch)
 		assert(fd_cir[31:16] == expect_cir[31:16]);
 end
 
