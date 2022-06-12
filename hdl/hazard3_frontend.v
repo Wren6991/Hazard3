@@ -155,6 +155,7 @@ always @ (*) begin: fifo_shift
 			<< (fifo_push && mem_data_hwvalid[0])
 			<< (fifo_push && mem_data_hwvalid[1])
 		) >> cir_use;
+		fifo_err_next = fifo_err_plus_fetch >> cir_use;
 	end
 end
 
