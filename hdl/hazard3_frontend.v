@@ -72,7 +72,7 @@ module hazard3_frontend #(
 
 // This is the minimum size (in halfwords) for full fetch throughput, and
 // there is little benefit to increasing it:
-localparam FIFO_DEPTH = 6;
+localparam FIFO_DEPTH = 7;
 
 localparam W_BUNDLE = W_DATA / 2;
 
