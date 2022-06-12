@@ -17,7 +17,7 @@ module hazard3_decode #(
 	input  wire [1:0]           fd_cir_err,
 	input  wire [1:0]           fd_cir_vld,
 	output wire [1:0]           df_cir_use,
-	output wire                 df_cir_lock,
+	output wire                 df_cir_flush_behind,
 	output wire [W_ADDR-1:0]    d_pc,
 
 	input  wire                 debug_mode,
@@ -113,13 +113,16 @@ wire assert_cir_lock = jump_caused_by_d && d_stall;
 wire deassert_cir_lock = !d_stall;
 reg cir_lock_prev;
 
-assign df_cir_lock = (cir_lock_prev && !deassert_cir_lock) || assert_cir_lock;
+wire cir_lock = (cir_lock_prev && !deassert_cir_lock) || assert_cir_lock;
+assign df_cir_flush_behind = assert_cir_lock && !cir_lock_prev;
 
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
 		cir_lock_prev <= 1'b0;
-	else
-		cir_lock_prev <= df_cir_lock;
+	end else begin
+		cir_lock_prev <= cir_lock;
+	end
+end
 
 reg  [W_ADDR-1:0]    pc;
 wire [W_ADDR-1:0]    pc_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
@@ -143,7 +146,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// if (cir_lock_prev && deassert_cir_lock)
 			// 	assert(f_jump_target == d_jump_target);
 `endif
-		end else if (!d_stall && !df_cir_lock) begin
+		end else if (!d_stall && !cir_lock) begin
 			pc <= pc_next;
 		end
 	end

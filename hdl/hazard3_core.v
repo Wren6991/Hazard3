@@ -100,7 +100,7 @@ wire [31:0]          fd_cir;
 wire [1:0]           fd_cir_err;
 wire [1:0]           fd_cir_vld;
 wire [1:0]           df_cir_use;
-wire                 df_cir_lock;
+wire                 df_cir_flush_behind;
 
 assign bus_aph_panic_i = 1'b0;
 
@@ -132,7 +132,7 @@ hazard3_frontend #(
 	.cir_err              (fd_cir_err),
 	.cir_vld              (fd_cir_vld),
 	.cir_use              (df_cir_use),
-	.cir_lock             (df_cir_lock),
+	.cir_flush_behind     (df_cir_flush_behind),
 
 	.predecode_rs1_coarse (f_rs1_coarse),
 	.predecode_rs2_coarse (f_rs2_coarse),
@@ -200,7 +200,7 @@ hazard3_decode #(
 	.fd_cir_err           (fd_cir_err),
 	.fd_cir_vld           (fd_cir_vld),
 	.df_cir_use           (df_cir_use),
-	.df_cir_lock          (df_cir_lock),
+	.df_cir_flush_behind  (df_cir_flush_behind),
 	.d_pc                 (d_pc),
 	.x_jump_not_except    (x_jump_not_except),
 
