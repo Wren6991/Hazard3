@@ -120,13 +120,37 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-assign cir_flush_behind = 1'b0; // TODO
 assign debug_mode = 1'b0;
 assign dbg_instr_data_vld = 1'b0;
 
+// Don't consume nonexistent data
 always assume(cir_use <= cir_vld);
+// Consume an amount consistent with the instruction size (as the frontend
+// also considers instruction size when a cir_flush_behind occurs)
+always assume(cir_use == 0 || cir_use == (cir[1:0] == 2'b11 ? 2'd2 : 2'd1));
 
 assign jump_target[0] = 1'b0;
+
+// flush_behind is always due to an instruction in D, so should only happen
+// when the CIR is fully valid.
+assign cir_flush_behind = jump_target_vld && jump_target_rdy && ~|cir_use &&
+	cir_vld >= (cir[1:0] == 2'b11 ? 2'd2 : 2'd1);
+
+reg cir_locked;
+reg [31:0] jump_target_prev;
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		cir_locked <= 1'b0;
+		jump_target_prev <= 32'h0;
+	end else begin
+		cir_locked <= (cir_locked || cir_flush_behind) && ~|cir_use;
+		jump_target_prev <= jump_target;
+		if (cir_locked) begin
+			assume(jump_target == jump_target_prev);
+			assume(!jump_target_vld);
+		end
+	end
+end
 
 // Jump should not be asserted on the first cycle after reset, as this *will*
 // change the fetch address and screw things up. We don't check this in
@@ -145,6 +169,8 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		pc <= RESET_VECTOR;
 	end else if (jump_target_vld && jump_target_rdy) begin
+		pc <= cir_flush_behind ? pc : jump_target;
+	end else if (cir_locked && |cir_use) begin
 		pc <= jump_target;
 	end else begin
 		pc <= pc + {cir_use, 1'b0};
@@ -159,7 +185,10 @@ always @ (posedge clk) if (rst_n) begin
 	if (cir_vld >= 2'd1) begin
 		assert(cir[15:0] == pc[16:1]);
 	end
-	if (cir_vld >= 2'd2) begin
+	// Note that following a flush_behind the upper half of the CIR may be
+	// nonsequential with the lower half, if and only if the lower half
+	// contains a 16-bit instruction.
+	if (cir_vld >= 2'd2 && cir[1:0] == 2'b11) begin
 		assert(cir[31:16] == pc[16:1] + 16'd1);
 	end
 end

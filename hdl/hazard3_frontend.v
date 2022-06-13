@@ -74,7 +74,7 @@ module hazard3_frontend #(
 
 `include "rv_opcodes.vh"
 
-localparam W_BUNDLE = W_DATA / 2;
+localparam W_BUNDLE = 16;
 // This is the minimum for full throughput (enough to avoid dropping data when
 // decode stalls) and there is no significant advantage to going larger.
 localparam FIFO_DEPTH = 2;
