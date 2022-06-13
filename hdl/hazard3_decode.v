@@ -80,7 +80,6 @@ wire [31:0] d_imm_b = {{20{d_instr[31]}}, d_instr[7], d_instr[30:25], d_instr[11
 wire [31:0] d_imm_u = {d_instr[31:12], {12{1'b0}}};
 wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
 
-
 // ----------------------------------------------------------------------------
 // PC/CIR control
 
@@ -98,16 +97,14 @@ assign df_cir_use =
 	d_starved || d_stall ? 2'h0 :
 	d_instr_is_32bit ? 2'h2 : 2'h1;
 
-// CIR Locking is required if we successfully assert a jump request, but decode is stalled.
-// (This only happens if decode stall is caused by X stall, not if fetch is starved!)
-// The reason for this is that, if the CIR is not locked in, it can be trashed by
-// incoming fetch data before the roadblock clears ahead of us, which will squash any other
-// side effects this instruction may have besides jumping! This includes:
-// - Linking for JAL
-// - Mispredict recovery for branches
-// Note that it is not possible to simply gate the jump request based on X stalling,
-// because X stall is a function of hready, and jump request feeds haddr htrans etc.
-
+// CIR Locking is required if we successfully assert a jump request, but
+// decode is stalled. It is not possible to gate the jump request if the
+// stall depends on bus stall (as this would create a through-path from bus
+// stall to bus request) so instead we instruct the frontent to preserve the
+// stalled instruction when flushing, and fill in behind it.
+//
+// Once the stall clears, the stalled instruction can execute its remaining
+// side effects e.g. writing a link value to the register file.
 wire jump_caused_by_d = f_jump_now && x_jump_not_except;
 wire assert_cir_lock = jump_caused_by_d && d_stall;
 wire deassert_cir_lock = !d_stall;

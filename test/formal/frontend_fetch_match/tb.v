@@ -41,7 +41,7 @@ always @ (posedge clk)
 (*keep*) wire [1:0]        cir_vld;
 (*keep*) wire [1:0]        cir_use;
 (*keep*) wire [1:0]        cir_err;
-(*keep*) reg               cir_lock;
+(*keep*) reg               cir_flush_behind;
 
 (*keep*) wire [4:0]        predecode_rs1_coarse;
 (*keep*) wire [4:0]        predecode_rs2_coarse;
@@ -78,7 +78,7 @@ hazard3_frontend #(
 	.cir_vld              (cir_vld),
 	.cir_use              (cir_use),
 	.cir_err              (cir_err),
-	.cir_lock             (cir_lock),
+	.cir_flush_behind     (cir_flush_behind),
 
 	.predecode_rs1_coarse (predecode_rs1_coarse),
 	.predecode_rs2_coarse (predecode_rs2_coarse),
@@ -120,7 +120,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-assign cir_lock = 1'b0; // TODO
+assign cir_flush_behind = 1'b0; // TODO
 assign debug_mode = 1'b0;
 assign dbg_instr_data_vld = 1'b0;
 
@@ -134,11 +134,12 @@ assign jump_target[0] = 1'b0;
 // assert on it inside the frontend.
 always @ (posedge clk) assume(!(jump_target_vld && !$past(rst_n)));
 
-
 // ----------------------------------------------------------------------------
 // Properties
 
 reg [31:0] pc;
+
+always if (!EXTENSION_C) assume(!pc[1]);
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin

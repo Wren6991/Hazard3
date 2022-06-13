@@ -159,9 +159,9 @@ wire [1:0] pending_fetches_next = pending_fetches + (mem_addr_vld && !mem_addr_h
 // Debugger only injects instructions when the frontend is at rest and empty.
 assign dbg_instr_data_rdy = DEBUG_SUPPORT && !fifo_valid[0] && ~|ctr_flush_pending;
 
-wire cir_must_refill;
+wire cir_room_for_fetch;
 // If fetch data is forwarded past the FIFO, ensure it is not also written to it.
-assign fifo_push = mem_data_vld && ~|ctr_flush_pending && !(cir_must_refill && fifo_empty)
+assign fifo_push = mem_data_vld && ~|ctr_flush_pending && !(cir_room_for_fetch && fifo_empty)
 	&& !(DEBUG_SUPPORT && debug_mode);
 
 always @ (posedge clk or negedge rst_n) begin
@@ -306,12 +306,12 @@ wire [1:0] level_next_no_fetch = buf_level - cir_use;
 
 // Overlay fresh fetch data onto the shifted/recycled instruction data
 // Again, if something won't be looked at, generate cheapest possible garbage.
-wire instr_fetch_overlay_blocked = level_next_no_fetch[1] && (~|EXTENSION_C || &fetch_data_hwvld);
-
+assign cir_room_for_fetch = level_next_no_fetch <= (|EXTENSION_C && ~&fetch_data_hwvld ? 2'h2 : 2'h1);
+assign fifo_pop = cir_room_for_fetch && !fifo_empty;
 
 wire [3*W_BUNDLE-1:0] instr_data_plus_fetch =
-	instr_fetch_overlay_blocked            ? instr_data_shifted :
-	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_data_aligned[0 +: W_BUNDLE], instr_data_shifted} :
+	!cir_room_for_fetch                    ? instr_data_shifted :
+	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_data_aligned[0 +: W_BUNDLE], instr_data_shifted[0 +: 2 * W_BUNDLE]} :
 	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_data_aligned, instr_data_shifted[0 +: W_BUNDLE]} :
 	                                         {instr_data_shifted[2 * W_BUNDLE +: W_BUNDLE], fetch_data_aligned};
 
@@ -327,15 +327,12 @@ wire [2:0] cir_bus_err_shifted =
 	cir_use[0] && EXTENSION_C ? cir_bus_err >> 1 : cir_bus_err;
 
 wire [2:0] cir_bus_err_plus_fetch =
-	instr_fetch_overlay_blocked            ? cir_bus_err_shifted :
+	!cir_room_for_fetch                    ? cir_bus_err_shifted :
 	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_bus_err, cir_bus_err_shifted[1:0]} :
 	level_next_no_fetch[0] && |EXTENSION_C ? {{2{fetch_bus_err}}, cir_bus_err_shifted[0]} :
 	                                         {cir_bus_err_shifted[2], {2{fetch_bus_err}}};
 
-assign cir_must_refill = !level_next_no_fetch[1];
-assign fifo_pop = cir_must_refill && !fifo_empty;
-
-wire [1:0] fetch_fill_amount = cir_must_refill && fetch_data_vld ? (
+wire [1:0] fetch_fill_amount = cir_room_for_fetch && fetch_data_vld ? (
 	&fetch_data_hwvld ? 2'h2 : 2'h1
 ) : 2'h0;
 

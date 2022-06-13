@@ -8,8 +8,6 @@ list $HDL/hazard3.f
 list $HDL/debug/dtm/hazard3_jtag_dtm.f
 list $HDL/debug/dm/hazard3_dm.f
 
-list $HDL/peri/hazard3_riscv_timer.f
-
 # Generic SoC components from libfpga
 
 file ../libfpga/common/reset_sync.v

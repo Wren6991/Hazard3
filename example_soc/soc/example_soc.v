@@ -484,25 +484,30 @@ uart_mini uart_u (
 	.dreq         (/* unused */)
 );
 
-hazard3_riscv_timer timer_u (
-	.clk       (clk),
-	.rst_n     (rst_n),
+// hazard3_riscv_timer timer_u (
+// 	.clk       (clk),
+// 	.rst_n     (rst_n),
 
-	.psel      (timer_psel),
-	.penable   (timer_penable),
-	.pwrite    (timer_pwrite),
-	.paddr     (timer_paddr),
-	.pwdata    (timer_pwdata),
-	.prdata    (timer_prdata),
-	.pready    (timer_pready),
-	.pslverr   (timer_pslverr),
+// 	.psel      (timer_psel),
+// 	.penable   (timer_penable),
+// 	.pwrite    (timer_pwrite),
+// 	.paddr     (timer_paddr),
+// 	.pwdata    (timer_pwdata),
+// 	.prdata    (timer_prdata),
+// 	.pready    (timer_pready),
+// 	.pslverr   (timer_pslverr),
 
-	.dbg_halt  (&hart_halted),
+// 	.dbg_halt  (&hart_halted),
 
-	// Tie high for 64-cycle timebase:
-	.tick      (1'b1),
+// 	// Tie high for 64-cycle timebase:
+// 	.tick      (1'b1),
 
-	.timer_irq (timer_irq)
-);
+// 	.timer_irq (timer_irq)
+// );
+
+assign timer_pslverr = 1'b0;
+assign timer_pready = 1'b1;
+assign timer_prdata = 32'h0;
+assign timer_irq = 1'b0;
 
 endmodule

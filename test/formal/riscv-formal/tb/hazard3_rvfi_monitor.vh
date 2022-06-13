@@ -136,8 +136,14 @@ always @ (posedge clk or negedge rst_n) begin
 		rvfm_xm_rdata1 <= 32'h0;
 		rvfm_xm_rdata2 <= 32'h0;
 	end else if (!x_stall) begin
-		rvfm_xm_rdata1 <= x_rs1_bypass;
-		rvfm_xm_rdata2 <= x_rs2_bypass;
+		// rs*_bypass may have garbage on them for instructions with *no*
+		// register operands (due to some interesting optimisations), though
+		// d_rs* is still driven to 0 to disable stalling on that register
+		// lane. riscv-formal still likes to see zeroes from x0, so fix that
+		// up here. This shouldn't cover up any bugs, since a
+		// register-operand instruction would still *use* the garbage value.
+		rvfm_xm_rdata1 <= |d_rs1 ? x_rs1_bypass : 32'h0;
+		rvfm_xm_rdata2 <= |d_rs2 ? x_rs2_bypass : 32'h0;
 	end
 end
 
@@ -161,7 +167,7 @@ always @ (posedge clk or negedge rst_n) begin
 		rvfi_rs1_addr_r <= m_stall ? 5'h0 : xm_rs1;
 		rvfi_rs2_addr_r <= m_stall ? 5'h0 : xm_rs2;
 		rvfi_rs1_rdata_r <= rvfm_xm_rdata1;
-		rvfi_rs2_rdata_r <= rvfm_xm_rdata2;
+		rvfi_rs2_rdata_r <= xm_rs2 == mw_rd && |xm_rs2 ? m_wdata : rvfm_xm_rdata2;
 	end
 end
 
