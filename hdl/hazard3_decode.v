@@ -30,6 +30,7 @@ module hazard3_decode #(
 	input  wire                 f_jump_now,
 	input  wire [W_ADDR-1:0]    f_jump_target,
 	input  wire                 x_jump_not_except,
+	input  wire [W_ADDR-1:0]    d_btb_target_addr,
 
 	output reg  [W_DATA-1:0]    d_imm,
 	output reg  [W_REGADDR-1:0] d_rs1,
@@ -123,9 +124,11 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-reg  [W_ADDR-1:0]    pc;
-wire [W_ADDR-1:0]    pc_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
+reg  [W_ADDR-1:0] pc;
+wire [W_ADDR-1:0] pc_seq_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
 assign d_pc = pc;
+
+wire predicted_branch = fd_cir_predbranch[d_instr_is_32bit] && |BRANCH_PREDICTOR;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -133,21 +136,27 @@ always @ (posedge clk or negedge rst_n) begin
 	end else begin
 		if ((f_jump_now && !assert_cir_lock) || (cir_lock_prev && deassert_cir_lock)) begin
 			pc <= f_jump_target;
-`ifdef FORMAL
-			// Being cheeky above to save a 32 bit mux. Check that we never get an M target by mistake.
-
-			// FIXME disabled this for now -- we do sometimes see an exception taking
-			// place during the stall, which then leads to a different branch target
-			// appearing. (i.e. f_jump_now is asserted for two cycles, the first one
-			// from this instruction and the second from the exception; this is ok,
-			// because the exception will return to this branch when done.)
-
-			// if (cir_lock_prev && deassert_cir_lock)
-			// 	assert(f_jump_target == d_jump_target);
-`endif
 		end else if (!d_stall && !cir_lock) begin
-			pc <= pc_next;
+			// If this instruction is a predicted-taken branch (and has not
+			// generated a mispredict recovery jump) then set PC to the
+			// prediction target instead of the sequentially next PC
+			pc <= predicted_branch ? d_btb_target_addr : pc_seq_next;
 		end
+		// If the current instruction is marked as being a predicted-taken
+		// branch, it *must* be a valid branch instruction, because executing
+		// the branch is how we recover from misprediction
+`ifdef FORMAL
+		// This can be defeated if you branch backward halfway into a 32-bit instruction that immediately precedes the branch.
+		if (predicted_branch && !d_starved && !debug_mode) begin
+			assert(!d_invalid);
+			assert(d_branchcond == BCOND_ZERO || d_branchcond == BCOND_NZERO);
+		end
+		if (&fd_cir_predbranch && !d_instr_is_32bit) begin
+			// Only way to get two back-to-back predicted-taken instructions
+			// is if they are the same instruction
+			assert(d_btb_target_addr == pc);
+		end
+`endif
 	end
 end
 

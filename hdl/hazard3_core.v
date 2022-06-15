@@ -108,6 +108,8 @@ wire [W_ADDR-1:0]    x_btb_set_src_addr;
 wire [W_ADDR-1:0]    x_btb_set_target_addr;
 wire                 x_btb_clear;
 
+wire [W_ADDR-1:0]    d_btb_target_addr;
+
 assign bus_aph_panic_i = 1'b0;
 
 wire f_mem_size;
@@ -138,6 +140,7 @@ hazard3_frontend #(
 	.btb_set_src_addr     (x_btb_set_src_addr),
 	.btb_set_target_addr  (x_btb_set_target_addr),
 	.btb_clear            (x_btb_clear),
+	.btb_target_addr_out  (d_btb_target_addr),
 
 	.cir                  (fd_cir),
 	.cir_err              (fd_cir_err),
@@ -226,6 +229,7 @@ hazard3_decode #(
 	.x_stall              (x_stall),
 	.f_jump_now           (f_jump_now),
 	.f_jump_target        (f_jump_target),
+	.d_btb_target_addr    (d_btb_target_addr),
 
 	.d_imm                (d_imm),
 	.d_rs1                (d_rs1),
@@ -738,7 +742,8 @@ wire x_jump_req_unchecked = !x_stall_on_raw && (
 assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail;
 
 assign x_btb_set = |BRANCH_PREDICTOR && (
-	x_jump_req_unchecked && d_addr_offs[W_ADDR - 1] && !x_branch_was_predicted
+	x_jump_req_unchecked && d_addr_offs[W_ADDR - 1] && !x_branch_was_predicted &&
+	(d_branchcond == BCOND_NZERO || d_branchcond == BCOND_ZERO)
 );
 
 assign x_btb_clear = d_fence_i || (m_trap_enter_vld && m_trap_enter_rdy) || (|BRANCH_PREDICTOR && (

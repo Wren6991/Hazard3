@@ -59,7 +59,12 @@ assign expect_cir[31:16] = instr_mem[(d_pc + 2) / 4] >> (d_pc[1] ? 0  : 16);
 // Note we can get a mismatch in the upper halfword during a CIR lock of a
 // jump in the lower halfword -- the fetch will tumble into the top and this
 // is fine as long as we correctly update the PC when the lock clears.
-wire allow_upper_half_mismatch = fd_cir[15:0] == expect_cir[15:0] && fd_cir[1:0] != 2'b11;
+
+// Note also following a predicted branch the upper half of CIR may be
+// nonsequential, so we can't check it.
+wire allow_upper_half_mismatch = fd_cir[15:0] == expect_cir[15:0] && (
+	fd_cir[1:0] != 2'b11 || fd_cir_predbranch[0]
+);
 
 always @ (posedge clk) if (rst_n) begin
 	if (fd_cir_vld >= 2'd1)

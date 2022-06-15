@@ -43,6 +43,7 @@ module hazard3_frontend #(
 	input  wire [W_ADDR-1:0] btb_set_src_addr,
 	input  wire [W_ADDR-1:0] btb_set_target_addr,
 	input  wire              btb_clear,
+	output wire [W_ADDR-1:0] btb_target_addr_out,
 
 	// Interface to Decode
 	// Note reg/wire distinction
@@ -181,12 +182,14 @@ if (BRANCH_PREDICTOR) begin: have_btb
 			btb_src_addr <= {W_ADDR{1'b0}};
 			btb_target_addr <= {W_ADDR{1'b0}};
 			btb_valid <= 1'b0;
+		end else if (btb_clear) begin
+			// Clear takes precedences over set. E.g. if a taken branch is in
+			// stage 2 and an exception is in stage 3, we must clear the BTB.
+			btb_valid <= 1'b0;
 		end else if (btb_set) begin
 			btb_src_addr <= btb_set_src_addr;
 			btb_target_addr <= btb_set_target_addr;
 			btb_valid <= 1'b1;
-		end else if (btb_clear) begin
-			btb_valid <= 1'b0;
 		end
 	end
 end else begin: no_btb
@@ -197,6 +200,17 @@ end else begin: no_btb
 	end
 end
 endgenerate
+
+// Decode uses the target address to set the PC to the correct branch target
+// value following a predicted-taken branch (as normally it would update PC
+// by following an X jump request, and in this case there is none).
+//
+// Note this assumes the BTB target has not changed by the time the predicted
+// branch arrives at decode! This is always true because the only way for the
+// target address to change is when an older branch is taken, which would
+// flush the younger predicted-taken branch before it reaches decode. 
+
+assign btb_target_addr_out = btb_target_addr;
 
 // ----------------------------------------------------------------------------
 // Fetch request generation
@@ -330,25 +344,30 @@ always @ (posedge clk or negedge rst_n) begin
 		mem_data_hwvld <= 2'b11;
 		mem_aph_hwvld <= 2'b11;
 		mem_data_predbranch <= 1'b0;
-	end else if (EXTENSION_C) begin
+	end else begin
 		if (jump_now) begin
-			if (mem_addr_rdy) begin
-				mem_data_hwvld <= {1'b1, !jump_target[1]};
-			end else begin
-				mem_aph_hwvld <= {1'b1, !jump_target[1]};
+			if (|EXTENSION_C) begin
+				if (mem_addr_rdy) begin
+					mem_data_hwvld <= {1'b1, !jump_target[1]};
+				end else begin
+					mem_aph_hwvld <= {1'b1, !jump_target[1]};
+				end
 			end
+			mem_data_predbranch <= 1'b0;
 		end else if (mem_addr_vld && mem_addr_rdy) begin
-			// If a predicted-taken branch instruction only spans the first
-			// half of a word, need to flag the second half as invalid. 
-			mem_data_hwvld <= mem_aph_hwvld & {
-				!(|BRANCH_PREDICTOR && btb_match_now && !btb_src_addr[1]),
-				1'b1
-			};
-			// Also need to take the alignment of the destination into account.
-			mem_aph_hwvld <= {
-				1'b1,
-				!(|BRANCH_PREDICTOR && btb_match_now && btb_target_addr[1])
-			};
+			if (|EXTENSION_C) begin
+				// If a predicted-taken branch instruction only spans the first
+				// half of a word, need to flag the second half as invalid. 
+				mem_data_hwvld <= mem_aph_hwvld & {
+					!(|BRANCH_PREDICTOR && btb_match_now && !btb_src_addr[1]),
+					1'b1
+				};
+				// Also need to take the alignment of the destination into account.
+				mem_aph_hwvld <= {
+					1'b1,
+					!(|BRANCH_PREDICTOR && btb_match_now && btb_target_addr[1])
+				};
+			end
 			mem_data_predbranch <= |BRANCH_PREDICTOR && btb_match_now;
 		end
 	end
@@ -397,7 +416,6 @@ wire [3*W_BUNDLE-1:0] instr_data_plus_fetch =
 // may be buffered in the prefetch queue.
 
 wire fetch_bus_err = fifo_empty ? mem_data_err : fifo_err[0];
-wire fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
 
 reg  [2:0] cir_bus_err;
 wire [2:0] cir_bus_err_shifted =
@@ -413,6 +431,10 @@ wire [2:0] cir_bus_err_plus_fetch =
 // And the same thing again for whether CIR contains a predicted-taken branch.
 // One day I should clean up this copy/paste.
 
+wire fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
+// We mark only the last halfword of the branch instruction as being predicted.
+wire [1:0] fetch_predbranch_hw = &fetch_data_hwvld ? {fetch_predbranch, 1'b0} : {1'b0, fetch_predbranch};
+
 reg  [2:0] cir_predbranch_reg;
 wire [2:0] cir_predbranch_shifted =
 	cir_use[1]                ? cir_predbranch_reg >> 2 :
@@ -420,9 +442,9 @@ wire [2:0] cir_predbranch_shifted =
 
 wire [2:0] cir_predbranch_plus_fetch =
 	!cir_room_for_fetch                    ? cir_predbranch_shifted :
-	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_predbranch, cir_predbranch_shifted[1:0]} :
-	level_next_no_fetch[0] && |EXTENSION_C ? {{2{fetch_predbranch}}, cir_predbranch_shifted[0]} :
-	                                         {cir_predbranch_shifted[2], {2{fetch_predbranch}}};
+	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_predbranch_hw[0], cir_predbranch_shifted[1:0]} :
+	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_predbranch_hw, cir_predbranch_shifted[0]} :
+	                                         {cir_predbranch_shifted[2], fetch_predbranch_hw};
 
 wire [1:0] fetch_fill_amount = cir_room_for_fetch && fetch_data_vld ? (
 	&fetch_data_hwvld ? 2'h2 : 2'h1
