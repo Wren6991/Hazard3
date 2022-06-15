@@ -37,6 +37,11 @@ always @ (posedge clk)
 (*keep*) wire              jump_target_vld;
 (*keep*) wire              jump_target_rdy;
 
+(*keep*) wire              btb_set;
+(*keep*) wire [31:0]       btb_set_src_addr;
+(*keep*) wire [31:0]       btb_set_target_addr;
+(*keep*) wire              btb_clear;
+
 (*keep*) wire [31:0]       cir;
 (*keep*) wire [1:0]        cir_vld;
 (*keep*) wire [1:0]        cir_use;
@@ -73,6 +78,11 @@ hazard3_frontend #(
 	.jump_priv            (jump_priv),
 	.jump_target_vld      (jump_target_vld),
 	.jump_target_rdy      (jump_target_rdy),
+
+	.btb_set              (btb_set),
+	.btb_set_src_addr     (btb_set_src_addr),
+	.btb_set_target_addr  (btb_set_target_addr),
+	.btb_clear            (btb_clear),
 
 	.cir                  (cir),
 	.cir_vld              (cir_vld),
@@ -125,8 +135,9 @@ assign dbg_instr_data_vld = 1'b0;
 
 // Don't consume nonexistent data
 always assume(cir_use <= cir_vld);
-// Consume an amount consistent with the instruction size (as the frontend
-// also considers instruction size when a cir_flush_behind occurs)
+
+// Always consume an amount consistent with the instruction size (as the
+// frontend also considers instruction size when a cir_flush_behind occurs)
 always assume(cir_use == 0 || cir_use == (cir[1:0] == 2'b11 ? 2'd2 : 2'd1));
 
 assign jump_target[0] = 1'b0;
@@ -157,6 +168,10 @@ end
 // hardware (as it's assumed to be impossible in the real processor), just
 // assert on it inside the frontend.
 always @ (posedge clk) assume(!(jump_target_vld && !$past(rst_n)));
+
+// TODO would be nice to cover this here as well as in the full-core test
+assign btb_set = 1'b0;
+assign btb_clear = 1'b0;
 
 // ----------------------------------------------------------------------------
 // Properties

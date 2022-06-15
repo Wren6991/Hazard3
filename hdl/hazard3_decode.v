@@ -15,6 +15,7 @@ module hazard3_decode #(
 
 	input  wire [31:0]          fd_cir,
 	input  wire [1:0]           fd_cir_err,
+	input  wire [1:0]           fd_cir_predbranch,
 	input  wire [1:0]           fd_cir_vld,
 	output wire [1:0]           df_cir_use,
 	output wire                 df_cir_flush_behind,
@@ -47,7 +48,8 @@ module hazard3_decode #(
 	output reg  [W_ADDR-1:0]    d_addr_offs,
 	output reg                  d_addr_is_regoffs,
 	output reg  [W_EXCEPT-1:0]  d_except,
-	output reg                  d_wfi
+	output reg                  d_wfi,
+	output reg                  d_fence_i
 );
 
 `include "rv_opcodes.vh"
@@ -149,11 +151,14 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+wire [W_ADDR-1:0] branch_offs =
+	!d_instr_is_32bit && fd_cir_predbranch[0] && |BRANCH_PREDICTOR ? 32'h2 :
+	 d_instr_is_32bit && fd_cir_predbranch[1] && |BRANCH_PREDICTOR ? 32'h4 : d_imm_b;
 
 always @ (*) begin
 	casez ({|EXTENSION_A, |EXTENSION_ZIFENCEI, d_instr[6:2]})
 	{1'bz, 1'bz, 5'b11011}: d_addr_offs = d_imm_j      ; // JAL
-	{1'bz, 1'bz, 5'b11000}: d_addr_offs = d_imm_b      ; // Branches
+	{1'bz, 1'bz, 5'b11000}: d_addr_offs = branch_offs  ; // Branches
 	{1'bz, 1'bz, 5'b01000}: d_addr_offs = d_imm_s      ; // Store
 	{1'bz, 1'bz, 5'b11001}: d_addr_offs = d_imm_i      ; // JALR
 	{1'bz, 1'bz, 5'b00000}: d_addr_offs = d_imm_i      ; // Loads
@@ -188,6 +193,7 @@ always @ (*) begin
 	d_invalid_32bit = 1'b0;
 	d_except = EXCEPT_NONE;
 	d_wfi = 1'b0;
+	d_fence_i = 1'b0;
 
 	casez (d_instr)
 	RV_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_ZERO;  end
@@ -292,7 +298,7 @@ always @ (*) begin
 	RV_ZIP:       if (EXTENSION_ZBKB) begin d_aluop = ALUOP_ZIP;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 
 	RV_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
-	RV_FENCE_I:   if (EXTENSION_ZIFENCEI)     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
+	RV_FENCE_I:   if (EXTENSION_ZIFENCEI)     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_fence_i = 1'b1; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
 	RV_CSRRW:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRS:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
 	RV_CSRRC:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end
@@ -331,3 +337,7 @@ always @ (*) begin
 end
 
 endmodule
+
+`ifndef YOSYS
+`default_nettype wire
+`endif

@@ -169,13 +169,21 @@ parameter FAST_BRANCHCMP      = 1,
 // disabled e.g. to permit block-RAM inference on FPGA.
 parameter RESET_REGFILE       = 1,
 
-// MTVEC_WMASK: Mask of which bits in MTVEC are modifiable. Save gates by
-// making trap vector base partly fixed (legal, as it's WARL).
+// BRANCH_PREDICTOR: enable branch prediction. The branch predictor consists
+// of a single BTB entry which is allocated on a taken backward branch, and
+// cleared on a mispredicted nontaken branch, a fence.i or a trap. Successful
+// prediction eliminates the 1-cyle fetch bubble on a taken branch, usually
+// making tight loops faster.
+parameter BRANCH_PREDICTOR    = 1,
+
+// MTVEC_WMASK: Mask of which bits in mtvec are writable. Full writability is
+// recommended, because a common idiom in setup code is to set mtvec just
+// past code that may trap, as a hardware "try {...} catch" block.
 //
 // - The vectoring mode can be made fixed by clearing the LSB of MTVEC_WMASK
 //
-// - Note the entire vector table must always be aligned to its size, rounded
-//   up to a power of two, so careful with the low-order bits.
+// - In vectored mode, the vector table must be aligned to its size, rounded
+//   up to a power of two.
 parameter MTVEC_WMASK         = 32'hfffffffd,
 
 // ----------------------------------------------------------------------------

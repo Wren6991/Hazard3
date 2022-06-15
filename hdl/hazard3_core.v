@@ -98,9 +98,15 @@ wire [W_REGADDR-1:0] f_rs2_fine;
 
 wire [31:0]          fd_cir;
 wire [1:0]           fd_cir_err;
+wire [1:0]           fd_cir_predbranch;
 wire [1:0]           fd_cir_vld;
 wire [1:0]           df_cir_use;
 wire                 df_cir_flush_behind;
+
+wire                 x_btb_set;
+wire [W_ADDR-1:0]    x_btb_set_src_addr;
+wire [W_ADDR-1:0]    x_btb_set_target_addr;
+wire                 x_btb_clear;
 
 assign bus_aph_panic_i = 1'b0;
 
@@ -128,8 +134,14 @@ hazard3_frontend #(
 	.jump_target_vld      (f_jump_req),
 	.jump_target_rdy      (f_jump_rdy),
 
+	.btb_set              (x_btb_set),
+	.btb_set_src_addr     (x_btb_set_src_addr),
+	.btb_set_target_addr  (x_btb_set_target_addr),
+	.btb_clear            (x_btb_clear),
+
 	.cir                  (fd_cir),
 	.cir_err              (fd_cir_err),
+	.cir_predbranch       (fd_cir_predbranch),
 	.cir_vld              (fd_cir_vld),
 	.cir_use              (df_cir_use),
 	.cir_flush_behind     (df_cir_flush_behind),
@@ -181,6 +193,7 @@ wire                 d_addr_is_regoffs;
 wire [W_ADDR-1:0]    d_pc;
 wire [W_EXCEPT-1:0]  d_except;
 wire                 d_wfi;
+wire                 d_fence_i;
 wire                 d_csr_ren;
 wire                 d_csr_wen;
 wire [1:0]           d_csr_wtype;
@@ -198,6 +211,7 @@ hazard3_decode #(
 
 	.fd_cir               (fd_cir),
 	.fd_cir_err           (fd_cir_err),
+	.fd_cir_predbranch    (fd_cir_predbranch),
 	.fd_cir_vld           (fd_cir_vld),
 	.df_cir_use           (df_cir_use),
 	.df_cir_flush_behind  (df_cir_flush_behind),
@@ -230,7 +244,8 @@ hazard3_decode #(
 	.d_addr_offs          (d_addr_offs),
 	.d_addr_is_regoffs    (d_addr_is_regoffs),
 	.d_except             (d_except),
-	.d_wfi                (d_wfi)
+	.d_wfi                (d_wfi),
+	.d_fence_i            (d_fence_i)
 );
 
 // ----------------------------------------------------------------------------
@@ -689,12 +704,15 @@ endgenerate
 // For JALR, the LSB of the result must be cleared by hardware
 wire [W_ADDR-1:0] x_jump_target = x_addr_sum & ~32'h1;
 wire              x_jump_misaligned = ~|EXTENSION_C && x_addr_sum[1];
-wire              x_branch_cmp;
+wire              x_branch_cmp_noinvert;
+
+wire              x_branch_was_predicted = |BRANCH_PREDICTOR && fd_cir_predbranch[fd_cir[1:0] == 2'b11];
+wire              x_branch_cmp = x_branch_cmp_noinvert ^ x_branch_was_predicted;
 
 generate
 if (~|FAST_BRANCHCMP) begin: alu_branchcmp
 
-	assign x_branch_cmp = x_alu_cmp;
+	assign x_branch_cmp_noinvert = x_alu_cmp;
 
 end else begin: fast_branchcmp
 
@@ -704,7 +722,7 @@ end else begin: fast_branchcmp
 		.aluop (d_aluop),
 		.op_a  (x_rs1_bypass),
 		.op_b  (x_rs2_bypass),
-		.cmp   (x_branch_cmp)
+		.cmp   (x_branch_cmp_noinvert)
 	);
 
 end
@@ -718,6 +736,19 @@ wire x_jump_req_unchecked = !x_stall_on_raw && (
 );
 
 assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail;
+
+assign x_btb_set = |BRANCH_PREDICTOR && (
+	x_jump_req_unchecked && d_addr_offs[W_ADDR - 1] && !x_branch_was_predicted
+);
+
+assign x_btb_clear = d_fence_i || (m_trap_enter_vld && m_trap_enter_rdy) || (|BRANCH_PREDICTOR && (
+	x_branch_was_predicted && x_jump_req_unchecked
+));
+
+// Match address is the address of the final halfword of the branch
+// instruction. TODO can we save this adder?
+assign x_btb_set_src_addr = d_pc + {30'h0, fd_cir[1:0] == 2'b11, 1'b0};
+assign x_btb_set_target_addr = x_jump_target;
 
 // Memory protection
 
