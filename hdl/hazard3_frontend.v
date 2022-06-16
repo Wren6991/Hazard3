@@ -348,6 +348,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (jump_now) begin
 			if (|EXTENSION_C) begin
 				if (mem_addr_rdy) begin
+					mem_aph_hwvld <= 2'b11;
 					mem_data_hwvld <= {1'b1, !jump_target[1]};
 				end else begin
 					mem_aph_hwvld <= {1'b1, !jump_target[1]};

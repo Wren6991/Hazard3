@@ -146,8 +146,9 @@ always @ (posedge clk or negedge rst_n) begin
 		// branch, it *must* be a valid branch instruction, because executing
 		// the branch is how we recover from misprediction
 `ifdef FORMAL
-		// This can be defeated if you branch backward halfway into a 32-bit instruction that immediately precedes the branch.
-		if (predicted_branch && !d_starved && !debug_mode) begin
+		// This can be defeated if you branch backward halfway into a 32-bit
+		// instruction that immediately precedes the branch.
+		if (predicted_branch && !d_starved && !debug_mode && !d_except_instr_bus_fault) begin
 			assert(!d_invalid);
 			assert(d_branchcond == BCOND_ZERO || d_branchcond == BCOND_NZERO);
 		end

@@ -35,7 +35,7 @@ SEPARATE_COMPILE=1
 # You must also define below how to create an object file, and how to link.
 OBJOUT 	= -o
 LFLAGS 	= -T ../../common/memmap.ld
-ASFLAGS = -c -march=rv32imc_zicsr
+ASFLAGS = -c -march=rv32im_zicsr
 OFLAG 	= -o
 COUT 	= -c
 
