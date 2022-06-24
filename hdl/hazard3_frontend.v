@@ -41,6 +41,7 @@ module hazard3_frontend #(
 	// such that `src_addr` appears to be sequentially followed by `target`.
 	input  wire              btb_set,
 	input  wire [W_ADDR-1:0] btb_set_src_addr,
+	input  wire              btb_set_src_size,
 	input  wire [W_ADDR-1:0] btb_set_target_addr,
 	input  wire              btb_clear,
 	output wire [W_ADDR-1:0] btb_target_addr_out,
@@ -95,16 +96,17 @@ localparam FIFO_DEPTH = 2;
 wire jump_now = jump_target_vld && jump_target_rdy;
 reg [1:0] mem_data_hwvld;
 // Mark data as containing a predicted-taken branch instruction so that
-// mispredicts can be recovered:
-reg       mem_data_predbranch;
+// mispredicts can be recovered -- need to track both halfwords so that we
+// can mark the entire instruction, and nothing but the instruction:
+reg [1:0] mem_data_predbranch;
 
 // Bus errors travel alongside data. They cause an exception if the core tries
 // to decode the instruction, but until then can be flushed harmlessly.
 
-reg  [W_DATA-1:0]    fifo_mem [0:FIFO_DEPTH];
+reg  [W_DATA-1:0]    fifo_mem        [0:FIFO_DEPTH];
 reg  [FIFO_DEPTH:0]  fifo_err;
-reg  [FIFO_DEPTH:0]  fifo_predbranch;
-reg  [1:0]           fifo_valid_hw [0:FIFO_DEPTH];
+reg  [1:0]           fifo_predbranch [0:FIFO_DEPTH];
+reg  [1:0]           fifo_valid_hw   [0:FIFO_DEPTH];
 reg  [FIFO_DEPTH:-1] fifo_valid;
 
 wire [W_DATA-1:0] fifo_rdata       = fifo_mem[0];
@@ -119,6 +121,7 @@ wire              fifo_dbg_inject = DEBUG_SUPPORT && dbg_instr_data_vld && dbg_i
 always @ (*) begin: boundary_conditions
 	integer i;
 	fifo_mem[FIFO_DEPTH] = mem_data;
+	fifo_predbranch[FIFO_DEPTH] = 2'b00;
 	fifo_valid_hw[FIFO_DEPTH] = 2'b00;
 	fifo_valid[FIFO_DEPTH] = 1'b0;
 	fifo_valid[-1] = 1'b1;
@@ -134,7 +137,7 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 			fifo_valid_hw[i] <= 2'b00;
 			fifo_mem[i] <= 32'h0;
 			fifo_err[i] <= 1'b0;
-			fifo_predbranch[i] <= 1'b0;
+			fifo_predbranch[i] <= 2'b00;
 		end
 	end else begin
 		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
@@ -156,7 +159,7 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 		if (fifo_dbg_inject) begin
 			fifo_mem[0] <= dbg_instr_data;
 			fifo_err[0] <= 1'b0;
-			fifo_predbranch[0] <= 1'b0;
+			fifo_predbranch[0] <= 2'b00;
 			fifo_valid_hw[0] <= 2'b11;
 		end
 `ifdef FORMAL
@@ -172,6 +175,7 @@ end
 // Branch target buffer
 
 reg [W_ADDR-1:0] btb_src_addr;
+reg              btb_src_size;
 reg [W_ADDR-1:0] btb_target_addr;
 reg              btb_valid;
 
@@ -180,6 +184,7 @@ if (BRANCH_PREDICTOR) begin: have_btb
 	always @ (posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
 			btb_src_addr <= {W_ADDR{1'b0}};
+			btb_src_size <= 1'b0;
 			btb_target_addr <= {W_ADDR{1'b0}};
 			btb_valid <= 1'b0;
 		end else if (btb_clear) begin
@@ -188,6 +193,7 @@ if (BRANCH_PREDICTOR) begin: have_btb
 			btb_valid <= 1'b0;
 		end else if (btb_set) begin
 			btb_src_addr <= btb_set_src_addr;
+			btb_src_size <= btb_set_src_size;
 			btb_target_addr <= btb_set_target_addr;
 			btb_valid <= 1'b1;
 		end
@@ -218,27 +224,37 @@ assign btb_target_addr_out = btb_target_addr;
 // Fetch addr runs ahead of the PC, in word increments.
 reg [W_ADDR-1:0] fetch_addr;
 reg              fetch_priv;
+reg              btb_prev_start_of_overhanging;
 
-wire btb_match_now = |BRANCH_PREDICTOR && btb_valid && (
+wire btb_match_word = |BRANCH_PREDICTOR && btb_valid && (
 	fetch_addr[W_ADDR-1:2] == btb_src_addr[W_ADDR-1:2]
 );
+
+wire btb_src_overhanging    = btb_src_size && btb_src_addr[1];
+wire btb_match_current_addr = btb_match_word && !btb_src_overhanging;
+wire btb_match_next_addr    = btb_match_word && btb_src_overhanging;
+
+wire btb_match_now = btb_match_current_addr || btb_prev_start_of_overhanging;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		fetch_addr <= RESET_VECTOR;
 		// M-mode at reset:
 		fetch_priv <= 1'b1;
+		btb_prev_start_of_overhanging <= 1'b0;
 	end else begin
 		if (jump_now) begin
 			// Post-increment if jump request is going straight through
 			fetch_addr <= {jump_target[W_ADDR-1:2] + (mem_addr_rdy && !mem_addr_hold), 2'b00};
 			fetch_priv <= jump_priv || !U_MODE;
+			btb_prev_start_of_overhanging <= 1'b0;
 		end else if (mem_addr_vld && mem_addr_rdy) begin
 			if (btb_match_now && |BRANCH_PREDICTOR) begin
 				fetch_addr <= {btb_target_addr[W_ADDR-1:2], 2'b00};
 			end else begin
 				fetch_addr <= fetch_addr + 32'h4;
 			end
+			btb_prev_start_of_overhanging <= btb_match_next_addr;
 		end
 	end
 end
@@ -343,7 +359,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mem_data_hwvld <= 2'b11;
 		mem_aph_hwvld <= 2'b11;
-		mem_data_predbranch <= 1'b0;
+		mem_data_predbranch <= 2'b00;
 	end else begin
 		if (jump_now) begin
 			if (|EXTENSION_C) begin
@@ -354,13 +370,13 @@ always @ (posedge clk or negedge rst_n) begin
 					mem_aph_hwvld <= {1'b1, !jump_target[1]};
 				end
 			end
-			mem_data_predbranch <= 1'b0;
+			mem_data_predbranch <= 2'b00;
 		end else if (mem_addr_vld && mem_addr_rdy) begin
 			if (|EXTENSION_C) begin
 				// If a predicted-taken branch instruction only spans the first
 				// half of a word, need to flag the second half as invalid. 
 				mem_data_hwvld <= mem_aph_hwvld & {
-					!(|BRANCH_PREDICTOR && btb_match_now && !btb_src_addr[1]),
+					!(|BRANCH_PREDICTOR && btb_match_now && (btb_src_addr[1] == btb_src_size)),
 					1'b1
 				};
 				// Also need to take the alignment of the destination into account.
@@ -369,7 +385,14 @@ always @ (posedge clk or negedge rst_n) begin
 					!(|BRANCH_PREDICTOR && btb_match_now && btb_target_addr[1])
 				};
 			end
-			mem_data_predbranch <= |BRANCH_PREDICTOR && btb_match_now;
+			mem_data_predbranch <=
+				|BRANCH_PREDICTOR && btb_match_current_addr ? (
+					btb_src_addr[1] ? 2'b10 :
+					btb_src_size    ? 2'b11 : 2'b01
+				) :
+				|BRANCH_PREDICTOR && btb_prev_start_of_overhanging ? (
+					2'b01
+				) : 2'b00;
 		end
 	end
 end
@@ -432,9 +455,7 @@ wire [2:0] cir_bus_err_plus_fetch =
 // And the same thing again for whether CIR contains a predicted-taken branch.
 // One day I should clean up this copy/paste.
 
-wire fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
-// We mark only the last halfword of the branch instruction as being predicted.
-wire [1:0] fetch_predbranch_hw = &fetch_data_hwvld ? {fetch_predbranch, 1'b0} : {1'b0, fetch_predbranch};
+wire [1:0] fetch_predbranch_hw = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
 
 reg  [2:0] cir_predbranch_reg;
 wire [2:0] cir_predbranch_shifted =

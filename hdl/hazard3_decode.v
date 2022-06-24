@@ -128,7 +128,16 @@ reg  [W_ADDR-1:0] pc;
 wire [W_ADDR-1:0] pc_seq_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
 assign d_pc = pc;
 
-wire predicted_branch = fd_cir_predbranch[d_instr_is_32bit] && |BRANCH_PREDICTOR;
+// Frontend should mark the whole instruction, and nothing but the
+// instruction, as a predicted branch. This goes wrong when we execute the
+// address containing the predicted branch twice with different 16-bit
+// alignments! We don't care about performance in this case(it took BMC to
+// find it), but need to issue a branch-to-self to get back on a linear path,
+// otherwise PC and CIR will diverge and we will misexecute.
+wire partial_predicted_branch = !d_starved &&
+	|BRANCH_PREDICTOR && d_instr_is_32bit && ^fd_cir_predbranch;
+
+wire predicted_branch = |BRANCH_PREDICTOR && fd_cir_predbranch[0];
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -148,15 +157,10 @@ always @ (posedge clk or negedge rst_n) begin
 `ifdef FORMAL
 		// This can be defeated if you branch backward halfway into a 32-bit
 		// instruction that immediately precedes the branch.
-		if (predicted_branch && !d_starved && !debug_mode && !d_except_instr_bus_fault) begin
-			assert(!d_invalid);
-			assert(d_branchcond == BCOND_ZERO || d_branchcond == BCOND_NZERO);
-		end
-		if (&fd_cir_predbranch && !d_instr_is_32bit) begin
-			// Only way to get two back-to-back predicted-taken instructions
-			// is if they are the same instruction
-			assert(d_btb_target_addr == pc);
-		end
+		// if (predicted_branch && !d_starved && !debug_mode && !d_except_instr_bus_fault) begin
+		// 	assert(!d_invalid);
+		// 	assert(d_branchcond == BCOND_ZERO || d_branchcond == BCOND_NZERO);
+		// end
 `endif
 	end
 end
@@ -176,6 +180,9 @@ always @ (*) begin
 	{1'bz, 1'b1, 5'b00011}: d_addr_offs = 32'h0000_0004; // Zifencei
 	default:                d_addr_offs = 32'hxxxx_xxxx;
 	endcase
+	if (partial_predicted_branch) begin
+		d_addr_offs = 32'h0000_0000;
+	end
 end
 
 // ----------------------------------------------------------------------------
@@ -323,7 +330,7 @@ always @ (*) begin
 	default:      begin d_invalid_32bit = 1'b1; end
 	endcase
 
-	if (d_invalid || d_starved || d_except_instr_bus_fault) begin
+	if (d_invalid || d_starved || d_except_instr_bus_fault || partial_predicted_branch) begin
 		d_rs1        = {W_REGADDR{1'b0}};
 		d_rs2        = {W_REGADDR{1'b0}};
 		d_rd         = {W_REGADDR{1'b0}};
@@ -343,6 +350,9 @@ always @ (*) begin
 	end
 	if (cir_lock_prev) begin
 		d_branchcond = BCOND_NEVER;
+	end else if (partial_predicted_branch) begin
+		d_addr_is_regoffs = 1'b0;
+		d_branchcond = BCOND_ALWAYS;
 	end
 end
 

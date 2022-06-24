@@ -105,6 +105,7 @@ wire                 df_cir_flush_behind;
 
 wire                 x_btb_set;
 wire [W_ADDR-1:0]    x_btb_set_src_addr;
+wire                 x_btb_set_src_size;
 wire [W_ADDR-1:0]    x_btb_set_target_addr;
 wire                 x_btb_clear;
 
@@ -138,6 +139,7 @@ hazard3_frontend #(
 
 	.btb_set              (x_btb_set),
 	.btb_set_src_addr     (x_btb_set_src_addr),
+	.btb_set_src_size     (x_btb_set_src_size),
 	.btb_set_target_addr  (x_btb_set_target_addr),
 	.btb_clear            (x_btb_clear),
 	.btb_target_addr_out  (d_btb_target_addr),
@@ -750,10 +752,9 @@ assign x_btb_clear = d_fence_i || (m_trap_enter_vld && m_trap_enter_rdy) || (|BR
 	x_branch_was_predicted && x_jump_req_unchecked
 ));
 
-// Match address is the address of the final halfword of the branch
-// instruction. TODO can we save this adder?
-assign x_btb_set_src_addr = d_pc + {30'h0, fd_cir[1:0] == 2'b11, 1'b0};
+assign x_btb_set_src_addr = d_pc;
 assign x_btb_set_target_addr = x_jump_target;
+assign x_btb_set_src_size = &fd_cir[1:0];
 
 // Memory protection
 
