@@ -190,30 +190,9 @@ assign sys_reset_done = rst_n_cpu0 && rst_n_cpu1;
 assign hart_reset_done = {rst_n_cpu1, rst_n_cpu0};
 
 hazard3_cpu_1port #(
-	// Have to copy paste hazard3_config_inst.vh just so we can change MHARTID
-	.RESET_VECTOR    (RESET_VECTOR),
-	.MTVEC_INIT      (MTVEC_INIT),
-	.EXTENSION_A     (EXTENSION_A),
-	.EXTENSION_C     (EXTENSION_C),
-	.EXTENSION_M     (EXTENSION_M),
-	.EXTENSION_ZBA   (EXTENSION_ZBA),
-	.EXTENSION_ZBB   (EXTENSION_ZBB),
-	.EXTENSION_ZBC   (EXTENSION_ZBC),
-	.EXTENSION_ZBS   (EXTENSION_ZBS),
-	.CSR_M_MANDATORY (CSR_M_MANDATORY),
-	.CSR_M_TRAP      (CSR_M_TRAP),
-	.CSR_COUNTER     (CSR_COUNTER),
-	.DEBUG_SUPPORT   (DEBUG_SUPPORT),
-	.NUM_IRQ         (NUM_IRQ),
-	.MVENDORID_VAL   (MVENDORID_VAL),
-	.MIMPID_VAL      (MIMPID_VAL),
-	.MHARTID_VAL     (32'h0000_0000),
-	.MCONFIGPTR_VAL  (MCONFIGPTR_VAL),
-	.REDUCED_BYPASS  (REDUCED_BYPASS),
-	.MULDIV_UNROLL   (MULDIV_UNROLL),
-	.MUL_FAST        (MUL_FAST),
-	.MULH_FAST       (MULH_FAST),
-	.MTVEC_WMASK     (MTVEC_WMASK)
+	.MHARTID_VAL (32'h0000_0000),
+`define HAZARD3_CONFIG_INST_NO_MHARTID
+`include "hazard3_config_inst.vh"
 ) cpu0 (
 	.clk                        (clk),
 	.rst_n                      (rst_n_cpu0),
@@ -254,30 +233,9 @@ hazard3_cpu_1port #(
 );
 
 hazard3_cpu_1port #(
-	// Have to copy paste hazard3_config_inst.vh just so we can change MHARTID
-	.RESET_VECTOR    (RESET_VECTOR),
-	.MTVEC_INIT      (MTVEC_INIT),
-	.EXTENSION_A     (EXTENSION_A),
-	.EXTENSION_C     (EXTENSION_C),
-	.EXTENSION_M     (EXTENSION_M),
-	.EXTENSION_ZBA   (EXTENSION_ZBA),
-	.EXTENSION_ZBB   (EXTENSION_ZBB),
-	.EXTENSION_ZBC   (EXTENSION_ZBC),
-	.EXTENSION_ZBS   (EXTENSION_ZBS),
-	.CSR_M_MANDATORY (CSR_M_MANDATORY),
-	.CSR_M_TRAP      (CSR_M_TRAP),
-	.CSR_COUNTER     (CSR_COUNTER),
-	.DEBUG_SUPPORT   (DEBUG_SUPPORT),
-	.NUM_IRQ         (NUM_IRQ),
-	.MVENDORID_VAL   (MVENDORID_VAL),
-	.MIMPID_VAL      (MIMPID_VAL),
-	.MHARTID_VAL     (32'h0000_0001),
-	.MCONFIGPTR_VAL  (MCONFIGPTR_VAL),
-	.REDUCED_BYPASS  (REDUCED_BYPASS),
-	.MULDIV_UNROLL   (MULDIV_UNROLL),
-	.MUL_FAST        (MUL_FAST),
-	.MULH_FAST       (MULH_FAST),
-	.MTVEC_WMASK     (MTVEC_WMASK)
+	.MHARTID_VAL (32'h0000_0001),
+`define HAZARD3_CONFIG_INST_NO_MHARTID
+`include "hazard3_config_inst.vh"
 ) cpu1 (
 	.clk                        (clk),
 	.rst_n                      (rst_n_cpu1),

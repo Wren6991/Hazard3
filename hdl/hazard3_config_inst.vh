@@ -7,6 +7,11 @@
 // be set at instantiation rather than editing the config file, and will flow
 // correctly down through the hierarchy.
 
+// The symbol HAZARD3_CONFIG_INST_NO_MHARTID can be defined to allow reuse of
+// this file in multicore instantiations, where cores share all parameters
+// except for MHARTID_VAL. It must be defined once before each include of
+// this file.
+
 .RESET_VECTOR       (RESET_VECTOR),
 .MTVEC_INIT         (MTVEC_INIT),
 .EXTENSION_A        (EXTENSION_A),
@@ -31,7 +36,9 @@
 .NUM_IRQ            (NUM_IRQ),
 .MVENDORID_VAL      (MVENDORID_VAL),
 .MIMPID_VAL         (MIMPID_VAL),
+`ifndef HAZARD3_CONFIG_INST_NO_MHARTID
 .MHARTID_VAL        (MHARTID_VAL),
+`endif
 .MCONFIGPTR_VAL     (MCONFIGPTR_VAL),
 .REDUCED_BYPASS     (REDUCED_BYPASS),
 .MULDIV_UNROLL      (MULDIV_UNROLL),
@@ -43,3 +50,7 @@
 .RESET_REGFILE      (RESET_REGFILE),
 .W_ADDR             (W_ADDR),
 .W_DATA             (W_DATA)
+
+`ifdef HAZARD3_CONFIG_INST_NO_MHARTID
+`undef HAZARD3_CONFIG_INST_NO_MHARTID
+`endif
