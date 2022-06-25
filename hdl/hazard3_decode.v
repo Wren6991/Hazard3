@@ -131,9 +131,8 @@ assign d_pc = pc;
 // Frontend should mark the whole instruction, and nothing but the
 // instruction, as a predicted branch. This goes wrong when we execute the
 // address containing the predicted branch twice with different 16-bit
-// alignments! We don't care about performance in this case(it took BMC to
-// find it), but need to issue a branch-to-self to get back on a linear path,
-// otherwise PC and CIR will diverge and we will misexecute.
+// alignments (!). We need to issue a branch-to-self to get back on a linear
+// path, otherwise PC and CIR will diverge and we will misexecute.
 wire partial_predicted_branch = !d_starved &&
 	|BRANCH_PREDICTOR && d_instr_is_32bit && ^fd_cir_predbranch;
 

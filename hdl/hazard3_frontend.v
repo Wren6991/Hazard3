@@ -386,7 +386,7 @@ always @ (posedge clk or negedge rst_n) begin
 				};
 			end
 			mem_data_predbranch <=
-				|BRANCH_PREDICTOR && btb_match_current_addr ? (
+				|BRANCH_PREDICTOR && btb_match_word ? (
 					btb_src_addr[1] ? 2'b10 :
 					btb_src_size    ? 2'b11 : 2'b01
 				) :
