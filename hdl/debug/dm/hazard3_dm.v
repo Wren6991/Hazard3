@@ -3,7 +3,7 @@
 |                     SPDX-License-Identifier: Apache-2.0                     |
 \*****************************************************************************/
 
-// RISC-V Debug Module for Hazard3
+// RISC-V Debug Module for Hazard3. Supports up to 32 cores (1 hart per core).
 
 `default_nettype none
 
@@ -88,7 +88,8 @@ localparam ADDR_HARTINFO     = 7'h12;
 localparam ADDR_HALTSUM1     = 7'h13;
 localparam ADDR_HALTSUM0     = 7'h40;
 // No HALTSUM2+ registers (we don't support >32 harts anyway)
-// No array mask select registers
+localparam ADDR_HAWINDOWSEL  = 7'h14;
+localparam ADDR_HAWINDOW     = 7'h15;
 localparam ADDR_ABSTRACTCS   = 7'h16;
 localparam ADDR_COMMAND      = 7'h17;
 localparam ADDR_ABSTRACTAUTO = 7'h18;
@@ -116,11 +117,15 @@ wire [W_HARTSEL-1:0] hartsel_next;
 
 generate
 if (N_HARTS > 1) begin: has_hartsel
-	// only the lower 10 bits of hartsel are supported
+
+	// Only the lower 10 bits of hartsel are supported
 	assign hartsel_next = dmi_write && dmi_regaddr == ADDR_DMCONTROL ?
 		dmi_pwdata[16 +: W_HARTSEL] : hartsel;
+
 end else begin: has_no_hartsel
+
 	assign hartsel_next = 1'b0;
+
 end
 endgenerate
 
@@ -134,15 +139,68 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+// Also implement the hart array mask if there is more than one hart.
+reg  [N_HARTS-1:0] hart_array_mask;
+reg                hasel;
+wire [N_HARTS-1:0] hart_array_mask_next;
+wire               hasel_next;
+
+generate
+if (N_HARTS > 1) begin: has_array_mask
+
+	assign hart_array_mask_next = dmi_write && dmi_regaddr == ADDR_HAWINDOW ?
+		dmi_pwdata[N_HARTS-1:0] : hart_array_mask;
+	assign hasel_next = dmi_write && dmi_regaddr == ADDR_DMCONTROL ?
+		dmi_pwdata[26] : hasel;
+
+end else begin: has_no_array_mask
+
+	assign hart_array_mask_next = 1'b0;
+	assign hasel_next = 1'b0;
+
+end
+endgenerate
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		hart_array_mask <= {N_HARTS{1'b0}};
+		hasel <= 1'b0;
+	end else if (!dmactive) begin
+		hart_array_mask <= {N_HARTS{1'b0}};
+		hasel <= 1'b0;
+	end else begin
+		hart_array_mask <= hart_array_mask_next;
+		hasel <= hasel_next;
+	end
+end
+
 // ----------------------------------------------------------------------------
 // Run/halt/reset control
 
 // Normal read/write fields for dmcontrol (note some of these are per-hart
 // fields that get rotated into dmcontrol based on the current/next hartsel).
-reg [N_HARTS-1:0] dmcontrol_haltreq;
-reg [N_HARTS-1:0] dmcontrol_hartreset;
-reg [N_HARTS-1:0] dmcontrol_resethaltreq;
-reg               dmcontrol_ndmreset;
+reg  [N_HARTS-1:0] dmcontrol_haltreq;
+reg  [N_HARTS-1:0] dmcontrol_hartreset;
+reg  [N_HARTS-1:0] dmcontrol_resethaltreq;
+reg                dmcontrol_ndmreset;
+
+wire [N_HARTS-1:0] dmcontrol_op_mask;
+
+generate
+if (N_HARTS > 1) begin: dmcontrol_multiple_harts
+
+	// Note we don't need to use the "next" version of hart_array_mask since
+	// it can't change simultaneously with a run/halt/reset request.
+	assign dmcontrol_op_mask =
+		hasel_next              ? hart_array_mask :
+		hartsel_next >= N_HARTS ? {N_HARTS{1'b0}} : {{N_HARTS-1{1'b0}}, 1'b1} << hartsel_next;
+
+end else begin: dmcontrol_single_hart
+
+	assign dmcontrol_op_mask = 1'b1;
+
+end
+endgenerate
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -162,11 +220,16 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (dmi_write && dmi_regaddr == ADDR_DMCONTROL) begin
 		dmactive <= dmi_pwdata[0];
 		dmcontrol_ndmreset <= dmi_pwdata[1];
-		dmcontrol_haltreq[hartsel_next] <= dmi_pwdata[31];
-		dmcontrol_hartreset[hartsel_next] <= dmi_pwdata[29];
-		// set/clear fields on this one for some reason
-		dmcontrol_resethaltreq[hartsel_next] <= dmcontrol_resethaltreq[hartsel_next]
-			&& !dmi_pwdata[2] || dmi_pwdata[3];
+
+		dmcontrol_haltreq <= (dmcontrol_haltreq & ~dmcontrol_op_mask) |
+			({N_HARTS{dmi_pwdata[31]}} & dmcontrol_op_mask);
+
+		dmcontrol_hartreset <= (dmcontrol_hartreset & ~dmcontrol_op_mask) |
+			({N_HARTS{dmi_pwdata[29]}} & dmcontrol_op_mask);
+
+		dmcontrol_resethaltreq <= (dmcontrol_resethaltreq
+			& ~({N_HARTS{dmi_pwdata[2]}} & dmcontrol_op_mask))
+			|  ({N_HARTS{dmi_pwdata[3]}} & dmcontrol_op_mask);
 	end
 end
 
@@ -187,22 +250,24 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+wire dmcontrol_ackhavereset = dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[28];
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		dmstatus_havereset <= {N_HARTS{1'b0}};
 	end else if (!dmactive) begin
 		dmstatus_havereset <= {N_HARTS{1'b0}};
 	end else begin
-		dmstatus_havereset <= dmstatus_havereset | (hart_reset_done & ~hart_reset_done_prev);
-		// dmcontrol.ackhavereset:
-		if (dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[28])
-			dmstatus_havereset[hartsel_next] <= 1'b0;
+		dmstatus_havereset <= (dmstatus_havereset | (hart_reset_done & ~hart_reset_done_prev))
+			& ~({N_HARTS{dmcontrol_ackhavereset}} & dmcontrol_op_mask);
 	end
 end
 
 reg [N_HARTS-1:0] dmstatus_resumeack;
 reg [N_HARTS-1:0] dmcontrol_resumereq_sticky;
 
+wire dmcontrol_resumereq = dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[30];
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		dmstatus_resumeack <= {N_HARTS{1'b0}};
@@ -211,13 +276,13 @@ always @ (posedge clk or negedge rst_n) begin
 		dmstatus_resumeack <= {N_HARTS{1'b0}};
 		dmcontrol_resumereq_sticky <= {N_HARTS{1'b0}};
 	end else begin
-		dmstatus_resumeack <= dmstatus_resumeack | (dmcontrol_resumereq_sticky & hart_running & hart_available);
-		dmcontrol_resumereq_sticky <= dmcontrol_resumereq_sticky & ~(hart_running & hart_available); // TODO this is because our "running" is actually just "not debug mode"
-		// dmcontrol.resumereq:
-		if (dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[30]) begin
-			dmcontrol_resumereq_sticky[hartsel_next] <= 1'b1;
-			dmstatus_resumeack[hartsel_next] <= 1'b0;
-		end
+		dmstatus_resumeack <= (dmstatus_resumeack
+			| (dmcontrol_resumereq_sticky & hart_running & hart_available))
+			& ~({N_HARTS{dmcontrol_resumereq}} & dmcontrol_op_mask);
+
+		dmcontrol_resumereq_sticky <= (dmcontrol_resumereq_sticky
+			& ~(hart_running & hart_available))
+			| ({N_HARTS{dmcontrol_resumereq}} & dmcontrol_op_mask);
 	end
 end
 
@@ -483,18 +548,53 @@ assign hart_instr_data = {N_HARTS{
 }};
 
 // ----------------------------------------------------------------------------
+// Status helper functions
+
+function status_any;
+	input [N_HARTS-1:0] status_mask;
+begin
+	if (hasel) begin
+		status_any = |(status_mask & hart_array_mask);
+	end else begin
+		status_any = status_mask[hartsel];
+	end
+end
+endfunction
+
+function status_all;
+	input [N_HARTS-1:0] status_mask;
+begin
+	if (hasel) begin
+		status_all = ~|(~status_mask & hart_array_mask);
+	end else begin
+		status_all = status_mask[hartsel];
+	end
+end
+endfunction
+
+function [1:0] status_all_any;
+	input [N_HARTS-1:0] status_mask;
+begin
+	status_all_any = {
+		status_all(status_mask),
+		status_any(status_mask)
+	};
+end
+endfunction
+
+// ----------------------------------------------------------------------------
 // DMI read data mux
 
 always @ (*) begin
 	case (dmi_regaddr)
 	ADDR_DATA0:        dmi_prdata = abstract_data0;
 	ADDR_DMCONTROL:    dmi_prdata = {
-		dmcontrol_haltreq[hartsel],
+		1'b0,                             // haltreq is a W-only field
 		1'b0,                             // resumereq is a W1 field
-		dmcontrol_hartreset[hartsel],
+		status_any(dmcontrol_hartreset),
 		1'b0,                             // ackhavereset is a W1 field
 		1'b0,                             // reserved
-		1'b0,                             // hasel hardwired 0 (no array mask)
+		hasel,
 		{{10-W_HARTSEL{1'b0}}, hartsel},  // hartsello
 		10'h0,                            // hartselhi
 		2'h0,                             // reserved
@@ -503,20 +603,20 @@ always @ (*) begin
 		dmactive
 	};
 	ADDR_DMSTATUS:     dmi_prdata = {
-		9'h0,                                                  // reserved
-		1'b1,                                                  // impebreak = 1
-		2'h0,                                                  // reserved
-		{2{dmstatus_havereset[hartsel]}},                      // allhavereset, anyhavereset
-		{2{dmstatus_resumeack[hartsel]}},                      // allresumeack, anyresumeack
-		{2{hartsel >= N_HARTS}},                               // allnonexistent, anynonexistent
-		{2{!hart_available[hartsel]}},                         // allunavail, anyunavail
-		{2{hart_running[hartsel] && hart_available[hartsel]}}, // allrunning, anyrunning
-		{2{hart_halted[hartsel] && hart_available[hartsel]}},  // allhalted, anyhalted
-		1'b1,                                                  // authenticated
-		1'b0,                                                  // authbusy
-		1'b1,                                                  // hasresethaltreq = 1 (we do support it)
-		1'b0,                                                  // confstrptrvalid
-		4'd2                                                   // version = 2: RISC-V debug spec 0.13.2
+		9'h0,                                           // reserved
+		1'b1,                                           // impebreak = 1
+		2'h0,                                           // reserved
+		status_all_any(dmstatus_havereset),             // allhavereset, anyhavereset
+		status_all_any(dmstatus_resumeack),             // allresumeack, anyresumeack
+		{2{!hasel && hartsel >= N_HARTS}},              // allnonexistent, anynonexistent
+		status_all_any(~hart_available),                // allunavail, anyunavail
+		status_all_any(hart_running & hart_available),  // allrunning, anyrunning
+		status_all_any(hart_halted & hart_available),   // allhalted, anyhalted
+		1'b1,                                           // authenticated
+		1'b0,                                           // authbusy
+		1'b1,                                           // hasresethaltreq = 1 (we do support it)
+		1'b0,                                           // confstrptrvalid
+		4'd2                                            // version = 2: RISC-V debug spec 0.13.2
 	};
 	ADDR_HARTINFO:     dmi_prdata = {
 		8'h0,                             // reserved
@@ -534,6 +634,11 @@ always @ (*) begin
 	ADDR_HALTSUM1:     dmi_prdata = {
 		{XLEN - 1{1'b0}},
 		|(hart_halted & hart_available)
+	};
+	ADDR_HAWINDOWSEL:  dmi_prdata = 32'h00000000;
+	ADDR_HAWINDOW:     dmi_prdata = {
+		{32-N_HARTS{1'b0}},
+		hart_array_mask
 	};
 	ADDR_ABSTRACTCS:   dmi_prdata = {
 		3'h0,                             // reserved
