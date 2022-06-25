@@ -347,11 +347,12 @@ always @ (*) begin
 		else if (d_invalid && !d_starved)
 			d_except = EXCEPT_INSTR_ILLEGAL;
 	end
-	if (cir_lock_prev) begin
-		d_branchcond = BCOND_NEVER;
-	end else if (partial_predicted_branch) begin
+	if (partial_predicted_branch) begin
 		d_addr_is_regoffs = 1'b0;
 		d_branchcond = BCOND_ALWAYS;
+	end
+	if (cir_lock_prev) begin
+		d_branchcond = BCOND_NEVER;
 	end
 end
 
