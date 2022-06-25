@@ -47,7 +47,7 @@ always @ (*) begin: shift
 		dout[i] = right_nleft ? shift_accum[W_DATA - 1 - i] : shift_accum[i];
 end
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 always @ (*) begin
 	if (right_nleft && arith && !rotate) begin: asr
 		assert($signed(dout) == $signed(din) >>> $signed(shamt));

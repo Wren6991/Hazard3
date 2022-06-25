@@ -396,7 +396,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 always @ (posedge clk) if (rst_n && !x_stall) begin
 	// If stage 2 sees a reg operand, it must have been correctly predecoded too.
 	if (|d_rs1)
@@ -499,7 +499,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (m_trap_enter_vld) begin
 			// Bail out, squash the in-progress AMO.
 			x_amo_phase <= 3'h0;
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 			// Should only happen during an address phase, *or* the fault phase.
 			assert(x_amo_phase == 3'h0 || x_amo_phase == 3'h2 || x_amo_phase == 3'h4);
 			// The fault phase only holds when we have a misaligned AMO directly behind
@@ -512,14 +512,14 @@ always @ (posedge clk or negedge rst_n) begin
 			// First address phase stalled due to address dependency on
 			// previous load/mul/etc. Shouldn't be possible in later phases.
 			x_amo_phase <= 3'h0;
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 			assert(x_amo_phase == 3'h0);
 `endif
 		end else if (x_amo_phase == 3'h4) begin
 			// Clear fault phase once it goes through to stage 3 and excepts
 			if (!x_stall)
 				x_amo_phase <= 3'h0;
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 			// This should only happen when we are stalled on an older load/store etc
 			assert(!(x_stall && !m_stall));
 `endif
@@ -542,7 +542,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 always @ (posedge clk) if (rst_n) begin
 	// Other states should be unreachable
 	assert(x_amo_phase <= 3'h4);
@@ -691,7 +691,7 @@ if (EXTENSION_M) begin: has_muldiv
 
 	end
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 	always @ (posedge clk) if (d_aluop != ALUOP_MULDIV) assert(!x_stall_muldiv);
 `endif
 
@@ -957,7 +957,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// First phase of 2-phase AHBL error response. Pass the exception along on
 			// this cycle, and on the next cycle the trap entry will be asserted,
 			// suppressing any load/store that may currently be in stage X.
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 			assert(xm_memop != MEMOP_NONE);
 `endif
 			xm_except <=
@@ -968,7 +968,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 always @ (posedge clk) if (rst_n) begin
 	// D bus errors must always squash younger load/stores
 	if ($past(bus_dph_err_d && !bus_dph_ready_d))
@@ -1124,7 +1124,7 @@ always @ (posedge clk) begin
 end
 `endif
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 // We borrow mw_result during an AMO to capture rdata and feed back through
 // the ALU, since it already has the right paths. Make sure this is safe.
 // (Whatever instruction is in M ahead of AMO should have passed through by

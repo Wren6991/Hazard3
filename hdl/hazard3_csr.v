@@ -1198,7 +1198,7 @@ assign m_mode_loadstore = !U_MODE || debug_mode || ( // FIXME how does this inte
 // ----------------------------------------------------------------------------
 // Properties
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 
 // Keep track of whether we are in a trap (only for formal property purposes)
 reg in_trap;

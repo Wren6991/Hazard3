@@ -212,7 +212,7 @@ end
 // ----------------------------------------------------------------------------
 // Properties for base-ISA instructions
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 `ifndef RISCV_FORMAL
 // Really we're just interested in the shifts and comparisons, as these are
 // the nontrivial ones. However, easier to test everything!

@@ -162,7 +162,7 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 			fifo_predbranch[0] <= 2'b00;
 			fifo_valid_hw[0] <= 2'b11;
 		end
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 		// FIFO validity must be compact, so we can always consume from the end
 		if (!fifo_valid[0]) begin
 			assert(!fifo_valid[1]);
@@ -270,7 +270,7 @@ always @ (posedge clk or negedge rst_n) begin
 		// This should be impossible, but assert to be sure, because it *will*
 		// change the fetch address (and we shouldn't check it in hardware if
 		// we can prove it doesn't happen)
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 		assert(!(jump_target_vld && reset_holdoff));
 `endif
 	end
@@ -338,7 +338,7 @@ always @ (posedge clk or negedge rst_n) begin
 		pending_fetches <= 2'h0;
 		ctr_flush_pending <= 2'h0;
 	end else begin
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 		assert(ctr_flush_pending <= pending_fetches);
 		assert(pending_fetches < 2'd3);
 		assert(!(mem_data_vld && !pending_fetches));
@@ -485,7 +485,7 @@ always @ (posedge clk or negedge rst_n) begin
 		cir_bus_err <= 3'h0;
 		cir_predbranch_reg <= 3'h0;
 	end else begin
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 		assert(cir_vld <= 2);
  		assert(cir_use <= cir_vld);
  		if (!jump_now)
@@ -499,7 +499,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 reg [1:0] property_past_buf_level; // Workaround for weird non-constant $past reset issue
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin

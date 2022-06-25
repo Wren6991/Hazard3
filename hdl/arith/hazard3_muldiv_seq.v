@@ -259,7 +259,7 @@ assign result_l =
 // ----------------------------------------------------------------------------
 // Interface properties
 
-`ifdef FORMAL
+`ifdef HAZARD3_ASSERTIONS
 
 always @ (posedge clk) if (rst_n && $past(rst_n)) begin: properties
 	integer i;

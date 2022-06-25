@@ -150,17 +150,6 @@ always @ (posedge clk or negedge rst_n) begin
 			// prediction target instead of the sequentially next PC
 			pc <= predicted_branch ? d_btb_target_addr : pc_seq_next;
 		end
-		// If the current instruction is marked as being a predicted-taken
-		// branch, it *must* be a valid branch instruction, because executing
-		// the branch is how we recover from misprediction
-`ifdef FORMAL
-		// This can be defeated if you branch backward halfway into a 32-bit
-		// instruction that immediately precedes the branch.
-		// if (predicted_branch && !d_starved && !debug_mode && !d_except_instr_bus_fault) begin
-		// 	assert(!d_invalid);
-		// 	assert(d_branchcond == BCOND_ZERO || d_branchcond == BCOND_NZERO);
-		// end
-`endif
 	end
 end
 
