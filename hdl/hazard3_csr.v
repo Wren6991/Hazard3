@@ -67,6 +67,7 @@ module hazard3_csr #(
 	// case we lower trap_enter_vld.
 	output wire [XLEN-1:0]     trap_addr,
 	output wire                trap_is_irq,
+	output wire                trap_is_debug_entry,
 	output wire                trap_enter_vld,
 	input  wire                trap_enter_rdy,
 	// True when we are about to trap, but are waiting for an excepting or
@@ -1068,7 +1069,8 @@ assign dcause_next =
 	dbg_req_halt_prev || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
 	                                                                  3'h4;  // single-step (priority 0)
 
-assign enter_debug_mode = !debug_mode && (want_halt_irq || want_halt_except) && trap_enter_rdy;
+assign trap_is_debug_entry = |DEBUG_SUPPORT && !debug_mode && (want_halt_irq || want_halt_except);
+assign enter_debug_mode = trap_is_debug_entry && trap_enter_rdy;
 
 assign exit_debug_mode = debug_mode && pending_dbg_resume && trap_enter_rdy;
 

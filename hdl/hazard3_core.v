@@ -277,6 +277,7 @@ wire                 x_alu_cmp;
 
 wire [W_DATA-1:0]    m_trap_addr;
 wire                 m_trap_is_irq;
+wire                 m_trap_is_debug_entry;
 wire                 m_trap_enter_vld;
 wire                 m_trap_enter_soon;
 wire                 m_trap_enter_rdy = f_jump_rdy;
@@ -900,6 +901,7 @@ hazard3_csr #(
 	// Trap signalling
 	.trap_addr                  (m_trap_addr),
 	.trap_is_irq                (m_trap_is_irq),
+	.m_trap_is_debug_entry      (m_trap_is_debug_entry),
 	.trap_enter_soon            (m_trap_enter_soon),
 	.trap_enter_vld             (m_trap_enter_vld),
 	.trap_enter_rdy             (m_trap_enter_rdy),
@@ -1086,21 +1088,26 @@ end
 // Local monitor update.
 // - Set on a load-reserved with good response from global monitor
 // - Cleared by any store-conditional
-// - Not affected by trap entry (permitted by RISC-V spec)
+// - Cleared by non-debug-related trap entry/exit
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mw_local_exclusive_reserved <= 1'b0;
-	end else if (|EXTENSION_A && (!m_stall || bus_dph_err_d)) begin
-		if (d_memop_is_amo) begin
+	end else begin
+		if (|EXTENSION_A && (!m_stall || bus_dph_err_d)) begin
+			if (d_memop_is_amo) begin
+				mw_local_exclusive_reserved <= 1'b0;
+			end else if (xm_memop == MEMOP_SC_W && (bus_dph_ready_d || bus_dph_err_d)) begin
+				mw_local_exclusive_reserved <= 1'b0;
+			end else if (xm_memop == MEMOP_LR_W && bus_dph_ready_d) begin
+				// In theory, the bus should never report HEXOKAY when HRESP is asserted.
+				// Still might happen (e.g. if HEXOKAY is tied high), so mask HEXOKAY with
+				// HREADY to be sure a failed lr.w clears the monitor.
+				mw_local_exclusive_reserved <= bus_dph_exokay_d && !bus_dph_err_d;
+			end
+		end
+		if (m_trap_enter_vld && m_trap_enter_rdy && !(debug_mode || m_trap_is_debug_entry)) begin
 			mw_local_exclusive_reserved <= 1'b0;
-		end else if (xm_memop == MEMOP_SC_W && (bus_dph_ready_d || bus_dph_err_d)) begin
-			mw_local_exclusive_reserved <= 1'b0;
-		end else if (xm_memop == MEMOP_LR_W && bus_dph_ready_d) begin
-			// In theory, the bus should never report HEXOKAY when HRESP is asserted.
-			// Still might happen (e.g. if HEXOKAY is tied high), so mask HEXOKAY with
-			// HREADY to be sure a failed lr.w clears the monitor.
-			mw_local_exclusive_reserved <= bus_dph_exokay_d && !bus_dph_err_d;
 		end
 	end
 end
