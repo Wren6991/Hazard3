@@ -455,7 +455,12 @@ wire [2:0] cir_bus_err_plus_fetch =
 // And the same thing again for whether CIR contains a predicted-taken branch.
 // One day I should clean up this copy/paste.
 
-wire [1:0] fetch_predbranch_hw = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
+wire [1:0] fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
+wire [1:0] fetch_predbranch_aligned = {
+	fetch_predbranch[1],
+	fetch_data_hwvld[0] || ~|EXTENSION_C ? fetch_predbranch[0] : fetch_predbranch[1]
+};
+
 
 reg  [2:0] cir_predbranch_reg;
 wire [2:0] cir_predbranch_shifted =
@@ -464,9 +469,9 @@ wire [2:0] cir_predbranch_shifted =
 
 wire [2:0] cir_predbranch_plus_fetch =
 	!cir_room_for_fetch                    ? cir_predbranch_shifted :
-	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_predbranch_hw[0], cir_predbranch_shifted[1:0]} :
-	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_predbranch_hw, cir_predbranch_shifted[0]} :
-	                                         {cir_predbranch_shifted[2], fetch_predbranch_hw};
+	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_predbranch_aligned[0], cir_predbranch_shifted[1:0]} :
+	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_predbranch_aligned, cir_predbranch_shifted[0]} :
+	                                         {cir_predbranch_shifted[2], fetch_predbranch_aligned};
 
 wire [1:0] fetch_fill_amount = cir_room_for_fetch && fetch_data_vld ? (
 	&fetch_data_hwvld ? 2'h2 : 2'h1
