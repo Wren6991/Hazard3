@@ -6,7 +6,7 @@
 // - Asserting that, when CIR is valid, CIR contents matches the memory value
 //   at PC
 
-localparam MEM_SIZE_BYTES = 64;
+localparam MEM_SIZE_BYTES = 16;
 
 reg [31:0] instr_mem [0:MEM_SIZE_BYTES-1];
 reg [31:0] garbage;

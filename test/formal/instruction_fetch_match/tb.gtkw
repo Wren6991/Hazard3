@@ -1,0 +1,56 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Thu Jun 16 01:20:52 2022
+[*]
+[dumpfile] "/home/luke/proj/hazard3/test/formal/instruction_fetch_match/tb.vcd"
+[dumpfile_mtime] "Thu Jun 16 00:55:13 2022"
+[dumpfile_size] 205426
+[savefile] "/home/luke/proj/hazard3/test/formal/instruction_fetch_match/tb.gtkw"
+[timestart] 0
+[size] 1501 1121
+[pos] -33 -43
+*-5.249836 105 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 233
+[signals_width] 206
+[sst_expanded] 1
+[sst_vpaned_height] 325
+@200
+-I Bus
+@22
+i_haddr[31:0]
+@28
+i_htrans[1:0]
+i_hready
+i_hresp
+@22
+i_hrdata[31:0]
+@200
+-
+@28
+fd_cir_err[1:0]
+fd_cir_predbranch[1:0]
+fd_cir_vld[1:0]
+@22
+fd_cir[31:0]
+@28
+df_cir_use[1:0]
+@22
+d_pc[31:0]
+@200
+-
+-
+@28
+frontend.btb_set
+frontend.btb_clear
+frontend.btb_match_now
+@22
+frontend.btb_target_addr[31:0]
+frontend.fetch_addr[31:0]
+@200
+-
+@28
+frontend.jump_now
+@22
+frontend.jump_target[31:0]
+[pattern_trace] 1
+[pattern_trace] 0
