@@ -29,7 +29,7 @@ Hazard3 is still under development.
 
 # Links to Specifications
 
-These are links to the ratified versions of the extensions. In general, later drafts or releases of these specifications describing the _same extension versions_ may be used for reference, and often have minor improvements to wording.
+These are links to the ratified versions of the extensions.
 
 | Extension  | Specification |
 |----------- |---------------|

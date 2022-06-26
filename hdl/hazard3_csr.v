@@ -555,8 +555,17 @@ always @ (*) begin
 		decode_match = match_mrw;
 	end
 
-	// MEDELEG, MIDELEG should not exist for M-only implementations. Will raise
-	// illegal instruction exception if accessed.
+	// MEDELEG, MIDELEG should not exist for no-S-mode implementations. Will
+	// raise illegal instruction exception if accessed.
+
+	// MENVCFG is seemingly mandatory as of M-mode v1.12, if U-mode is
+	// implemented. All of its fields are tied to 0 in our implementation.
+	MENVCFGH: if (U_MODE) begin
+		decode_match = match_mrw;
+	end
+	MENVCFG: if (U_MODE) begin
+		decode_match = match_mrw;
+	end
 
     // ------------------------------------------------------------------------
 	// Trap-handling CSRs
@@ -844,6 +853,9 @@ always @ (*) begin
 		pmp_cfg_wen = match_mrw && wen;
 		rdata = pmp_cfg_rdata;
 	end
+
+	// MSECCFG is strictly optional, and we don't implement any of its
+	// features (ePMP etc) so we don't decode it.
 
     // ------------------------------------------------------------------------
     // U-mode CSRs
@@ -1272,3 +1284,7 @@ end
 `endif
 
 endmodule
+
+`ifndef YOSYS
+`default_nettype wire
+`endif

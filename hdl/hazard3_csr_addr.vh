@@ -54,6 +54,9 @@ localparam PMPADDR13      = 12'h3bd;
 localparam PMPADDR14      = 12'h3be;
 localparam PMPADDR15      = 12'h3bf;
 
+localparam MSECCFG        = 12'h747;
+localparam MSECCFGH       = 12'h757;
+
 // Performance counters (RW)
 localparam MCYCLE         = 12'hb00; // Raw cycles since start of day
 localparam MINSTRET       = 12'hb02; // Instruction retire count since start of day
@@ -149,6 +152,10 @@ localparam MHPMEVENT28    = 12'h33c; // WARL (we tie to 0)
 localparam MHPMEVENT29    = 12'h33d; // WARL (we tie to 0)
 localparam MHPMEVENT30    = 12'h33e; // WARL (we tie to 0)
 localparam MHPMEVENT31    = 12'h33f; // WARL (we tie to 0)
+
+// Other standard M-mode CSRs:
+localparam MENVCFG        = 12'h30a;
+localparam MENVCFGH       = 12'h31a;
 
 // Custom M-mode CSRs:
 localparam MEIE0          = 12'hbe0; // External interrupt enable register 0
