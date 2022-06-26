@@ -189,11 +189,12 @@ wire [N_HARTS-1:0] dmcontrol_op_mask;
 generate
 if (N_HARTS > 1) begin: dmcontrol_multiple_harts
 
-	// Note we don't need to use the "next" version of hart_array_mask since
-	// it can't change simultaneously with a run/halt/reset request.
+	// Selection is the hart selected by hartsel, *plus* the hart array mask
+	// if hasel is set. Note we don't need to use the "next" version of
+	// hart_array_mask since it can't change simultaneously with dmcontrol.
 	assign dmcontrol_op_mask =
-		hasel_next              ? hart_array_mask :
-		hartsel_next >= N_HARTS ? {N_HARTS{1'b0}} : {{N_HARTS-1{1'b0}}, 1'b1} << hartsel_next;
+		(hartsel_next >= N_HARTS ? {N_HARTS{1'b0}} : {{N_HARTS-1{1'b0}}, 1'b1} << hartsel_next)
+		| ({N_HARTS{hasel_next}} & hart_array_mask);
 
 end else begin: dmcontrol_single_hart
 
@@ -553,22 +554,14 @@ assign hart_instr_data = {N_HARTS{
 function status_any;
 	input [N_HARTS-1:0] status_mask;
 begin
-	if (hasel) begin
-		status_any = |(status_mask & hart_array_mask);
-	end else begin
-		status_any = status_mask[hartsel];
-	end
+	status_any = status_mask[hartsel] || (hasel && |(status_mask & hart_array_mask));
 end
 endfunction
 
 function status_all;
 	input [N_HARTS-1:0] status_mask;
 begin
-	if (hasel) begin
-		status_all = ~|(~status_mask & hart_array_mask);
-	end else begin
-		status_all = status_mask[hartsel];
-	end
+	status_all = status_mask[hartsel] && (!hasel || ~|(~status_mask & hart_array_mask));
 end
 endfunction
 
