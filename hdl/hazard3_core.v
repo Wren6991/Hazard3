@@ -712,7 +712,7 @@ wire [W_ADDR-1:0] x_jump_target = x_addr_sum & ~32'h1;
 wire              x_jump_misaligned = ~|EXTENSION_C && x_addr_sum[1];
 wire              x_branch_cmp_noinvert;
 
-wire              x_branch_was_predicted = |BRANCH_PREDICTOR && fd_cir_predbranch[fd_cir[1:0] == 2'b11];
+wire              x_branch_was_predicted = |BRANCH_PREDICTOR && fd_cir_predbranch[0];
 wire              x_branch_cmp = x_branch_cmp_noinvert ^ x_branch_was_predicted;
 
 generate

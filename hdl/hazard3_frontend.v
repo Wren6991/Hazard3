@@ -95,6 +95,7 @@ localparam FIFO_DEPTH = 2;
 
 wire jump_now = jump_target_vld && jump_target_rdy;
 reg [1:0] mem_data_hwvld;
+
 // Mark data as containing a predicted-taken branch instruction so that
 // mispredicts can be recovered -- need to track both halfwords so that we
 // can mark the entire instruction, and nothing but the instruction:
@@ -225,13 +226,20 @@ assign btb_target_addr_out = btb_target_addr;
 reg [W_ADDR-1:0] fetch_addr;
 reg              fetch_priv;
 reg              btb_prev_start_of_overhanging;
+reg [1:0]        mem_aph_hwvld;
 
 wire btb_match_word = |BRANCH_PREDICTOR && btb_valid && (
 	fetch_addr[W_ADDR-1:2] == btb_src_addr[W_ADDR-1:2]
 );
 
+// Catch case where predicted-taken branch instruction extends into next word:
 wire btb_src_overhanging    = btb_src_size && btb_src_addr[1];
-wire btb_match_current_addr = btb_match_word && !btb_src_overhanging;
+
+// Suppress case where we have jumped immediately after a word-aligned halfword-sized
+// branch, and the jump target went into fetch_addr due to an address-phase hold:
+wire btb_jumped_beyond      = !btb_src_size && !btb_src_addr[1] && !mem_aph_hwvld[0];
+
+wire btb_match_current_addr = btb_match_word && !btb_src_overhanging && !btb_jumped_beyond;
 wire btb_match_next_addr    = btb_match_word && btb_src_overhanging;
 
 wire btb_match_now = btb_match_current_addr || btb_prev_start_of_overhanging;
@@ -352,8 +360,6 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
-
-reg [1:0] mem_aph_hwvld;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
