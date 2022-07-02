@@ -154,14 +154,16 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 				fifo_valid[i] && fifo_pop &&  fifo_push                       ? mem_data_hwvld       :
 				!fifo_valid[i] && fifo_valid[i - 1] && fifo_push && !fifo_pop ? mem_data_hwvld       : fifo_valid_hw[i];
 		end
-		// Allow DM to inject instructions directly into the lowest-numbered queue
-		// entry. This mux should not extend critical path since it is balanced
-		// with the instruction-assembly muxes on the queue bypass path.
+		// Allow DM to inject instructions directly into the lowest-numbered
+		// queue entry. This mux should not extend critical path since it is
+		// balanced with the instruction-assembly muxes on the queue bypass
+		// path. Note that flush takes precedence over debug injection
+		// (and the debug module design must account for this)
 		if (fifo_dbg_inject) begin
 			fifo_mem[0] <= dbg_instr_data;
 			fifo_err[0] <= 1'b0;
 			fifo_predbranch[0] <= 2'b00;
-			fifo_valid_hw[0] <= 2'b11;
+			fifo_valid_hw[0] <= jump_now ? 2'b00 : 2'b11;
 		end
 `ifdef HAZARD3_ASSERTIONS
 		// FIFO validity must be compact, so we can always consume from the end

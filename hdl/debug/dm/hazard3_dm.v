@@ -465,7 +465,7 @@ always @ (posedge clk or negedge rst_n) begin
 			abstractcs_cmderr <= abstractcs_cmderr & ~dmi_pwdata[10:8];
 		if (abstractcs_cmderr == CMDERR_OK && abstractcs_busy && dmi_access_illegal_when_busy)
 			abstractcs_cmderr <= CMDERR_BUSY;
-		if (acmd_state != S_IDLE && hart_instr_caught_exception)
+		if (acmd_state != S_IDLE && hart_instr_caught_exception[hartsel])
 			abstractcs_cmderr <= CMDERR_EXCEPTION;
 		case (acmd_state)
 			S_IDLE: begin
@@ -500,7 +500,7 @@ always @ (posedge clk or negedge rst_n) begin
 					acmd_state <= S_WAIT_REGEBREAK;
 			end
 			S_WAIT_REGEBREAK: begin
-				if (hart_instr_caught_ebreak) begin
+				if (hart_instr_caught_ebreak[hartsel]) begin
 					if (acmd_prev_postexec)
 						acmd_state <= S_ISSUE_PROGBUF0;
 					else
@@ -513,21 +513,21 @@ always @ (posedge clk or negedge rst_n) begin
 					acmd_state <= S_ISSUE_PROGBUF1;
 			end
 			S_ISSUE_PROGBUF1: begin
-				if (hart_instr_caught_exception || hart_instr_caught_ebreak) begin
+				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
 					acmd_state <= S_IDLE;
 				end else if (hart_instr_data_rdy[hartsel]) begin
 					acmd_state <= S_ISSUE_IMPEBREAK;
 				end
 			end
 			S_ISSUE_IMPEBREAK: begin
-				if (hart_instr_caught_exception || hart_instr_caught_ebreak) begin
+				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
 					acmd_state <= S_IDLE;
 				end else if (hart_instr_data_rdy[hartsel]) begin
 					acmd_state <= S_WAIT_IMPEBREAK;
 				end
 			end
 			S_WAIT_IMPEBREAK: begin
-				if (hart_instr_caught_exception || hart_instr_caught_ebreak) begin
+				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
 					acmd_state <= S_IDLE;
 				end
 			end
@@ -662,4 +662,6 @@ end
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif
