@@ -64,6 +64,15 @@ module hazard3_cpu_2port #(
 	output wire              dbg_instr_data_rdy,
 	output wire              dbg_instr_caught_exception,
 	output wire              dbg_instr_caught_ebreak,
+	// Optional debug system bus access patch-through
+	input  wire [31:0]       dbg_sbus_addr,
+	input  wire              dbg_sbus_write,
+	input  wire [1:0]        dbg_sbus_size,
+	input  wire              dbg_sbus_vld,
+	output wire              dbg_sbus_rdy,
+	output wire              dbg_sbus_err,
+	input  wire [31:0]       dbg_sbus_wdata,
+	output wire [31:0]       dbg_sbus_rdata,
 
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
@@ -192,39 +201,78 @@ assign i_hprot = {
 // ----------------------------------------------------------------------------
 // Load/store port
 
-assign d_haddr = core_haddr_d;
-assign d_htrans = core_aph_req_d ? HTRANS_NSEQ : HTRANS_IDLE;
-assign d_hwrite = core_hwrite_d;
-assign d_hsize = core_hsize_d;
-assign d_hexcl = core_aph_excl_d;
+// The debug module has optional System Bus Access support, which can be muxed
+// into the processor's D port here (or connected to a standalone AHB shim).
+// This confers absolutely no advantage for debugger bus throughput, but
+// allows the debugger to access the bus with minimal disturbance to the
+// processor.
 
-reg dphase_active_d;
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
-		dphase_active_d <= 1'b0;
-	else if (d_hready)
-		dphase_active_d <= core_aph_req_d;
+wire      bus_gnt_d;
+wire      bus_gnt_s;
+
+reg       bus_hold_aph;
+reg [1:0] bus_gnt_ds_prev;
+reg       bus_active_dph_d;
+reg       bus_active_dph_s;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		bus_hold_aph <= 1'b0;
+		bus_gnt_ds_prev <= 2'h0;
+	end else begin
+		bus_hold_aph <= d_htrans[1] && !d_hready && !d_hresp;
+		bus_gnt_ds_prev <= {bus_gnt_d, bus_gnt_s};
+	end
+end
+
+assign {bus_gnt_d, bus_gnt_s} =
+	bus_hold_aph                      ? bus_gnt_ds_prev :
+	core_aph_req_d                    ? 2'b10 :
+	dbg_sbus_vld && !bus_active_dph_s ? 2'b01 :
+	                                    2'b00 ;
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		bus_active_dph_d <= 1'b0;
+		bus_active_dph_s <= 1'b0;
+	end else if (d_hready) begin
+		bus_active_dph_d <= bus_gnt_d;
+		bus_active_dph_s <= bus_gnt_s;
+	end
+end
+
+assign d_htrans = bus_gnt_d || bus_gnt_s ? HTRANS_NSEQ : HTRANS_IDLE;
+
+assign d_haddr  = bus_gnt_s ? dbg_sbus_addr  : core_haddr_d;
+assign d_hwrite = bus_gnt_s ? dbg_sbus_write : core_hwrite_d;
+assign d_hsize  = bus_gnt_s ? dbg_sbus_size  : core_hsize_d;
+assign d_hexcl  = bus_gnt_s ? 1'b0           : core_aph_excl_d;
+
+assign d_hprot = {
+	2'b00,                    // Noncacheable/nonbufferable
+	bus_gnt_s || core_priv_d, // Privileged or Normal as per core state
+	1'b1                      // Data access
+};
+
+assign d_hwdata = bus_active_dph_s ? dbg_sbus_wdata : core_wdata_d;
 
 // D-side errors are reported even when not ready, so that the core can make
 // use of the two-phase error response to cleanly squash a second load/store
 // chasing the faulting one down the pipeline.
-assign core_aph_ready_d = d_hready && core_aph_req_d;
-assign core_dph_ready_d = d_hready && dphase_active_d;
-assign core_dph_err_d = dphase_active_d && d_hresp;
-assign core_dph_exokay_d = dphase_active_d && d_hexokay;
-
+assign core_aph_ready_d  = d_hready && bus_gnt_d;
+assign core_dph_ready_d  = bus_active_dph_d && d_hready;
+assign core_dph_err_d    = bus_active_dph_d && d_hresp;
+assign core_dph_exokay_d = bus_active_dph_d && d_hexokay;
 assign core_rdata_d = d_hrdata;
-assign d_hwdata = core_wdata_d;
+
+assign dbg_sbus_err = bus_active_dph_s && d_hresp;
+assign dbg_sbus_rdy = bus_active_dph_s && d_hready;
+assign dbg_sbus_rdata = d_hrdata;
 
 assign d_hburst = 3'h0;
 assign d_hmastlock = 1'b0;
 
-assign d_hprot = {
-	2'b00,         // Noncacheable/nonbufferable
-	core_priv_d,   // Privileged or Normal as per core state
-	1'b1           // Data access
-};
-
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

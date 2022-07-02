@@ -10,13 +10,16 @@
 module hazard3_dm #(
 	// Where there are multiple harts per DM, the least-indexed hart is the
 	// least-significant on each concatenated hart access bus.
-	parameter N_HARTS = 1,
+	parameter N_HARTS      = 1,
 	// Where there are multiple DMs, the address of each DM should be a
 	// multiple of 'h200, so that bits[8:2] decode correctly.
 	parameter NEXT_DM_ADDR = 32'h0000_0000,
+	// Implement support for system bus access:
+	parameter HAVE_SBA     = 1,
 
-	parameter XLEN = 32, // Do not modify
-	parameter W_HARTSEL = N_HARTS > 1 ? $clog2(N_HARTS) : 1 // Do not modify
+	// Do not modify:
+	parameter XLEN         = 32,                               // Do not modify
+	parameter W_HARTSEL    = N_HARTS > 1 ? $clog2(N_HARTS) : 1 // Do not modify
 ) (
 	// DM is assumed to be in same clock domain as core; clock crossing
 	// (if any) is inside DTM, or between DTM and DM.
@@ -63,7 +66,21 @@ module hazard3_dm #(
 	output wire [N_HARTS-1:0]        hart_instr_data_vld,
 	input  wire [N_HARTS-1:0]        hart_instr_data_rdy,
 	input  wire [N_HARTS-1:0]        hart_instr_caught_exception,
-	input  wire [N_HARTS-1:0]        hart_instr_caught_ebreak
+	input  wire [N_HARTS-1:0]        hart_instr_caught_ebreak,
+
+	// System bus access (optional) -- can be hooked up to the standalone AHB
+	// shim (hazard3_sba_to_ahb.v) or the SBA input port on the processor
+	// wrapper, which muxes SBA into the processor's load/store bus access
+	// port. SBA does not increase debugger bus throughput, but supports
+	// minimally intrusive debug bus access for e.g. Segger RTT.
+	output wire [31:0]               sbus_addr,
+	output wire                      sbus_write,
+	output wire [1:0]                sbus_size,
+	output wire                      sbus_vld,
+	input  wire                      sbus_rdy,
+	input  wire                      sbus_err,
+	output wire [31:0]               sbus_wdata,
+	input  wire [31:0]               sbus_rdata
 );
 
 wire dmi_write = dmi_psel && dmi_penable && dmi_pready && dmi_pwrite;
@@ -100,7 +117,10 @@ localparam ADDR_CONFSTRPTR3  = 7'h1c;
 localparam ADDR_NEXTDM       = 7'h1d;
 localparam ADDR_PROGBUF0     = 7'h20;
 localparam ADDR_PROGBUF1     = 7'h21;
-// No authentication, no system bus access
+// No authentication
+localparam ADDR_SBCS         = 7'h38;
+localparam ADDR_SBADDRESS0   = 7'h39;
+localparam ADDR_SBDATA0      = 7'h3c;
 
 // APB is byte-addressed, DM registers are word-addressed.
 wire [6:0] dmi_regaddr = dmi_paddr[8:2];
@@ -288,6 +308,125 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 assign hart_req_resume = dmcontrol_resumereq_sticky;
+
+// ----------------------------------------------------------------------------
+// System bus access
+
+reg [31:0] sbaddress;
+reg [31:0] sbdata;
+
+// Update logic for address/data registers:
+
+reg        sbbusy;
+reg        sbautoincrement;
+reg [2:0]  sbaccess; // Size of the transfer
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		sbaddress <= {32{1'b0}};
+		sbdata <= {32{1'b0}};
+	end else if (!dmactive) begin
+		sbaddress <= {32{1'b0}};
+		sbdata <= {32{1'b0}};
+	end else if (HAVE_SBA) begin
+		if (dmi_write && dmi_regaddr == ADDR_SBDATA0 && !sbbusy) begin
+			sbdata <= dmi_pwdata;
+		end else if (sbus_vld && sbus_rdy && !sbus_write) begin
+			sbdata <= sbus_rdata;
+		end
+		if (dmi_write && dmi_regaddr == ADDR_SBADDRESS0 && !sbbusy) begin
+			sbaddress <= dmi_pwdata;
+		end else if (sbus_vld && sbus_rdy && sbautoincrement) begin
+			sbaddress <= sbaddress + (
+				sbaccess[1:0] == 2'b00 ? 3'h1 :
+				sbaccess[1:0] == 2'b01 ? 3'h2 : 3'h4
+			);
+		end
+	end
+end
+
+// Control logic:
+
+reg        sbbusyerror;
+reg        sbreadonaddr;
+reg        sbreadondata;
+reg [2:0]  sberror;
+reg        sb_current_is_write;
+
+localparam SBERROR_OK       = 3'h0;
+localparam SBERROR_BADADDR  = 3'h2;
+localparam SBERROR_BADALIGN = 3'h3;
+localparam SBERROR_BADSIZE  = 3'h4;
+
+wire sb_want_start_write = dmi_write && dmi_regaddr == ADDR_SBDATA0;
+
+wire sb_want_start_read =
+	(sbreadonaddr && dmi_write && dmi_regaddr == ADDR_SBADDRESS0) ||
+	(sbreadondata && dmi_read && dmi_regaddr == ADDR_SBDATA0);
+
+wire sb_badalign =
+	(sbaccess == 3'h1 && sbaddress[0]) ||
+	(sbaccess == 3'h2 && |sbaddress[1:0]);
+
+wire sb_badsize = sbaccess > 3'h2;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		sbbusy              <= 1'b0;
+		sbbusyerror         <= 1'b0;
+		sbreadonaddr        <= 1'b0;
+		sbreadondata        <= 1'b0;
+		sbaccess            <= 3'h0;
+		sbautoincrement     <= 1'b0;
+		sberror             <= 3'h0;
+		sb_current_is_write <= 1'b0;
+	end else if (!dmactive) begin
+		sbbusy              <= 1'b0;
+		sbbusyerror         <= 1'b0;
+		sbreadonaddr        <= 1'b0;
+		sbreadondata        <= 1'b0;
+		sbaccess            <= 3'h0;
+		sbautoincrement     <= 1'b0;
+		sberror             <= 3'h0;
+		sb_current_is_write <= 1'b0;
+	end else if (HAVE_SBA) begin
+		if (dmi_write && dmi_regaddr == ADDR_SBCS) begin
+			// Assume a transfer is not in progress when written (per spec)
+			sbbusyerror     <= sbbusyerror && !dmi_pwdata[22];
+			sbreadonaddr    <= dmi_pwdata[20];
+			sbaccess        <= dmi_pwdata[19:17];
+			sbautoincrement <= dmi_pwdata[16];
+			sbreadondata    <= dmi_pwdata[15];
+			sberror         <= sberror & ~dmi_pwdata[14:12];
+		end
+		if (sbbusy) begin
+			if (sb_want_start_read || sb_want_start_write) begin
+				sbbusyerror <= 1'b1;
+			end
+			if (sbus_vld && sbus_rdy) begin
+				sbbusy <= 1'b0;
+				if (sbus_err) begin
+					sberror <= SBERROR_BADADDR;
+				end
+			end
+		end else if (sb_want_start_read || sb_want_start_write) begin
+			if (sb_badsize) begin
+				sberror <= SBERROR_BADSIZE;
+			end else if (sb_badalign) begin
+				sberror <= SBERROR_BADALIGN;
+			end else begin
+				sbbusy <= 1'b1;
+				sb_current_is_write <= sb_want_start_write;
+			end
+		end
+	end
+end
+
+assign sbus_addr  = sbaddress;
+assign sbus_write = sb_current_is_write;
+assign sbus_size  = sbaccess[1:0];
+assign sbus_vld   = sbbusy;
+assign sbus_wdata = sbdata;
 
 // ----------------------------------------------------------------------------
 // Abstract command data registers
@@ -649,6 +788,21 @@ always @ (*) begin
 		15'h0,
 		abstractauto_autoexecdata         // only data0 present
 	};
+	ADDR_SBCS:          dmi_prdata = {
+		3'h1,                             // version = 1
+		6'h00,
+		sbbusyerror,
+		sbbusy,
+		sbreadonaddr,
+		sbaccess,
+		sbautoincrement,
+		sbreadondata,
+		sberror,
+		7'h20,                            // sbasize = 32
+		5'b00111                          // 8, 16, 32-bit transfers supported
+	} & {32{|HAVE_SBA}};
+	ADDR_SBDATA0:      dmi_prdata = sbdata & {32{|HAVE_SBA}};
+	ADDR_SBADDRESS0:   dmi_prdata = sbaddress & {32{|HAVE_SBA}};
 	ADDR_CONFSTRPTR0:  dmi_prdata = 32'h4c296328;
 	ADDR_CONFSTRPTR1:  dmi_prdata = 32'h20656b75;
 	ADDR_CONFSTRPTR2:  dmi_prdata = 32'h6e657257;
