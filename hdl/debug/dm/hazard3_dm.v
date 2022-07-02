@@ -10,13 +10,17 @@
 module hazard3_dm #(
 	// Where there are multiple harts per DM, the least-indexed hart is the
 	// least-significant on each concatenated hart access bus.
-	parameter N_HARTS = 1,
+	parameter N_HARTS       = 1,
 	// Where there are multiple DMs, the address of each DM should be a
 	// multiple of 'h200, so that bits[8:2] decode correctly.
-	parameter NEXT_DM_ADDR = 32'h0000_0000,
+	parameter NEXT_DM_ADDR  = 32'h0000_0000,
+	// If 1, implement the abstract access memory command. AAM is not required
+	// for full-speed memory transfers, but can perform minimally intrusive
+	// memory access whilst the core is running (e.g. Segger RTT)
+	parameter HAVE_AAM      = 1,
 
-	parameter XLEN = 32, // Do not modify
-	parameter W_HARTSEL = N_HARTS > 1 ? $clog2(N_HARTS) : 1 // Do not modify
+	parameter XLEN          = 32, // Do not modify
+	parameter W_HARTSEL     = N_HARTS > 1 ? $clog2(N_HARTS) : 1 // Do not modify
 ) (
 	// DM is assumed to be in same clock domain as core; clock crossing
 	// (if any) is inside DTM, or between DTM and DM.
@@ -77,10 +81,14 @@ assign dmi_pslverr = 1'b0;
 // impebreak is sufficient for RV32IC.
 localparam PROGBUF_SIZE = 2;
 
+// Second data register required for address for abstract access memory cmd
+localparam HAVE_DATA1 = HAVE_AAM;
+
 // ----------------------------------------------------------------------------
 // Address constants
 
 localparam ADDR_DATA0        = 7'h04;
+localparam ADDR_DATA1        = 7'h05;
 // Other data registers not present.
 localparam ADDR_DMCONTROL    = 7'h10;
 localparam ADDR_DMSTATUS     = 7'h11;
@@ -303,21 +311,37 @@ wire abstractcs_busy;
 // The DM can also read/write data0 at all times.
 
 reg [XLEN-1:0] abstract_data0;
+reg [XLEN-1:0] abstract_data1;
 
-assign hart_data0_rdata = {N_HARTS{abstract_data0}};
+// If AAM is supported then we may expose either data0/data1 to the core CSR
+// interface at different times, and this wire determines which:
+reg core_adata_regsel;
+
+assign hart_data0_rdata = {N_HARTS{
+	core_adata_regsel ? abstract_data1 : abstract_data0
+}};
 
 always @ (posedge clk or negedge rst_n) begin: update_hart_data0
 	integer i;
 	if (!rst_n) begin
 		abstract_data0 <= {XLEN{1'b0}};
+		abstract_data1 <= {XLEN{1'b0}};
 	end else if (!dmactive) begin
 		abstract_data0 <= {XLEN{1'b0}};
+		abstract_data1 <= {XLEN{1'b0}};
 	end else if (dmi_write && dmi_regaddr == ADDR_DATA0) begin
 		abstract_data0 <= dmi_pwdata;
+	end else if (dmi_write && dmi_regaddr == ADDR_DATA1 && HAVE_DATA1) begin
+		abstract_data1 <= dmi_pwdata;
 	end else begin
 		for (i = 0; i < N_HARTS; i = i + 1) begin
-			if (hartsel == i && hart_data0_wen[i] && hart_halted[i] && abstractcs_busy)
-				abstract_data0 <= hart_data0_wdata[i * XLEN +: XLEN];
+			if (hartsel == i && hart_data0_wen[i] && hart_halted[i] && abstractcs_busy) begin
+				if (core_adata_regsel) begin
+					abstract_data1 <= hart_data0_wdata[i * XLEN +: XLEN];
+				end else begin
+					abstract_data0 <= hart_data0_wdata[i * XLEN +: XLEN];
+				end
+			end
 		end
 	end
 end
@@ -340,19 +364,18 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// We only support abstractauto on data0 update (use case is bulk memory read/write)
-reg       abstractauto_autoexecdata;
-reg [1:0] abstractauto_autoexecprogbuf;
+reg [HAVE_DATA1:0] abstractauto_autoexecdata;
+reg [1:0]          abstractauto_autoexecprogbuf;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		abstractauto_autoexecdata <= 1'b0;
+		abstractauto_autoexecdata <= {HAVE_DATA1+1{1'b0}};
 		abstractauto_autoexecprogbuf <= 2'b00;
 	end else if (!dmactive) begin
-		abstractauto_autoexecdata <= 1'b0;
+		abstractauto_autoexecdata <= {HAVE_DATA1+1{1'b0}};
 		abstractauto_autoexecprogbuf <= 2'b00;
 	end else if (dmi_write && dmi_regaddr == ADDR_ABSTRACTAUTO) begin
-		abstractauto_autoexecdata <= dmi_pwdata[0];
+		abstractauto_autoexecdata <= dmi_pwdata[HAVE_DATA1:0];
 		abstractauto_autoexecprogbuf <= dmi_pwdata[17:16];
 	end
 end
@@ -360,24 +383,39 @@ end
 // ----------------------------------------------------------------------------
 // Abstract command state machine
 
-localparam W_STATE = 4;
-localparam S_IDLE            = 4'd0;
+localparam W_STATE = 5;
+localparam S_IDLE           = 5'd0;
 
-localparam S_ISSUE_REGREAD   = 4'd1;
-localparam S_ISSUE_REGWRITE  = 4'd2;
-localparam S_ISSUE_REGEBREAK = 4'd3;
-localparam S_WAIT_REGEBREAK  = 4'd4;
+// States for the Abstract Access Register command
+localparam S_AAR_REGREAD    = 5'd1;
+localparam S_AAR_REGWRITE   = 5'd2;
+localparam S_AAR_REG_BREAK  = 5'd3;
+localparam S_AAR_WAIT_REG   = 5'd4;
 
-localparam S_ISSUE_PROGBUF0  = 4'd5;
-localparam S_ISSUE_PROGBUF1  = 4'd6;
-localparam S_ISSUE_IMPEBREAK = 4'd7;
-localparam S_WAIT_IMPEBREAK  = 4'd8;
+localparam S_AAR_PROGBUF0   = 5'd5;
+localparam S_AAR_PROGBUF1   = 5'd6;
+localparam S_AAR_IMPEBREAK  = 5'd7;
 
-localparam CMDERR_OK = 3'h0;
-localparam CMDERR_BUSY = 3'h1;
+// States for the Abstract Access Register command
+localparam S_AAM_PRESWAP0   = 5'd8;
+localparam S_AAM_PRESWAP1   = 5'd9;
+localparam S_AAM_LOADSTORE  = 5'd10;
+localparam S_AAM_LS_BREAK   = 5'd11;
+localparam S_AAM_WAIT_LS    = 5'd12;
+localparam S_AAM_INCREMENT  = 5'd13;
+localparam S_AAM_POSTSWAP0  = 5'd14;
+localparam S_AAM_POSTSWAP1  = 5'd15;
+localparam S_AAM_END_BREAK  = 5'd16;
+
+// Shared state: wait for ebreak then return to idle
+localparam S_WAIT_DONE      = 5'd17;
+
+// Error codes for abstractcs.cmderr:
+localparam CMDERR_OK          = 3'h0;
+localparam CMDERR_BUSY        = 3'h1;
 localparam CMDERR_UNSUPPORTED = 3'h2;
-localparam CMDERR_EXCEPTION = 3'h3;
-localparam CMDERR_HALTRESUME = 3'h4;
+localparam CMDERR_EXCEPTION   = 3'h3;
+localparam CMDERR_HALTRESUME  = 3'h4;
 
 reg [2:0]         abstractcs_cmderr;
 reg [W_STATE-1:0] acmd_state;
@@ -386,9 +424,10 @@ assign abstractcs_busy = acmd_state != S_IDLE;
 
 wire start_abstract_cmd = abstractcs_cmderr == CMDERR_OK && !abstractcs_busy && (
 	(dmi_write && dmi_regaddr == ADDR_COMMAND) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_regaddr == ADDR_DATA0) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[0] && dmi_regaddr == ADDR_PROGBUF0) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[1] && dmi_regaddr == ADDR_PROGBUF1)
+	((dmi_write || dmi_read) && dmi_regaddr == ADDR_DATA0    && abstractauto_autoexecdata[0]) ||
+	((dmi_write || dmi_read) && dmi_regaddr == ADDR_DATA1    && abstractauto_autoexecdata[HAVE_DATA1] && HAVE_DATA1) ||
+	((dmi_write || dmi_read) && dmi_regaddr == ADDR_PROGBUF0 && abstractauto_autoexecprogbuf[0]) ||
+	((dmi_write || dmi_read) && dmi_regaddr == ADDR_PROGBUF1 && abstractauto_autoexecprogbuf[1])
 );
 
 wire dmi_access_illegal_when_busy =
@@ -407,19 +446,33 @@ wire dmi_access_illegal_when_busy =
 
 wire       acmd_new = dmi_write && dmi_regaddr == ADDR_COMMAND;
 
+// The fields line up nicely between AAR and AAM:
+wire [7:0] acmd_new_command     = dmi_pwdata[31:24];
+wire       acmd_new_increment   = dmi_pwdata[19];
 wire       acmd_new_postexec    = dmi_pwdata[18];
+wire [2:0] acmd_new_size        = dmi_pwdata[22:20];
 wire       acmd_new_transfer    = dmi_pwdata[17];
 wire       acmd_new_write       = dmi_pwdata[16];
 wire [4:0] acmd_new_regno       = dmi_pwdata[4:0];
 
 wire       acmd_new_unsupported =
-	dmi_pwdata[31:24] != 8'h00 || // Only Access Register command supported
-	dmi_pwdata[22:20] != 3'h2  || // Must be 32 bits in size
-	dmi_pwdata[19]             || // aarpostincrement not supported
-	dmi_pwdata[15:12] != 4'h1  || // Only core register access supported
-	dmi_pwdata[11:5]  != 7'h0;    // Only GPRs supported
+	acmd_new_command == 8'h00 ? (             // Abstract Access Register
+		acmd_new_size     != 3'h2  ||         // Must be 32 bits in size
+		acmd_new_increment         ||         // aarpostincrement not supported
+		dmi_pwdata[15:12] != 4'h1  ||         // Only core register access supported
+		dmi_pwdata[11:5]  != 7'h0             // Only GPRs supported
+	) :
+	acmd_new_command == 8'h02 && HAVE_AAM ? ( // Abstract Access Memory
+		acmd_new_size     >  3'h2             // 8/16/32-bit supported
+	) :
+		1'b1;                                 // No other commands supported
 
+
+// Only bit 1 of the command field is stored (AAR vs AAM)
+reg        acmd_prev_command;
+reg        acmd_prev_increment;
 reg        acmd_prev_postexec;
+reg  [2:0] acmd_prev_size;
 reg        acmd_prev_transfer;
 reg        acmd_prev_write;
 reg  [4:0] acmd_prev_regno;
@@ -427,27 +480,39 @@ reg        acmd_prev_unsupported;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		acmd_prev_postexec <= 1'b0;
-		acmd_prev_transfer <= 1'b0;
-		acmd_prev_write <= 1'b0;
-		acmd_prev_regno <= 5'h0;
+		acmd_prev_command     <= 1'b0;
+		acmd_prev_increment   <= 1'b0;
+		acmd_prev_postexec    <= 1'b0;
+		acmd_prev_size        <= 3'h0;
+		acmd_prev_transfer    <= 1'b0;
+		acmd_prev_write       <= 1'b0;
+		acmd_prev_regno       <= 5'h0;
 		acmd_prev_unsupported <= 1'b1;
 	end else if (!dmactive) begin
-		acmd_prev_postexec <= 1'b0;
-		acmd_prev_transfer <= 1'b0;
-		acmd_prev_write <= 1'b0;
-		acmd_prev_regno <= 5'h0;
+		acmd_prev_command     <= 1'b0;
+		acmd_prev_increment   <= 1'b0;
+		acmd_prev_postexec    <= 1'b0;
+		acmd_prev_size        <= 3'h0;
+		acmd_prev_transfer    <= 1'b0;
+		acmd_prev_write       <= 1'b0;
+		acmd_prev_regno       <= 5'h0;
 		acmd_prev_unsupported <= 1'b1;
 	end else if (start_abstract_cmd && acmd_new) begin
-		acmd_prev_postexec <= acmd_new_postexec;
-		acmd_prev_transfer <= acmd_new_transfer;
-		acmd_prev_write <= acmd_new_write;
-		acmd_prev_regno <= acmd_new_regno;
+		acmd_prev_command     <= acmd_new_command[1] && HAVE_AAM;
+		acmd_prev_increment   <= acmd_new_increment && HAVE_AAM;
+		acmd_prev_postexec    <= acmd_new_postexec;
+		acmd_prev_size        <= HAVE_AAM ? acmd_new_size : 3'h0;
+		acmd_prev_transfer    <= acmd_new_transfer;
+		acmd_prev_write       <= acmd_new_write;
+		acmd_prev_regno       <= acmd_new_regno;
 		acmd_prev_unsupported <= acmd_new_unsupported;
 	end
 end
 
+wire       acmd_command     = acmd_new ? acmd_new_command[1]  : acmd_prev_command    ;
+wire       acmd_increment   = acmd_new ? acmd_new_increment   : acmd_prev_increment  ;
 wire       acmd_postexec    = acmd_new ? acmd_new_postexec    : acmd_prev_postexec   ;
+wire [2:0] acmd_size        = acmd_new ? acmd_new_size        : acmd_prev_size       ;
 wire       acmd_transfer    = acmd_new ? acmd_new_transfer    : acmd_prev_transfer   ;
 wire       acmd_write       = acmd_new ? acmd_new_write       : acmd_prev_write      ;
 wire [4:0] acmd_regno       = acmd_new ? acmd_new_regno       : acmd_prev_regno      ;
@@ -474,78 +539,179 @@ always @ (posedge clk or negedge rst_n) begin
 						abstractcs_cmderr <= CMDERR_HALTRESUME;
 					end else if (acmd_unsupported) begin
 						abstractcs_cmderr <= CMDERR_UNSUPPORTED;
-					end else begin
+					end else if (!acmd_command) begin
+						// Abstract Access Register
 						if (acmd_transfer && acmd_write)
-							acmd_state <= S_ISSUE_REGWRITE;
+							acmd_state <= S_AAR_REGWRITE;
 						else if (acmd_transfer && !acmd_write)
-							acmd_state <= S_ISSUE_REGREAD;
+							acmd_state <= S_AAR_REGREAD;
 						else if (acmd_postexec)
-							acmd_state <= S_ISSUE_PROGBUF0;
+							acmd_state <= S_AAR_PROGBUF0;
 						else
 							acmd_state <= S_IDLE;
+					end else if (acmd_command && HAVE_AAM) begin
+						// Abstract Access Memory
+						acmd_state <= S_AAM_PRESWAP0;
 					end
 				end
 			end
 
-			S_ISSUE_REGREAD: begin
+			// Abstract Access Register transfer states:
+
+			S_AAR_REGREAD: begin
 				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_ISSUE_REGEBREAK;
+					acmd_state <= S_AAR_REG_BREAK;
 			end
-			S_ISSUE_REGWRITE: begin
+			S_AAR_REGWRITE: begin
 				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_ISSUE_REGEBREAK;
+					acmd_state <= S_AAR_REG_BREAK;
 			end
-			S_ISSUE_REGEBREAK: begin
+			S_AAR_REG_BREAK: begin
 				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_WAIT_REGEBREAK;
+					acmd_state <= S_AAR_WAIT_REG;
 			end
-			S_WAIT_REGEBREAK: begin
+			S_AAR_WAIT_REG: begin
 				if (hart_instr_caught_ebreak[hartsel]) begin
 					if (acmd_prev_postexec)
-						acmd_state <= S_ISSUE_PROGBUF0;
+						acmd_state <= S_AAR_PROGBUF0;
 					else
 						acmd_state <= S_IDLE;
 				end
 			end
 
-			S_ISSUE_PROGBUF0: begin
+			// Abstract Access Register postexec states:
+
+			S_AAR_PROGBUF0: begin
 				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_ISSUE_PROGBUF1;
+					acmd_state <= S_AAR_PROGBUF1;
 			end
-			S_ISSUE_PROGBUF1: begin
+			S_AAR_PROGBUF1: begin
+				// Note frontend flush takes precedence over instruction injection, so we can go
+				// straight to idle without worrying about the instruction injected from this state.
 				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
 					acmd_state <= S_IDLE;
 				end else if (hart_instr_data_rdy[hartsel]) begin
-					acmd_state <= S_ISSUE_IMPEBREAK;
+					acmd_state <= S_AAR_IMPEBREAK;
 				end
 			end
-			S_ISSUE_IMPEBREAK: begin
+			S_AAR_IMPEBREAK: begin
 				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
 					acmd_state <= S_IDLE;
 				end else if (hart_instr_data_rdy[hartsel]) begin
-					acmd_state <= S_WAIT_IMPEBREAK;
+					acmd_state <= S_WAIT_DONE;
 				end
 			end
-			S_WAIT_IMPEBREAK: begin
+
+			// Abstract Access Memory states:
+			// TODO minimally intrusive quick halt
+
+			S_AAM_PRESWAP0: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_AAM_PRESWAP1;
+			end
+			S_AAM_PRESWAP1: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_AAM_LOADSTORE;
+			end
+			S_AAM_LOADSTORE: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_AAM_LS_BREAK;
+			end
+			S_AAM_LS_BREAK: begin
+				if (hart_instr_caught_exception[hartsel]) begin
+					acmd_state <= S_AAM_INCREMENT;
+				end else if (hart_instr_data_rdy[hartsel]) begin
+					acmd_state <= S_AAM_WAIT_LS;
+				end
+			end
+			S_AAM_WAIT_LS: begin
+				// Fence off on the load/store having completed, by waiting for an ebreak directly
+				// after it. Required because the cmderr exception flag must suppress increment
+				// (but we must still run the rest of this microprogram to restore GPRs)
+				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel])
+					acmd_state <= S_AAM_INCREMENT;
+			end
+
+			S_AAM_INCREMENT: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_AAM_POSTSWAP0;
+			end
+			S_AAM_POSTSWAP0: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_AAM_POSTSWAP1;
+			end
+			S_AAM_POSTSWAP1: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_AAM_END_BREAK;
+			end
+			S_AAM_END_BREAK: begin
+				if (hart_instr_data_rdy[hartsel])
+					acmd_state <= S_WAIT_DONE;
+			end
+
+			// Fence off on the final ebreak before returning
+
+			S_WAIT_DONE: begin
 				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
 					acmd_state <= S_IDLE;
 				end
 			end
+
 		endcase
 	end
 end
 
-assign hart_instr_data_vld = {{N_HARTS{1'b0}},
-	acmd_state == S_ISSUE_REGREAD || acmd_state == S_ISSUE_REGWRITE || acmd_state == S_ISSUE_REGEBREAK ||
-	acmd_state == S_ISSUE_PROGBUF0 || acmd_state == S_ISSUE_PROGBUF1 || acmd_state == S_ISSUE_IMPEBREAK
+// Control whether DATA0/DATA1 is exposed to the hart, according to the state machine
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		core_adata_regsel <= 1'b0;
+	end else if (!dmactive || acmd_state == S_IDLE) begin
+		core_adata_regsel <= 1'b0;
+	end else if (hart_data0_wen[hartsel] && hart_halted[hartsel] && abstractcs_busy) begin
+		// AAM performs alternating accesses to DATA0/DATA1. AAR only accesses DATA0.
+		core_adata_regsel <= core_adata_regsel ^ acmd_prev_command;
+	end
+end
+
+assign hart_instr_data_vld = {{N_HARTS-1{1'b0}},
+	acmd_state == S_AAR_REGREAD || acmd_state == S_AAR_REGWRITE || acmd_state == S_AAR_REG_BREAK ||
+	acmd_state == S_AAR_PROGBUF0 || acmd_state == S_AAR_PROGBUF1 || acmd_state == S_AAR_IMPEBREAK ||
+	HAVE_AAM && (
+		acmd_state == S_AAM_PRESWAP0 || acmd_state == S_AAM_PRESWAP1 || acmd_state == S_AAM_LOADSTORE || acmd_state == S_AAM_LS_BREAK ||
+		acmd_state == S_AAM_INCREMENT || acmd_state == S_AAM_POSTSWAP0 || acmd_state == S_AAM_POSTSWAP1 || acmd_state == S_AAM_END_BREAK
+	)
 } << hartsel;
 
 assign hart_instr_data = {N_HARTS{
-	acmd_state == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, dmdata0
-	acmd_state == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw dmdata0, xx
-	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                    :
-	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                    :
-	                                  32'h00100073                                  // ebreak
+	acmd_state == S_AAR_REGWRITE              ? 32'hbff02073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, dmdata
+	acmd_state == S_AAR_REGREAD               ? 32'hbff01073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw dmdata, xx
+	acmd_state == S_AAR_PROGBUF0              ? progbuf0                                       :
+	acmd_state == S_AAR_PROGBUF1              ? progbuf1                                       :
+
+	acmd_state == S_AAM_PRESWAP0  && HAVE_AAM ? 32'hbff51573                                   : // csrrw a0, dmdata, a0
+	acmd_state == S_AAM_PRESWAP1  && HAVE_AAM ? 32'hbff595f3                                   : // csrrw a1, dmdata, a1
+
+	acmd_state == S_AAM_LOADSTORE && HAVE_AAM ? (
+	acmd_prev_write && acmd_prev_size == 3'h0 ? 32'h00a58023                                   : // sb  a0, (a1)
+	                   acmd_prev_size == 3'h0 ? 32'h0005c503                                   : // lbu a0, (a1)
+	acmd_prev_write && acmd_prev_size == 3'h1 ? 32'h00a59023                                   : // sh  a0, (a1)
+	                   acmd_prev_size == 3'h1 ? 32'h0005d503                                   : // lhu a0, (a1)
+	acmd_prev_write                           ? 32'h00a5a023                                   : // sw  a0, (a1)
+	                                            32'h0005a503                                     // lw  a0, (a1)
+	) :
+
+	acmd_state == S_AAM_INCREMENT && HAVE_AAM ? 32'h00058593 | {                                 // addi a1, a1, 0x000
+		!acmd_prev_increment                  ? 12'h000 :                                        // no increment because disabled
+		abstractcs_cmderr == CMDERR_EXCEPTION ? 12'h000 :                                        // no increment because of load/store exception
+		acmd_prev_size == 3'h0                ? 12'h001 :                                        // byte increment
+		acmd_prev_size == 3'h1                ? 12'h002 : 12'h004,                               // halfword/word increment
+		20'h00000
+	} :
+
+	acmd_state == S_AAM_POSTSWAP0 && HAVE_AAM ? 32'hbff51573                                   : // csrrw a0, dmdata, a0
+	acmd_state == S_AAM_POSTSWAP1 && HAVE_AAM ? 32'hbff595f3                                   : // csrrw a1, dmdata, a1
+
+	                                            32'h00100073                                     // ebreak
 }};
 
 // ----------------------------------------------------------------------------
@@ -581,6 +747,7 @@ endfunction
 always @ (*) begin
 	case (dmi_regaddr)
 	ADDR_DATA0:        dmi_prdata = abstract_data0;
+	ADDR_DATA1:        dmi_prdata = abstract_data1;
 	ADDR_DMCONTROL:    dmi_prdata = {
 		1'b0,                             // haltreq is a W-only field
 		1'b0,                             // resumereq is a W1 field
@@ -641,13 +808,13 @@ always @ (*) begin
 		1'b0,
 		abstractcs_cmderr,
 		4'h0,
-		4'd1                              // datacount = 1
+		HAVE_DATA1 ? 4'd2 : 4'd1          // datacount = 1 or 2, depending on AAM support
 	};
 	ADDR_ABSTRACTAUTO: dmi_prdata = {
 		14'h0,
 		abstractauto_autoexecprogbuf,     // only progbuf0,1 present
-		15'h0,
-		abstractauto_autoexecdata         // only data0 present
+		{15-HAVE_DATA1{1'b0}},
+		abstractauto_autoexecdata         // Either 1 or 2 bits wide
 	};
 	ADDR_CONFSTRPTR0:  dmi_prdata = 32'h4c296328;
 	ADDR_CONFSTRPTR1:  dmi_prdata = 32'h20656b75;
