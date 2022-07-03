@@ -65,14 +65,14 @@ module hazard3_cpu_2port #(
 	output wire              dbg_instr_caught_exception,
 	output wire              dbg_instr_caught_ebreak,
 	// Optional debug system bus access patch-through
-	input  wire [31:0]       dbg_sbus_addr,
+	input  wire [W_ADDR-1:0] dbg_sbus_addr,
 	input  wire              dbg_sbus_write,
 	input  wire [1:0]        dbg_sbus_size,
 	input  wire              dbg_sbus_vld,
 	output wire              dbg_sbus_rdy,
 	output wire              dbg_sbus_err,
-	input  wire [31:0]       dbg_sbus_wdata,
-	output wire [31:0]       dbg_sbus_rdata,
+	input  wire [W_DATA-1:0] dbg_sbus_wdata,
+	output wire [W_DATA-1:0] dbg_sbus_rdata,
 
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
@@ -110,7 +110,6 @@ wire              core_priv_d;
 wire              core_hwrite_d;
 wire [W_DATA-1:0] core_wdata_d;
 wire [W_DATA-1:0] core_rdata_d;
-
 
 hazard3_core #(
 `include "hazard3_config_inst.vh"
@@ -230,6 +229,7 @@ assign {bus_gnt_d, bus_gnt_s} =
 	core_aph_req_d                    ? 2'b10 :
 	dbg_sbus_vld && !bus_active_dph_s ? 2'b01 :
 	                                    2'b00 ;
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_active_dph_d <= 1'b0;
@@ -242,10 +242,10 @@ end
 
 assign d_htrans = bus_gnt_d || bus_gnt_s ? HTRANS_NSEQ : HTRANS_IDLE;
 
-assign d_haddr  = bus_gnt_s ? dbg_sbus_addr  : core_haddr_d;
-assign d_hwrite = bus_gnt_s ? dbg_sbus_write : core_hwrite_d;
-assign d_hsize  = bus_gnt_s ? dbg_sbus_size  : core_hsize_d;
-assign d_hexcl  = bus_gnt_s ? 1'b0           : core_aph_excl_d;
+assign d_haddr  = bus_gnt_s ? dbg_sbus_addr         : core_haddr_d;
+assign d_hwrite = bus_gnt_s ? dbg_sbus_write        : core_hwrite_d;
+assign d_hsize  = bus_gnt_s ? {1'b0, dbg_sbus_size} : core_hsize_d;
+assign d_hexcl  = bus_gnt_s ? 1'b0                  : core_aph_excl_d;
 
 assign d_hprot = {
 	2'b00,                    // Noncacheable/nonbufferable

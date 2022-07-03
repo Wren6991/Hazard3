@@ -53,6 +53,15 @@ localparam W_DATA = 32;
 (* keep *) wire              dbg_instr_caught_exception;
 (* keep *) wire              dbg_instr_caught_ebreak;
 
+(*keep*) wire [31:0]         dbg_sbus_addr;
+(*keep*) wire                dbg_sbus_write;
+(*keep*) wire [1:0]          dbg_sbus_size;
+(*keep*) wire                dbg_sbus_vld;
+(*keep*) wire                dbg_sbus_rdy;
+(*keep*) wire                dbg_sbus_err;
+(*keep*) wire [31:0]         dbg_sbus_wdata;
+(*keep*) wire [31:0]         dbg_sbus_rdata;
+
 (* keep *) wire [31:0]       irq;
 (* keep *) wire              soft_irq;
 (* keep *) wire              timer_irq;
@@ -100,6 +109,15 @@ hazard3_cpu_2port dut (
 	.dbg_instr_data_rdy         (dbg_instr_data_rdy),
 	.dbg_instr_caught_exception (dbg_instr_caught_exception),
 	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
+
+	.dbg_sbus_addr              (dbg_sbus_addr),
+	.dbg_sbus_write             (dbg_sbus_write),
+	.dbg_sbus_size              (dbg_sbus_size),
+	.dbg_sbus_vld               (dbg_sbus_vld),
+	.dbg_sbus_rdy               (dbg_sbus_rdy),
+	.dbg_sbus_err               (dbg_sbus_err),
+	.dbg_sbus_wdata             (dbg_sbus_wdata),
+	.dbg_sbus_rdata             (dbg_sbus_rdata),
 
 	.irq                        (irq),
 	.soft_irq                   (soft_irq),
@@ -193,6 +211,20 @@ ahbl_master_assertions d_assertions (
 	.src_hexcl       (d_hexcl),
 	.src_hwdata      (d_hwdata),
 	.src_hrdata      (d_hrdata)
+);
+
+sbus_assumptions sbus_assumptions (
+	.clk            (clk),
+	.rst_n          (rst_n),
+
+	.dbg_sbus_addr  (dbg_sbus_addr),
+	.dbg_sbus_write (dbg_sbus_write),
+	.dbg_sbus_size  (dbg_sbus_size),
+	.dbg_sbus_vld   (dbg_sbus_vld),
+	.dbg_sbus_rdy   (dbg_sbus_rdy),
+	.dbg_sbus_err   (dbg_sbus_err),
+	.dbg_sbus_wdata (dbg_sbus_wdata),
+	.dbg_sbus_rdata (dbg_sbus_rdata)
 );
 
 endmodule
