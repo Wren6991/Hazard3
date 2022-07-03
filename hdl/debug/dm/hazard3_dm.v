@@ -15,7 +15,7 @@ module hazard3_dm #(
 	// multiple of 'h200, so that bits[8:2] decode correctly.
 	parameter NEXT_DM_ADDR = 32'h0000_0000,
 	// Implement support for system bus access:
-	parameter HAVE_SBA     = 1,
+	parameter HAVE_SBA     = 0,
 
 	// Do not modify:
 	parameter XLEN         = 32,                               // Do not modify
@@ -69,7 +69,7 @@ module hazard3_dm #(
 	input  wire [N_HARTS-1:0]        hart_instr_caught_ebreak,
 
 	// System bus access (optional) -- can be hooked up to the standalone AHB
-	// shim (hazard3_sba_to_ahb.v) or the SBA input port on the processor
+	// shim (hazard3_sbus_to_ahb.v) or the SBA input port on the processor
 	// wrapper, which muxes SBA into the processor's load/store bus access
 	// port. SBA does not increase debugger bus throughput, but supports
 	// minimally intrusive debug bus access for e.g. Segger RTT.
