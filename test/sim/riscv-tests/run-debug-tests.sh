@@ -17,6 +17,7 @@ done
 	--gcc riscv32-unknown-elf-gcc \
 	targets/luke/hazard3.py \
 CheckMisa \
+CrashLoop \
 DebugBreakpoint \
 DebugChangeString \
 DebugCompareSections \
@@ -28,12 +29,9 @@ DisconnectTest \
 DownloadTest \
 EbreakTest \
 InfoTest \
-InterruptTest \
-CrashLoop \
 InstantChangePc \
 InstantHaltTest \
-MemorySampleMixed \
-MemorySampleSingle \
+InterruptTest \
 MemTest16 \
 MemTest32 \
 MemTest64 \
@@ -42,12 +40,15 @@ MemTestBlock0 \
 MemTestBlock1 \
 MemTestBlock2 \
 MemTestReadInvalid \
+MemorySampleMixed \
+MemorySampleSingle \
 PrivChange \
 PrivRw \
 ProgramSwWatchpoint \
 Registers \
 RepeatReadTest \
 Semihosting \
+SemihostingFileio \
 SimpleF18Test \
 SimpleNoExistTest \
 SimpleS0Test \
