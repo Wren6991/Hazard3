@@ -368,9 +368,12 @@ wire sb_want_start_read =
 	(sbreadonaddr && dmi_write && dmi_regaddr == ADDR_SBADDRESS0) ||
 	(sbreadondata && dmi_read && dmi_regaddr == ADDR_SBDATA0);
 
+wire [1:0] sb_next_align = sbreadonaddr && dmi_write && dmi_regaddr == ADDR_SBADDRESS0 ?
+	dmi_pwdata[1:0] : sbaddress[1:0];
+
 wire sb_badalign =
-	(sbaccess == 3'h1 && sbaddress[0]) ||
-	(sbaccess == 3'h2 && |sbaddress[1:0]);
+	(sbaccess == 3'h1 && sb_next_align[0]) ||
+	(sbaccess == 3'h2 && |sb_next_align[1:0]);
 
 wire sb_badsize = sbaccess > 3'h2;
 
@@ -413,7 +416,7 @@ always @ (posedge clk or negedge rst_n) begin
 					sberror <= SBERROR_BADADDR;
 				end
 			end
-		end else if (sb_want_start_read || sb_want_start_write) begin
+		end else if (sb_want_start_read || sb_want_start_write && ~|sberror && !sbbusyerror) begin
 			if (sb_badsize) begin
 				sberror <= SBERROR_BADSIZE;
 			end else if (sb_badalign) begin
