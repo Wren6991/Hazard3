@@ -1,0 +1,56 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sun Jul  3 18:10:08 2022
+[*]
+[dumpfile] "/home/luke/proj/hazard3/test/sim/riscv-tests/riscv-tests/debug/waves.vcd"
+[dumpfile_mtime] "Sun Jul  3 18:08:00 2022"
+[dumpfile_size] 95825843
+[savefile] "/home/luke/proj/hazard3/test/sim/riscv-tests/debug.gtkw"
+[timestart] 519500
+[size] 1920 2096
+[pos] -1 -1
+*-16.000000 771701 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] cpu.
+[treeopen] cpu.core.
+[sst_width] 233
+[signals_width] 182
+[sst_expanded] 1
+[sst_vpaned_height] 665
+@28
+dm.sberror[2:0]
+dm.sbbusy
+dm.sbbusyerror
+@200
+-
+@22
+dm.sbus_addr[31:0]
+@28
+dm.sbaccess[2:0]
+dm.sb_badalign
+dm.sb_want_start_write
+dm.sb_want_start_read
+@200
+-
+-System Bus Request
+@22
+dm.sbus_addr[31:0]
+@28
+dm.sbus_size[1:0]
+dm.sbus_write
+dm.sbus_vld
+dm.sbus_rdy
+dm.sbus_err
+@22
+dm.sbus_wdata[31:0]
+dm.sbus_rdata[31:0]
+@200
+-
+-Core Bus Request
+@28
+cpu.core_aph_req_d
+cpu.core_aph_ready_d
+cpu.core_dph_ready_d
+@201
+-
+[pattern_trace] 1
+[pattern_trace] 0

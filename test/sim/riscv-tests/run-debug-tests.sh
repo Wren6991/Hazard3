@@ -12,7 +12,7 @@ done
 # Only applicable tests are included
 ./gdbserver.py \
 	--sim_cmd "../../../tb_cxxrtl/tb --port 9824" \
-	--server_cmd riscv-openocd \
+	--server_cmd "riscv-openocd" \
 	--gdb riscv32-unknown-elf-gdb \
 	--gcc riscv32-unknown-elf-gcc \
 	targets/luke/hazard3.py \
@@ -32,6 +32,8 @@ InterruptTest \
 CrashLoop \
 InstantChangePc \
 InstantHaltTest \
+MemorySampleMixed \
+MemorySampleSingle \
 MemTest16 \
 MemTest32 \
 MemTest64 \
