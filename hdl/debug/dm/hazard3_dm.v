@@ -331,7 +331,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (HAVE_SBA) begin
 		if (dmi_write && dmi_regaddr == ADDR_SBDATA0 && !sbbusy) begin
 			sbdata <= dmi_pwdata;
-		end else if (sbus_vld && sbus_rdy && !sbus_write) begin
+		end else if (sbus_vld && sbus_rdy && !sbus_write && !sbus_err) begin
 			// Make sure the lower byte lanes see appropriately shifted data as
 			// long as the transfer is naturally aligned
 			sbdata <= sbaddress[1:0] == 2'b01 ? {sbus_rdata[31:8],  sbus_rdata[15:8]}  :
