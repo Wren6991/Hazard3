@@ -332,7 +332,11 @@ always @ (posedge clk or negedge rst_n) begin
 		if (dmi_write && dmi_regaddr == ADDR_SBDATA0 && !sbbusy) begin
 			sbdata <= dmi_pwdata;
 		end else if (sbus_vld && sbus_rdy && !sbus_write) begin
-			sbdata <= sbus_rdata;
+			// Make sure the lower byte lanes see appropriately shifted data as
+			// long as the transfer is naturally aligned
+			sbdata <= sbaddress[1:0] == 2'b01 ? {sbus_rdata[31:8],  sbus_rdata[15:8]}  :
+			          sbaddress[1:0] == 2'b10 ? {sbus_rdata[31:16], sbus_rdata[31:16]} :
+			          sbaddress[1:0] == 2'b11 ? {sbus_rdata[31:8],  sbus_rdata[31:24]} : sbus_rdata;
 		end
 		if (dmi_write && dmi_regaddr == ADDR_SBADDRESS0 && !sbbusy) begin
 			sbaddress <= dmi_pwdata;
@@ -426,7 +430,10 @@ assign sbus_addr  = sbaddress;
 assign sbus_write = sb_current_is_write;
 assign sbus_size  = sbaccess[1:0];
 assign sbus_vld   = sbbusy;
-assign sbus_wdata = sbdata;
+
+// Replicate byte lanes to handle naturally-aligned cases.
+assign sbus_wdata = sbaccess[1:0] == 2'b00 ? {4{sbdata[7:0]}}  :
+                    sbaccess[1:0] == 2'b01 ? {2{sbdata[15:0]}} : sbdata;
 
 // ----------------------------------------------------------------------------
 // Abstract command data registers
