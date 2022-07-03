@@ -1,5 +1,5 @@
 /*****************************************************************************\
-|                        Copyright (C) 2021 Luke Wren                         |
+|                      Copyright (C) 2021-2022 Luke Wren                      |
 |                     SPDX-License-Identifier: Apache-2.0                     |
 \*****************************************************************************/
 
@@ -141,8 +141,18 @@ wire [N_HARTS-1:0]        hart_instr_data_rdy;
 wire [N_HARTS-1:0]        hart_instr_caught_exception;
 wire [N_HARTS-1:0]        hart_instr_caught_ebreak;
 
+wire [31:0]               sbus_addr;
+wire                      sbus_write;
+wire [1:0]                sbus_size;
+wire                      sbus_vld;
+wire                      sbus_rdy;
+wire                      sbus_err;
+wire [31:0]               sbus_wdata;
+wire [31:0]               sbus_rdata;
+
 hazard3_dm #(
 	.N_HARTS      (N_HARTS),
+	.HAVE_SBA     (0),
 	.NEXT_DM_ADDR (0)
 ) dm (
 	.clk                         (clk),
@@ -176,7 +186,16 @@ hazard3_dm #(
 	.hart_instr_data_vld         (hart_instr_data_vld),
 	.hart_instr_data_rdy         (hart_instr_data_rdy),
 	.hart_instr_caught_exception (hart_instr_caught_exception),
-	.hart_instr_caught_ebreak    (hart_instr_caught_ebreak)
+	.hart_instr_caught_ebreak    (hart_instr_caught_ebreak),
+
+	.sbus_addr                   (sbus_addr),
+	.sbus_write                  (sbus_write),
+	.sbus_size                   (sbus_size),
+	.sbus_vld                    (sbus_vld),
+	.sbus_rdy                    (sbus_rdy),
+	.sbus_err                    (sbus_err),
+	.sbus_wdata                  (sbus_wdata),
+	.sbus_rdata                  (sbus_rdata)
 );
 
 
@@ -278,6 +297,15 @@ hazard3_cpu_1port #(
 	.dbg_instr_data_rdy         (hart_instr_data_rdy),
 	.dbg_instr_caught_exception (hart_instr_caught_exception),
 	.dbg_instr_caught_ebreak    (hart_instr_caught_ebreak),
+
+	.dbg_sbus_addr              (sbus_addr),
+	.dbg_sbus_write             (sbus_write),
+	.dbg_sbus_size              (sbus_size),
+	.dbg_sbus_vld               (sbus_vld),
+	.dbg_sbus_rdy               (sbus_rdy),
+	.dbg_sbus_err               (sbus_err),
+	.dbg_sbus_wdata             (sbus_wdata),
+	.dbg_sbus_rdata             (sbus_rdata),
 
 	.irq                        (uart_irq),
 

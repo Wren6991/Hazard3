@@ -52,6 +52,16 @@ module hazard3_cpu_1port #(
 	output wire              dbg_instr_caught_exception,
 	output wire              dbg_instr_caught_ebreak,
 
+	// Optional debug system bus access patch-through
+	input  wire [W_ADDR-1:0] dbg_sbus_addr,
+	input  wire              dbg_sbus_write,
+	input  wire [1:0]        dbg_sbus_size,
+	input  wire              dbg_sbus_vld,
+	output wire              dbg_sbus_rdy,
+	output wire              dbg_sbus_err,
+	input  wire [W_DATA-1:0] dbg_sbus_wdata,
+	output wire [W_DATA-1:0] dbg_sbus_rdata,
+
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
 	input wire               soft_irq,  // -> mip.msip
@@ -137,6 +147,8 @@ hazard3_core #(
 	.dbg_instr_caught_exception (dbg_instr_caught_exception),
 	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
 
+
+
 	.irq                        (irq),
 	.soft_irq                   (soft_irq),
 	.timer_irq                  (timer_irq)
@@ -147,28 +159,42 @@ hazard3_core #(
 
 wire      bus_gnt_i;
 wire      bus_gnt_d;
+wire      bus_gnt_s;
 
 reg       bus_hold_aph;
-reg [1:0] bus_gnt_id_prev;
+reg [2:0] bus_gnt_ids_prev;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_hold_aph <= 1'b0;
-		bus_gnt_id_prev <= 2'h0;
+		bus_gnt_id_prev <= 3'h0;
 	end else begin
 		bus_hold_aph <= ahblm_htrans[1] && !ahblm_hready && !ahblm_hresp;
-		bus_gnt_id_prev <= {bus_gnt_i, bus_gnt_d};
+		bus_gnt_id_prev <= {bus_gnt_i, bus_gnt_d, bus_gnt_s};
 	end
 end
 
-assign {bus_gnt_i, bus_gnt_d} =
-	bus_hold_aph     ? bus_gnt_id_prev :
-	core_aph_panic_i ? 2'b10 :
-	core_aph_req_d   ? 2'b01 :
-	core_aph_req_i   ? 2'b10 :
-	                   2'b00 ;
+// Debug SBA access is lower priority than load/store, but higher than
+// instruction fetch. This isn't ideal, but in a tight loop the core may be
+// performing an instruction fetch or load/store on every single cycle, and
+// this is a simple way to guarantee eventual success of debugger accesses. A
+// more complex way would be to add a "panic timer" to boost a stalled sbus
+// access over an instruction fetch.
 
-// Keep track of whether instr/data access is active in AHB dataphase.
+// Note that, often, the sbus will be disconnected: it doesn't provide any
+// increase in debugger bus throughput compared with the program buffer and
+// autoexec. It's useful for "minimally intrusive" debug bus access(i.e. less
+// intrusive than halting the core and resuming it) e.g. for Segger RTT.
+
+reg bus_active_dph_s;
+
+assign {bus_gnt_i, bus_gnt_d, bus_gnt_s} =
+	bus_hold_aph                      ? bus_gnt_id_prev :
+	core_aph_panic_i                  ? 3'b100 :
+	core_aph_req_d                    ? 3'b010 :
+	dbg_sbus_vld && !bus_active_dph_s ? 3'b001 :
+	core_aph_req_i                    ? 3'b100 :
+	                                    3'b000 ;
 reg bus_active_dph_i;
 reg bus_active_dph_d;
 
@@ -176,9 +202,11 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_active_dph_i <= 1'b0;
 		bus_active_dph_d <= 1'b0;
+		bus_active_dph_s <= 1'b0;
 	end else if (ahblm_hready) begin
 		bus_active_dph_i <= bus_gnt_i;
 		bus_active_dph_d <= bus_gnt_d;
+		bus_active_dph_s <= bus_gnt_s;
 	end
 end
 
@@ -200,11 +228,24 @@ wire [3:0] hprot_instr = {
 	1'b0                    // Instruction access
 };
 
+wire [3:0] hprot_sbus = {
+	2'b00,         // Noncacheable/nonbufferable
+	1'b1,          // Always privileged
+	1'b1           // Data access
+};
+
 assign ahblm_hburst = 3'b000;   // HBURST_SINGLE
 assign ahblm_hmastlock = 1'b0;
 
 always @ (*) begin
-	if (bus_gnt_d) begin
+	if (bus_gnt_s) begin
+		ahblm_htrans = HTRANS_NSEQ;
+		ahblm_hexcl  = 1'b0;
+		ahblm_haddr  = dbg_sbus_addr;
+		ahblm_hsize  = {1'b0, dbg_sbus_size};
+		ahblm_hwrite = dbg_sbus_write;
+		ahblm_hprot  = hprot_sbus;
+	end else if (bus_gnt_d) begin
 		ahblm_htrans = HTRANS_NSEQ;
 		ahblm_hexcl  = core_aph_excl_d;
 		ahblm_haddr  = core_haddr_d;
@@ -228,26 +269,31 @@ always @ (*) begin
 	end
 end
 
+assign ahblm_hwdata = bus_active_dph_s ? dbg_sbus_wdata : core_wdata_d;
+
 // ----------------------------------------------------------------------------
 // Response routing
 
 // Data buses directly connected
-assign core_rdata_d = ahblm_hrdata;
-assign core_rdata_i = ahblm_hrdata;
-assign ahblm_hwdata = core_wdata_d;
+assign core_rdata_d   = ahblm_hrdata;
+assign core_rdata_i   = ahblm_hrdata;
+assign dbg_sbus_rdata = ahblm_hrdata;
 
 // Handhshake based on grant and bus stall
 assign core_aph_ready_i = ahblm_hready && bus_gnt_i;
-assign core_dph_ready_i = ahblm_hready && bus_active_dph_i;
+assign core_dph_ready_i = bus_active_dph_i && ahblm_hready;
 assign core_dph_err_i   = bus_active_dph_i && ahblm_hresp;
 
 // D-side errors are reported even when not ready, so that the core can make
 // use of the two-phase error response to cleanly squash a second load/store
 // chasing the faulting one down the pipeline.
-assign core_aph_ready_d = ahblm_hready && bus_gnt_d;
-assign core_dph_ready_d = ahblm_hready && bus_active_dph_d;
-assign core_dph_err_d = bus_active_dph_d && ahblm_hresp;
+assign core_aph_ready_d  = ahblm_hready && bus_gnt_d;
+assign core_dph_ready_d  = bus_active_dph_d && ahblm_hready;
+assign core_dph_err_d    = bus_active_dph_d && ahblm_hresp;
 assign core_dph_exokay_d = bus_active_dph_d && ahblm_hexokay;
+
+assign dbg_sbus_err = bus_active_dph_s && ahblm_hresp;
+assign dbg_sbus_rdy = bus_active_dph_s && ahblm_hready;
 
 endmodule
 
