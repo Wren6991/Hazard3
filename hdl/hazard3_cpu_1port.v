@@ -28,6 +28,7 @@ module hazard3_cpu_1port #(
 	output wire [2:0]        ahblm_hburst,
 	output reg  [3:0]        ahblm_hprot,
 	output wire              ahblm_hmastlock,
+	output reg  [7:0]        ahblm_hmaster,
 	output reg               ahblm_hexcl,
 	input  wire              ahblm_hready,
 	input  wire              ahblm_hresp,
@@ -239,33 +240,37 @@ assign ahblm_hmastlock = 1'b0;
 
 always @ (*) begin
 	if (bus_gnt_s) begin
-		ahblm_htrans = HTRANS_NSEQ;
-		ahblm_hexcl  = 1'b0;
-		ahblm_haddr  = dbg_sbus_addr;
-		ahblm_hsize  = {1'b0, dbg_sbus_size};
-		ahblm_hwrite = dbg_sbus_write;
-		ahblm_hprot  = hprot_sbus;
+		ahblm_htrans  = HTRANS_NSEQ;
+		ahblm_hexcl   = 1'b0;
+		ahblm_haddr   = dbg_sbus_addr;
+		ahblm_hsize   = {1'b0, dbg_sbus_size};
+		ahblm_hwrite  = dbg_sbus_write;
+		ahblm_hprot   = hprot_sbus;
+		ahblm_hmaster = 8'h01;
 	end else if (bus_gnt_d) begin
-		ahblm_htrans = HTRANS_NSEQ;
-		ahblm_hexcl  = core_aph_excl_d;
-		ahblm_haddr  = core_haddr_d;
-		ahblm_hsize  = core_hsize_d;
-		ahblm_hwrite = core_hwrite_d;
-		ahblm_hprot  = hprot_data;
+		ahblm_htrans  = HTRANS_NSEQ;
+		ahblm_hexcl   = core_aph_excl_d;
+		ahblm_haddr   = core_haddr_d;
+		ahblm_hsize   = core_hsize_d;
+		ahblm_hwrite  = core_hwrite_d;
+		ahblm_hprot   = hprot_data;
+		ahblm_hmaster = 8'h00;
 	end else if (bus_gnt_i) begin
-		ahblm_htrans = HTRANS_NSEQ;
-		ahblm_hexcl  = 1'b0;
-		ahblm_haddr  = core_haddr_i;
-		ahblm_hsize  = core_hsize_i;
-		ahblm_hwrite = 1'b0;
-		ahblm_hprot  = hprot_instr;
+		ahblm_htrans  = HTRANS_NSEQ;
+		ahblm_hexcl   = 1'b0;
+		ahblm_haddr   = core_haddr_i;
+		ahblm_hsize   = core_hsize_i;
+		ahblm_hwrite  = 1'b0;
+		ahblm_hprot   = hprot_instr;
+		ahblm_hmaster = 8'h00;
 	end else begin
-		ahblm_htrans = HTRANS_IDLE;
-		ahblm_hexcl  = 1'b0;
-		ahblm_haddr  = {W_ADDR{1'b0}};
-		ahblm_hsize  = 3'h0;
-		ahblm_hwrite = 1'b0;
-		ahblm_hprot  = 4'h0;
+		ahblm_htrans  = HTRANS_IDLE;
+		ahblm_hexcl   = 1'b0;
+		ahblm_haddr   = {W_ADDR{1'b0}};
+		ahblm_hsize   = 3'h0;
+		ahblm_hwrite  = 1'b0;
+		ahblm_hprot   = 4'h0;
+		ahblm_hmaster = 8'h00;
 	end
 end
 

@@ -28,6 +28,7 @@ module hazard3_cpu_2port #(
 	output wire [2:0]        i_hburst,
 	output wire [3:0]        i_hprot,
 	output wire              i_hmastlock,
+	output wire [7:0]        i_hmaster,
 	input  wire              i_hready,
 	input  wire              i_hresp,
 	output wire [W_DATA-1:0] i_hwdata,
@@ -41,6 +42,7 @@ module hazard3_cpu_2port #(
 	output wire [2:0]        d_hburst,
 	output wire [3:0]        d_hprot,
 	output wire              d_hmastlock,
+	output wire [7:0]        d_hmaster,
 	output wire              d_hexcl,
 	input  wire              d_hready,
 	input  wire              d_hresp,
@@ -189,6 +191,7 @@ assign core_rdata_i = i_hrdata;
 assign i_hwrite = 1'b0;
 assign i_hburst = 3'h0;
 assign i_hmastlock = 1'b0;
+assign i_hmaster = 8'h00;
 assign i_hwdata = {W_DATA{1'b0}};
 
 assign i_hprot = {
@@ -270,6 +273,7 @@ assign dbg_sbus_rdata = d_hrdata;
 
 assign d_hburst = 3'h0;
 assign d_hmastlock = 1'b0;
+assign d_hmaster = bus_gnt_s ? 8'h01 : 8'h00;
 
 endmodule
 
