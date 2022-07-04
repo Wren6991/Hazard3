@@ -229,6 +229,7 @@ reg [W_ADDR-1:0] fetch_addr;
 reg              fetch_priv;
 reg              btb_prev_start_of_overhanging;
 reg [1:0]        mem_aph_hwvld;
+reg              mem_addr_hold;
 
 wire btb_match_word = |BRANCH_PREDICTOR && btb_valid && (
 	fetch_addr[W_ADDR-1:2] == btb_src_addr[W_ADDR-1:2]
@@ -321,7 +322,6 @@ assign jump_target_rdy = !mem_addr_hold;
 
 // Keep track of some useful state of the memory interface
 
-reg        mem_addr_hold;
 reg  [1:0] pending_fetches;
 reg  [1:0] ctr_flush_pending;
 
