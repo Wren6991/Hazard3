@@ -68,8 +68,16 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		end
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			if (!PMP_HARDWIRED[i]) begin
-				if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
+			if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
+				if (PMP_HARDWIRED[i]) begin
+					// Keep tied to hardwired value (but still make the "register" sensitive to clk)
+					pmpcfg_l[i] <= PMP_HARDWIRED_CFG[8 * i + 7];
+					pmpcfg_a[i] <= PMP_HARDWIRED_CFG[8 * i + 3 +: 2];
+					pmpcfg_r[i] <= PMP_HARDWIRED_CFG[8 * i + 2];
+					pmpcfg_w[i] <= PMP_HARDWIRED_CFG[8 * i + 1];
+					pmpcfg_x[i] <= PMP_HARDWIRED_CFG[8 * i + 0];
+					pmpaddr[i]  <= PMP_HARDWIRED_ADDR[32 * i +: 30];
+				end else begin
 					pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
 					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
 					pmpcfg_w[i] <= cfg_wdata[i % 4 * 8 + 1];
