@@ -35,6 +35,9 @@ localparam XLEN = W_DATA;
 generate if (MULH_FAST && !MUL_FAST)
 	initial $fatal("%m: MULH_FAST requires that MUL_FAST is also set.");
 endgenerate
+generate if (MUL_FASTER && !MUL_FAST)
+	initial $fatal("%m: MUL_FASTER requires that MUL_FAST is also set.");
+endgenerate
 //synthesis translate_on
 
 // Latency of 1:
@@ -60,10 +63,17 @@ if (!MULH_FAST) begin: mul_only
 reg [XLEN-1:0] op_a_r;
 reg [XLEN-1:0] op_b_r;
 
-always @ (posedge clk) begin
-	if (op_vld) begin
-		op_a_r <= op_a;
-		op_b_r <= op_b;
+if (MUL_FASTER) begin: op_passthrough
+	always @ (*) begin
+		op_a_r = op_a;
+		op_b_r = op_b;
+	end
+end else begin: op_register
+	always @ (posedge clk) begin
+		if (op_vld) begin
+			op_a_r <= op_a;
+			op_b_r <= op_b;
+		end
 	end
 end
 
@@ -97,11 +107,19 @@ reg [XLEN-1:0]    op_a_r;
 reg [XLEN-1:0]    op_b_r;
 reg [W_MULOP-1:0] op_r;
 
-always @ (posedge clk) begin
-	if (op_vld) begin
-		op_a_r <= op_a;
-		op_b_r <= op_b;
-		op_r <= op;
+if (MUL_FASTER) begin: op_passthrough
+	always @ (*) begin
+		op_a_r = op_a;
+		op_b_r = op_b;
+		op_r = op;
+	end
+end else begin: op_register
+	always @ (posedge clk) begin
+		if (op_vld) begin
+			op_a_r <= op_a;
+			op_b_r <= op_b;
+			op_r <= op;
+		end
 	end
 end
 

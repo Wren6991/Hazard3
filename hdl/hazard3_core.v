@@ -613,6 +613,13 @@ end
 wire [W_DATA-1:0] x_muldiv_result;
 wire [W_DATA-1:0] m_fast_mul_result;
 
+wire x_use_fast_mul = d_aluop == ALUOP_MULDIV && (
+	MUL_FAST  && d_mulop == M_OP_MUL   ||
+	MULH_FAST && d_mulop == M_OP_MULH  ||
+	MULH_FAST && d_mulop == M_OP_MULHU ||
+	MULH_FAST && d_mulop == M_OP_MULHSU
+);
+
 generate
 if (EXTENSION_M) begin: has_muldiv
 	wire              x_muldiv_op_vld;
@@ -629,13 +636,6 @@ if (EXTENSION_M) begin: has_muldiv
 			x_muldiv_posted <= (x_muldiv_posted || (x_muldiv_op_vld && x_muldiv_op_rdy)) && x_stall;
 
 	wire x_muldiv_kill = m_trap_enter_soon;
-
-	wire x_use_fast_mul = d_aluop == ALUOP_MULDIV && (
-		MUL_FAST  && d_mulop == M_OP_MUL   ||
-		MULH_FAST && d_mulop == M_OP_MULH  ||
-		MULH_FAST && d_mulop == M_OP_MULHU ||
-		MULH_FAST && d_mulop == M_OP_MULHSU
-	);
 
 	assign x_muldiv_op_vld = (d_aluop == ALUOP_MULDIV && !x_use_fast_mul)
 		&& !(x_muldiv_posted || x_stall_on_raw || x_muldiv_kill);
@@ -668,7 +668,9 @@ if (EXTENSION_M) begin: has_muldiv
 
 	if (MUL_FAST) begin: has_fast_mul
 
-		wire x_issue_fast_mul = x_use_fast_mul && |d_rd && !x_stall;
+		// If MUL_FASTER is set, the multiplier produces its result
+		// combinatorially, so we never have to post a mul result to stage 3.
+		wire x_issue_fast_mul = x_use_fast_mul && |d_rd && !x_stall && !MUL_FASTER;
 
 		hazard3_mul_fast #(
 		`include "hazard3_config_inst.vh"
@@ -993,9 +995,10 @@ always @ (posedge clk or negedge rst_n) begin
 		// - Steer captured read phase data in mw_result back through xm_result at end of AMO
 		// - Make sure xm_result (store data) doesn't transition during stalled write dphase
 		xm_result <=
-			d_csr_ren                               ? x_csr_rdata :
-			|EXTENSION_A && x_amo_phase == 3'h3     ? mw_result :
-			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result :
+			d_csr_ren                               ? x_csr_rdata       :
+			|EXTENSION_A && x_amo_phase == 3'h3     ? mw_result         :
+			|MUL_FASTER  && x_use_fast_mul          ? m_fast_mul_result :
+			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result   :
 			                                          x_alu_result;
 		xm_addr_align <= x_addr_sum[1:0];
 	end

@@ -16,6 +16,7 @@ PMP_REGIONS      := 4
 
 MULDIV_UNROLL    := 2
 MUL_FAST         := 1
+MUL_FASTER       := 1
 MULH_FAST        := 1
 FAST_BRANCHCMP   := 1
 REDUCED_BYPASS   := 0
@@ -43,6 +44,7 @@ SYNTH_CMD += chparam -set RESET_VECTOR $(CPU_RESET_VECTOR) $(TOP);
 SYNTH_CMD += chparam -set REDUCED_BYPASS $(REDUCED_BYPASS) $(TOP);
 SYNTH_CMD += chparam -set MULDIV_UNROLL $(MULDIV_UNROLL) $(TOP);
 SYNTH_CMD += chparam -set MUL_FAST $(MUL_FAST) $(TOP);
+SYNTH_CMD += chparam -set MUL_FASTER $(MUL_FASTER) $(TOP);
 SYNTH_CMD += chparam -set MULH_FAST $(MULH_FAST) $(TOP);
 SYNTH_CMD += chparam -set FAST_BRANCHCMP $(FAST_BRANCHCMP) $(TOP);
 SYNTH_CMD += chparam -set MVENDORID_VAL $(MVENDORID_VAL) $(TOP);
