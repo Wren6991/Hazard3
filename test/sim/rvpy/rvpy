@@ -162,6 +162,9 @@ class RVCore:
 		self.csr = RVCSR()
 		self.stage3_result = None
 
+		self.btb_valid = False
+		self.btb_pc = 0
+
 	def step(self, instr=None, log=True, cycle_accurate=True):
 		if instr is None:
 			instr = self.mem.mem[self.pc >> 2]
@@ -242,7 +245,6 @@ class RVCore:
 					if funct3 != 0b000:
 						mul_result >>= 32
 					rd_wdata = sext(mul_result, XLEN - 1)
-					stage3_result_next = regnum_rd
 				else:
 					if log:
 						div_instr_name = {0b100: "div", 0b101: "divu", 0b110: "rem", 0b111: "remu"}[funct3]
@@ -344,9 +346,17 @@ class RVCore:
 				instr_invalid = True
 			if not instr_invalid:
 				stall_cycles += regnum_rs1 == self.stage3_result or regnum_rs2 == self.stage3_result
+
+			predicted_taken = self.btb_valid and self.pc == self.btb_pc
+			stall_cycles += taken != predicted_taken
 			if taken:
 				pc_wdata = target
-				stall_cycles += 1
+				if target < self.pc:
+					self.btb_valid = True
+					self.btb_pc = self.pc
+			elif predicted_taken:
+				self.btb_valid = False
+
 
 		elif opc == OPC_LOAD:
 			imm = imm_i(instr)
