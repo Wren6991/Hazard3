@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
-[*] Wed Dec 15 09:37:16 2021
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sat Jul  2 12:28:35 2022
 [*]
 [dumpfile] "/home/luke/proj/hazard3/test/sim/tb_cxxrtl/waves.vcd"
-[dumpfile_mtime] "Wed Dec 15 09:24:58 2021"
-[dumpfile_size] 9773165
+[dumpfile_mtime] "Sun Jun 26 18:58:42 2022"
+[dumpfile_size] 34958839
 [savefile] "/home/luke/proj/hazard3/test/sim/tb_cxxrtl/multicore.gtkw"
 [timestart] 0
 [size] 2509 1368
 [pos] -1 -1
-*-13.000000 9780 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.000000 136300 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [sst_width] 233
 [signals_width] 238
 [sst_expanded] 1
@@ -23,12 +23,27 @@ tdo
 tms
 @200
 -
+@22
+dm.dmi_paddr[8:0]
 @28
-dm.hartsel
+dm.dmi_penable
+dm.dmi_pwrite
+@22
+dm.dmi_pwdata[31:0]
+dm.dmi_prdata[31:0]
 @200
 -
+@28
+dm.hartsel
+dm.hasel
+dm.hart_array_mask[1:0]
+dm.hart_array_mask_next[1:0]
+@200
+-
+>-491
 -Core 0 debug
 @28
+>0
 cpu0.dbg_req_halt
 cpu0.dbg_req_resume
 cpu0.dbg_halted

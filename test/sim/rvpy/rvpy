@@ -110,7 +110,7 @@ class MemWithTBIO(FlatMemory):
 		elif addr == self.TB_IO_PRINT_CHAR:
 			sys.stdout.write(self.io_log_fmt.format(chr(data)))
 		elif addr == self.TB_IO_PRINT_INT:
-			sys.stdout.write(self.io_log_fmt.format(f"{data:08x}"))
+			sys.stdout.write(self.io_log_fmt.format(f"{data:08x}\n"))
 		elif addr == self.TB_IO_EXIT:
 			raise TBExit(data)
 		else:
@@ -514,7 +514,7 @@ def main(argv):
 		for i in range(args.cycles):
 			rv.step(log=not args.quiet)
 	except TBExit as e:
-		print(f"Processor halted simulation with exit code {e}")
+		print(f"CPU requested halt. Exit code {e}")
 	except BrokenPipeError as e:
 		sys.exit(0)
 	print(f"Ran for {i + 1} cycles")

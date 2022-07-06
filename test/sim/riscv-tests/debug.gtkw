@@ -1,21 +1,21 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sun Jul  3 18:10:08 2022
+[*] Sun Jul  3 23:06:37 2022
 [*]
 [dumpfile] "/home/luke/proj/hazard3/test/sim/riscv-tests/riscv-tests/debug/waves.vcd"
-[dumpfile_mtime] "Sun Jul  3 18:08:00 2022"
-[dumpfile_size] 95825843
+[dumpfile_mtime] "Sun Jul  3 23:06:19 2022"
+[dumpfile_size] 259991106
 [savefile] "/home/luke/proj/hazard3/test/sim/riscv-tests/debug.gtkw"
-[timestart] 519500
-[size] 1920 2096
+[timestart] 740660
+[size] 1620 2096
 [pos] -1 -1
-*-16.000000 771701 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-12.000000 759700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] cpu.
 [treeopen] cpu.core.
 [sst_width] 233
 [signals_width] 182
 [sst_expanded] 1
-[sst_vpaned_height] 665
+[sst_vpaned_height] 664
 @28
 dm.sberror[2:0]
 dm.sbbusy
@@ -46,11 +46,43 @@ dm.sbus_rdata[31:0]
 @200
 -
 -Core Bus Request
+@22
+cpu.core_haddr_d[31:0]
 @28
 cpu.core_aph_req_d
 cpu.core_aph_ready_d
 cpu.core_dph_ready_d
-@201
+@200
 -
+-D Bus
+@22
+cpu.d_haddr[31:0]
+@28
+cpu.d_htrans[1:0]
+cpu.d_hwrite
+cpu.d_hready
+@22
+cpu.d_hwdata[31:0]
+cpu.d_hrdata[31:0]
+@200
+-
+-I Bus
+@22
+cpu.i_haddr[31:0]
+@28
+cpu.i_htrans[1:0]
+cpu.i_hready
+@22
+cpu.i_hrdata[31:0]
+@200
+-
+-Run/Halt
+@28
+cpu.dbg_req_halt
+cpu.dbg_req_resume
+@200
+-
+@29
+cpu.dbg_halted
 [pattern_trace] 1
 [pattern_trace] 0
