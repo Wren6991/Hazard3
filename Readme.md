@@ -70,7 +70,7 @@ The [Yosys GitHub repo](https://github.com/YosysHQ/yosys) has instructions for b
 
 ## RISC-V Toolchain
 
-The instructions below are for building a version of the 32-bit [RISC-V GNU toolchain](https://github.com/riscv/riscv-gnu-toolchain) with multilib support for the various combinations of RV32I/M/C ISAs:
+The instructions below are for building a version of the 32-bit [RISC-V GNU toolchain](https://github.com/riscv/riscv-gnu-toolchain) with multilib support for the various combinations of RV32I/M/A/C ISAs:
 
 ```bash
 # Prerequisites for Ubuntu 20.04
@@ -78,16 +78,15 @@ sudo apt install -y autoconf automake autotools-dev curl python3 libmpc-dev libm
 cd /tmp
 git clone --recursive https://github.com/riscv/riscv-gnu-toolchain
 cd riscv-gnu-toolchain
-# The ./configure arguments are the most important difference
-./configure --prefix=/opt/riscv --with-arch=rv32imc --with-abi=ilp32 --with-multilib-generator="rv32i-ilp32--;rv32ic-ilp32--;rv32im-ilp32--;rv32imc-ilp32--"
+./configure --prefix=/opt/riscv --with-arch=rv32ia --with-abi=ilp32 --with-multilib-generator="rv32i-ilp32--;rv32ia-ilp32--;rv32iac-ilp32--;rv32ic-ilp32--;rv32im-ilp32--;rv32ima-ilp32--;rv32imac-ilp32--;rv32imc-ilp32--"
 sudo mkdir /opt/riscv
 sudo chown $(whoami) /opt/riscv
 make -j $(nproc)
 ```
-
-The multilib build is strongly recommended -- getting a RV32IMC standard library on a RV32I processor variant will ruin your day, and running soft float that does not use the multiply instructions is not much fun either.
-
 This build will also install an appropriate gdb as `riscv32-unknown-elf-gdb`.
+
+The `--with-multilib-generator=` flag builds multiple versions of the standard library, to match possible `-march` flags provided at link time. If there is no _exact_ match, the linker falls back to the architecture specified by the `--with-arch` flag, which in this case is the fairly conservative RV32IA. This will become worse with GCC 12, where for example the CSR instructions have moved from `I` to `Zicsr`, and the entire arch string must still be matched to get the non-fallback library.
+
 
 ## Actually Running Hello World
 
