@@ -129,15 +129,18 @@ class RVCSR:
 
 	def __init__(self):
 		self.mcycle = 0
+		self.minstret = 0
 		self.mscratch = 0
 
 	def step(self):
 		self.mcycle += 1
+		self.minstret += 1
 
 	def read(self, addr, side_effect=True):
-		# Close your eyes
-		if addr in (RVCSR.MCYCLE, RVCSR.MTIME, RVCSR.MINSTRET):
+		if addr in (RVCSR.MCYCLE, RVCSR.MTIME):
 			return self.mcycle
+		elif addr == RVCSR.MINSTRET:
+			return self.minstret
 		elif addr == RVCSR.MSCRATCH:
 			return self.mscratch
 		else:
@@ -150,6 +153,8 @@ class RVCSR:
 			data = self.read(addr, side_effect=False) | data
 		if addr == RVCSR.MCYCLE:
 			self.mcycle = data
+		elif addr == RVCSR.MINSTRET:
+			self.minstret = data
 		elif addr == RVCSR.MSCRATCH:
 			self.mscratch = data
 
