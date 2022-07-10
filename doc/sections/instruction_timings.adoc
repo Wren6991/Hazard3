@@ -1,6 +1,6 @@
 == Instruction Cycle Counts
 
-All timings are given assuming perfect bus behaviour (no downstream bus stalls).
+All timings are given assuming perfect bus behaviour (no downstream bus stalls), and that the core is configured with `MULDIV_UNROLL = 2` and all other configuration options set for maximum performance.
 
 === RV32I
 
@@ -34,12 +34,12 @@ All timings are given assuming perfect bus behaviour (no downstream bus stalls).
 3+| Control Transfer
 | `jal rd, label` | 2footnote:unaligned_branch[A jump or branch to a 32-bit instruction which is not 32-bit-aligned requires one additional cycle, because two naturally aligned bus cycles are required to fetch the target instruction.]|
 | `jalr rd, rs1, imm` | 2footnote:unaligned_branch[] |
-| `beq rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
-| `bne rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
-| `blt rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
-| `bge rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
-| `bltu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
-| `bgeu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if nontaken, 2 if taken.
+| `beq rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `bne rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `blt rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `bge rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `bltu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `bgeu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
 3+| Load and Store
 | `lw rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[If an instruction in stage 2 (e.g. an `add`) uses data from stage 3 (e.g. a `lw` result), a 1-cycle bubble is inserted between the pair. A load data -> store data dependency is _not_ an example of this, because data is produced and consumed in stage 3. However, load data -> load address _would_ qualify, as would e.g. `sc.w` -> `beqz`.]
 | `lh rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
@@ -60,11 +60,11 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 |===
 | Instruction | Cycles | Note
 3+| 32 {times} 32 -> 32 Multiply
-| `mul rd, rs1, rs2` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.
+| `mul rd, rs1, rs2` | 1  |
 3+| 32 {times} 32 -> 64 Multiply, Upper Half
-| `mulh rd, rs1, rs2` | 18 to 20 | Depending on sign correction
-| `mulhsu rd, rs1, rs2` | 18 to 20 | Depending on sign correction
-| `mulhu rd, rs1, rs2` | 18 |
+| `mulh rd, rs1, rs2` | 1 |
+| `mulhsu rd, rs1, rs2` | 1 |
+| `mulhu rd, rs1, rs2` | 1 |
 3+| Divide and Remainder
 | `div rd, rs1, rs2` | 18 or 19 | Depending on sign correction
 | `divu rd, rs1, rs2` | 18 |
@@ -157,4 +157,21 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 |`binvi rd, rs1, imm`  | 1 |
 |`bset rd, rs1, rs2`   | 1 |
 |`bseti rd, rs1, imm`  | 1 |
+3+| Zbkb (basic bit manipulation for cryptography)
+|`pack rd, rs1, rs2`   | 1 |
+|`packh rd, rs1, rs2`  | 1 |
+|`brev8 rd, rs1`       | 1 |
+|`zip   rd, rs1`       | 1 |
+|`unzip rd, rs1`       | 1 |
 |===
+
+=== Branch Predictor
+
+Hazard3 includes a minimal branch predictor, to accelerate tight loops:
+
+* The instruction frontend remembers the last taken, backward branch
+* If the same branch is seen again, it is predicted taken
+* All other branches are predicted nontaken
+* If a predicted-taken branch is not taken, the predictor state is cleared, and it will be predicted nontaken on its next execution.
+
+Correctly predicted branches execute in one cycle: the frontend is able to stitch together the two nonsequential fetch paths so that they appear sequential. Mispredicted branches incur a penalty cycle, since a nonsequential fetch address must be issued when the branch is executed.
