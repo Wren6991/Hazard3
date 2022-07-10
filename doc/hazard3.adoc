@@ -11,6 +11,8 @@ include::sections/introduction.adoc[]
 
 include::sections/instruction_timings.adoc[]
 
+include::sections/instruction_pseudocode.adoc[]
+
 include::sections/csr.adoc[]
 
 [[debug-chapter]]

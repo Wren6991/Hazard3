@@ -1,0 +1,1219 @@
+== Instruction Pseudocode
+
+This section is a quick reference for the operation of the instructions supported by Hazard3, in Verilog syntax. Conventions used in this section:
+
+* `rs1`, `rs2` and `rd` are 32-bit unsigned vector variables referring to the two register operands and the destination register
+* `imm` is a 32-bit unsigned vector referring to the instruction's immediate value
+* `pc` is a 32-bit unsigned vector referring to the program counter
+* `mem` is an array of 8-bit unsigned vectors, each corresponding to a byte address in memory.
+
+=== RV32I: Register-register
+
+With the exception of the shift instructions, all instructions in this section have an immediate range of -2048 to 2047. Negative immediates can be useful for the bitwise operations too: for example `not rd, rs1` is a pseudo-op for `xori rd, rs1, -1`.
+
+Shift instructions have an immediate range of 0 to 31.
+
+==== add
+
+Add register to register.
+
+Syntax:
+
+    add rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 + rs2;
+
+==== sub
+
+Subtract register from register.
+
+Syntax:
+
+    sub rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 - rs2;
+
+==== slt
+
+Set if less than (signed).
+
+Syntax:
+
+    slt rd, rs1, rs2
+
+Operation:
+
+    rd = $signed(rs1) < $signed(rs2);
+
+==== sltu
+
+Set if less than (unsigned).
+
+Syntax:
+
+    sltu rd, rs1, rs
+
+Operation:
+
+    rd = rs1 < rs2;
+
+==== and
+
+Bitwise AND.
+
+Syntax:
+
+    and rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 & rs2;
+
+
+==== or
+
+Bitwise OR.
+
+Syntax:
+
+    or rd, rs1, rs2`
+
+Operation:
+
+    rd = rs1 | rs2;
+
+
+==== xor
+
+Bitwise XOR.
+
+Syntax:
+
+    xor rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 ^ rs2;
+
+==== sll
+
+Shift left, logical.
+
+Syntax:
+
+    sll rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 << rs2;
+
+
+==== srl
+
+Shift right, logical.
+
+Syntax:
+
+    srl rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 >> rs2;
+
+
+==== sra
+
+Shift right, arithmetic.
+
+Syntax:
+
+    sra rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 >>> rs2;
+
+
+=== RV32I: Register-immediate
+
+
+==== addi
+
+Add register to immediate.
+
+Syntax:
+
+    addi rd, rs1, imm
+
+Operation:
+
+    rd = rs1 + imm
+
+==== slti
+
+Set if less than immediate (signed).
+
+Syntax:
+
+    slti rd, rs1, imm
+
+Operation:
+
+    rd = $signed(rs1) < $signed(imm);
+
+==== sltiu
+
+Set if less than immediate (unsigned).
+
+Syntax:
+
+    sltiu rd, rs1, imm
+
+Operation:
+
+    rd = rs1 < imm;
+
+==== andi
+
+Bitwise AND with immediate.
+
+Syntax:
+
+    andi rd, rs1, imm
+
+Operation:
+
+    rd = rs1 & imm;
+
+==== ori
+
+Bitwise OR with immediate.
+
+Syntax:
+
+    ori rd, rs1, imm
+
+Operation:
+
+    rd = rs1 \| imm;
+
+==== xori
+
+Bitwise XOR with immediate.
+
+Syntax:
+
+    xori rd, rs1, imm
+
+Operation:
+
+    rd = rs1 ^ imm;
+
+==== slli
+
+Shift left, logical, immediate.
+
+Syntax:
+
+    slli rd, rs1, imm
+
+Operation:
+
+    rd = rs1 << imm;
+
+==== srli
+
+Shift right, logical, immediate.
+
+Syntax:
+
+    srli rd, rs1, imm
+
+Operation:
+
+    rd = rs1 >> imm;
+
+==== srai
+
+Shift right, arithmetic, immediate.
+
+Syntax:
+
+    srai rd, rs1, imm
+
+Operation:
+
+    rd = rs1 >>> imm;
+
+=== RV32I: Large immediate
+
+==== lui
+
+Load upper immediate.
+
+Syntax:
+
+    lui rd, imm
+
+Operation:
+
+    rd = imm;
+
+(`imm` is a 20-bit value followed by 12 zeroes)
+
+==== auipc
+
+Add upper immediate to program counter.
+
+Syntax:
+
+	auipc rd, imm
+
+Operation:
+
+	rd = pc + imm;
+
+(`imm` is a 20-bit value followed by 12 zeroes)
+
+=== RV32I: Control transfer
+
+
+==== jal
+
+Jump and link.
+
+Syntax:
+
+    jal rd, label
+    j label        // rd is implicitly x0
+
+Operation:
+
+    rd = pc + 4;
+    pc = label;
+
+NOTE: the 16-bit variant, `c.jal`, writes `pc + 2` to `rd`, rather than `pc + 4`. The `rd` value always points to the sequentially-next instruction.
+
+==== jalr
+
+Jump and link, target is register.
+
+Syntax:
+
+    jalr rd, rs1, imm // imm is implicitly 0 if omitted.
+    jr rs1, imm       // rd is implicitly x0. imm is implicitly 0 if omitted.
+    ret               // pseudo-op for jr ra
+
+Operation:
+
+    rd = pc + 4;
+    pc = rs1 + imm;
+
+NOTE: the 16-bit variant, `c.jalr`, writes `pc + 2` to `rd`, rather than `pc + 4`. The `rd` value always points to the sequentially-next instruction.
+
+==== beq
+
+Branch if equal.
+
+Syntax:
+
+    beq rs1, rs2, label
+
+Operation:
+
+    if (rs1 == rs2)
+        pc = label;
+
+==== bne
+
+Branch if not equal.
+
+Syntax:
+
+    bne rs1, rs2, label
+
+Operation:
+
+    if (rs1 != rs2)
+        pc = label;
+
+==== blt
+
+Branch if less than (signed).
+
+Syntax:
+
+    blt rs1, rs2, label
+
+Operation:
+
+    if ($signed(rs1) < $signed(rs2))
+        pc = label;
+
+==== bge
+
+Branch if greater than or equal (signed).
+
+Syntax:
+
+    bge rs1, rs2, label
+
+Operation:
+
+    if ($signed(rs1) >= $signed(rs2))
+        pc = label;
+
+==== bltu
+
+Branch if less than (unsigned).
+
+Syntax:
+
+    bltu rs1, rs2, label
+
+Operation:
+
+    if (rs1 < rs2)
+        pc = label;
+
+==== bgeu
+
+Branch if less than or equal (unsigned).
+
+Syntax:
+
+    bgeu rs1, rs2, label
+
+Operation:
+
+    if (rs1 >= rs2)
+        pc = label;
+
+=== RV32I: Load and Store
+
+==== lw
+
+Load word.
+
+Syntax:
+
+    lw rd, imm(rs1)
+    lw rd, (rs1)    // imm is implicitly 0 if omitted.
+
+
+Operation:
+
+    rd = {
+        mem[rs1 + imm + 3],
+        mem[rs1 + imm + 2],
+        mem[rs1 + imm + 1],
+        mem[rs1 + imm]
+    };
+
+==== lh
+
+Load halfword (signed).
+
+Syntax:
+
+    lh rd, imm(rs1)
+    lh rd, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+	rd = {
+		{16{mem[rs1 + imm + 1][7]}}, // Sign-extend
+		mem[rs1 + imm + 1],
+		mem[rs1 + imm]
+	};
+
+==== lhu
+
+Load halfword (unsigned).
+
+Syntax:
+
+    lhu rd, imm(rs1)
+    lhu rd, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+	rd = {
+		16'h0000, // Zero-extend
+		mem[rs1 + imm + 1],
+		mem[rs1 + imm]
+	};
+
+==== lb
+
+Load byte (signed).
+
+Syntax:
+
+	lb rd, imm(rs1)
+    lb rd, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+    rd = {
+        {24{mem[rs1 + imm][7]}}, // Sign-extend
+        mem[rs1 + imm]
+    };
+
+
+
+==== lbu
+
+Load byte (unsigned).
+
+Syntax:
+
+	lbu rd, imm(rs1)
+    lbu rd, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+    rd = {
+        24'h000000, // Zero-extend
+        mem[rs1 + imm]
+    };
+
+==== sw
+
+Store word.
+
+Syntax:
+
+    sw rs2, imm(rs1)
+    sw rs2, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+    mem[rs1 + imm]     = rs2[7:0];
+    mem[rs1 + imm + 1] = rs2[15:8];
+    mem[rs1 + imm + 2] = rs2[23:16];
+    mem[rs1 + imm + 3] = rs2[31:24];
+
+==== sh
+
+Store halfword.
+
+Syntax:
+
+    sh rs2, imm(rs1)
+    sh rs2, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+    mem[rs1 + imm]     = rs2[7:0];
+    mem[rs1 + imm + 1] = rs2[15:8];
+
+==== sb
+
+Store byte.
+
+Syntax:
+
+    sb rs2, imm(rs1)
+    sb rs2, (rs1)    // imm is implicitly 0 if omitted.
+
+Operation:
+
+    mem[rs1 + imm] = rs2[7:0];
+
+=== M Extension
+
+
+==== mul
+
+Multiply 32 × 32 -> 32.
+
+Syntax:
+
+    mul rd, rs1, rs2
+
+
+Operation:
+
+    rd = rs1 * rs2;
+
+==== mulh
+
+Multiply signed (32) by signed (32), return upper 32 bits of the 64-bit result.
+
+Syntax:
+
+    mulh rd, rs1, rs2
+
+Operation:
+
+    // Both operands are sign-extended to 64 bits:
+    wire [63:0] result_full = {{32{rs1[31]}}, rs1} * {{32{rs2[31]}}, rs2};
+    rd = result_full[63:32];
+
+==== mulhsu
+
+Multiply signed (32) by unsigned (32), return upper 32 bits of the 64-bit result.
+
+Syntax:
+
+    mulhsu rd, rs1, rs2
+
+Operation:
+
+    // rs1 is sign-extended, rs2 is zero-extended:
+    wire [63:0] result_full = {{32{rs1[31}}, rs1} * {32'h00000000, rs2};
+    rd = result_full[63:32];
+
+==== mulhu
+
+Multiply unsigned (32) by unsigned (32), return upper 32 bits of the 64-bit result.
+
+Syntax:
+
+    mulhu rd, rs1, rs2
+
+Operation:
+
+    wire [63:0] result_full = {32'h00000000, rs1} * {32'h00000000, rs2};
+    rd = result_full[63:32];
+
+==== div
+
+Divide (signed).
+
+Syntax:
+
+    div rd, rs1, rs2
+
+Operation:
+
+    if (rs2 == 32'h0)
+        rd = 32'hffffffff;
+    else if (rs1 == 32'h80000000 && rs2 == 32'hffffffff) // Signed overflow
+        rd = 32'h80000000;
+    else
+        rd = $signed(rs1) / $signed(rs2);
+
+==== divu
+
+Divide (unsigned).
+
+Syntax:
+
+    divu rd, rs1, rs2
+
+Operation:
+
+    if (rs2 == 32'h0)
+        rd = 32'hffffffff;
+    else
+        rd = rs1 / rs2;
+
+==== rem
+
+Remainder (signed).
+
+Syntax:
+
+    rem rd, rs1, rs2
+
+Operation:
+
+    if (rs2 == 32'h0)
+        rd = rs1;
+    else
+        rd = $signed(rs1) % $signed(rs2);
+
+==== remu
+
+Remainder (unsigned).
+
+Syntax:
+
+    remu rd, rs1, rs2
+
+Operation:
+
+    if (rs2 == 32'h0)
+        rd = rs1;
+    else
+        rd = rs1 % rs2;
+
+=== A Extension
+
+(TODO)
+
+=== C Extension
+
+All C extension instructions are 16-bit aliases of 32-bit instructions from other extensions (in the case of Hazard3, entirely from the RV32I base extension). They behave identically to their 32-bit counterparts.
+
+=== Zba: Bit manipulation (address generation)
+
+==== sh1add
+
+Add, with the second addend shifted left by 1.
+
+Syntax:
+
+    sh1add rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 + (rs2 << 1);
+
+==== sh2add
+
+Add, with the second addend shifted left by 2.
+
+Syntax:
+
+    sh2add rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 + (rs2 << 2);
+
+==== sh3add
+
+Add, with the second addend shifted left by 3.
+
+Syntax:
+
+    sh3add rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 + (rs2 << 3);
+
+=== Zbb: Bit manipulation (basic)
+
+==== andn
+
+Bitwise AND with inverted operand.
+
+Syntax:
+
+    andn rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 & ~rs2;
+
+==== clz
+
+Count leading zeroes (starting from MSB, searching LSB-ward).
+
+Syntax:
+
+    clz rd, rs1
+
+Operation:
+
+----
+rd = 32;          // Default = 32 if no set bits
+reg found = 1'b0; // Local variable
+
+for (i = 0; i < 32; i = i + 1) begin
+    if (rs1[i] && !found) begin
+        found = 1'b1;
+        rd = i;
+    end
+end
+----
+
+==== cpop
+
+Population count.
+
+Syntax:
+
+    cpop rd, rs1
+
+Operation:
+
+    rd = 0;
+    for (i = 0; i < 32; i = i + 1)
+        rd = rd + rs1[i];
+
+==== ctz
+
+Count trailing zeroes (starting from LSB, searching MSB-ward).
+
+Syntax:
+
+    ctz rd, rs1
+
+Operation:
+
+----
+rd = 32;          // Default = 32 if no set bits
+reg found = 1'b0; // Local variable
+
+for (i = 0; i < 32; i = i + 1) begin
+    if (rs1[31 - i] && !found) begin
+        found = 1'b1;
+        rd = i;
+    end
+end
+----
+
+==== max
+
+Maximum of two values (signed).
+
+Syntax:
+
+    max rd, rs1, rs2
+
+Operation:
+
+    if ($signed(rs1) < $signed(rs2))
+        rd = rs2;
+    else
+        rd = rs1;
+
+==== maxu
+
+Maximum of two values (unsigned).
+
+Syntax:
+
+    maxu rd, rs1, rs2
+
+Operation:
+
+    if (rs1 < rs2)
+        rd = rs2;
+    else
+        rd = rs1;
+
+==== min
+
+Minimum of two values (signed).
+
+Syntax:
+
+    min rd, rs1, rs2
+
+Operation:
+
+    if ($signed(rs1) < $signed(rs2))
+        rd = rd1;
+    else
+        rd = rs2;
+
+==== minu
+
+Minimum of two values (unsigned).
+
+Syntax:
+
+    minu rd, rs1, rs2
+
+Operation:
+
+    if (rs1 < rs2)
+        rd = rs1;
+    else
+        rd = rs2;
+
+==== orc.b
+
+Or-combine of bits within each byte.
+
+Syntax:
+
+    orc.b rd, rs1
+
+Operation:
+
+    rd = {
+        {8{|rs1[31:24]}},
+        {8{|rs1[23:16]}},
+        {8{|rs1[15:8]}},
+        {8{|rs1[7:0]}}
+    };
+
+==== orn
+
+Bitwise OR with inverted operand.
+
+Syntax:
+
+    orn rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 | ~rs2;
+
+==== rev8
+
+Reverse bytes within word.
+
+Syntax:
+
+    rev8 rd, rs1
+
+Operation:
+
+    rd = {
+        rs1[7:0],
+        rs1[15:8],
+        rs1[23:16],
+        rs1[31:24]
+    };
+
+==== rol
+
+Rotate left.
+
+Syntax:
+
+    rol rd, rs1, rs2
+
+Operation:
+
+    if (rs2[4:0] == 0)
+        rd = rs1;
+    else
+        rd = (rs1 << rs2[4:0]) | (rs1 >> (32 - rs2[4:0]));
+
+==== ror
+
+Rotate right.
+
+Syntax:
+
+    ror rd, rs1, rs2
+
+Operation:
+
+    if (rs2[4:0] == 0)
+        rd = rs1;
+    else
+        rd = (rs1 >> rs2[4:0]) | (rs1 << (32 - rs2[4:0]));
+
+==== rori
+
+Rotate right, immediate.
+
+Syntax:
+
+    ror rd, rs1, imm
+
+Operation:
+
+    if (imm[4:0] == 0)
+        rd = rs1;
+    else
+        rd = (rs1 >> imm[4:0]) | (rs1 << (32 - imm[4:0]));
+
+==== sext.b
+
+Sign-extend from byte.
+
+Syntax:
+
+    sext.b rd, rs1
+
+Operation:
+
+    rd = {
+        {24{rs1[7]}},
+        rs1[7:0]
+    };
+
+==== sext.h
+
+Sign-extend from halfword.
+
+Syntax:
+
+    sext.h rd, rs1
+
+Operation:
+
+    rd = {
+        {16{rs1[15]}},
+        rs1[15:0]
+    };
+
+==== xnor
+
+Bitwise XOR with inverted operand.
+
+Syntax:
+
+    xnor rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 ^ ~rs2;
+
+==== zext.h
+
+Zero-extend from halfword.
+
+Syntax:
+
+    zext.h rd, rs1
+
+Operation:
+
+    rd = {
+        16'h0000,
+        rs1[15:0]
+    };
+
+==== zext.b
+
+Zero-extend from byte.
+
+Syntax:
+
+    zext.b rd, rs1
+
+Operation:
+
+    // Pseudo-op for RV32I instruction
+    andi rd, rs1, 0xff
+
+=== Zbc: Bit manipulation (carry-less multiply)
+
+Each of these three instructions returns a 32-bit slice of the following 64-bit result:
+
+----
+reg [63:0] clmul_result;
+
+always @ (*) begin
+    clmul_result = 0;
+    for (i = 0; i < 32; i = i + 1) begin
+        if (rs2[i])) begin
+            clmul_result = clmul_result ^ ({32'h0, rs1} << i);
+        end
+    end
+end
+----
+
+==== clmul
+
+Carry-less multiply, low half.
+
+Syntax:
+
+    clmul rd, rs1, rs2
+
+Operation:
+
+    rd = cmul_result[31:0];
+
+==== clmulh
+
+Carry-les multiply, high half.
+
+Syntax:
+
+    clmulh rd, rs1, rs2
+
+Operation:
+
+    rd = clmul_result[63:32];
+
+==== clmulr
+
+Bit-reverse of carry-less multiply of bit-reverse.
+
+Syntax:
+
+    clmulr rd, rs1, rs2
+
+Operation:
+
+    rd = clmul_result[32:1];
+
+
+=== Zbs: Bit manipulation (single-bit)
+
+==== bclr
+
+Clear single bit.
+
+Syntax:
+
+    bclr rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 & ~(32'h1 << rs2[4:0]);
+
+==== bclri
+
+Clear single bit (immediate).
+
+Syntax:
+
+    bclri rd, rs1, imm
+
+Operation:
+
+    rd = rs1 & ~(32'h1 << imm[4:0]);
+
+
+==== bext
+
+Extract single bit.
+
+Syntax:
+
+    bext rd, rs1, rs2
+
+Operation:
+
+    rd = (rs1 >> rs2[4:0]) & 32'h1;
+
+==== bexti
+
+Extract single bit (immediate).
+
+Syntax:
+
+    bexti rd, rs1, imm
+
+Operation:
+
+    rd = (rs1 >> imm[4:0]) & 32'h1;
+
+==== binv
+
+Invert single bit.
+
+Syntax:
+
+    binv rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 ^ (32'h1 << rs2[4:0]);
+
+==== binvi
+
+Invert single bit (immediate).
+
+Syntax:
+
+    binvi rd, rs1, imm
+
+Operation:
+
+    rd = rs1 ^ (32'h1 << imm[4:0]);
+
+==== bset
+
+Set single bit.
+
+Syntax:
+
+    bset rd, rs1, rs2
+
+Operation:
+
+    rd = rs1 | (32'h1 << rs2[4:0])
+
+==== bseti
+
+Set single bit (immediate).
+
+Syntax:
+
+    bseti rd, rs1, imm
+
+Operation:
+
+    rd = rs1 | (32'h1 << imm[4:0]);
+
+=== Zbkb: Basic bit manipulation for cryptography
+
+NOTE: Zbkb has a large overlap with Zbb (basic bit manipulation). This section covers only those instruction in Zbkb but not in Zbb.
+
+==== brev8
+
+Bit-reverse within each byte.
+
+Syntax:
+
+    brev8 rd, rs1
+
+Operation:
+
+    for (i = 0; i < 32; i = i + 8) begin
+        for (j = 0; j < 8; j = j + 1) begin
+            rd[i + j] = rs1[i + (7 - j)];
+        end
+    end
+
+==== pack
+
+Pack halfwords into word.
+
+Syntax:
+
+    pack rd, rs1, rs2
+
+Operation:
+
+    rd = {
+        rs2[15:0],
+        rs1[15:0]
+    };
+
+==== packh
+
+Pack bytes into halfword.
+
+Syntax:
+
+    packh rd, rs1, rs2
+
+Operation:
+
+    rd = {
+        16'h0000,
+        rs2[7:0],
+        rs1[7:0]
+    };
+
+==== zip
+
+Interleave upper/lower half of register into odd/even bits of result.
+
+Syntax:
+
+    zip rd, rs1
+
+Operation:
+
+    for (i = 0; i < 32; i = i + 2) begin
+        rd[i]     = rs1[i / 2];
+        rd[i + 1] = rs1[i / 2 + 16];
+    end
+
+==== unzip
+
+Deinterleave odd/even bits of register into upper/lower half of result.
+
+Syntax:
+
+    unzip rd, rs1
+
+Operation:
+
+    for (i = 0; i < 32; i = i + 2) begin
+        rd[i / 2]      = rs1[i];
+        rd[i / 2 + 16] = rs1[i + 1];
+    end
+
