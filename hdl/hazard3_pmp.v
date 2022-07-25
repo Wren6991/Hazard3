@@ -88,18 +88,18 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 						cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_NA4 && PMP_GRAIN > 0 ? PMP_A_OFF :
 						cfg_wdata[i % 4 * 8 + 3 +: 2];
 				end
-				if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
-					if (PMP_GRAIN > 1) begin
-						pmpaddr[i] <= cfg_wdata[W_ADDR-3:0] | ~(~30'h0 << (PMP_GRAIN - 1));
-					end else begin
-						pmpaddr[i] <= cfg_wdata[W_ADDR-3:0];
-					end
+			end
+			if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
+				if (PMP_GRAIN > 1) begin
+					pmpaddr[i] <= cfg_wdata[W_ADDR-3:0] | ~(~30'h0 << (PMP_GRAIN - 1));
+				end else begin
+					pmpaddr[i] <= cfg_wdata[W_ADDR-3:0];
 				end
-
 			end
 		end
 	end
 end
+
 
 always @ (*) begin: cfg_read
 	integer i;
