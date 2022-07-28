@@ -82,7 +82,7 @@ Read-only, constant. Value depends on which ISA extensions Hazard3 is configured
 |===
 | Bits | Name | Description
 | 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
-| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie0>> and <<reg-meip0>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
+| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie>> and <<reg-meip>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
 | 12 | `m` | 1 if the M extension is present, otherwise 0.
 | 2 | `c` | 1 if the C extension is present, otherwise 0.
 | 0 | `a` | 1 if the A extension is present, otherwise 0.
@@ -134,12 +134,12 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20h,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-meie0>>.
+| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-meie>>.
 | 7 | `mtie` | Timer interrupt enable. A timer interrupt is requested when `mie.mtie`, `mip.mtip` and `mstatus.mie` are all 1.
 | 3 | `msie` | Software interrupt enable. A software interupt is requested when  `mie.msie`, `mip.mtip` and `mstatus.mie` are all 1.
 |===
 
-NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-meie0>>, and keeps the upper half of `mie` reserved.
+NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-meie>>, and keeps the upper half of `mie` reserved.
 
 ==== mip
 
@@ -154,7 +154,7 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20h,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-meip0>>) and enabled in <<reg-meie0>>.
+| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-meip>>) and enabled in <<reg-meie>>.
 | 7 | `mtip` | Timer interrupt pending. Level-sensitive interrupt signal from outside the core. Connected to a standard, external RISC-V 64-bit timer.
 | 3 | `msip` | Software interrupt pending. In spite of the name, this is not triggered by an instruction on this core, rather it is wired to an external memory-mapped register to provide a cross-hart level-sensitive doorbell interrupt.
 |===
@@ -414,37 +414,40 @@ The Debug Module uses this mapping to exchange data with the core by injecting `
 
 This CSR address is given by the `dataaddress` field of the Debug Module's `hartinfo` register, and `hartinfo.dataaccess` is set to 0 to indicate this is a CSR mapping, not a memory mapping.
 
-[[reg-meie0]]
-==== meie0
+[[reg-meie]]
+==== meiea
 
 Address: `0xbe0`
 
-External interrupt enable register 0. Contains a read-write bit for each external interrupt request IRQ0 through IRQ31. A `1` bit indicates that interrupt is currently enabled.
+External interrupt enable array. Contains a read-write bit for each external interrupt request: a `1` bit indicates that interrupt is currently enabled. At reset, all external interrupts are disabled.
 
-Addresses `0xbe1` through `0xbe3` are reserved for further `meie` registers, supporting up to 128 external interrupts.
+If enabled, an external interrupt can cause assertion of the standard RISC-V machine external interrupt pending flag (`mip.meip`), and therefore cause the processor to enter the external interrupt vector. See <<reg-meip>>.
 
-An external interrupt is taken when all of the following are true:
+There are up to 512 external interrupts. The upper half of this register contains a 16-bit window into the full 512-bit vector. The window is indexed by the 5 LSBs of the write data. For example:
 
-* The interrupt is currently asserted in `meip0`
-* The matching interrupt enable bit is set in `meie0`
-* The standard M-mode interrupt enable `mstatus.mie` is set
-* The standard M-mode global external interrupt enable `mie.meie` is set
+----
+csrrs a0, meiea, a0 // Read IRQ enables from the window selected by a0
+csrw meiea, a0      // Write a0[31:16] to the window selected by a0[4:0]
+csrr a0, meiea      // Read from window 0 (edge case)
+----
 
-`meie0` resets to *all-ones*, for compatibility with software which is only aware of `mstatus` and `mie`. Because `mstatus.mie` and `mie.meie` are both initially clear, the core will not take interrupts straight out of reset, but it is strongly recommended to configure `meie0` before setting the global interrupt enable, to avoid interrupts from unexpected sources.
+The purpose of this scheme is to allow software to _index_ an array of interrupt enables (something not usually possible in the CSR space) without introducing a stateful CSR index register which may have to be saved/restored around IRQs.
 
-[[reg-meip0]]
-==== meip0
 
-Address: `0xfe0`
+[[reg-meip]]
+==== meipa
 
-External IRQ pending register 0. Contains a read-only bit for each external interrupt request IRQ0 through IRQ31. A `1` bit indicates that interrupt is currently asserted. IRQs are assumed to be level-sensitive, and the relevant `meip0` bit is cleared by servicing the requestor so that it deasserts its interrupt request.
+Address: `0xbe1`
 
-Addresses `0xfe1` through `0xfe3` are reserved for further `meip` registers, supporting up to 128 external interrupts.
+External interrupt pending array. Contains a read-only bit for each external interrupt request. Similarly to `meiea`, this register is a window into an array of up to 512 external interrupt flags. The status appears in the upper 16 bits of the value read from `meipa`, and the lower 5 bits of the value _written_ by the same CSR instruction (or 0 if no write takes place) select a 16-bit window of the full interrupt pending array.
 
-When any bit is set in both `meip0` and `meie0`, the standard external interrupt pending bit `mip.meip` is also set. In other words, `meip0` is filtered by `meie0` to generate the standard `mip.meip` flag. So, an external interrupt is taken when _all_ of the following are true:
+A `1` bit indicates that interrupt is currently asserted. IRQs are assumed to be level-sensitive, and the relevant `meipa` bit is cleared by servicing the requestor so that it deasserts its interrupt request.
 
-* An interrupt is currently asserted in `meip0`
-* The matching interrupt enable bit is set in `meie0`
+When any interrupt of sufficient priority is both set in `meipa` and enabled in `meiea`, the standard RISC-V external interrupt pending bit `mip.meip` is asserted. In other words, `meip0` is filtered by `meiea` to generate the standard `mip.meip` flag. So, an external interrupt is taken when _all_ of the following are true:
+
+* An interrupt is currently asserted in `meipa`
+* The matching interrupt enable bit is set in `meiea`
+* The interrupt priority is greater than or equal to the preemption priority in `meicontext`
 * The standard M-mode interrupt enable `mstatus.mie` is set
 * The standard M-mode global external interrupt enable `mie.meie` is set
 
@@ -453,19 +456,106 @@ In this case, the processor jumps to either:
 * `mtvec` directly, if vectoring is disabled (`mtvec[0]` is 0)
 * `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1)
 
-==== mlei
+==== meipra
 
-Address: `0xfe4`
+Address: `0xbe2`
 
-Lowest external interrupt. Contains the index of the lowest-numbered external interrupt which is both asserted in `meip0` and enabled in `meie0`, left-shifted by 2 so that it can be used to index an array of 32-bit function pointers.
+External interrupt priority array. Each interrupt has an (up to) 4-bit priority value associated with it, and each access to this register reads and/or writes a 16-bit window containing four such priority values. When less than 16 priority levels are available, the LSBs of the priority fields are hardwired to 0.
+
+When an interrupt's priority is lower than the current preemption priority `meicontext.preempt`, it is treated as not being pending. The pending bit in `meipa` will still assert, but the machine external interrupt pending bit `mip.meip` will not, so the processor will ignore this interrupt. See <<reg-meicontext>>.
+
+==== meinext
+
+Address: `0xbe3`
+
+Get next interrupt. Contains the index of the highest-priority external interrupt which is both asserted in `meipa` and enabled in `meiea`, left-shifted by 2 so that it can be used to index an array of 32-bit function pointers. If there is no such interrupt, the MSB is set.
+
+When multiple interrupts of the same priority are both pending and enabled, the lowest-numbered wins. Interrupts with priority less than `meicontext.preempt` are treated as though they are not pending.
 
 [cols="10h,20h,~", options="header"]
 |===
-| Bits | Name | Description
-| 31:7 | - | RES0
-| 6:2 | - | Index of the lowest-numbered active external interrupt. A LSB-first priority encode of `meip0 & meie0`. Zero when no external interrupts are both pending and enabled.
-| 1:0 | - | RES0
+| Bits  | Name   | Description
+| 31    | noirq  | Set when there is no external interrupt which is enabled, pending, and has sufficient priority. Can be efficiently tested with a `bltz` or `bgez` instruction.
+| 30:11 | -      | RES0
+| 10:2  | irq    | Index of the highest-priority active external interrupt. Zero when no external interrupts with sufficient priority are both pending and enabled.
+| 1     | -      | RES0
+| 0     | update | Writing 1 (self-clearing) causes hardware to update `meicontext` with the IRQ number and preemption priority of the interrupt indicated in `noirq`/`irq`. This should be done in a single atomic operation, i.e. `csrrsi a0, meinext, 0x1`.
 |===
+
+[[reg-meicontext]]
+==== meicontext
+
+Address: `0xbe4`
+
+External interrupt context register. Configures the priority level for interrupt preemption, and helps software track which interrupt it is currently in. The latter is useful when a common interrupt service routine handles interrupt requests from multiple instances of the same peripheral.
+
+Generally this register is updated by hardware on an `meinext` access, and saved/restored by software when entering/exiting an interrupt dispatch routine.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits  | Name    | Description
+| 31:21 | -       | RES0
+| 20:16 | preempt | Minimum interrupt priority to preempt the current interrupt. Set to the priority of `meinext.irq`, plus one, when `meinext.update` is written. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler.
+| 15    | noirq   | Not in interrupt (read/write). Set to 1 at reset, and set to `meinext.noirq` when `meinext.update` is written.
+| 14:9  | -       | RES0
+| 8:0   | irq     | Current IRQ number (read/write). Set to `meinext.irq` when `meinext.update` is written..
+|===
+
+The following is an example of an external interrupt vector (`mip.meip`) which implements nested, prioritised interrupt dispatch using `meicontext` and `meinext`:
+
+----
+isr_external_irq:
+	// Save caller saves and exception return state whilst IRQs are disabled.
+	// We can't be pre-empted during this time, but if a higher-priority IRQ
+	// arrives ("late arrival"), that will be the one displayed in meinext. 
+	addi sp, sp, -80
+	sw ra,  0(sp)
+	... snip
+	sw t6, 60(sp)
+
+	csrr a0, mepc
+	sw a0, 64(sp)
+	csrr a0, meicontext
+	sw a0, 68(sp)
+	csrr a0, mstatus
+	sw a0, 72(sp)
+
+	j get_next_irq
+
+dispatch_irq:
+	// Preemption priority was configured by meinext update, so enable preemption:
+	csrsi mstatus, 0x8
+	// meinext is pre-shifted by 2, so only an add is required to index table
+	la a1, _external_irq_table
+	add a1, a1, a0
+	jalr ra, a1
+
+	// Disable IRQs on returning so we can sample the next IRQ
+	csrci mstatus, 0x8
+
+get_next_irq:
+	// Sample the current highest-priority active IRQ (left-shifted by 2) from
+	// meinext, and write 1 to the LSB to tell hardware to tell hw to update
+	// meicontext with the preemption priority (and IRQ number) of this IRQ
+	csrrsi a0, meinext, 0x1
+	// MSB will be set if there is no active IRQ at the current priority level
+	bgez a0, dispatch_irq
+
+no_more_irqs:
+	// Restore saved context and return from handler
+	lw a0, 64(sp)
+	csrw mepc, a0
+	lw a0, 68(sp)
+	csrw meicontext, a0
+	lw a0, 72(sp)
+	csrw mstatus, a0
+
+	lw ra,  0(sp)
+	... snip
+	lw t6, 60(sp)
+	addi sp, sp, 80
+	mret
+----
 
 ==== msleep
 
