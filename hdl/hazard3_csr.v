@@ -412,12 +412,14 @@ end
 
 // The following DCSR bits are read/writable as normal:
 // - ebreakm (bit 15)
+// - ebreaku (bit 12) if U-mode is supported
 // - step (bit 2)
 // The following are read-only volatile:
 // - cause (bits 8:6)
 // All others are hardwired constants.
 
 reg dcsr_ebreakm;
+reg dcsr_ebreaku;
 reg dcsr_step;
 reg [2:0] dcsr_cause;
 wire [2:0] dcause_next;
@@ -430,11 +432,16 @@ localparam DCSR_CAUSE_STEP    = 3'h4;
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		dcsr_ebreakm <= 1'b0;
+		dcsr_ebreaku <= 1'b0;
 		dcsr_step <= 1'b0;
 		dcsr_cause <= 3'h0;
 	end else if (DEBUG_SUPPORT) begin
 		if (debug_mode && wen && addr == DCSR) begin
-			{dcsr_ebreakm, dcsr_step} <= {wdata_update[15], wdata_update[2]};
+			{dcsr_ebreakm, dcsr_ebreaku, dcsr_step} <= {
+				wdata_update[15],
+				wdata_update[12] && U_MODE,
+				wdata_update[2]
+			};
 		end
 		if (enter_debug_mode) begin
 			dcsr_cause <= dcause_next;
@@ -901,7 +908,8 @@ always @ (*) begin
 			4'h4,         // xdebugver = 4, for 0.13.2 debug spec
 			12'd0,        // reserved
 			dcsr_ebreakm,
-			3'h0,         // No other modes besides M to break from
+			2'h0,         // No mode 2/1
+			dcsr_ebreaku,
 			1'b0,         // stepie = 0, no interrupts in single-step mode
 			1'b1,         // stopcount = 1, no counter increment in debug mode
 			1'b1,         // stoptime = 0, no core-local timer increment in debug mode
@@ -1042,7 +1050,8 @@ wire halt_delayed_by_exception = exception_req_any || loadstore_dphase_pending;
 
 // This would also include triggers, if/when those are implemented:
 wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
-	dcsr_ebreakm && except == EXCEPT_EBREAK
+	dcsr_ebreakm &&  m_mode && except == EXCEPT_EBREAK ||
+	dcsr_ebreaku && !m_mode && except == EXCEPT_EBREAK
 );
 
 // Note exception-like causes (trigger, ebreak) are higher priority than
@@ -1143,7 +1152,9 @@ wire [3:0] standard_irq_num =
 
 // ebreak may be treated as a halt-to-debugger or a regular M-mode exception,
 // depending on dcsr.ebreakm.
-assign exception_req_any = except != EXCEPT_NONE && !(except == EXCEPT_EBREAK && dcsr_ebreakm);
+assign exception_req_any = except != EXCEPT_NONE && !(
+	except == EXCEPT_EBREAK && (m_mode ? dcsr_ebreakm : dcsr_ebreaku)
+);
 
 wire [5:0] mcause_irq_num =	irq_active ? {2'h0, standard_irq_num} : 6'd0;
 

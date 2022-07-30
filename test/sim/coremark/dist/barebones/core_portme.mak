@@ -19,9 +19,9 @@
 #	Use this flag to define how to to get an executable (e.g -o)
 OUTFLAG= -o
 
-CC 		= riscv32-unknown-elf-gcc
-LD		= riscv32-unknown-elf-gcc
-AS		= riscv32-unknown-elf-gcc
+CC 		= /opt/riscv/unstable/bin/riscv32-unknown-elf-gcc
+LD		= /opt/riscv/unstable/bin/riscv32-unknown-elf-gcc
+AS		= /opt/riscv/unstable/bin/riscv32-unknown-elf-gcc
 # Flag : CFLAGS
 #	Use this flag to define compiler options. Note, you can add compiler options from the command line using XCFLAGS="other flags"
 PORT_CFLAGS = -O3 -g -march=rv32im_zicsr_zba_zbb_zbc_zbs -fno-common -funroll-loops -finline-functions --param max-inline-insns-auto=20 -falign-functions=4 -falign-jumps=4 -falign-loops=4
