@@ -287,7 +287,12 @@ end
 reg [N_HARTS-1:0] dmstatus_resumeack;
 reg [N_HARTS-1:0] dmcontrol_resumereq_sticky;
 
-wire dmcontrol_resumereq = dmi_write && dmi_regaddr == ADDR_DMCONTROL && dmi_pwdata[30];
+// Note: we are required to ignore resumereq when haltreq is also set, as per
+// spec (odd since the host is forbidden from writing both at once anyway).
+// The wording is odd, it refers only to `haltreq` which is specifically the
+// write-only `dmcontrol` field, not the underlying halt request state bits.
+wire dmcontrol_resumereq = dmi_write && dmi_regaddr == ADDR_DMCONTROL &&
+	dmi_pwdata[30] && !dmi_pwdata[31];
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -561,12 +566,14 @@ wire       acmd_new_transfer    = dmi_pwdata[17];
 wire       acmd_new_write       = dmi_pwdata[16];
 wire [4:0] acmd_new_regno       = dmi_pwdata[4:0];
 
+// Note: regno and aarsize are permitted to have otherwise-invalid values if
+// the transfer flag is not set.
 wire       acmd_new_unsupported =
-	dmi_pwdata[31:24] != 8'h00 || // Only Access Register command supported
-	dmi_pwdata[22:20] != 3'h2  || // Must be 32 bits in size
-	dmi_pwdata[19]             || // aarpostincrement not supported
-	dmi_pwdata[15:12] != 4'h1  || // Only core register access supported
-	dmi_pwdata[11:5]  != 7'h0;    // Only GPRs supported
+	(dmi_pwdata[31:24] != 8'h00                    ) || // Only Access Register command supported
+	(dmi_pwdata[22:20] != 3'h2 && acmd_new_transfer) || // Must be 32 bits in size
+	(dmi_pwdata[19]                                ) || // aarpostincrement not supported
+	(dmi_pwdata[15:12] != 4'h1 && acmd_new_transfer) || // Only core register access supported
+	(dmi_pwdata[11:5]  != 7'h0 && acmd_new_transfer);   // Only GPRs supported
 
 reg        acmd_prev_postexec;
 reg        acmd_prev_transfer;
