@@ -82,7 +82,8 @@ Read-only, constant. Value depends on which ISA extensions Hazard3 is configured
 |===
 | Bits | Name | Description
 | 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
-| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meie>> and <<reg-meip>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
+| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meiea>> and <<reg-meipa>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
+| 20 | `u` | 1 if User mode is supported, otherwise 0.
 | 12 | `m` | 1 if the M extension is present, otherwise 0.
 | 2 | `c` | 1 if the C extension is present, otherwise 0.
 | 0 | `a` | 1 if the A extension is present, otherwise 0.
@@ -99,7 +100,9 @@ The below table lists the fields which are _not_ hardwired to 0:
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
-| 12:11 | `mpp` | Previous privilege level. Always `0x3`, indicating M-mode.
+| 21    | `tw`  | Timeout wait. Only present if U-mode is supported. When 1, attempting to execute a WFI instruction in U-mode will instantly cause an illegal instruction exception.
+| 17    | `mprv` | Modify privilege. Only present if U-mode is supported. If 1, loads and stores behave as though the current privilege level were `mpp`. This includes physical memory protection checks, and the privilege level asserted on the system bus alongside the load/store address.
+| 12:11 | `mpp` | Previous privilege level. If U-mode is supported, this register can store the values 3 (M-mode) or 0 (U-mode). Otherwise, only 3 (M-mode). If another value is written, hardware rounds to the nearest supported mode.
 | 7 | `mpie` | Previous interrupt enable. Readable and writable. Is set to the current value of `mstatus.mie` on trap entry. Is set to 1 on trap return.
 | 3 | `mie` | Interrupt enable. Readable and writable. Is set to 0 on trap entry. Is set to the current value of `mstatus.mpie` on trap return.
 |===
@@ -134,12 +137,12 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20h,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-meie>>.
+| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-meiea>>.
 | 7 | `mtie` | Timer interrupt enable. A timer interrupt is requested when `mie.mtie`, `mip.mtip` and `mstatus.mie` are all 1.
 | 3 | `msie` | Software interrupt enable. A software interupt is requested when  `mie.msie`, `mip.mtip` and `mstatus.mie` are all 1.
 |===
 
-NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-meie>>, and keeps the upper half of `mie` reserved.
+NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-meiea>>, and keeps the upper half of `mie` reserved.
 
 ==== mip
 
@@ -154,12 +157,10 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20h,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-meip>>) and enabled in <<reg-meie>>.
+| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-meipa>>) and enabled in <<reg-meiea>>.
 | 7 | `mtip` | Timer interrupt pending. Level-sensitive interrupt signal from outside the core. Connected to a standard, external RISC-V 64-bit timer.
 | 3 | `msip` | Software interrupt pending. In spite of the name, this is not triggered by an instruction on this core, rather it is wired to an external memory-mapped register to provide a cross-hart level-sensitive doorbell interrupt.
 |===
-
-NOTE: Hazard3 assumes interrupts to be level-sensitive at system level. Bits in `mip` are cleared by servicing the requestor and causing it to deassert its interrupt request.
 
 ==== mtvec
 
@@ -188,7 +189,7 @@ Address: `0x341`
 
 Exception program counter. When entering a trap, the current value of the program counter is recorded here. When executing an `mret`, the processor jumps to `mepc`. Can also be read and written by software.
 
-On Hazard3, bits 31:1 of `mepc` are capable of holding all 31-bit values. Bit 0 is hardwired to 0, as per the specification.
+On Hazard3, bits 31:2 of `mepc` are capable of holding all 30-bit values. Bit 1 is writable only if the C extension is implemented, and is otherwise hardwired to 0. Bit 0 is hardwired to 0, as per the specification.
 
 All traps on Hazard3 are precise. For example, a load/store bus error will set `mepc` to the exact address of the load/store instruction which encountered the fault.
 
@@ -225,8 +226,6 @@ The following exception causes may be set by Hazard3 hardware:
 | 11 | Environment call
 |===
 
-NOTE: Not every instruction fetch bus cycle which returns a bus error leads to an exception. Hazard3 prefetches instructions ahead of execution, and associated bus errors are speculated through to the point the processor actually attempts to decode the instruction. Until this point, the error can be flushed by a branch, with no ill effect.
-
 ==== mtval
 
 Address: `0x343`
@@ -237,23 +236,54 @@ Hardwired to 0.
 
 Address: `0x306`
 
-Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+Counter enable. Control access to counters from U-mode. Not to be confused with <<reg-mcountinhibit>>.
 
-Not to be confused with <<reg-mcountinhibit>>.
+This register only exists if U-mode is supported.
 
-=== Standard Memory Protection
+[cols="10h,20h,~", options="header"]
+|===
+|Bits | Name | Description
+| 31:3 | -    | RES0
+| 2    | `ir` | If 1, U-mode is permitted to access the `instret`/`instreth` instruction retire counter CSRs. Otherwise, U-mode accesses to these CSRs will trap.
+| 1    | `tm` | No hardware effect, as the `time`/`timeh` CSRs are not implemented. However, this field still exists, as M-mode software can use it to track whether it should emulate U-mode attempts to access those CSRs.
+| 0   | `cy`  |If 1, U-mode is permitted to access the `cycle`/`cycleh` cycle counter CSRs. Otherwise, U-mode accesses to these CSRs will trap.
+|===
+
+=== Standard Memory Protection CSRs
 
 ==== pmpcfg0...3
 
 Address: `0x3a0` through `0x3a3`
 
-Unimplemented. Access will cause an illegal instruction exception.
+Configuration registers for up to 16 physical memory protection regions. Only present if PMP support is configured. If so, all 4 registers are present, but some registers may be partially/completely hardwired depending on the number of PMP regions present.
+
+By default, M-mode has full permissions (RWX) on all of memory, and U-mode has no permissions. A PMP region can be configured to alter this default within some range of addresses. For every memory location executed, loaded or stored, the processor looks up the _lowest active region_ that overlaps that memory location, and applies its permissions to determine whether this access is allowed. The full description can be found in the RISC-V privileged ISA manual.
+
+Each `pmpcfg` register divides into four identical 8-bit chunks, each corresponding to one region, and laid out as below:
+
+[cols="10h,20h,~", options="header"]
+|===
+|Bits | Name | Description
+| 7   | `L` | Lock region, and additionally enforce its permissions on M-mode as well as U-mode.
+| 6:5 | -   | RES0
+| 4:3 | `A` | Address-matching mode. Values supported are 0 (OFF), 2 (NA4, naturally aligned 4-byte) and 3 (NAPOT, naturally aligned power-of-two). Attempting to write an unsupported value will set the region to OFF.
+| 2    | `X` | Execute permission
+| 1    | `W` | Write permission
+| 0    | `R` | Read permission
+|===
 
 ==== pmpaddr0...15
 
 Address: `0x3b0` through `0x3bf`
 
-Unimplemented. Access will cause an illegal instruction exception.
+Address registers for up to 16 physical memory protection regions. Only present if PMP support is configured. If so, all 16 registers are present, but some may fully/partially hardwired.
+
+`pmpaddr` registers express addresses in units of 4 bytes, so on Hazard3 (a 32-bit processor with no virtual address support) only the lower 30 bits of each address register are implemented.
+
+The interpretation of the `pmpaddr` bits depends on the `A` mode configured in the corresponding `pmpcfg` register field:
+
+* For NA4, the entire 30-bit `pmpaddr` field is matched against the 30 most-significant bits of the checked address.
+* FOr NAPOT, `pmpaddr` bits up to and including the least-significant zero bits are ignored, and only the remaining bits are matched against the checked address.
 
 === Standard M-mode Performance Counters
 
@@ -352,7 +382,8 @@ Debug control and status register. Access outside of Debug Mode will cause an il
 |===
 | Bits | Name | Description
 | 31:28 | `xdebugver` | Hardwired to 4: external debug support as per RISC-V 0.13.2 debug specification.
-| 15 | `ebreakm` | When 1, `ebreak` instructions will break to Debug Mode instead of trapping in M mode.
+| 15 | `ebreakm` | When 1, `ebreak` instructions executed in M-mode will break to Debug Mode instead of trapping
+| 12 | `ebreaku` | When 1, `ebreak` instructions executed in U-mode will break to Debug Mode instead of trapping. Hardwired to 0 if U-mode is not supported.
 | 11 | `stepie` | Hardwired to 0: no interrupts are taken during hardware single-stepping.
 | 10 | `stopcount` | Hardwired to 1: `mcycle`/`mcycleh` and `minstret`/`minstreth` do not increment in Debug Mode.
 | 9 | `stoptime` | Hardwired to 1: core-local timers don't increment in debug mode. This requires cooperation of external hardware based on the halt status to implement correctly.
@@ -412,14 +443,14 @@ This CSR address is given by the `dataaddress` field of the Debug Module's `hart
 
 === Custom Interrupt Handling CSRs
 
-[[reg-meie]]
+[[reg-meiea]]
 ==== meiea
 
 Address: `0xbe0`
 
 External interrupt enable array. Contains a read-write bit for each external interrupt request: a `1` bit indicates that interrupt is currently enabled. At reset, all external interrupts are disabled.
 
-If enabled, an external interrupt can cause assertion of the standard RISC-V machine external interrupt pending flag (`mip.meip`), and therefore cause the processor to enter the external interrupt vector. See <<reg-meip>>.
+If enabled, an external interrupt can cause assertion of the standard RISC-V machine external interrupt pending flag (`mip.meip`), and therefore cause the processor to enter the external interrupt vector. See <<reg-meipa>>.
 
 There are up to 512 external interrupts. The upper half of this register contains a 16-bit window into the full 512-bit vector. The window is indexed by the 5 LSBs of the write data. For example:
 
@@ -434,12 +465,12 @@ The purpose of this scheme is to allow software to _index_ an array of interrupt
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name   | Description
-| 31:16 | window | 16-bit read/write window into the external interrupt enable array
-| 15:5  | -      | RES0
-| 4:0   | index  | Write-only self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
+| 31:16 | `window` | 16-bit read/write window into the external interrupt enable array
+| 15:5  | -        | RES0
+| 4:0   | `index`  | Write-only self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
 
-[[reg-meip]]
+[[reg-meipa]]
 ==== meipa
 
 Address: `0xbe1`
@@ -464,9 +495,9 @@ In this case, the processor jumps to either:
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name   | Description
-| 31:16 | window | 16-bit read-only window into the external interrupt pending array
-| 15:5  | -      | RES0
-| 4:0   | index  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
+| 31:16 | `window` | 16-bit read-only window into the external interrupt pending array
+| 15:5  | -        | RES0
+| 4:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
 
 [[reg-meifa]]
@@ -485,9 +516,9 @@ Bits can be cleared by software, and are cleared automatically by hardware upon 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name   | Description
-| 31:16 | window | 16-bit read/write window into the external interrupt force array
-| 15:5  | -      | RES0
-| 4:0   | index  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
+| 31:16 | `window` | 16-bit read/write window into the external interrupt force array
+| 15:5  | -        | RES0
+| 4:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
 
 ==== meipra
@@ -501,9 +532,9 @@ When an interrupt's priority is lower than the current preemption priority `meic
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name   | Description
-| 31:16 | window | 16-bit read/write window into the external interrupt priority array, containing four 4-bit priority values.
-| 15:7  | -      | RES0
-| 6:0   | index  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
+| 31:16 | `window` | 16-bit read/write window into the external interrupt priority array, containing four 4-bit priority values.
+| 15:7  | -        | RES0
+| 6:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
 
 ==== meinext
@@ -516,12 +547,12 @@ When multiple interrupts of the same priority are both pending and enabled, the 
 
 [cols="10h,20h,~", options="header"]
 |===
-| Bits  | Name   | Description
-| 31    | noirq  | Set when there is no external interrupt which is enabled, pending, and has sufficient priority. Can be efficiently tested with a `bltz` or `bgez` instruction.
-| 30:11 | -      | RES0
-| 10:2  | irq    | Index of the highest-priority active external interrupt. Zero when no external interrupts with sufficient priority are both pending and enabled.
-| 1     | -      | RES0
-| 0     | update | Writing 1 (self-clearing) causes hardware to update `meicontext` with the IRQ number and preemption priority of the interrupt indicated in `noirq`/`irq`. This should be done in a single atomic operation, i.e. `csrrsi a0, meinext, 0x1`.
+| Bits  | Name     | Description
+| 31    | `noirq`  | Set when there is no external interrupt which is enabled, pending, and has sufficient priority. Can be efficiently tested with a `bltz` or `bgez` instruction.
+| 30:11 | -        | RES0
+| 10:2  | `irq`    | Index of the highest-priority active external interrupt. Zero when no external interrupts with sufficient priority are both pending and enabled.
+| 1     | -        | RES0
+| 0     | `update` | Writing 1 (self-clearing) causes hardware to update `meicontext` with the IRQ number and preemption priority of the interrupt indicated in `noirq`/`irq`. This should be done in a single atomic operation, i.e. `csrrsi a0, meinext, 0x1`.
 |===
 
 [[reg-meicontext]]
@@ -537,19 +568,19 @@ The third entry, `pppreempt`, has no hardware effect, but ensures that `preempt`
 
 [cols="10h,20h,~", options="header"]
 |===
-| Bits  | Name      | Description
-| 31:28 | pppreempt | Previous `ppreempt`. Set to `ppreempt` when taking an interrupt, set to zero by `mret`.  Has no hardware effect, but ensures that when `meicontext` is saved/restored correctly, `preempt` and `ppreempt` stack correctly through arbitrarily many preemption frames.
+| Bits  | Name        | Description
+| 31:28 | `pppreempt` | Previous `ppreempt`. Set to `ppreempt` when taking an interrupt, set to zero by `mret`.  Has no hardware effect, but ensures that when `meicontext` is saved/restored correctly, `preempt` and `ppreempt` stack correctly through arbitrarily many preemption frames.
 
 TODO: how to track whether the `mret` is a return from external IRQ?
-| 27:24 | ppreempt  | Previous `preempt`. Set to `preempt` when taking an interrupt, restored to to `pppreempt` by `mret`. IRQs of lower priority than `preemptp` are not visible in `meinext`, so that the preempted interrupt is not re-taken in the preempting frame.
+| 27:24 | `ppreempt`  | Previous `preempt`. Set to `preempt` when taking an interrupt, restored to to `pppreempt` by `mret`. IRQs of lower priority than `preemptp` are not visible in `meinext`, so that the preempted interrupt is not re-taken in the preempting frame.
 
 One bit smaller than `preempt`, because when `preempt` has its maximum value of 16, no further preemption is possible.
-| 23:21 | -         | RES0
-| 20:16 | preempt   | Minimum interrupt priority to preempt the current interrupt. Set to the priority of `meinext.irq`, plus one, when `meinext.update` is written. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler.
-| 15:12 | -         | RES0
-| 11    | noirq     | Not in interrupt (read/write). Set to 1 at reset or when taking any trap other than an external interrupt. Set to `meinext.noirq` when `meinext.update` is written.
-| 10:9  | -         | RES0
-| 8:0   | irq       | Current IRQ number (read/write). Set to `meinext.irq` when `meinext.update` is written..
+| 23:21 | -           | RES0
+| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Set to the priority of `meinext.irq`, plus one, when `meinext.update` is written. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler.
+| 15:12 | -           | RES0
+| 11    | `noirq`     | Not in interrupt (read/write). Set to 1 at reset or when taking any trap other than an external interrupt. Set to `meinext.noirq` when `meinext.update` is written.
+| 10:9  | -           | RES0
+| 8:0   | `irq`       | Current IRQ number (read/write). Set to `meinext.irq` when `meinext.update` is written..
 |===
 
 The following is an example of an external interrupt vector (`mip.meip`) which implements nested, prioritised interrupt dispatch using `meicontext` and `meinext`:
