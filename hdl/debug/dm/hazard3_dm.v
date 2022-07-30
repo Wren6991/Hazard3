@@ -752,20 +752,21 @@ always @ (*) begin
 		dmactive
 	};
 	ADDR_DMSTATUS:     dmi_prdata = {
-		9'h0,                                           // reserved
-		1'b1,                                           // impebreak = 1
-		2'h0,                                           // reserved
-		status_all_any(dmstatus_havereset),             // allhavereset, anyhavereset
-		status_all_any(dmstatus_resumeack),             // allresumeack, anyresumeack
-		{2{!hasel && hartsel >= N_HARTS}},              // allnonexistent, anynonexistent
-		status_all_any(~hart_available),                // allunavail, anyunavail
-		status_all_any(hart_running & hart_available),  // allrunning, anyrunning
-		status_all_any(hart_halted & hart_available),   // allhalted, anyhalted
-		1'b1,                                           // authenticated
-		1'b0,                                           // authbusy
-		1'b1,                                           // hasresethaltreq = 1 (we do support it)
-		1'b0,                                           // confstrptrvalid
-		4'd2                                            // version = 2: RISC-V debug spec 0.13.2
+		9'h0,                                               // reserved
+		1'b1,                                               // impebreak = 1
+		2'h0,                                               // reserved
+		status_all_any(dmstatus_havereset),                 // allhavereset, anyhavereset
+		status_all_any(dmstatus_resumeack),                 // allresumeack, anyresumeack
+		hartsel >= N_HARTS && !(hasel && |hart_array_mask), // allnonexistent
+		hartsel >= N_HARTS,                                 // anynonexistent
+		status_all_any(~hart_available),                    // allunavail, anyunavail
+		status_all_any(hart_running & hart_available),      // allrunning, anyrunning
+		status_all_any(hart_halted & hart_available),       // allhalted, anyhalted
+		1'b1,                                               // authenticated
+		1'b0,                                               // authbusy
+		1'b1,                                               // hasresethaltreq = 1 (we do support it)
+		1'b0,                                               // confstrptrvalid
+		4'd2                                                // version = 2: RISC-V debug spec 0.13.2
 	};
 	ADDR_HARTINFO:     dmi_prdata = {
 		8'h0,                             // reserved
