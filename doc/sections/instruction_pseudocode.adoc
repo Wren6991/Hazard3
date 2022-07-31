@@ -656,7 +656,7 @@ All C extension instructions are 16-bit aliases of 32-bit instructions from othe
 
 ==== sh1add
 
-Add, with the second addend shifted left by 1.
+Add, with the first addend shifted left by 1.
 
 Syntax:
 
@@ -664,11 +664,11 @@ Syntax:
 
 Operation:
 
-    rd = rs1 + (rs2 << 1);
+    rd = (rs1 << 1) + rs2;
 
 ==== sh2add
 
-Add, with the second addend shifted left by 2.
+Add, with the first addend shifted left by 2.
 
 Syntax:
 
@@ -676,11 +676,11 @@ Syntax:
 
 Operation:
 
-    rd = rs1 + (rs2 << 2);
+    rd = (rs1 << 2) + rs2;
 
 ==== sh3add
 
-Add, with the second addend shifted left by 3.
+Add, with the first addend shifted left by 3.
 
 Syntax:
 
@@ -688,7 +688,7 @@ Syntax:
 
 Operation:
 
-    rd = rs1 + (rs2 << 3);
+    rd = (rs1 << 3) + rs2;
 
 === Zbb: Bit manipulation (basic)
 
