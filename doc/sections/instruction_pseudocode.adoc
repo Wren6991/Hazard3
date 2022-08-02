@@ -719,7 +719,7 @@ rd = 32;          // Default = 32 if no set bits
 reg found = 1'b0; // Local variable
 
 for (i = 0; i < 32; i = i + 1) begin
-    if (rs1[i] && !found) begin
+    if (rs1[31 - i] && !found) begin
         found = 1'b1;
         rd = i;
     end
@@ -755,7 +755,7 @@ rd = 32;          // Default = 32 if no set bits
 reg found = 1'b0; // Local variable
 
 for (i = 0; i < 32; i = i + 1) begin
-    if (rs1[31 - i] && !found) begin
+    if (rs1[i] && !found) begin
         found = 1'b1;
         rd = i;
     end
