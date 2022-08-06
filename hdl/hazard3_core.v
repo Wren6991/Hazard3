@@ -187,6 +187,8 @@ wire [W_DATA-1:0]    d_imm;
 wire [W_REGADDR-1:0] d_rs1;
 wire [W_REGADDR-1:0] d_rs2;
 wire [W_REGADDR-1:0] d_rd;
+wire [2:0]           d_funct3_32b;
+wire [6:0]           d_funct7_32b;
 wire [W_ALUSRC-1:0]  d_alusrc_a;
 wire [W_ALUSRC-1:0]  d_alusrc_b;
 wire [W_ALUOP-1:0]   d_aluop;
@@ -237,6 +239,8 @@ hazard3_decode #(
 	.d_rs1                (d_rs1),
 	.d_rs2                (d_rs2),
 	.d_rd                 (d_rd),
+	.d_funct3_32b         (d_funct3_32b),
+	.d_funct7_32b         (d_funct7_32b),
 	.d_alusrc_a           (d_alusrc_a),
 	.d_alusrc_b           (d_alusrc_b),
 	.d_aluop              (d_aluop),
@@ -451,6 +455,8 @@ hazard3_alu #(
 `include "hazard3_config_inst.vh"
 ) alu (
 	.aluop      (d_aluop),
+	.funct3_32b (d_funct3_32b),
+	.funct7_32b (d_funct7_32b),
 	.op_a       (x_op_a),
 	.op_b       (x_op_b),
 	.result     (x_alu_result),

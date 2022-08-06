@@ -18,9 +18,7 @@ localparam ALUOP_SLL     = 6'h0b;
 localparam ALUOP_MULDIV  = 6'h0c;
 localparam ALUOP_RS2     = 6'h0d; // differs from AND/OR/XOR in [1:0]
 // Bitmanip ALU operations (some also used by AMOs):
-localparam ALUOP_SH1ADD  = 6'h20;
-localparam ALUOP_SH2ADD  = 6'h21;
-localparam ALUOP_SH3ADD  = 6'h22;
+localparam ALUOP_SHXADD  = 6'h20;
 localparam ALUOP_CLZ     = 6'h23;
 localparam ALUOP_CPOP    = 6'h24;
 localparam ALUOP_CTZ     = 6'h25;
@@ -40,19 +38,19 @@ localparam ALUOP_SEXT_H  = 6'h32;
 localparam ALUOP_ZEXT_H  = 6'h33;
 
 localparam ALUOP_CLMUL   = 6'h34;
-localparam ALUOP_CLMULH  = 6'h35;
-localparam ALUOP_CLMULR  = 6'h36;
 
-localparam ALUOP_BCLR    = 6'h37;
-localparam ALUOP_BEXT    = 6'h38;
-localparam ALUOP_BINV    = 6'h39;
-localparam ALUOP_BSET    = 6'h3a;
+localparam ALUOP_BCLR    = 6'h35;
+localparam ALUOP_BEXT    = 6'h36;
+localparam ALUOP_BINV    = 6'h37;
+localparam ALUOP_BSET    = 6'h38;
 
-localparam ALUOP_PACK    = 6'h3b;
-localparam ALUOP_PACKH   = 6'h3c;
-localparam ALUOP_BREV8   = 6'h3d;
-localparam ALUOP_ZIP     = 6'h3e;
-localparam ALUOP_UNZIP   = 6'h3f;
+localparam ALUOP_PACK    = 6'h39;
+localparam ALUOP_PACKH   = 6'h3a;
+localparam ALUOP_BREV8   = 6'h3b;
+localparam ALUOP_ZIP     = 6'h3c;
+localparam ALUOP_UNZIP   = 6'h3d;
+
+localparam ALUOP_BEXTM   = 6'h3e;
 
 // Parameters to control ALU input muxes. Bypass mux paths are
 // controlled by X, so D has no parameters to choose these.

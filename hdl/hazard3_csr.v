@@ -497,7 +497,10 @@ always @ (*) begin
 			{XLEN-28{1'b0}},   // WLRL
 
 			2'd0,              // Z, Y, no
-			|CSR_M_TRAP,       // X is set for our non-standard interrupt enable CSRs
+			|{                 // X is set for any custom extensions
+				|CSR_M_TRAP,
+				|EXTENSION_XH3B
+			},
 			2'd0,              // V, W, no
 			|U_MODE,
 			7'd0,              // T...N, no
