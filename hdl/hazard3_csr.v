@@ -405,7 +405,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end else if (wen_m_mode && addr == MEINEXT && wdata_update[0]) begin
 		// Interrupt has been sampled, with the update request set, so update
 		// the context (including preemption level) appropriately.
-		meicontext_preempt <= preempt_level_next & IRQ_PRIORITY_MASK;
+		meicontext_preempt <= preempt_level_next & {1'b1, IRQ_PRIORITY_MASK};
 		meicontext_noirq <= meinext_noirq;
 		meicontext_irq <= meinext_irq;
 	end
@@ -480,7 +480,9 @@ always @ (*) begin: get_highest_eirq_priority
 	integer i;
 	eirq_highest_priority = 4'h0;
 	for (i = 0; i < NUM_IRQS; i = i + 1) begin
-		eirq_highest_priority = meipra[4 * i +: 4] & {4{highest_eirq_onehot[i]}};
+		eirq_highest_priority = eirq_highest_priority | (
+			meipra[4 * i +: 4] & {4{highest_eirq_onehot[i]}}
+		);
 	end
 end
 

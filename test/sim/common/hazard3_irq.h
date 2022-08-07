@@ -28,4 +28,20 @@ static inline bool h3irq_force_pending(unsigned int irq) {
 	h3irq_array_set(hazard3_csr_meifa, irq >> 4, 1u << (irq & 0xfu));
 }
 
+// -1 for no IRQ
+static inline int h3irq_get_current_irq() {
+	uint32_t meicontext = read_csr(hazard3_csr_meicontext);
+	return meicontext & 0x8000u ? -1 : (meicontext >> 4) & 0x1ffu;
+}
+
+static inline void h3irq_set_priority(unsigned int irq, uint32_t priority) {
+	// Don't want read-modify-write, but no instruction for atomically writing
+	// a bitfield. So, first drop priority to minimum, then set to the target
+	// value. It should be safe to drop an IRQ's priority below its current
+	// even from within that IRQ (but it is never safe to boost an IRQ when
+	// it may already be in an older stack frame)
+	h3irq_array_clear(hazard3_csr_meipra, irq >> 2, 0xfu << (4 * (irq & 0x3)));
+	h3irq_array_set(hazard3_csr_meipra, irq >> 2, (priority & 0xfu) << (4 * (irq & 0x3)));
+}
+
 #endif

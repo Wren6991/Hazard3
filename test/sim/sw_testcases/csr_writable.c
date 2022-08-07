@@ -170,7 +170,7 @@ int main() {
 	write_csr(hazard3_csr_meiea,      read_csr(hazard3_csr_meiea     ));
 	write_csr(hazard3_csr_meipa,      read_csr(hazard3_csr_meipa     ));
 	write_csr(hazard3_csr_meifa,      read_csr(hazard3_csr_meifa     ));
-	write_csr(hazard3_csr_meipr,      read_csr(hazard3_csr_meipr     ));
+	write_csr(hazard3_csr_meipra,     read_csr(hazard3_csr_meipra    ));
 	write_csr(hazard3_csr_meinext,    read_csr(hazard3_csr_meinext   ));
 	write_csr(hazard3_csr_meicontext, read_csr(hazard3_csr_meicontext));
 

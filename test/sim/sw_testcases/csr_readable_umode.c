@@ -192,7 +192,7 @@ CSR was be0
 CSR was be1
 -> exception, mcause = 2, mpp = 0 // hazard3_csr_meifa
 CSR was be2
--> exception, mcause = 2, mpp = 0 // hazard3_csr_meipr
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meipra
 CSR was be3
 -> exception, mcause = 2, mpp = 0 // hazard3_csr_meinext
 CSR was be4
@@ -304,7 +304,7 @@ void read_all_csrs() {
 	(void)read_csr(hazard3_csr_meiea);
 	(void)read_csr(hazard3_csr_meipa);
 	(void)read_csr(hazard3_csr_meifa);
-	(void)read_csr(hazard3_csr_meipr);
+	(void)read_csr(hazard3_csr_meipra);
 	(void)read_csr(hazard3_csr_meinext);
 	(void)read_csr(hazard3_csr_meicontext);
 }

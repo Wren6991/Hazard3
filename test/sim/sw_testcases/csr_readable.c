@@ -140,7 +140,7 @@ int main() {
 	(void)read_csr(hazard3_csr_meiea);
 	(void)read_csr(hazard3_csr_meipa);
 	(void)read_csr(hazard3_csr_meifa);
-	(void)read_csr(hazard3_csr_meipr);
+	(void)read_csr(hazard3_csr_meipra);
 	(void)read_csr(hazard3_csr_meinext);
 	(void)read_csr(hazard3_csr_meicontext);
 
