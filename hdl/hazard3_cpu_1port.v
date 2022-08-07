@@ -168,10 +168,10 @@ reg [2:0] bus_gnt_ids_prev;
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_hold_aph <= 1'b0;
-		bus_gnt_id_prev <= 3'h0;
+		bus_gnt_ids_prev <= 3'h0;
 	end else begin
 		bus_hold_aph <= ahblm_htrans[1] && !ahblm_hready && !ahblm_hresp;
-		bus_gnt_id_prev <= {bus_gnt_i, bus_gnt_d, bus_gnt_s};
+		bus_gnt_ids_prev <= {bus_gnt_i, bus_gnt_d, bus_gnt_s};
 	end
 end
 
@@ -190,7 +190,7 @@ end
 reg bus_active_dph_s;
 
 assign {bus_gnt_i, bus_gnt_d, bus_gnt_s} =
-	bus_hold_aph                      ? bus_gnt_id_prev :
+	bus_hold_aph                      ? bus_gnt_ids_prev :
 	core_aph_panic_i                  ? 3'b100 :
 	core_aph_req_d                    ? 3'b010 :
 	dbg_sbus_vld && !bus_active_dph_s ? 3'b001 :
@@ -302,4 +302,6 @@ assign dbg_sbus_rdy = bus_active_dph_s && ahblm_hready;
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif
