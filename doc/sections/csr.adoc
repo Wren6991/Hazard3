@@ -604,7 +604,8 @@ isr_external_irq:
 
 	csrr a0, mepc
 	sw a0, 64(sp)
-	csrr a0, meicontext
+	// Set bit 1 when reading to clear+save mie.mtie and mie.msie
+	csrrsi a0, meicontext, 0x2
 	sw a0, 68(sp)
 	csrr a0, mstatus
 	sw a0, 72(sp)
