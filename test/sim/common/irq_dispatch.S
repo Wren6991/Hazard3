@@ -23,6 +23,14 @@ isr_external_irq:
 	sw t5, 56(sp)
 	sw t6, 60(sp)
 
+	// Update a count of the number of external IRQ vector entries (just for
+	// use in tests)
+	la a0, _external_irq_entry_count
+	lw a1, (a0)
+	addi a1, a1, 1
+	sw a1, (a0)
+	// Make sure to delete the above ^^^ if you use this code for real!
+
 	csrr a0, mepc
 	sw a0, 64(sp)
 	// Make sure to set meicontext.clearts to clear and save mie.msie/mtie
@@ -117,3 +125,7 @@ _external_irq_table:
 ref_eirq i
 .equ i, i + 1
 .endr
+
+.global _external_irq_entry_count
+_external_irq_entry_count:
+.word 0

@@ -21,7 +21,7 @@ always @ (*) begin: select
 	integer i;
 	for (i = 0; i < W_REQ; i = i + 1) begin
 		gnt[i] = req[i] && ~|(req & (
-			HIGHEST_WINS ? ~({W_REQ{1'b1}} >> i) : ~({W_REQ{1'b1}} << i)
+			HIGHEST_WINS ? ~({W_REQ{1'b1}} >> (W_REQ - 1 - i)) : ~({W_REQ{1'b1}} << i)
 		));
 	end
 end

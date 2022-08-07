@@ -313,7 +313,7 @@ end
 localparam MAX_IRQS = 512;
 localparam [MAX_IRQS-1:0] IRQ_IMPL_MASK = ~({MAX_IRQS{1'b1}} << NUM_IRQS);
 
-localparam IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
+localparam [3:0] IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
 
 // Assigned later:
 wire [MAX_IRQS-1:0]   meipa;
@@ -471,9 +471,9 @@ hazard3_onehot_priority_dynamic #(
 	.PRIORITY_HIGHEST_WINS (1),
 	.TIEBREAK_HIGHEST_WINS (0)
 ) eirq_priority_u (
-	.priority (meipra[NUM_IRQS-1:0] & {NUM_IRQS{IRQ_PRIORITY_MASK}}),
-	.req      (eirq_active_above_ppreempt),
-	.gnt      (highest_eirq_onehot)
+	.pri (meipra[4*NUM_IRQS-1:0] & {NUM_IRQS{IRQ_PRIORITY_MASK}}),
+	.req (eirq_active_above_ppreempt),
+	.gnt (highest_eirq_onehot)
 );
 
 always @ (*) begin: get_highest_eirq_priority

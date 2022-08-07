@@ -19,7 +19,7 @@ module hazard3_onehot_priority_dynamic #(
 	// Do not modify:
 	parameter W_PRIORITY            = $clog2(N_PRIORITIES)
 ) (
-	input  wire [W_REQ*W_PRIORITY-1:0] priority,
+	input  wire [W_REQ*W_PRIORITY-1:0] pri,
 	input  wire [W_REQ-1:0]            req,
 	output wire [W_REQ-1:0]            gnt
 );
@@ -32,7 +32,7 @@ always @ (*) begin: stratify
 	integer i, j;
 	for (i = 0; i < N_PRIORITIES; i = i + 1) begin
 		for (j = 0; j < W_REQ; j = j + 1) begin
-			req_stratified[i][j] = req[j] && priority[W_PRIORITY * j +: W_PRIORITY] == i;
+			req_stratified[i][j] = req[j] && pri[W_PRIORITY * j +: W_PRIORITY] == i;
 		end
 		level_has_req[i] = |req_stratified[i];
 	end
