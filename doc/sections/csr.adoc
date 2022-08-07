@@ -574,15 +574,17 @@ The top entry of the priority stack, `preempt`, is used by hardware to ensure th
 
 IRQs of lower priority than `ppreempt` are not visible in `meinext`, so that a preemptee is not re-taken in the preempting frame.
 | 23:21 | -           | RES0
-| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. When `meinext.update` is written, `preempt` is set to one higher than the priority of `meinext.irq`, or to `ppreempt`, whichever is higher.
+| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when when `meinext.update` is written, or when hardware enters the external interrupt vector.
 
-Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Lower-bounding the update value of `preempt` with `ppreempt` ensures that the processor does not re-interrupt into a previously preempted handler.
+If an interrupt is present in `meinext`, then `preempt` is set to one level greater than that interrupt's priority. Otherwise, `ppreempt` is set to one level greater than the maximum interrupt priority, disabling preemption.
 | 15    | `noirq`     | Not in interrupt (read/write). Set to 1 at reset. Set to `meinext.noirq` when `meinext.update` is written. No hardware effect.
 | 14:13  | -           | RES0
 | 12:4   | `irq`       | Current IRQ number (read/write). Set to `meinext.irq` when `meinext.update` is written.
 | 3      | `mtiesave`  | Reads as the current value of `mie.mtie`, if `clearts` is set. Otherwise reads as 0. Writes are ORed into `mie.mtie`.
 | 2      | `msiesave`  | Reads as the current value of `mie.msie`, if `clearts` is set. Otherwise reads as 0. Writes are ORed into `mie.msie`.
 | 1      | `clearts`   | Write-1 self-clearing field. Writing 1 will clear `mie.mtie` and `mie.msie`, and present their prior values in the `mtiesave` and `msiesave` of this register. This makes it safe to re-enable IRQs (via `mstatus.mie`) without the possibility of being preempted by the standard timer and soft interrupt handlers, which may not be aware of Hazard3's interrupt hardware.
+
+The clear due to `clearts` takes precedence over the set due to `mtiesave`/`msiesave`, although it would be unusual for software to write both on the same cycle.
 | 0      | `mreteirq` | Enable restore of the preemption priority stack on `mret`. This bit is set on entering the external interrupt vector, cleared by `mret`, and cleared upon taking any trap other than an external interrupt.
 
 Provided `meicontext` is saved on entry to the external interrupt vector (before enabling preemption), is restored before exiting, and the standard software/timer IRQs are prevented from preempting (e.g. by using `clearts`), this flag allows the hardware to safely manage the preemption priority stack even when an external interrupt handler may take exceptions.
