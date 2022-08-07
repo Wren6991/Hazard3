@@ -11,61 +11,61 @@ module hazard3_core #(
 `include "hazard3_width_const.vh"
 ) (
 	// Global signals
-	input wire               clk,
-	input wire               rst_n,
+	input wire                clk,
+	input wire                rst_n,
 
 	`ifdef RISCV_FORMAL
 	`RVFI_OUTPUTS ,
 	`endif
 
 	// Instruction fetch port
-	output wire              bus_aph_req_i,
-	output wire              bus_aph_panic_i, // e.g. branch mispredict + flush
-	input  wire              bus_aph_ready_i,
-	input  wire              bus_dph_ready_i,
-	input  wire              bus_dph_err_i,
+	output wire               bus_aph_req_i,
+	output wire               bus_aph_panic_i, // e.g. branch mispredict + flush
+	input  wire               bus_aph_ready_i,
+	input  wire               bus_dph_ready_i,
+	input  wire               bus_dph_err_i,
 
-	output wire [W_ADDR-1:0] bus_haddr_i,
-	output wire [2:0]        bus_hsize_i,
-	output wire              bus_priv_i,
-	input  wire [W_DATA-1:0] bus_rdata_i,
+	output wire [W_ADDR-1:0]  bus_haddr_i,
+	output wire [2:0]         bus_hsize_i,
+	output wire               bus_priv_i,
+	input  wire [W_DATA-1:0]  bus_rdata_i,
 
 	// Load/store port
-	output reg               bus_aph_req_d,
-	output wire              bus_aph_excl_d,
-	input  wire              bus_aph_ready_d,
-	input  wire              bus_dph_ready_d,
-	input  wire              bus_dph_err_d,
-	input  wire              bus_dph_exokay_d,
+	output reg                bus_aph_req_d,
+	output wire               bus_aph_excl_d,
+	input  wire               bus_aph_ready_d,
+	input  wire               bus_dph_ready_d,
+	input  wire               bus_dph_err_d,
+	input  wire               bus_dph_exokay_d,
 
-	output reg  [W_ADDR-1:0] bus_haddr_d,
-	output reg  [2:0]        bus_hsize_d,
-	output reg               bus_priv_d,
-	output reg               bus_hwrite_d,
-	output reg  [W_DATA-1:0] bus_wdata_d,
-	input  wire [W_DATA-1:0] bus_rdata_d,
+	output reg  [W_ADDR-1:0]  bus_haddr_d,
+	output reg  [2:0]         bus_hsize_d,
+	output reg                bus_priv_d,
+	output reg                bus_hwrite_d,
+	output reg  [W_DATA-1:0]  bus_wdata_d,
+	input  wire [W_DATA-1:0]  bus_rdata_d,
 
 	// Debugger run/halt control
-	input  wire              dbg_req_halt,
-	input  wire              dbg_req_halt_on_reset,
-	input  wire              dbg_req_resume,
-	output wire              dbg_halted,
-	output wire              dbg_running,
+	input  wire               dbg_req_halt,
+	input  wire               dbg_req_halt_on_reset,
+	input  wire               dbg_req_resume,
+	output wire               dbg_halted,
+	output wire               dbg_running,
 	// Debugger access to data0 CSR
-	input  wire [W_DATA-1:0] dbg_data0_rdata,
-	output wire [W_DATA-1:0] dbg_data0_wdata,
-	output wire              dbg_data0_wen,
+	input  wire [W_DATA-1:0]  dbg_data0_rdata,
+	output wire [W_DATA-1:0]  dbg_data0_wdata,
+	output wire               dbg_data0_wen,
 	// Debugger instruction injection
-	input  wire [W_DATA-1:0] dbg_instr_data,
-	input  wire              dbg_instr_data_vld,
-	output wire              dbg_instr_data_rdy,
-	output wire              dbg_instr_caught_exception,
-	output wire              dbg_instr_caught_ebreak,
+	input  wire [W_DATA-1:0]  dbg_instr_data,
+	input  wire               dbg_instr_data_vld,
+	output wire               dbg_instr_data_rdy,
+	output wire               dbg_instr_caught_exception,
+	output wire               dbg_instr_caught_ebreak,
 
 	// Level-sensitive interrupt sources
-	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
-	input wire               soft_irq,  // -> mip.msip
-	input wire               timer_irq  // -> mip.mtip
+	input wire [NUM_IRQS-1:0] irq,       // -> mip.meip
+	input wire                soft_irq,  // -> mip.msip
+	input wire                timer_irq  // -> mip.mtip
 );
 
 `include "hazard3_ops.vh"

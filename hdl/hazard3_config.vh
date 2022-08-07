@@ -120,9 +120,18 @@ parameter PMP_HARDWIRED_CFG   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
 // Requires: CSR_M_MANDATORY, CSR_M_TRAP.
 parameter DEBUG_SUPPORT       = 0,
 
-// NUM_IRQ: Number of external IRQs implemented in meie0 and meip0.
-// Minimum 1 (if CSR_M_TRAP = 1), maximum 128.
-parameter NUM_IRQ             = 32,
+// ----------------------------------------------------------------------------
+// External interrupt support
+
+// NUM_IRQS: Number of external IRQs implemented in meiea, meipa, meifa and
+// meipra, if CSR_M_TRAP is enabled. Minimum 1, maximum 512.
+parameter NUM_IRQS            = 32,
+
+// Number of priority bits implemented for each interrupt in meipra. The
+// number of distinct levels is (1 << IRQ_PRIORITY_BITS). Minimum 0, max 4.
+// Note that having more than 1 priority level with a large number of IRQs
+// will have a severe effect on timing.
+parameter IRQ_PRIORITY_BITS   = 0,
 
 // ----------------------------------------------------------------------------
 // ID registers

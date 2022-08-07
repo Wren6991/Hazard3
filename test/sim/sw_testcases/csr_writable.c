@@ -64,10 +64,6 @@ CSR was 7b3
 CSR was bff
 -> exception, mcause = 2 // write to dmdata0, D-mode
 CSR was bff
--> exception, mcause = 2 // write to meip0, read-only
-CSR was fe0
--> exception, mcause = 2 // write to mlei, read-only
-CSR was fe4
 
 *******************************************************************************/
 
@@ -170,9 +166,13 @@ int main() {
 	write_csr(dscratch0,           read_csr(dscratch0          ));
 	write_csr(dscratch1,           read_csr(dscratch1          ));
 	write_csr(hazard3_csr_dmdata0, read_csr(hazard3_csr_dmdata0));
-	write_csr(hazard3_csr_meie0,   read_csr(hazard3_csr_meie0  ));
-	write_csr(hazard3_csr_meip0,   read_csr(hazard3_csr_meip0  ));
-	write_csr(hazard3_csr_mlei,    read_csr(hazard3_csr_mlei   ));
+
+	write_csr(hazard3_csr_meiea,      read_csr(hazard3_csr_meiea     ));
+	write_csr(hazard3_csr_meipa,      read_csr(hazard3_csr_meipa     ));
+	write_csr(hazard3_csr_meifa,      read_csr(hazard3_csr_meifa     ));
+	write_csr(hazard3_csr_meipr,      read_csr(hazard3_csr_meipr     ));
+	write_csr(hazard3_csr_meinext,    read_csr(hazard3_csr_meinext   ));
+	write_csr(hazard3_csr_meicontext, read_csr(hazard3_csr_meicontext));
 
 	return 0;
 }

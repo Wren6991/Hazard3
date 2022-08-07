@@ -3,8 +3,11 @@ file hazard3_cpu_1port.v
 file hazard3_cpu_2port.v
 file arith/hazard3_alu.v
 file arith/hazard3_branchcmp.v
-file arith/hazard3_muldiv_seq.v
 file arith/hazard3_mul_fast.v
+file arith/hazard3_muldiv_seq.v
+file arith/hazard3_onehot_encode.v
+file arith/hazard3_onehot_priority.v
+file arith/hazard3_onehot_priority_dynamic.v
 file arith/hazard3_priority_encode.v
 file arith/hazard3_shift_barrel.v
 file hazard3_frontend.v

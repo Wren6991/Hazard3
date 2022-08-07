@@ -184,14 +184,20 @@ CSR was 7b1
 CSR was 7b2
 -> exception, mcause = 2, mpp = 0 // dscratch1
 CSR was 7b3
--> exception, mcause = 2, mpp = 0 // hazard3 dmdata0
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_dmdata0
 CSR was bff
--> exception, mcause = 2, mpp = 0 // hazard3 meie0
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meiea
 CSR was be0
--> exception, mcause = 2, mpp = 0 // hazard3 meip0
-CSR was fe0
--> exception, mcause = 2, mpp = 0 // hazard3 mlei
-CSR was fe4
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meipa
+CSR was be1
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meifa
+CSR was be2
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meipr
+CSR was be3
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meinext
+CSR was be4
+-> exception, mcause = 2, mpp = 0 // hazard3_csr_meicontext
+CSR was be5
 -> exception, mcause = 3, mpp = 0 // This is the ebreak that ends the test
 
 *******************************************************************************/
@@ -295,9 +301,12 @@ void read_all_csrs() {
 	(void)read_csr(dscratch0);
 	(void)read_csr(dscratch1);
 	(void)read_csr(hazard3_csr_dmdata0);
-	(void)read_csr(hazard3_csr_meie0);
-	(void)read_csr(hazard3_csr_meip0);
-	(void)read_csr(hazard3_csr_mlei);
+	(void)read_csr(hazard3_csr_meiea);
+	(void)read_csr(hazard3_csr_meipa);
+	(void)read_csr(hazard3_csr_meifa);
+	(void)read_csr(hazard3_csr_meipr);
+	(void)read_csr(hazard3_csr_meinext);
+	(void)read_csr(hazard3_csr_meicontext);
 }
 
 void __attribute__((naked)) ebreak_trampoline() {

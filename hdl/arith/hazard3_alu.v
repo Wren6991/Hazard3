@@ -94,7 +94,8 @@ wire [W_DATA-1:0] ctz_search_mask = aluop == ALUOP_CLZ ? op_a_rev : op_a;
 wire [W_SHAMT:0]  ctz_clz;
 
 hazard3_priority_encode #(
-	.W_REQ (W_DATA)
+	.W_REQ        (W_DATA),
+	.HIGHEST_WINS (0)
 ) ctz_priority_encode (
 	.req (ctz_search_mask),
 	.gnt (ctz_clz[W_SHAMT-1:0])

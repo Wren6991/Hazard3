@@ -245,7 +245,7 @@ hazard3_cpu_1port #(
 	.CSR_M_MANDATORY (1),
 	.CSR_M_TRAP      (1),
 	.DEBUG_SUPPORT   (1),
-	.NUM_IRQ         (1),
+	.NUM_IRQS        (1),
 	.RESET_REGFILE   (0),
 	// Can be overridden from the defaults in hazard3_config.vh during
 	// instantiation of example_soc():

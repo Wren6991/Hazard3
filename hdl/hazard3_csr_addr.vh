@@ -158,15 +158,14 @@ localparam MENVCFG        = 12'h30a;
 localparam MENVCFGH       = 12'h31a;
 
 // Custom M-mode CSRs:
-localparam MEIE0          = 12'hbe0; // External interrupt enable register 0
-localparam MEIE1          = 12'hbe1; // External interrupt enable register 1
-localparam MEIE2          = 12'hbe2; // External interrupt enable register 2
-localparam MEIE3          = 12'hbe3; // External interrupt enable register 3
-localparam MEIP0          = 12'hfe0; // External interrupt pending register 0
-localparam MEIP1          = 12'hfe1; // External interrupt pending register 1
-localparam MEIP2          = 12'hfe2; // External interrupt pending register 2
-localparam MEIP3          = 12'hfe3; // External interrupt pending register 3
-localparam MLEI           = 12'hfe4; // Lowest external interrupt number
+localparam MEIEA          = 12'hbe0; // External interrupt pending array
+localparam MEIPA          = 12'hbe1; // External interrupt enable array
+localparam MEIFA          = 12'hbe2; // External interrupt force array
+localparam MEIPRA         = 12'hbe3; // External interrupt priority array
+localparam MEINEXT        = 12'hbe4; // Next external interrupt
+localparam MEICONTEXT     = 12'hbe5; // External interrupt context register
+
+localparam MSLEEP         = 12'hbf0; // M-mode sleep control register
 
 // ----------------------------------------------------------------------------
 // U-mode CSRs
@@ -178,6 +177,9 @@ localparam INSTRET        = 12'hc02;
 localparam CYCLEH         = 12'hc80;
 localparam TIMEH          = 12'hc81;
 localparam INSTRETH       = 12'hc82;
+
+// Custom U-mode CSRs
+localparam SLEEP          = 12'h8f0; // U-mode subset of M-mode sleep control
 
 // ----------------------------------------------------------------------------
 // Trigger Module

@@ -7,50 +7,50 @@ module tb #(
 `include "hazard3_config.vh"
 ) (
 	// Global signals
-	input wire               clk,
-	input wire               rst_n,
+	input wire                clk,
+	input wire                rst_n,
 
 	// JTAG port
-    input  wire              tck,
-    input  wire              trst_n,
-    input  wire              tms,
-    input  wire              tdi,
-    output wire              tdo,
+    input  wire               tck,
+    input  wire               trst_n,
+    input  wire               tms,
+    input  wire               tdi,
+    output wire               tdo,
 
 	// Core 0 bus (named I for consistency with 1-core 2-port tb)
-	output wire [W_ADDR-1:0] i_haddr,
-	output wire              i_hwrite,
-	output wire [1:0]        i_htrans,
-	output wire              i_hexcl,
-	output wire [2:0]        i_hsize,
-	output wire [2:0]        i_hburst,
-	output wire [3:0]        i_hprot,
-	output wire              i_hmastlock,
-	input  wire              i_hready,
-	input  wire              i_hresp,
-	input  wire              i_hexokay,
-	output wire [W_DATA-1:0] i_hwdata,
-	input  wire [W_DATA-1:0] i_hrdata,
+	output wire [W_ADDR-1:0]  i_haddr,
+	output wire               i_hwrite,
+	output wire [1:0]         i_htrans,
+	output wire               i_hexcl,
+	output wire [2:0]         i_hsize,
+	output wire [2:0]         i_hburst,
+	output wire [3:0]         i_hprot,
+	output wire               i_hmastlock,
+	input  wire               i_hready,
+	input  wire               i_hresp,
+	input  wire               i_hexokay,
+	output wire [W_DATA-1:0]  i_hwdata,
+	input  wire [W_DATA-1:0]  i_hrdata,
 
 	// Core 1 bus (named D for consistency with 1-core 2-port tb)
-	output wire [W_ADDR-1:0] d_haddr,
-	output wire              d_hwrite,
-	output wire [1:0]        d_htrans,
-	output wire              d_hexcl,
-	output wire [2:0]        d_hsize,
-	output wire [2:0]        d_hburst,
-	output wire [3:0]        d_hprot,
-	output wire              d_hmastlock,
-	input  wire              d_hready,
-	input  wire              d_hresp,
-	input  wire              d_hexokay,
-	output wire [W_DATA-1:0] d_hwdata,
-	input  wire [W_DATA-1:0] d_hrdata,
+	output wire [W_ADDR-1:0]  d_haddr,
+	output wire               d_hwrite,
+	output wire [1:0]         d_htrans,
+	output wire               d_hexcl,
+	output wire [2:0]         d_hsize,
+	output wire [2:0]         d_hburst,
+	output wire [3:0]         d_hprot,
+	output wire               d_hmastlock,
+	input  wire               d_hready,
+	input  wire               d_hresp,
+	input  wire               d_hexokay,
+	output wire [W_DATA-1:0]  d_hwdata,
+	input  wire [W_DATA-1:0]  d_hrdata,
 
 	// Level-sensitive interrupt sources
-	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
-	input wire [1:0]         soft_irq,  // -> mip.msip
-	input wire               timer_irq  // -> mip.mtip
+	input wire [NUM_IRQS-1:0] irq,       // -> mip.meip
+	input wire [1:0]          soft_irq,  // -> mip.msip
+	input wire                timer_irq  // -> mip.mtip
 );
 
 // JTAG-DTM IDCODE, selected after TAP reset, would normally be a

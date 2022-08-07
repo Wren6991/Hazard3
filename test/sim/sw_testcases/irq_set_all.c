@@ -1,5 +1,6 @@
 #include "tb_cxxrtl_io.h"
 #include "hazard3_csr.h"
+#include "hazard3_irq.h"
 
 // Fire all IRQs simultaneously, and log the resulting handler calls
 
@@ -8,7 +9,8 @@
 int main() {
 	asm volatile ("csrsi mstatus, 0x8");
 	write_csr(mie, mie_meie);
-	write_csr(hazard3_csr_meie0, -1u);
+	h3irq_array_write(hazard3_csr_meiea, 0, 0xffffu);
+	h3irq_array_write(hazard3_csr_meiea, 1, 0xffffu);
 
 	tb_puts("Firing all IRQs\n");
 	tb_set_irq_masked(-1u);
@@ -20,118 +22,124 @@ int main() {
 void __attribute__((interrupt)) isr_external_irq() {
 	tb_puts("-> external irq handler\n");
 	tb_assert(read_csr(mcause) == 0x8000000bu, "mcause should indicate external IRQ\n");
-	tb_assert(read_csr(mip) == 0x880u, "mip should indicate external + timer IRQ\n");
+	// Once an interrupt has fired, it does not appear pending in mip since it
+	// can't preempt itself unless its priority is raised.
+	tb_assert(read_csr(mip) == 0x080u, "mip should indicate timer IRQ only\n");
 
-	// mlei updates dynamically, should be read exactly once at the start of an
+	// meinext updates dynamically, should be read exactly once at the start of an
 	// IRQ handler.
-	uint32_t mlei = read_csr(hazard3_csr_mlei);
-	tb_printf("mlei    = %u\n", mlei);
-	tb_printf("meip0   = %08x\n", read_csr(hazard3_csr_meip0));
+	uint32_t meinext = read_csr(hazard3_csr_meinext);
+	tb_printf("meinext = %u\n", meinext);
+	tb_printf(
+		"meipa   = %08x\n",
+		h3irq_array_read(hazard3_csr_meipa, 0) |
+		((uint32_t)h3irq_array_read(hazard3_csr_meipa, 1) << 16)
+	);
 
-	// mlei is scaled by 4 to make it cheaper to index a software vector table.
-	tb_assert(read_csr(hazard3_csr_meip0) & (1u << (mlei >> 2)), "IRQ indicated by mlei is not pending\n");
-	tb_clr_irq_masked(1u << (mlei >> 2));
+	// meinext is scaled by 4 to make it cheaper to index a software vector table.
+	tb_assert(h3irq_pending(meinext >> 2), "IRQ indicated by meinext is not pending\n");
+	tb_clr_irq_masked(1u << (meinext >> 2));
 }
 
 /*EXPECTED-OUTPUT***************************************************************
 
 Firing all IRQs
 -> external irq handler
-mlei    = 0
-meip0   = ffffffff
+meinext = 0
+meipa   = ffffffff
 -> external irq handler
-mlei    = 4
-meip0   = fffffffe
+meinext = 4
+meipa   = fffffffe
 -> external irq handler
-mlei    = 8
-meip0   = fffffffc
+meinext = 8
+meipa   = fffffffc
 -> external irq handler
-mlei    = 12
-meip0   = fffffff8
+meinext = 12
+meipa   = fffffff8
 -> external irq handler
-mlei    = 16
-meip0   = fffffff0
+meinext = 16
+meipa   = fffffff0
 -> external irq handler
-mlei    = 20
-meip0   = ffffffe0
+meinext = 20
+meipa   = ffffffe0
 -> external irq handler
-mlei    = 24
-meip0   = ffffffc0
+meinext = 24
+meipa   = ffffffc0
 -> external irq handler
-mlei    = 28
-meip0   = ffffff80
+meinext = 28
+meipa   = ffffff80
 -> external irq handler
-mlei    = 32
-meip0   = ffffff00
+meinext = 32
+meipa   = ffffff00
 -> external irq handler
-mlei    = 36
-meip0   = fffffe00
+meinext = 36
+meipa   = fffffe00
 -> external irq handler
-mlei    = 40
-meip0   = fffffc00
+meinext = 40
+meipa   = fffffc00
 -> external irq handler
-mlei    = 44
-meip0   = fffff800
+meinext = 44
+meipa   = fffff800
 -> external irq handler
-mlei    = 48
-meip0   = fffff000
+meinext = 48
+meipa   = fffff000
 -> external irq handler
-mlei    = 52
-meip0   = ffffe000
+meinext = 52
+meipa   = ffffe000
 -> external irq handler
-mlei    = 56
-meip0   = ffffc000
+meinext = 56
+meipa   = ffffc000
 -> external irq handler
-mlei    = 60
-meip0   = ffff8000
+meinext = 60
+meipa   = ffff8000
 -> external irq handler
-mlei    = 64
-meip0   = ffff0000
+meinext = 64
+meipa   = ffff0000
 -> external irq handler
-mlei    = 68
-meip0   = fffe0000
+meinext = 68
+meipa   = fffe0000
 -> external irq handler
-mlei    = 72
-meip0   = fffc0000
+meinext = 72
+meipa   = fffc0000
 -> external irq handler
-mlei    = 76
-meip0   = fff80000
+meinext = 76
+meipa   = fff80000
 -> external irq handler
-mlei    = 80
-meip0   = fff00000
+meinext = 80
+meipa   = fff00000
 -> external irq handler
-mlei    = 84
-meip0   = ffe00000
+meinext = 84
+meipa   = ffe00000
 -> external irq handler
-mlei    = 88
-meip0   = ffc00000
+meinext = 88
+meipa   = ffc00000
 -> external irq handler
-mlei    = 92
-meip0   = ff800000
+meinext = 92
+meipa   = ff800000
 -> external irq handler
-mlei    = 96
-meip0   = ff000000
+meinext = 96
+meipa   = ff000000
 -> external irq handler
-mlei    = 100
-meip0   = fe000000
+meinext = 100
+meipa   = fe000000
 -> external irq handler
-mlei    = 104
-meip0   = fc000000
+meinext = 104
+meipa   = fc000000
 -> external irq handler
-mlei    = 108
-meip0   = f8000000
+meinext = 108
+meipa   = f8000000
 -> external irq handler
-mlei    = 112
-meip0   = f0000000
+meinext = 112
+meipa   = f0000000
 -> external irq handler
-mlei    = 116
-meip0   = e0000000
+meinext = 116
+meipa   = e0000000
 -> external irq handler
-mlei    = 120
-meip0   = c0000000
+meinext = 120
+meipa   = c0000000
 -> external irq handler
-mlei    = 124
-meip0   = 80000000
+meinext = 124
+meipa   = 80000000
 Returned OK
 
 

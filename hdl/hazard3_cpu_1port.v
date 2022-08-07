@@ -13,60 +13,60 @@ module hazard3_cpu_1port #(
 `include "hazard3_config.vh"
 ) (
 	// Global signals
-	input wire               clk,
-	input wire               rst_n,
+	input wire                clk,
+	input wire                rst_n,
 
 	`ifdef RISCV_FORMAL
 	`RVFI_OUTPUTS ,
 	`endif
 
 	// AHB-lite Master port
-	output reg  [W_ADDR-1:0] ahblm_haddr,
-	output reg               ahblm_hwrite,
-	output reg  [1:0]        ahblm_htrans,
-	output reg  [2:0]        ahblm_hsize,
-	output wire [2:0]        ahblm_hburst,
-	output reg  [3:0]        ahblm_hprot,
-	output wire              ahblm_hmastlock,
-	output reg  [7:0]        ahblm_hmaster,
-	output reg               ahblm_hexcl,
-	input  wire              ahblm_hready,
-	input  wire              ahblm_hresp,
-	input  wire              ahblm_hexokay,
-	output wire [W_DATA-1:0] ahblm_hwdata,
-	input  wire [W_DATA-1:0] ahblm_hrdata,
+	output reg  [W_ADDR-1:0]  ahblm_haddr,
+	output reg                ahblm_hwrite,
+	output reg  [1:0]         ahblm_htrans,
+	output reg  [2:0]         ahblm_hsize,
+	output wire [2:0]         ahblm_hburst,
+	output reg  [3:0]         ahblm_hprot,
+	output wire               ahblm_hmastlock,
+	output reg  [7:0]         ahblm_hmaster,
+	output reg                ahblm_hexcl,
+	input  wire               ahblm_hready,
+	input  wire               ahblm_hresp,
+	input  wire               ahblm_hexokay,
+	output wire [W_DATA-1:0]  ahblm_hwdata,
+	input  wire [W_DATA-1:0]  ahblm_hrdata,
 
 	// Debugger run/halt control
-	input  wire              dbg_req_halt,
-	input  wire              dbg_req_halt_on_reset,
-	input  wire              dbg_req_resume,
-	output wire              dbg_halted,
-	output wire              dbg_running,
+	input  wire               dbg_req_halt,
+	input  wire               dbg_req_halt_on_reset,
+	input  wire               dbg_req_resume,
+	output wire               dbg_halted,
+	output wire               dbg_running,
 	// Debugger access to data0 CSR
-	input  wire [W_DATA-1:0] dbg_data0_rdata,
-	output wire [W_DATA-1:0] dbg_data0_wdata,
-	output wire              dbg_data0_wen,
+	input  wire [W_DATA-1:0]  dbg_data0_rdata,
+	output wire [W_DATA-1:0]  dbg_data0_wdata,
+	output wire               dbg_data0_wen,
 	// Debugger instruction injection
-	input  wire [W_DATA-1:0] dbg_instr_data,
-	input  wire              dbg_instr_data_vld,
-	output wire              dbg_instr_data_rdy,
-	output wire              dbg_instr_caught_exception,
-	output wire              dbg_instr_caught_ebreak,
+	input  wire [W_DATA-1:0]  dbg_instr_data,
+	input  wire               dbg_instr_data_vld,
+	output wire               dbg_instr_data_rdy,
+	output wire               dbg_instr_caught_exception,
+	output wire               dbg_instr_caught_ebreak,
 
 	// Optional debug system bus access patch-through
-	input  wire [W_ADDR-1:0] dbg_sbus_addr,
-	input  wire              dbg_sbus_write,
-	input  wire [1:0]        dbg_sbus_size,
-	input  wire              dbg_sbus_vld,
-	output wire              dbg_sbus_rdy,
-	output wire              dbg_sbus_err,
-	input  wire [W_DATA-1:0] dbg_sbus_wdata,
-	output wire [W_DATA-1:0] dbg_sbus_rdata,
+	input  wire [W_ADDR-1:0]  dbg_sbus_addr,
+	input  wire               dbg_sbus_write,
+	input  wire [1:0]         dbg_sbus_size,
+	input  wire               dbg_sbus_vld,
+	output wire               dbg_sbus_rdy,
+	output wire               dbg_sbus_err,
+	input  wire [W_DATA-1:0]  dbg_sbus_wdata,
+	output wire [W_DATA-1:0]  dbg_sbus_rdata,
 
 	// Level-sensitive interrupt sources
-	input wire [NUM_IRQ-1:0] irq,       // -> mip.meip
-	input wire               soft_irq,  // -> mip.msip
-	input wire               timer_irq  // -> mip.mtip
+	input wire [NUM_IRQS-1:0] irq,       // -> mip.meip
+	input wire                soft_irq,  // -> mip.msip
+	input wire                timer_irq  // -> mip.mtip
 );
 
 // ----------------------------------------------------------------------------

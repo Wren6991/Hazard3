@@ -137,9 +137,12 @@ int main() {
 	(void)read_csr(dscratch0);
 	(void)read_csr(dscratch1);
 	(void)read_csr(hazard3_csr_dmdata0);
-	(void)read_csr(hazard3_csr_meie0);
-	(void)read_csr(hazard3_csr_meip0);
-	(void)read_csr(hazard3_csr_mlei);
+	(void)read_csr(hazard3_csr_meiea);
+	(void)read_csr(hazard3_csr_meipa);
+	(void)read_csr(hazard3_csr_meifa);
+	(void)read_csr(hazard3_csr_meipr);
+	(void)read_csr(hazard3_csr_meinext);
+	(void)read_csr(hazard3_csr_meicontext);
 
 	return 0;
 }

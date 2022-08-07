@@ -92,7 +92,7 @@ module hazard3_csr #(
 
 	// Level-sensitive interrupt sources
 	input  wire                delay_irq_entry,
-	input  wire [NUM_IRQ-1:0]  irq,
+	input  wire [NUM_IRQS-1:0] irq,
 	input  wire                irq_software,
 	input  wire                irq_timer,
 
@@ -111,7 +111,6 @@ module hazard3_csr #(
 `include "hazard3_csr_addr.vh"
 
 localparam X0 = {XLEN{1'b0}};
-
 
 // ----------------------------------------------------------------------------
 // CSR state + update logic
@@ -142,22 +141,25 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+// Core execution state, 1 -> M-mode, 0 -> U-mode (if implemented)
+reg  m_mode;
+wire wen_m_mode = wen && (m_mode || debug_mode);
+wire ren_m_mode = ren && (m_mode || debug_mode);
 
 // ----------------------------------------------------------------------------
-// Trap-handling CSRs
+// Standard trap-handling CSRs
 
 wire debug_suppresses_trap_update = DEBUG_SUPPORT && (debug_mode || enter_debug_mode);
 
-// Core execution state, 1 -> M-mode, 0 -> U-mode (if implemented)
-reg m_mode;
+wire trapreg_update = trap_enter_vld && trap_enter_rdy && !debug_suppresses_trap_update;
+wire trapreg_update_enter = trapreg_update && except != EXCEPT_MRET;
+wire trapreg_update_exit = trapreg_update && except == EXCEPT_MRET;
 
 reg mstatus_mpie;
 reg mstatus_mie;
 reg mstatus_mpp; // only MSB is implemented
 reg mstatus_mprv;
 reg mstatus_tw;
-
-wire wen_m_mode = wen && (m_mode || debug_mode);
 
 // Spec text from priv-1.12:
 // "An MRET or SRET instruction is used to return from a trap in M-mode or
@@ -176,24 +178,22 @@ always @ (posedge clk or negedge rst_n) begin
 		mstatus_mprv <= 1'b0;
 		mstatus_tw <= 1'b0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy && !debug_suppresses_trap_update) begin
-			if (except == EXCEPT_MRET) begin
-				mstatus_mpie <= 1'b1;
-				mstatus_mie <= mstatus_mpie;
-				if (U_MODE) begin
-					m_mode <= mstatus_mpp;
-					mstatus_mpp <= 1'b0;
-					if (!mstatus_mpp) begin
-						mstatus_mprv <= 1'b0;
-					end
+		if (trapreg_update_exit) begin
+			mstatus_mpie <= 1'b1;
+			mstatus_mie <= mstatus_mpie;
+			if (U_MODE) begin
+				m_mode <= mstatus_mpp;
+				mstatus_mpp <= 1'b0;
+				if (!mstatus_mpp) begin
+					mstatus_mprv <= 1'b0;
 				end
-			end else begin
-				mstatus_mpie <= mstatus_mie;
-				mstatus_mie <= 1'b0;
-				if (U_MODE) begin
-					m_mode <= 1'b1;
-					mstatus_mpp <= m_mode;
-				end
+			end
+		end else if (trapreg_update_enter) begin
+			mstatus_mpie <= mstatus_mie;
+			mstatus_mie <= 1'b0;
+			if (U_MODE) begin
+				m_mode <= 1'b1;
+				mstatus_mpp <= m_mode;
 			end
 		end else if (wen_m_mode && addr == MSTATUS) begin
 			mstatus_mpie <= wdata_update[7];
@@ -249,7 +249,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mepc <= X0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
+		if (trapreg_update_enter) begin
 			mepc <= mepc_in & MEPC_MASK;
 		end else if (wen_m_mode && addr == MEPC) begin
 			mepc <= wdata_update & MEPC_MASK;
@@ -265,81 +265,234 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mie <= X0;
 	end else if (CSR_M_TRAP) begin
-		if (wen_m_mode && addr == MIE)
+		if (wen_m_mode && addr == MIE) begin
 			mie <= update_nonconst(mie, MIE_WMASK);
+		end else if (wen_m_mode && addr == MEICONTEXT) begin
+			// meicontext.clearts/mtiesave/msiesave can be used to clear and
+			// save standard timer and soft IRQ enables, simultaneously with
+			// saving external interrupt context.
+			mie[7] <= (mie[7] || wdata_update[3]) && !wdata_update[1];
+			mie[3] <= (mie[3] || wdata_update[2]) && !wdata_update[1];
+		end
 	end
 end
 
 wire mie_meie = mie[11];
 
-// Interrupt status ("pending") register, handled later
+// Interrupt pending register (assigned later). In our implementation this
+// register is entirely read-only.
 wire [XLEN-1:0] mip;
-// None of the bits we implement are directly writeable.
-// MSIP is only writeable by a "platform-defined" mechanism, and we don't implement
-// one!
 
-// Trap cause registers. The non-constant bits can be written by software,
-// and update automatically on trap entry. (bits 30:0 are WLRL, so we tie most off)
+// Trap cause registers. The non-constant bits can be written by software, and
+// update automatically on trap entry. The `code` field need only be large
+// enough to support causes that will be set by hardware, in our case 4 bits.
+// (Note this is different to scause which always has a hard minimum of 5
+// bits.)
 reg        mcause_irq;
-reg  [5:0] mcause_code;
+reg  [3:0] mcause_code;
 wire       mcause_irq_next;
-wire [5:0] mcause_code_next;
+wire [3:0] mcause_code_next;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mcause_irq <= 1'b0;
-		mcause_code <= 6'h0;
+		mcause_code <= 4'h0;
 	end else if (CSR_M_TRAP) begin
-		if (trap_enter_vld && trap_enter_rdy && except != EXCEPT_MRET && !debug_suppresses_trap_update) begin
+		if (trapreg_update_enter) begin
 			mcause_irq <= mcause_irq_next;
 			mcause_code <= mcause_code_next;
 		end else if (wen_m_mode && addr == MCAUSE) begin
-			{mcause_irq, mcause_code} <= {wdata_update[31], wdata_update[5:0]};
+			{mcause_irq, mcause_code} <= {wdata_update[31], wdata_update[3:0]};
 		end
 	end
 end
 
-// Custom external interrupt enable registers (would be at top of mie, but that
-// only leaves room for 16 external interrupts)
+// ----------------------------------------------------------------------------
+// Custom external IRQ handling CSRs
 
-localparam N_IRQ_REG0 = NUM_IRQ >= 32  ? 32 :                     NUM_IRQ     ;
-localparam N_IRQ_REG1 = NUM_IRQ >= 64  ? 32 : NUM_IRQ <= 32 ? 0 : NUM_IRQ - 32;
-localparam N_IRQ_REG2 = NUM_IRQ >= 96  ? 32 : NUM_IRQ <= 64 ? 0 : NUM_IRQ - 64;
-localparam N_IRQ_REG3 = NUM_IRQ >= 128 ? 32 : NUM_IRQ <= 96 ? 0 : NUM_IRQ - 96;
+localparam MAX_IRQS = 512;
+localparam [MAX_IRQS-1:0] IRQ_IMPL_MASK = ~({MAX_IRQS{1'b1}} << NUM_IRQS);
 
-localparam MEIE0_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG0);
-localparam MEIE1_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG1);
-localparam MEIE2_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG2);
-localparam MEIE3_WMASK = ~({XLEN{1'b1}} << N_IRQ_REG3);
+localparam IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
 
-reg [XLEN-1:0] meie0;
-reg [XLEN-1:0] meie1;
-reg [XLEN-1:0] meie2;
-reg [XLEN-1:0] meie3;
+// Assigned later:
+wire [MAX_IRQS-1:0]   meipa;
+wire [8:0]            meinext_irq;
+wire                  meinext_noirq;
+reg  [3:0]            eirq_highest_priority;
+
+reg  [MAX_IRQS-1:0]   meiea;
+reg  [MAX_IRQS-1:0]   meifa;
+reg  [4*MAX_IRQS-1:0] meipra;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		meie0 <= X0;
-		meie1 <= X0;
-		meie2 <= X0;
-		meie3 <= X0;
-	end else if (wen_m_mode && addr == MEIE0) begin
-		meie0 <= update_nonconst(meie0, MEIE0_WMASK);
-	end else if (wen_m_mode && addr == MEIE1) begin
-		meie1 <= update_nonconst(meie1, MEIE1_WMASK);
-	end else if (wen_m_mode && addr == MEIE2) begin
-		meie2 <= update_nonconst(meie2, MEIE2_WMASK);
-	end else if (wen_m_mode && addr == MEIE3) begin
-		meie3 <= update_nonconst(meie3, MEIE3_WMASK);
+		meiea <= {MAX_IRQS{1'b0}};
+		meifa <= {MAX_IRQS{1'b0}};
+		meipra <= {4*MAX_IRQS{1'b0}};
+	end else begin
+		// Tie off unimplemented fields with a constant mask, then rely on
+		// further constant folding. Otherwise subsequent RTL will get a bit
+		// out of hand.
+		if (wen_m_mode && addr == MEIEA) begin
+			meiea[16 * wdata[4:0] +: 16]  <= IRQ_IMPL_MASK[16 * wdata[4:0] +: 16] & wdata_update[31:16];
+		end else if (wen_m_mode && addr == MEIFA) begin
+			meifa[16 * wdata[4:0] +: 16]  <= IRQ_IMPL_MASK[16 * wdata[4:0] +: 16] & wdata_update[31:16];
+		end else if (wen_m_mode && addr == MEIPRA) begin
+			meipra[16 * wdata[6:0] +: 16] <= {
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 0]}},
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 1]}},
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 2]}},
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 3]}}
+			} & {4{~(4'hf >> IRQ_PRIORITY_BITS)}} & wdata_update[31:16];
+		end
+		// Clear IRQ force when the corresponding IRQ is sample from meinext
+		// (so that an IRQ can be posted *once* without modifying the ISR source)
+		if (ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
+			meifa[meinext_irq] <= 1'b0;
+		end
 	end
 end
 
-// Assigned later:
-wire [XLEN-1:0] meip0;
-wire [XLEN-1:0] meip1;
-wire [XLEN-1:0] meip2;
-wire [XLEN-1:0] meip3;
-wire [6:0] mlei;
+reg [3:0] meicontext_pppreempt;
+reg [3:0] meicontext_ppreempt;
+reg [4:0] meicontext_preempt;
+reg       meicontext_noirq;
+reg [8:0] meicontext_irq;
+reg       meicontext_mreteirq;
+
+wire [4:0] preempt_level_next = meinext_noirq ? 5'h10 : (
+	(5'd1 << (4 - IRQ_PRIORITY_BITS)) + {1'b0, eirq_highest_priority}
+);
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		meicontext_pppreempt <= 4'h0;
+		meicontext_ppreempt <= 4'h0;
+		meicontext_preempt <= 5'h0;
+		meicontext_noirq <= 1'b1;
+		meicontext_irq <= 9'h0;
+		meicontext_mreteirq <= 1'b0;
+	end else if (trapreg_update_enter) begin
+		if (mcause_irq_next && mcause_code_next == 4'hb) begin
+			// Priority save. Note the MSB of preempt needn't be saved since,
+			// when it is set, preemption is impossible, so we won't be here.
+			meicontext_pppreempt <= meicontext_ppreempt & IRQ_PRIORITY_MASK;
+			meicontext_ppreempt <= meicontext_preempt[3:0] & IRQ_PRIORITY_MASK;
+			// Setting preempt isn't strictly necessary, since an updating read
+			// of meinext ought to be performed before re-enabling IRQs via
+			// mstatus.mie, but it seems the least surprising thing to do:
+			meicontext_preempt <= preempt_level_next & {1'b1, IRQ_PRIORITY_MASK};
+			meicontext_mreteirq <= 1'b1;
+		end else begin
+			meicontext_mreteirq <= 1'b0;
+		end
+	end else if (trapreg_update_exit) begin
+		meicontext_mreteirq <= 1'b0;
+		if (meicontext_mreteirq) begin
+			// Priority restore
+			meicontext_pppreempt <= 4'h0;
+			meicontext_ppreempt <= meicontext_pppreempt & IRQ_PRIORITY_MASK;
+			meicontext_preempt <= {1'b0, meicontext_ppreempt & IRQ_PRIORITY_MASK};
+		end
+	end else if (wen_m_mode && addr == MEICONTEXT) begin
+		meicontext_pppreempt <= wdata_update[31:28] & IRQ_PRIORITY_MASK;
+		meicontext_ppreempt <= wdata_update[27:24] & IRQ_PRIORITY_MASK;
+		meicontext_preempt <= wdata_update[20:16] & {1'b1, IRQ_PRIORITY_MASK};
+		meicontext_noirq <= wdata_update[15];
+		meicontext_irq <= wdata_update[12:4];
+		meicontext_mreteirq <= wdata_update[0];
+	end else if (wen_m_mode && addr == MEINEXT && wdata_update[0]) begin
+		// Interrupt has been sampled, with the update request set, so update
+		// the context (including preemption level) appropriately.
+		meicontext_preempt <= preempt_level_next & IRQ_PRIORITY_MASK;
+		meicontext_noirq <= meinext_noirq;
+		meicontext_irq <= meinext_irq;
+	end
+end
+// ----------------------------------------------------------------------------
+// External interrupt logic
+
+// Signal to standard IRQ logic (mip etc) that at least one of the external IRQ
+// signals should cause a trap to the mip.meip vector:
+wire external_irq_pending;
+
+// Register external IRQ signals (mainly to avoid a through-path from IRQs to
+// bus request signals)
+
+reg [NUM_IRQS-1:0] irq_r;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		irq_r <= {NUM_IRQS{1'b0}};
+	end else begin
+		irq_r <= irq;
+	end
+end
+
+// Trap request is asserted when there is an interrupt at or above our current
+// preemption level. meinext displays interrupts at or above our *previous*
+// preemption level: this masking helps avoid re-taking IRQs in frames that you
+// have preempted. 
+
+assign meipa = {{MAX_IRQS{1'b0}}, irq_r} | meifa;
+
+reg [NUM_IRQS-1:0] eirq_active_above_preempt;
+reg [NUM_IRQS-1:0] eirq_active_above_ppreempt;
+
+always @ (*) begin: eirq_compare
+	integer i;
+	for (i = 0; i < NUM_IRQS; i = i + 1) begin
+		eirq_active_above_preempt[i]  = meipa[i] && meiea[i] && meipra[i * 4 +: 4] >= meicontext_preempt;
+		eirq_active_above_ppreempt[i] = meipa[i] && meiea[i] && meipra[i * 4 +: 4] >= meicontext_ppreempt;
+	end
+end
+
+assign external_irq_pending =  |eirq_active_above_preempt;
+assign meinext_noirq        = ~|eirq_active_above_ppreempt;
+
+// Two things remaining to calculate:
+//
+// - What is the IRQ number of the highest-priority pending IRQ that is above
+//   meicontext.ppreempt
+// - What is the priority of that IRQ
+//
+// In the second case we can relax the calculation to ignore ppreempt, since it
+// only needs to be valid if such an IRQ exists. Currently we choose to reuse
+// the same priority selector (possibly longer critpath while saving area), but
+// we could use a second priority selector that ignores ppreempt masking.
+
+wire [NUM_IRQS-1:0] highest_eirq_onehot;
+wire [8:0]          meinext_irq_unmasked;
+
+hazard3_onehot_priority_dynamic #(
+	.W_REQ                 (NUM_IRQS),
+	.N_PRIORITIES          (16),
+	.PRIORITY_HIGHEST_WINS (1),
+	.TIEBREAK_HIGHEST_WINS (0)
+) eirq_priority_u (
+	.priority (meipra[NUM_IRQS-1:0] & {NUM_IRQS{IRQ_PRIORITY_MASK}}),
+	.req      (eirq_active_above_ppreempt),
+	.gnt      (highest_eirq_onehot)
+);
+
+always @ (*) begin: get_highest_eirq_priority
+	integer i;
+	eirq_highest_priority = 4'h0;
+	for (i = 0; i < NUM_IRQS; i = i + 1) begin
+		eirq_highest_priority = meipra[4 * i +: 4] & {4{highest_eirq_onehot[i]}};
+	end
+end
+
+hazard3_onehot_encode #(
+	.W_REQ (NUM_IRQS),
+	.W_GNT (9)
+) eirq_encode_u (
+	.req (highest_eirq_onehot),
+	.gnt (meinext_irq_unmasked)
+);
+
+assign meinext_irq = meinext_irq_unmasked & {9{!meinext_noirq}};
 
 // ----------------------------------------------------------------------------
 // Counters
@@ -597,8 +750,8 @@ always @ (*) begin
 		decode_match = match_mrw;
 		rdata = {
 			mcause_irq,      // Sign bit is 1 for IRQ, 0 for exception
-			{26{1'b0}},      // Padding
-			mcause_code[4:0] // Enough for 16 external IRQs, which is all we have room for in mip/mie
+			{27{1'b0}},      // Padding
+			mcause_code[3:0] // Enough for 16 external IRQs, which is all we have room for in mip/mie
 		};
 	end
 
@@ -938,49 +1091,63 @@ always @ (*) begin
     // ------------------------------------------------------------------------
 	// Custom CSRs
 
-	MEIE0: if (CSR_M_TRAP && N_IRQ_REG0 > 0) begin
+	MEIEA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
-		rdata = meie0;
+		rdata = {
+			meiea[wdata[4:0] * 16 +: 16],
+			16'h0
+		};
 	end
 
-	MEIE1: if (CSR_M_TRAP && N_IRQ_REG1 > 0) begin
+	MEIPA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
-		rdata = meie1;
+		rdata = {
+			meipa[wdata[4:0] * 16 +: 16],
+			16'h0
+		};
 	end
 
-	MEIE2: if (CSR_M_TRAP && N_IRQ_REG2 > 0) begin
+	MEIFA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
-		rdata = meie2;
+		rdata = {
+			meifa[wdata[4:0] * 16 +: 16],
+			16'h0
+		};
 	end
 
-	MEIE3: if (CSR_M_TRAP && N_IRQ_REG3 > 0) begin
+	MEIPRA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
-		rdata = meie3;
+		rdata = {
+			meipra[wdata[6:0] * 16 +: 16],
+			16'h0
+		};
 	end
 
-	MEIP0: if (CSR_M_TRAP && N_IRQ_REG0 > 0) begin
-		decode_match = match_mro;
-		rdata = meip0;
+	MEINEXT: if (CSR_M_TRAP) begin
+		decode_match = match_mrw;
+		rdata = {
+			meinext_noirq,
+			20'h0,
+			meinext_irq,
+			2'h0
+		};
 	end
 
-	MEIP1: if (CSR_M_TRAP && N_IRQ_REG1 > 0) begin
-		decode_match = match_mro;
-		rdata = meip1;
-	end
-
-	MEIP2: if (CSR_M_TRAP && N_IRQ_REG2 > 0) begin
-		decode_match = match_mro;
-		rdata = meip2;
-	end
-
-	MEIP3: if (CSR_M_TRAP && N_IRQ_REG3 > 0) begin
-		decode_match = match_mro;
-		rdata = meip3;
-	end
-
-	MLEI: if (CSR_M_TRAP) begin
-		decode_match = match_mro;
-		rdata = {{XLEN-9{1'b0}}, mlei, 2'b00};
+	MEICONTEXT: if (CSR_M_TRAP) begin
+		decode_match = match_mrw;
+		rdata = {
+			meicontext_pppreempt,
+			meicontext_ppreempt,
+			3'h0,
+			meicontext_preempt,
+			meicontext_noirq,
+			2'h0,
+			meicontext_irq,
+			mie[7] && wdata_update[1],
+			mie[3] && wdata_update[1],
+			1'b0,
+			meicontext_mreteirq
+		};
 	end
 
 	default: begin end
@@ -1097,29 +1264,18 @@ assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE && excep
 // ----------------------------------------------------------------------------
 // Trap request generation
 
-reg [NUM_IRQ-1:0] irq_r;
 reg irq_software_r;
 reg irq_timer_r;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		irq_r <= {NUM_IRQ{1'b0}};
 		irq_software_r <= 1'b0;
 		irq_timer_r <= 1'b0;
 	end else begin
-		irq_r <= irq;
 		irq_software_r <= irq_software;
 		irq_timer_r <= irq_timer;
 	end
 end
-
-localparam MAX_IRQ = 128;
-wire [MAX_IRQ-1:0] meip = {{MAX_IRQ-NUM_IRQ{1'b0}}, irq_r};
-wire [MAX_IRQ-1:0] meie = {meie3, meie2, meie1, meie0};
-
-assign {meip3, meip2, meip1, meip0} = meip;
-
-wire external_irq_pending = |(meie & meip);
 
 assign mip = {
 	20'h0,                // Reserved
@@ -1137,16 +1293,6 @@ wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
 // Additionally, wfi is treated as a nop during single-stepping and D-mode.
 assign wfi_stall_clear = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
 
-wire [6:0] external_irq_num;
-assign mlei = external_irq_num;
-
-hazard3_priority_encode #(
-	.W_REQ (MAX_IRQ)
-) mlei_priority_encode (
-	.req (meie & meip),
-	.gnt (external_irq_num)
-);
-
 // Priority order from priv spec: external > software > timer
 wire [3:0] standard_irq_num =
 	mip[11] && mie[11] ? 4'd11 :
@@ -1159,13 +1305,13 @@ assign exception_req_any = except != EXCEPT_NONE && !(
 	except == EXCEPT_EBREAK && (m_mode ? dcsr_ebreakm : dcsr_ebreaku)
 );
 
-wire [5:0] mcause_irq_num =	irq_active ? {2'h0, standard_irq_num} : 6'd0;
+wire [3:0] mcause_irq_num =	irq_active ? standard_irq_num : 4'd0;
 
-wire [5:0] vector_sel =	!exception_req_any && irq_vector_enable ? mcause_irq_num : 6'd0;
+wire [3:0] vector_sel =	!exception_req_any && irq_vector_enable ? mcause_irq_num : 4'd0;
 
 assign trap_addr =
 	except == EXCEPT_MRET ? mepc :
-	pending_dbg_resume    ? dpc  : mtvec | {24'h0, vector_sel, 2'h0};
+	pending_dbg_resume    ? dpc  : mtvec | {26'h0, vector_sel, 2'h0};
 
 // Check for exception-like or IRQ-like trap entry; any debug mode entry takes
 // priority over any regular trap.
@@ -1192,7 +1338,7 @@ assign trap_enter_soon = trap_enter_vld || (
 );
 
 assign mcause_irq_next = !exception_req_any;
-assign mcause_code_next = exception_req_any ? {2'h0, except} : mcause_irq_num;
+assign mcause_code_next = exception_req_any ? except : mcause_irq_num;
 
 // ----------------------------------------------------------------------------
 // Privilege state outputs
