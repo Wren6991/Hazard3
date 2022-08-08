@@ -118,13 +118,13 @@ Hardwired to 0.
 
 Address: `0x302`
 
-Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+Unimplemented, as neither U-mode traps nor S-mode are supported. Access will cause an illegal instruction exception.
 
 ==== mideleg
 
 Address: `0x303`
 
-Unimplemented, as only M-mode is supported. Access will cause an illegal instruction exception.
+Unimplemented, as neither U-mode traps nor S-mode are supported. Access will cause an illegal instruction exception.
 
 ==== mie
 
@@ -389,7 +389,7 @@ Debug control and status register. Access outside of Debug Mode will cause an il
 | 9 | `stoptime` | Hardwired to 1: core-local timers don't increment in debug mode. This requires cooperation of external hardware based on the halt status to implement correctly.
 | 8:6 | `cause` | Read-only, set by hardware -- see table below.
 | 2 | `step` | When 1, re-enter Debug Mode after each instruction executed in M-mode.
-| 1:0 | `prv` | Hardwired to 3, as only M-mode is implemented.
+| 1:0 | `prv` | Read the privilege state the core was in when it entered Debug Mode, and set the privilege state it will be in when it exits Debug Mode. If U-mode is implemented, the values 3 and 0 are supported. Otherwise hardwired to 3.
 |===
 
 Fields not mentioned above are hardwired to 0.
