@@ -649,7 +649,7 @@ no_more_irqs:
 
 === Custom Memory Protection CSRs
 
-==== mpmpcfgm0
+==== pmpcfgm0
 
 Address: 0xbd0
 

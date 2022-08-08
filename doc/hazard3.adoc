@@ -5,6 +5,7 @@
 
 :times: ×
 
+include::rev.adoc[]
 = Hazard3
 
 include::sections/introduction.adoc[]
