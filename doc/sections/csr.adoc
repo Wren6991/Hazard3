@@ -647,6 +647,27 @@ no_more_irqs:
 	mret
 ----
 
+=== Custom Memory Protection CSRs
+
+==== mpmpcfgm0
+
+Address: 0xbd0
+
+PMP M-mode configuration. One bit per PMP region. Setting a bit makes the corresponding region apply to M-mode (like the `pmpcfg.L` bit) but does not lock the region.
+
+PMP is useful for non-security-related purposes, such as stack guarding and peripheral emulation. This extension allows M-mode to freely use any currently unlocked regions for its own purposes, without the inconvenience of having to lock them.
+
+Note that this does not grant any new capabilities to M-mode, since in the base standard it is already possible to apply unlocked regions to M-mode by locking them. In general, PMP regions should be locked in ascending region number order so they can't be subsequently overridden by currently unlocked regions.
+
+Note also that this is not the same as the "rule locking bypass" bit in the ePMP extension, which does not permit locked and unlocked M-mode regions to coexist.
+
+[cols="10h,20h,~", options="header"]
+|===
+| Bits  | Name     | Description
+| 31:16 | -        | RES0
+| 15:0  | `m`      | Regions apply to M-mode if this bit _or_ the corresponding `pmpcfg.L` bit is set. Regions are locked if and only if the corresponding `pmpcfg.L` bit is set.
+|===
+
 === Custom Power Control CSRs
 
 ==== msleep
