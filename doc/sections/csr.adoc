@@ -282,8 +282,8 @@ Address registers for up to 16 physical memory protection regions. Only present 
 
 The interpretation of the `pmpaddr` bits depends on the `A` mode configured in the corresponding `pmpcfg` register field:
 
-* For NA4, the entire 30-bit `pmpaddr` field is matched against the 30 most-significant bits of the checked address.
-* FOr NAPOT, `pmpaddr` bits up to and including the least-significant zero bits are ignored, and only the remaining bits are matched against the checked address.
+* For NA4, the entire 30-bit PMP address is matched against the 30 MSBs of the checked address.
+* For NAPOT, `pmpaddr` bits up to and including the least-significant zero bit are ignored, and the remaining bits are matched against the MSBs of the checked address.
 
 === Standard M-mode Performance Counters
 
