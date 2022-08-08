@@ -12,7 +12,6 @@ module hazard3_pmp #(
 ) (
 	input  wire              clk,
 	input  wire              rst_n,
-	input  wire              mstatus_mxr, // make executable readable
 
 	// Config interface passed through CSR block
 	input  wire [11:0]       cfg_addr,
@@ -190,7 +189,6 @@ reg d_m; // Hazard3 extension (M-mode without locking)
 reg d_l;
 reg d_r;
 reg d_w;
-reg d_x; // needed because of MXR
 
 always @ (*) begin: check_d_match
 	integer i;
@@ -199,7 +197,6 @@ always @ (*) begin: check_d_match
 	d_l = 1'b0;
 	d_r = 1'b0;
 	d_w = 1'b0;
-	d_x = 1'b0;
 	// Lowest-numbered match wins, so work down from the top. This should be
 	// inferred as a priority mux structure (cascade mux).
 	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
@@ -209,7 +206,6 @@ always @ (*) begin: check_d_match
 			d_l = pmpcfg_l[i];
 			d_r = pmpcfg_r[i];
 			d_w = pmpcfg_w[i];
-			d_x = pmpcfg_x[i];
 		end
 	end
 end
@@ -279,7 +275,7 @@ end
 // M-mode gets to ignore protections, unless the lock bit is set.
 
 assign d_kill = (!d_m_mode || d_l || d_m) && (
-	(!d_write && !(d_r || (d_x && mstatus_mxr))) ||
+	(!d_write && !d_r) ||
 	( d_write && !d_w)
 );
 

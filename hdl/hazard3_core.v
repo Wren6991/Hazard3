@@ -784,8 +784,6 @@ if (PMP_REGIONS > 0) begin: have_pmp
 		.clk              (clk),
 		.rst_n            (rst_n),
 
-		.mstatus_mxr      (1'b0), // Only used when S mode present
-
 		.cfg_addr         (x_pmp_cfg_addr),
 		.cfg_wen          (x_pmp_cfg_wen),
 		.cfg_wdata        (x_pmp_cfg_wdata),
