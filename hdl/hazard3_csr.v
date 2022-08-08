@@ -340,11 +340,11 @@ always @ (posedge clk or negedge rst_n) begin
 			meifa[16 * wdata[4:0] +: 16]  <= IRQ_IMPL_MASK[16 * wdata[4:0] +: 16] & wdata_update[31:16];
 		end else if (wen_m_mode && addr == MEIPRA) begin
 			meipra[16 * wdata[6:0] +: 16] <= {
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 0]}},
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 1]}},
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 3]}},
 				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 2]}},
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 3]}}
-			} & {4{~(4'hf >> IRQ_PRIORITY_BITS)}} & wdata_update[31:16];
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 1]}},
+				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 0]}}
+			} & {4{IRQ_PRIORITY_MASK}} & wdata_update[31:16];
 		end
 		// Clear IRQ force when the corresponding IRQ is sample from meinext
 		// (so that an IRQ can be posted *once* without modifying the ISR source)
