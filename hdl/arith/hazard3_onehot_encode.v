@@ -16,8 +16,6 @@ module hazard3_onehot_encode #(
 	output reg  [W_GNT-1:0] gnt
 );
 
-reg [W_GNT-1:0] gnt;
-
 always @ (*) begin: encode
 	reg [W_GNT:0] i;
 	gnt = {W_GNT{1'b0}};
