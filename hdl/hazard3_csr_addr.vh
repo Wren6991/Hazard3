@@ -158,6 +158,9 @@ localparam MENVCFG        = 12'h30a;
 localparam MENVCFGH       = 12'h31a;
 
 // Custom M-mode CSRs:
+localparam PMPCFGM0       = 12'hbd0; // Make PMP regions M-mode without locking
+//                              bd1  // (reserved for >32 regions)
+
 localparam MEIEA          = 12'hbe0; // External interrupt pending array
 localparam MEIPA          = 12'hbe1; // External interrupt enable array
 localparam MEIFA          = 12'hbe2; // External interrupt force array

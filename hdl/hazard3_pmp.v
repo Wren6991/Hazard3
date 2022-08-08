@@ -53,6 +53,12 @@ reg              pmpcfg_x [0:PMP_REGIONS-1];
 // physical address space). We don't implement bits 33 or 32.
 reg [W_ADDR-3:0] pmpaddr  [0:PMP_REGIONS-1];
 
+// Hazard3 extension for applying PMP regions to M-mode without locking.
+// Different from ePMP mseccfg.rlb: low-numbered regions may be locked for
+// security reasons, but higher-numbered regions should stll be available for
+// other purposes e.g. stack guarding, peripheral emulation
+reg [PMP_REGIONS-1:0] pmpcfg_m;
+
 always @ (posedge clk or negedge rst_n) begin: cfg_update
 	integer i;
 	if (!rst_n) begin
@@ -66,6 +72,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 			pmpaddr[i]  <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_ADDR[32 * i +: 30]  :
 			               PMP_GRAIN > 1    ? ~(~30'h0 << (PMP_GRAIN - 1))      : 30'h0;
 		end
+		pmpcfg_m <= {PMP_REGIONS{1'b0}};
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
 			if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
@@ -77,6 +84,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 					pmpcfg_w[i] <= PMP_HARDWIRED_CFG[8 * i + 1];
 					pmpcfg_x[i] <= PMP_HARDWIRED_CFG[8 * i + 0];
 					pmpaddr[i]  <= PMP_HARDWIRED_ADDR[32 * i +: 30];
+					pmpcfgm[i]  <= 1'b0;
 				end else begin
 					pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
 					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
@@ -96,6 +104,9 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 					pmpaddr[i] <= cfg_wdata[W_ADDR-3:0];
 				end
 			end
+		end
+		if (cfg_addr == PMPCFGM0) begin
+			pmpcfg_m <= cfg_wdata[PMP_REGIONS-1:0];
 		end
 	end
 end
@@ -125,6 +136,9 @@ always @ (*) begin: cfg_read
 				cfg_rdata[W_ADDR-3:0] = pmpaddr[i];
 			end
 		end
+	end
+	if (cfg_addr == PMPCFGM0) begin
+		cfg_rdata = {{32-PMP_REGIONS{1'b0}}, pmpcfg_m};
 	end
 end
 
@@ -172,6 +186,7 @@ end
 // happen, and we choose alignment fault in this case.
 
 reg d_match;
+reg d_m; // Hazard3 extension (M-mode without locking)
 reg d_l;
 reg d_r;
 reg d_w;
@@ -180,6 +195,7 @@ reg d_x; // needed because of MXR
 always @ (*) begin: check_d_match
 	integer i;
 	d_match = 1'b0;
+	d_m = 1'b0;
 	d_l = 1'b0;
 	d_r = 1'b0;
 	d_w = 1'b0;
@@ -189,6 +205,7 @@ always @ (*) begin: check_d_match
 	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
 		if (|pmpcfg_a[i] && (d_addr & match_mask[i]) == match_addr[i]) begin
 			d_match = 1'b1;
+			d_m = pmpcfg_m[i];
 			d_l = pmpcfg_l[i];
 			d_r = pmpcfg_r[i];
 			d_w = pmpcfg_w[i];
@@ -230,6 +247,7 @@ end
 
 reg i_match;
 reg i_partial_match;
+reg i_m; // Hazard3 extension (M-mode without locking)
 reg i_l;
 reg i_x;
 
@@ -248,6 +266,7 @@ always @ (*) begin: check_i_match
 		if (match_hw0 || match_hw1) begin
 			i_match = 1'b1;
 			i_partial_match = (match_hw0 ^ match_hw1) && i_instr_is_32bit;
+			i_m = pmpcfg_m[i];
 			i_l = pmpcfg_l[i];
 			i_x = pmpcfg_x[i];
 		end
@@ -259,7 +278,7 @@ end
 
 // M-mode gets to ignore protections, unless the lock bit is set.
 
-assign d_kill = !(d_m_mode && !d_l) && (
+assign d_kill = (!d_m_mode || d_l || d_m) && (
 	(!d_write && !(d_r || (d_x && mstatus_mxr))) ||
 	( d_write && !d_w)
 );
@@ -267,7 +286,7 @@ assign d_kill = !(d_m_mode && !d_l) && (
 // Straddling a protection boundary is always an error.
 
 assign i_kill = i_partial_match || (
-	!(i_m_mode && !i_l) && !i_x
+	(!i_m_mode || i_l || i_m) && !i_x
 );
 
 endmodule
