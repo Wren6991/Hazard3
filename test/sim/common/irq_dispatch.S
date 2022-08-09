@@ -104,7 +104,7 @@ isr_irq\num:
 .word isr_irq\num
 .endm
 
-#define NUM_IRQS 64
+#define NUM_IRQS 32
 
 .equ i, 0
 .rept NUM_IRQS

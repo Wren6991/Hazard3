@@ -41,22 +41,17 @@ EIRQ vector was entered 16 times
 *******************************************************************************/
 
 #define MAX_PRIORITY 15
-#define NUM_IRQS 64
-
-extern uintptr_t _external_irq_table[NUM_IRQS];
-extern uint32_t _external_irq_entry_count;
 
 void handler(void);
 
 int main() {
-	// Enable external IRQs globally
-	set_csr(mstatus, 0x8);
-	set_csr(mie, 0x800);
+	global_irq_enable(true);
+	external_irq_enable(true);
 	// Enable one external IRQ at each priority level
 	for (int i = 0; i <= MAX_PRIORITY; ++i) {
 		h3irq_enable(i, true);
 		h3irq_set_priority(i, i);
-		_external_irq_table[i] = (uintptr_t)handler;
+		h3irq_set_handler(i, handler);
 	}
 	// Set off the lowest-priority IRQ. The IRQ handler will then set the
 	// next-lowest, which will preempt it. So on, up to the highest level,

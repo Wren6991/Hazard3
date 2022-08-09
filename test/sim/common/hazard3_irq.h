@@ -5,6 +5,13 @@
 #include "stdint.h"
 #include "stdbool.h"
 
+// Should match processor configuration in testbench:
+#define NUM_IRQS 32
+
+// Declarations for irq_dispatch.S
+extern uintptr_t _external_irq_table[NUM_IRQS];
+extern uint32_t _external_irq_entry_count;
+
 #define h3irq_array_read(csr, index) (read_set_csr(csr, (index)) >> 16)
 
 #define h3irq_array_write(csr, index, data) (write_csr(csr, (index) | ((uint32_t)(data) << 16)))
@@ -24,8 +31,17 @@ static inline bool h3irq_pending(unsigned int irq) {
 	return h3irq_array_read(hazard3_csr_meipa, irq >> 4) & (1u << (irq & 0xfu));
 }
 
-static inline bool h3irq_force_pending(unsigned int irq) {
-	h3irq_array_set(hazard3_csr_meifa, irq >> 4, 1u << (irq & 0xfu));
+static inline void h3irq_force_pending(unsigned int irq, bool force) {
+	if (force) {
+		h3irq_array_set(hazard3_csr_meifa, irq >> 4, 1u << (irq & 0xfu));
+	}
+	else {
+		h3irq_array_clear(hazard3_csr_meifa, irq >> 4, 1u << (irq & 0xfu));
+	}
+}
+
+static inline bool h3irq_is_forced(unsigned int irq) {
+	return h3irq_array_read(hazard3_csr_meifa, irq >> 4) & (1u << (irq & 0xfu));
 }
 
 // -1 for no IRQ
@@ -43,5 +59,30 @@ static inline void h3irq_set_priority(unsigned int irq, uint32_t priority) {
 	h3irq_array_clear(hazard3_csr_meipra, irq >> 2, 0xfu << (4 * (irq & 0x3)));
 	h3irq_array_set(hazard3_csr_meipra, irq >> 2, (priority & 0xfu) << (4 * (irq & 0x3)));
 }
+
+static inline void h3irq_set_handler(unsigned int irq, void (*handler)(void)) {
+	_external_irq_table[irq] = (uintptr_t)handler;
+}
+
+static inline void global_irq_enable(bool en) {
+	// mstatus.mie
+	if (en) {
+		set_csr(mstatus, 0x8);
+	}
+	else {
+		clear_csr(mstatus, 0x8);
+	}
+}
+
+static inline void external_irq_enable(bool en) {
+	// mie.meie
+	if (en) {
+		set_csr(mie, 0x800);
+	}
+	else {
+		clear_csr(mie, 0x800);
+	}
+}
+
 
 #endif
