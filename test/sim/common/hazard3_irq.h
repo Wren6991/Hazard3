@@ -7,6 +7,7 @@
 
 // Should match processor configuration in testbench:
 #define NUM_IRQS 32
+#define MAX_PRIORITY 15
 
 // Declarations for irq_dispatch.S
 extern uintptr_t _external_irq_table[NUM_IRQS];

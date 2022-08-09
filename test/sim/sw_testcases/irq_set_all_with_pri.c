@@ -54,9 +54,6 @@ EIRQ vector was entered 1 times
 
 *******************************************************************************/
 
-#define PRIORITY_LEVELS 16
-#define NUM_IRQS 32
-
 void handler(void);
 
 int main() {

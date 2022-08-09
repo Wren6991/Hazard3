@@ -40,8 +40,6 @@ EIRQ vector was entered 16 times
 
 *******************************************************************************/
 
-#define MAX_PRIORITY 15
-
 void handler(void);
 
 int main() {
