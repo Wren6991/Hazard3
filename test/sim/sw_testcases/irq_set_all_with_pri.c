@@ -54,6 +54,8 @@ EIRQ vector was entered 1 times
 
 *******************************************************************************/
 
+#define PRIORITY_LEVELS (MAX_PRIORITY + 1)
+
 void handler(void);
 
 int main() {
