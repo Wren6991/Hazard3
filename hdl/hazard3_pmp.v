@@ -83,7 +83,6 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 					pmpcfg_w[i] <= PMP_HARDWIRED_CFG[8 * i + 1];
 					pmpcfg_x[i] <= PMP_HARDWIRED_CFG[8 * i + 0];
 					pmpaddr[i]  <= PMP_HARDWIRED_ADDR[32 * i +: 30];
-					pmpcfgm[i]  <= 1'b0;
 				end else begin
 					pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
 					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
@@ -105,7 +104,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 			end
 		end
 		if (cfg_addr == PMPCFGM0) begin
-			pmpcfg_m <= cfg_wdata[PMP_REGIONS-1:0];
+			pmpcfg_m <= cfg_wdata[PMP_REGIONS-1:0] & ~PMP_HARDWIRED;
 		end
 	end
 end
