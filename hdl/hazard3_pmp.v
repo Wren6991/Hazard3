@@ -253,6 +253,7 @@ always @ (*) begin: check_i_match
 	reg match_hw0, match_hw1;
 	i_match = 1'b0;
 	i_partial_match = 1'b0;
+	i_m = 1'b0;
 	i_l = 1'b0;
 	i_x = 1'b0;
 	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
@@ -271,7 +272,7 @@ end
 // ----------------------------------------------------------------------------
 // Access rules
 
-// M-mode gets to ignore protections, unless the lock bit is set.
+// M-mode gets to ignore protections, unless the lock or M-mode bit is set.
 
 assign d_kill = (!d_m_mode || d_l || d_m) && (
 	(!d_write && !d_r) ||
