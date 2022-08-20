@@ -435,7 +435,7 @@ end
 // preemption level: this masking helps avoid re-taking IRQs in frames that you
 // have preempted. 
 
-assign meipa = {{MAX_IRQS{1'b0}}, irq_r} | meifa;
+assign meipa = {{MAX_IRQS-NUM_IRQS{1'b0}}, irq_r} | meifa;
 
 reg [NUM_IRQS-1:0] eirq_active_above_preempt;
 reg [NUM_IRQS-1:0] eirq_active_above_ppreempt;
