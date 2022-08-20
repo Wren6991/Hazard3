@@ -287,6 +287,8 @@ always @ (*) begin
 	RV_SEXT_B:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_SEXT_B; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	RV_SEXT_H:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_SEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	RV_XNOR:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_XNOR;                                                          end else begin d_invalid_32bit = 1'b1; end
+	// Note: ZEXT_H is a subset of PACK from Zbkb. This is fine as long as
+	// this case appears first, since Zbkb implies Zbb on Hazard3.
 	RV_ZEXT_H:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ZEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 
 	RV_CLMUL:     if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end

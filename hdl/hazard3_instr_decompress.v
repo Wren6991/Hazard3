@@ -86,7 +86,7 @@ end else begin: instr_decompress
 			RV_C_ADDI4SPN: instr_out = RV_NOZ_ADDI | rfmt_rd(rd_s) | rfmt_rs1(5'h2)
 				| {2'h0, instr_in[10:7], instr_in[12:11], instr_in[5], instr_in[6], 2'b00, 20'h00000};
 			RV_C_LW:       instr_out = RV_NOZ_LW | rfmt_rd(rd_s) | rfmt_rs1(rs1_s)
-				| {6'h00, instr_in[5], instr_in[12:10], instr_in[6], 2'b00, 20'h00000};
+				| {5'h00, instr_in[5], instr_in[12:10], instr_in[6], 2'b00, 20'h00000};
 			RV_C_SW:       instr_out = RV_NOZ_SW | rfmt_rs2(rs2_s) | rfmt_rs1(rs1_s)
 				| {5'h00, instr_in[5], instr_in[12], 13'h000, instr_in[11:10], instr_in[6], 2'b00, 7'h00};
 			RV_C_ADDI:     instr_out = RV_NOZ_ADDI | rfmt_rd(rd_l) | rfmt_rs1(rs1_l) | imm_ci;

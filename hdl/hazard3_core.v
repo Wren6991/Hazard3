@@ -440,12 +440,12 @@ always @ (*) begin
 	// feed back through the ALU.
 	if (|EXTENSION_A && x_amo_phase == 3'h2)
 		x_op_a = mw_result;
-	else if (|d_alusrc_a)
+	else if (d_alusrc_a)
 		x_op_a = d_pc;
 	else
 		x_op_a = x_rs1_bypass;
 
-	if (|d_alusrc_b)
+	if (d_alusrc_b)
 		x_op_b = d_imm;
 	else
 		x_op_b = x_rs2_bypass;
@@ -933,7 +933,7 @@ hazard3_csr #(
 
 	// Other CSR-specific signalling
 	.permit_wfi                 (x_permit_wfi),
-	.instr_ret                  (|x_instr_ret)
+	.instr_ret                  (x_instr_ret)
 );
 
 // Pipe register
