@@ -559,8 +559,8 @@ always @ (*) begin
 
 	casez ({|EXTENSION_C, next_instr})
 	// -> addi rd, x0, imm:
-	{1'b1, 16'hzzzz, RV_C_LI  }: predecode_rs1_fine = 5'd0;
-	{1'b1, 16'hzzzz, RV_C_MV  }: begin
+	{1'b1, 16'hzzzz, `RVOPC_C_LI}: predecode_rs1_fine = 5'd0;
+	{1'b1, 16'hzzzz, `RVOPC_C_MV}: begin
 		if (next_instr[6:2] == 5'd0) begin
 			// c.jr has rs1 as normal
 			predecode_rs1_fine = predecode_rs1_coarse;
@@ -573,9 +573,9 @@ always @ (*) begin
 	endcase
 
 	casez ({|EXTENSION_C, next_instr})
-	{1'b1, 16'hzzzz, RV_C_BEQZ}: predecode_rs2_fine = 5'd0;    // -> beq rs1, x0, label
-	{1'b1, 16'hzzzz, RV_C_BNEZ}: predecode_rs2_fine = 5'd0;    // -> bne rs1, x0, label
-	default:                     predecode_rs2_fine = predecode_rs2_coarse;
+	{1'b1, 16'hzzzz, `RVOPC_C_BEQZ}: predecode_rs2_fine = 5'd0;    // -> beq rs1, x0, label
+	{1'b1, 16'hzzzz, `RVOPC_C_BNEZ}: predecode_rs2_fine = 5'd0;    // -> bne rs1, x0, label
+	default:                         predecode_rs2_fine = predecode_rs2_coarse;
 	endcase
 
 
