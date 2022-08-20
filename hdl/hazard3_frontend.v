@@ -105,10 +105,10 @@ reg [1:0] mem_data_predbranch;
 // to decode the instruction, but until then can be flushed harmlessly.
 
 reg  [W_DATA-1:0]    fifo_mem        [0:FIFO_DEPTH];
-reg  [FIFO_DEPTH:0]  fifo_err;
+reg                  fifo_err        [0:FIFO_DEPTH];
 reg  [1:0]           fifo_predbranch [0:FIFO_DEPTH];
 reg  [1:0]           fifo_valid_hw   [0:FIFO_DEPTH];
-reg  [FIFO_DEPTH:-1] fifo_valid;
+reg                  fifo_valid      [0:FIFO_DEPTH];
 
 wire [W_DATA-1:0] fifo_rdata       = fifo_mem[0];
 wire              fifo_full        = fifo_valid[FIFO_DEPTH - 1];
@@ -126,7 +126,6 @@ always @ (*) begin: boundary_conditions
 	fifo_err[FIFO_DEPTH] = 1'b0;
 	fifo_valid_hw[FIFO_DEPTH] = 2'b00;
 	fifo_valid[FIFO_DEPTH] = 1'b0;
-	fifo_valid[-1] = 1'b1;
 	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 		fifo_valid[i] = |EXTENSION_C ? |fifo_valid_hw[i] : fifo_valid_hw[i][0];
 	end
@@ -149,11 +148,11 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 				fifo_predbranch[i] <= fifo_valid[i + 1] ? fifo_predbranch[i + 1] : mem_data_predbranch;
 			end
 			fifo_valid_hw[i] <=
-				jump_now                                                      ? 2'h0                 :
-				fifo_valid[i + 1] && fifo_pop                                 ? fifo_valid_hw[i + 1] :
-				fifo_valid[i] && fifo_pop && !fifo_push                       ? 2'h0                 :
-				fifo_valid[i] && fifo_pop &&  fifo_push                       ? mem_data_hwvld       :
-				!fifo_valid[i] && fifo_valid[i - 1] && fifo_push && !fifo_pop ? mem_data_hwvld       : fifo_valid_hw[i];
+				jump_now                                                 ? 2'h0                            :
+				fifo_valid[i + 1] && fifo_pop                            ? fifo_valid_hw[i + 1]            :
+				fifo_valid[i]     && fifo_pop                            ? mem_data_hwvld & {2{fifo_push}} :
+				fifo_valid[i]                                            ? fifo_valid_hw[i]                :
+				fifo_push && !fifo_pop && (i == 0 || fifo_valid[i - |i]) ? mem_data_hwvld                  : 2'h0;
 		end
 		// Allow DM to inject instructions directly into the lowest-numbered
 		// queue entry. This mux should not extend critical path since it is

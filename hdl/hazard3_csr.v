@@ -441,8 +441,8 @@ reg [NUM_IRQS-1:0] eirq_active_above_ppreempt;
 always @ (*) begin: eirq_compare
 	integer i;
 	for (i = 0; i < NUM_IRQS; i = i + 1) begin
-		eirq_active_above_preempt[i]  = meipa[i] && meiea[i] && meipra[i * 4 +: 4] >= meicontext_preempt;
-		eirq_active_above_ppreempt[i] = meipa[i] && meiea[i] && meipra[i * 4 +: 4] >= meicontext_ppreempt;
+		eirq_active_above_preempt[i]  = meipa[i] && meiea[i] && {1'b0, meipra[i * 4 +: 4]} >= meicontext_preempt;
+		eirq_active_above_ppreempt[i] = meipa[i] && meiea[i] &&        meipra[i * 4 +: 4]  >= meicontext_ppreempt;
 	end
 end
 
