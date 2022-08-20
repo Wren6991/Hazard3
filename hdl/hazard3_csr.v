@@ -277,8 +277,6 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-wire mie_meie = mie[11];
-
 // Interrupt pending register (assigned later). In our implementation this
 // register is entirely read-only.
 wire [XLEN-1:0] mip;

@@ -123,6 +123,7 @@ always @ (*) begin: boundary_conditions
 	integer i;
 	fifo_mem[FIFO_DEPTH] = mem_data;
 	fifo_predbranch[FIFO_DEPTH] = 2'b00;
+	fifo_err[FIFO_DEPTH] = 1'b0;
 	fifo_valid_hw[FIFO_DEPTH] = 2'b00;
 	fifo_valid[FIFO_DEPTH] = 1'b0;
 	fifo_valid[-1] = 1'b1;

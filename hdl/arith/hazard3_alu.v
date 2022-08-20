@@ -24,13 +24,6 @@ module hazard3_alu #(
 // ----------------------------------------------------------------------------
 // Fiddle around with add/sub, comparisons etc (all related).
 
-function msb;
-input [W_DATA-1:0] x;
-begin
-	msb = x[W_DATA-1];
-end
-endfunction
-
 wire sub = !(aluop == ALUOP_ADD || (|EXTENSION_ZBA && aluop == ALUOP_SHXADD));
 
 wire inv_op_b = sub && !(
@@ -52,8 +45,8 @@ wire cmp_is_unsigned = aluop == ALUOP_LTU ||
 	|EXTENSION_ZBB && aluop == ALUOP_MAXU ||
 	|EXTENSION_ZBB && aluop == ALUOP_MINU;
 
-wire lt = msb(op_a) == msb(op_b) ? msb(sum)  :
-          cmp_is_unsigned        ? msb(op_b) : msb(op_a) ;
+wire lt = op_a[W_DATA-1] == op_b[W_DATA-1] ? sum[W_DATA-1]  :
+          cmp_is_unsigned                  ? op_b[W_DATA-1] : op_a[W_DATA-1] ;
 
 assign cmp = aluop == ALUOP_SUB ? |op_xor : lt;
 

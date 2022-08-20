@@ -87,7 +87,6 @@ module hazard3_cpu_2port #(
 
 // Instruction fetch signals
 wire              core_aph_req_i;
-wire              core_aph_panic_i; // unused as there's no arbitration
 wire              core_aph_ready_i;
 wire              core_dph_ready_i;
 wire              core_dph_err_i;
@@ -124,7 +123,7 @@ hazard3_core #(
 	`endif
 
 	.bus_aph_req_i              (core_aph_req_i),
-	.bus_aph_panic_i            (core_aph_panic_i),
+	.bus_aph_panic_i            (/* unused for 2port */),
 	.bus_aph_ready_i            (core_aph_ready_i),
 	.bus_dph_ready_i            (core_dph_ready_i),
 	.bus_dph_err_i              (core_dph_err_i),

@@ -183,7 +183,6 @@ end
 // load/store/AMO alignment fault (mcause = 4, 6), in the case that both
 // happen, and we choose alignment fault in this case.
 
-reg d_match;
 reg d_m; // Hazard3 extension (M-mode without locking)
 reg d_l;
 reg d_r;
@@ -191,7 +190,6 @@ reg d_w;
 
 always @ (*) begin: check_d_match
 	integer i;
-	d_match = 1'b0;
 	d_m = 1'b0;
 	d_l = 1'b0;
 	d_r = 1'b0;
@@ -200,7 +198,6 @@ always @ (*) begin: check_d_match
 	// inferred as a priority mux structure (cascade mux).
 	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
 		if (|pmpcfg_a[i] && (d_addr & match_mask[i]) == match_addr[i]) begin
-			d_match = 1'b1;
 			d_m = pmpcfg_m[i];
 			d_l = pmpcfg_l[i];
 			d_r = pmpcfg_r[i];
@@ -240,7 +237,6 @@ end
 // completely match a lower-numbered region. We don't accumulate the partial
 // match across all regions.
 
-reg i_match;
 reg i_partial_match;
 reg i_m; // Hazard3 extension (M-mode without locking)
 reg i_l;
@@ -251,7 +247,6 @@ wire [W_ADDR-1:0] i_addr_hw1 = i_addr + 2'h2;
 always @ (*) begin: check_i_match
 	integer i;
 	reg match_hw0, match_hw1;
-	i_match = 1'b0;
 	i_partial_match = 1'b0;
 	i_m = 1'b0;
 	i_l = 1'b0;
@@ -260,7 +255,6 @@ always @ (*) begin: check_i_match
 		match_hw0 = |pmpcfg_a[i] && (i_addr     & match_mask[i]) == match_addr[i];
 		match_hw1 = |pmpcfg_a[i] && (i_addr_hw1 & match_mask[i]) == match_addr[i];
 		if (match_hw0 || match_hw1) begin
-			i_match = 1'b1;
 			i_partial_match = (match_hw0 ^ match_hw1) && i_instr_is_32bit;
 			i_m = pmpcfg_m[i];
 			i_l = pmpcfg_l[i];
