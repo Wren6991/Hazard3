@@ -189,4 +189,6 @@ assign dmi_paddr[1:0] = 2'b00;
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`ifndef YOSYS

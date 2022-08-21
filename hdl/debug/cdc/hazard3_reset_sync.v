@@ -36,4 +36,6 @@ assign rst_n_out = delay[N_STAGES-1];
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

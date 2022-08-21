@@ -65,4 +65,6 @@ endgenerate
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

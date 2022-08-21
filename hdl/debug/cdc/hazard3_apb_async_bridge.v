@@ -194,4 +194,6 @@ assign {dst_paddr, dst_pwdata, dst_pwrite} = dst_paddr_pwdata_pwrite;
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

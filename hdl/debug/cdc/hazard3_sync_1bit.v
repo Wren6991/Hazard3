@@ -34,4 +34,6 @@ assign o = sync_flops[N_STAGES-1];
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

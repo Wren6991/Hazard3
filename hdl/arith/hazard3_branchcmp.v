@@ -39,4 +39,6 @@ assign cmp = aluop[0] ? op_a != op_b : lt;
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif
