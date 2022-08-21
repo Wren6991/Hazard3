@@ -639,7 +639,7 @@ always @ (*) begin
 	pmp_cfg_wen = 1'b0;
 	case (addr)
 
-    // ------------------------------------------------------------------------
+	// ------------------------------------------------------------------------
 	// Mandatory CSRs
 
 	MISA: if (CSR_M_MANDATORY) begin
@@ -731,7 +731,7 @@ always @ (*) begin
 		decode_match = match_mrw;
 	end
 
-    // ------------------------------------------------------------------------
+	// ------------------------------------------------------------------------
 	// Trap-handling CSRs
 
 	// This is a 32 bit synthesised register with set/clear/write/read, don't
@@ -780,7 +780,7 @@ always @ (*) begin
 		};
 	end
 
-    // ------------------------------------------------------------------------
+	// ------------------------------------------------------------------------
 	// Counter CSRs
 
 	// Get the tied WARLs out the way first
@@ -912,11 +912,11 @@ always @ (*) begin
 		};
 	end
 
-    // ------------------------------------------------------------------------
-    // PMP CSRs (bridge to PMP config interface)
+	// ------------------------------------------------------------------------
+	// PMP CSRs (bridge to PMP config interface)
 
-    // If PMP is present, all 16 registers are present, but some may be WARL'd
-    // to 0 depending on how many regions are actually implemented.
+	// If PMP is present, all 16 registers are present, but some may be WARL'd
+	// to 0 depending on how many regions are actually implemented.
 	PMPCFG0:   if (PMP_REGIONS > 0) begin
 		decode_match = match_mrw;
 		pmp_cfg_wen = match_mrw && wen;
@@ -1021,28 +1021,28 @@ always @ (*) begin
 	// MSECCFG is strictly optional, and we don't implement any of its
 	// features (ePMP etc) so we don't decode it.
 
-    // ------------------------------------------------------------------------
-    // U-mode CSRs
+	// ------------------------------------------------------------------------
+	// U-mode CSRs
 
-    // The read-only counters are always visible to M mode, and are visible to
-    // U mode if the corresponding mcounteren bit is set.
-    CYCLE: if (CSR_COUNTER) begin
-    	decode_match = mcounteren_cy ? match_uro : match_mro;
-    	rdata = mcycle;
-    end
-    CYCLEH: if (CSR_COUNTER) begin
-    	decode_match = mcounteren_cy ? match_uro : match_mro;
-    	rdata = mcycleh;
-    end
+	// The read-only counters are always visible to M mode, and are visible to
+	// U mode if the corresponding mcounteren bit is set.
+	CYCLE: if (CSR_COUNTER) begin
+		decode_match = mcounteren_cy ? match_uro : match_mro;
+		rdata = mcycle;
+	end
+	CYCLEH: if (CSR_COUNTER) begin
+		decode_match = mcounteren_cy ? match_uro : match_mro;
+		rdata = mcycleh;
+	end
 
-    INSTRET: if (CSR_COUNTER) begin
-    	decode_match = mcounteren_ir ? match_uro : match_mro;
-    	rdata = minstret;
-    end
-    INSTRETH: if (CSR_COUNTER) begin
-    	decode_match = mcounteren_ir ? match_uro : match_mro;
-    	rdata = minstreth;
-    end
+	INSTRET: if (CSR_COUNTER) begin
+		decode_match = mcounteren_ir ? match_uro : match_mro;
+		rdata = minstret;
+	end
+	INSTRETH: if (CSR_COUNTER) begin
+		decode_match = mcounteren_ir ? match_uro : match_mro;
+		rdata = minstreth;
+	end
 
 	// ------------------------------------------------------------------------
 	// Trigger Module CSRs
@@ -1088,7 +1088,7 @@ always @ (*) begin
 		rdata = dbg_data0_rdata;
 	end
 
-    // ------------------------------------------------------------------------
+	// ------------------------------------------------------------------------
 	// Custom CSRs
 
 	MEIEA: if (CSR_M_TRAP) begin
