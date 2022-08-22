@@ -47,11 +47,12 @@ reg [W_TSELECT-1:0] tselect;
 // fields (type/dmode) and mcontrol refers to those fields specific to
 // type=2 (address/data match), the only trigger type we implement.
 
-reg              tdata1_dmode    [0:BREAKPOINT_TRIGGERS-1];
-reg              mcontrol_action [0:BREAKPOINT_TRIGGERS-1];
-reg              mcontrol_m      [0:BREAKPOINT_TRIGGERS-1];
-reg              mcontrol_u      [0:BREAKPOINT_TRIGGERS-1];
-reg [W_DATA-1:0] tdata2          [0:BREAKPOINT_TRIGGERS-1];
+reg              tdata1_dmode     [0:BREAKPOINT_TRIGGERS-1];
+reg              mcontrol_action  [0:BREAKPOINT_TRIGGERS-1];
+reg              mcontrol_m       [0:BREAKPOINT_TRIGGERS-1];
+reg              mcontrol_u       [0:BREAKPOINT_TRIGGERS-1];
+reg              mcontrol_execute [0:BREAKPOINT_TRIGGERS-1];
+reg [W_DATA-1:0] tdata2           [0:BREAKPOINT_TRIGGERS-1];
 
 // ----------------------------------------------------------------------------
 // Configuration write port
@@ -65,6 +66,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 			mcontrol_action[i] <= 1'b0;
 			mcontrol_m[i] <= 1'b0;
 			mcontrol_u[i] <= 1'b0;
+			mcontrol_execute[i] <= 1'b0;
 			tdata2[i] <= {W_DATA{1'b0}};
 		end
 	end else if (cfg_wen && cfg_addr == TSELECT) begin
@@ -77,6 +79,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 			mcontrol_action[tselect] <= cfg_wdata[12];
 			mcontrol_m[tselect] <= cfg_wdata[6];
 			mcontrol_u[tselect] <= cfg_wdata[3];
+			mcontrol_execute[tselect] <= cfg_wdata[2];
 		end else if (cfg_addr == TDATA2) begin
 			tdata2[tselect] <= cfg_wdata;
 		end
@@ -110,7 +113,7 @@ always @ (*) begin
 				1'b0,
 				1'b0,                              // s = 0, no S-mode
 				mcontrol_u[tselect],
-				1'b1,                              // execute = 1, this is a breakpoint
+				mcontrol_execute[tselect],
 				1'b0,                              // store = 0, this is not a watchpoint
 				1'b0                               // load = 0, this is not a watchpoint
 			};

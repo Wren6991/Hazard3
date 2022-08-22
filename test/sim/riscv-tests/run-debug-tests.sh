@@ -28,10 +28,13 @@ DebugTurbostep \
 DisconnectTest \
 DownloadTest \
 EbreakTest \
+Hwbp1 \
+Hwbp2 \
 InfoTest \
 InstantChangePc \
 InstantHaltTest \
 InterruptTest \
+JumpHbreak \
 MemTest16 \
 MemTest32 \
 MemTest64 \
@@ -58,6 +61,7 @@ SimpleT1Test \
 SimpleV13Test \
 StepTest \
 TooManyHwbp \
+TriggerExecuteInstant \
 UserInterrupt \
 WriteCsrs \
 WriteGprs
