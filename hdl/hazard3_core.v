@@ -840,7 +840,7 @@ if (BREAKPOINT_TRIGGERS > 0) begin: have_triggers
 		.m_mode           (x_mmode_execution),
 		.d_mode           (debug_mode),
 
-		.break            (x_trig_break),
+		.break_any        (x_trig_break),
 		.break_d_mode     (x_trig_break_d_mode)
 	);
 

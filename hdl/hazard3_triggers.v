@@ -30,7 +30,7 @@ module hazard3_triggers #(
 	input  wire              d_mode,
 
 	// Break request
-	output wire              break,
+	output wire              break_any,
 	output wire              break_d_mode
 );
 
@@ -148,7 +148,7 @@ always @ (*) begin: match_pc
 	end
 end
 
-assign break        = |want_m_mode_break || |want_d_mode_break;
+assign break_any    = |want_m_mode_break || |want_d_mode_break;
 assign break_d_mode = |want_d_mode_break;
 
 endmodule
