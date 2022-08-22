@@ -24,8 +24,6 @@ CSR was 302
 -> exception, mcause = 2
 CSR was 303
 -> exception, mcause = 2
-CSR was 7a1
--> exception, mcause = 2
 CSR was 7b0
 -> exception, mcause = 2
 CSR was 7b1
@@ -132,6 +130,9 @@ int main() {
 	(void)read_csr(mhpmevent3);
 	(void)read_csr(tselect);
 	(void)read_csr(tdata1);
+	(void)read_csr(tdata2);
+	(void)read_csr(tinfo);
+	(void)read_csr(tcontrol);
 	(void)read_csr(dcsr);
 	(void)read_csr(dpc);
 	(void)read_csr(dscratch0);

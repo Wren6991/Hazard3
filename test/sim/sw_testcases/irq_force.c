@@ -12,6 +12,7 @@ int main() {
 	tb_assert(NUM_IRQS <= 32, "Test invalid for >32 IRQs");
 	global_irq_enable(true);
 	external_irq_enable(true);
+
 	// Dry run: Check that IRQ force array can be written/read and that it
 	// sets the pending array appropriately
 	for (int i = 0; i < NUM_IRQS; ++i) {

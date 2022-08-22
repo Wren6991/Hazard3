@@ -120,6 +120,10 @@ parameter PMP_HARDWIRED_CFG   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
 // Requires: CSR_M_MANDATORY, CSR_M_TRAP.
 parameter DEBUG_SUPPORT       = 0,
 
+// BREAKPOINT_TRIGGERS: Number of triggers which support type=2 execute=1
+// (but not store/load=1, i.e. not a watchpoint). Requires: DEBUG_SUPPORT
+parameter BREAKPOINT_TRIGGERS = 0,
+
 // ----------------------------------------------------------------------------
 // External interrupt support
 

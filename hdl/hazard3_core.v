@@ -296,6 +296,7 @@ reg  [W_DATA-1:0]    xm_result;
 reg  [1:0]           xm_addr_align;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
+reg                  xm_except_to_d_mode;
 reg                  xm_wfi;
 reg                  xm_delay_irq_entry;
 
@@ -376,6 +377,11 @@ assign x_stall =
 	x_jump_req && !f_jump_rdy;
 
 wire m_wfi_stall_clear;
+
+wire x_loadstore_pmp_fail;
+wire x_exec_pmp_fail;
+wire x_trig_break;
+wire x_trig_break_d_mode;
 
 // ----------------------------------------------------------------------------
 // Execution logic
@@ -464,9 +470,6 @@ hazard3_alu #(
 );
 
 // Load/store bus request
-
-wire x_loadstore_pmp_fail;
-wire x_exec_pmp_fail;
 
 wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
@@ -608,6 +611,7 @@ always @ (*) begin
 		x_stall_on_exclusive_overlap ||
 		x_loadstore_pmp_fail ||
 		x_exec_pmp_fail ||
+		x_trig_break ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
 		(xm_wfi && !m_wfi_stall_clear) // FIXME will cause a timing issue, better to stall til *after* clear
@@ -750,7 +754,7 @@ wire x_jump_req_unchecked = !x_stall_on_raw && (
 	d_branchcond == BCOND_NZERO && x_branch_cmp
 );
 
-assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail;
+assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail || x_trig_break;
 
 assign x_btb_set = |BRANCH_PREDICTOR && (
 	x_jump_req_unchecked && d_addr_offs[W_ADDR - 1] && !x_branch_was_predicted &&
@@ -809,6 +813,46 @@ end else begin: no_pmp
 end
 endgenerate
 
+// Triggers
+
+wire [11:0]       x_trig_cfg_addr;
+wire              x_trig_cfg_wen;
+wire [W_DATA-1:0] x_trig_cfg_wdata;
+wire [W_DATA-1:0] x_trig_cfg_rdata;
+wire              x_trig_m_en;
+
+generate
+if (BREAKPOINT_TRIGGERS > 0) begin: have_triggers
+
+	hazard3_triggers #(
+	`include "hazard3_config_inst.vh"
+	) triggers (
+		.clk              (clk),
+		.rst_n            (rst_n),
+
+		.cfg_addr         (x_trig_cfg_addr),
+		.cfg_wen          (x_trig_cfg_wen),
+		.cfg_wdata        (x_trig_cfg_wdata),
+		.cfg_rdata        (x_trig_cfg_rdata),
+		.trig_m_en        (x_trig_m_en),
+
+		.pc               (d_pc),
+		.m_mode           (x_mmode_execution),
+		.d_mode           (debug_mode),
+
+		.break            (x_trig_break),
+		.break_d_mode     (x_trig_break_d_mode)
+	);
+
+end else begin: no_triggers
+
+	assign x_trig_cfg_rdata = {W_DATA{1'b0}};
+	assign x_trig_break = 1'b0;
+	assign x_trig_break_d_mode = 1'b0;
+
+end
+endgenerate
+
 // CSRs and Trap Handling
 
 wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
@@ -850,6 +894,7 @@ end
 wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
+	x_trig_break                                             ? EXCEPT_EBREAK         :
 	x_exec_pmp_fail                                          ? EXCEPT_INSTR_FAULT    :
 	x_jump_req_unchecked && x_jump_misaligned                ? EXCEPT_INSTR_MISALIGN :
 	x_csr_illegal_access                                     ? EXCEPT_INSTR_ILLEGAL  :
@@ -925,11 +970,18 @@ hazard3_csr #(
 	.irq_software               (soft_irq),
 	.irq_timer                  (timer_irq),
 	.except                     (xm_except),
+	.except_to_d_mode           (xm_except_to_d_mode),
 
 	.pmp_cfg_addr               (x_pmp_cfg_addr),
 	.pmp_cfg_wen                (x_pmp_cfg_wen),
 	.pmp_cfg_wdata              (x_pmp_cfg_wdata),
 	.pmp_cfg_rdata              (x_pmp_cfg_rdata),
+
+	.trig_cfg_addr              (x_trig_cfg_addr),
+	.trig_cfg_wen               (x_trig_cfg_wen),
+	.trig_cfg_wdata             (x_trig_cfg_wdata),
+	.trig_cfg_rdata             (x_trig_cfg_rdata),
+	.trig_m_en                  (x_trig_m_en),
 
 	// Other CSR-specific signalling
 	.permit_wfi                 (x_permit_wfi),
@@ -942,6 +994,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_memop <= MEMOP_NONE;
 		xm_except <= EXCEPT_NONE;
+		xm_except_to_d_mode <= 1'b0;
 		xm_wfi <= 1'b0;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
@@ -950,6 +1003,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// If some X-sourced exception has squashed the address phase, need to squash the data phase too.
 			xm_memop <= x_unaligned_addr || x_exec_pmp_fail || x_loadstore_pmp_fail ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
+			xm_except_to_d_mode <= x_trig_break_d_mode;
 			xm_wfi <= d_wfi && !x_exec_pmp_fail;
 			// Note the d_starved term is required because it is possible
 			// (e.g. PMP X permission fail) to except when the frontend is
@@ -959,6 +1013,7 @@ always @ (posedge clk or negedge rst_n) begin
 				xm_rd <= {W_REGADDR{1'b0}};
 				xm_memop <= MEMOP_NONE;
 				xm_except <= EXCEPT_NONE;
+				xm_except_to_d_mode <= 1'b0;
 				xm_wfi <= 1'b0;
 			end
 		end else if (bus_dph_err_d) begin

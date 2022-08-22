@@ -16,4 +16,5 @@ file hazard3_decode.v
 file hazard3_csr.v
 file hazard3_regfile_1w2r.v
 file hazard3_pmp.v
+file hazard3_triggers.v
 include .

@@ -188,6 +188,11 @@ localparam SLEEP          = 12'h8f0; // U-mode subset of M-mode sleep control
 // Trigger Module
 
 localparam TSELECT       = 12'h7a0;
+localparam TDATA1        = 12'h7a1;
+localparam TDATA2        = 12'h7a2;
+localparam TINFO         = 12'h7a4;
+localparam TCONTROL      = 12'h7a5;
+localparam MCONTEXT      = 12'h7a8;
 
 // ----------------------------------------------------------------------------
 // D-mode CSRs

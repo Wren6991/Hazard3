@@ -89,6 +89,7 @@ module hazard3_csr #(
 
 	// Exceptions must *not* be a function of bus stall.
 	input  wire [W_EXCEPT-1:0] except,
+	input  wire                except_to_d_mode,
 
 	// Level-sensitive interrupt sources
 	input  wire                delay_irq_entry,
@@ -101,6 +102,13 @@ module hazard3_csr #(
 	output reg                 pmp_cfg_wen,
 	output wire [W_DATA-1:0]   pmp_cfg_wdata,
 	input  wire [W_DATA-1:0]   pmp_cfg_rdata,
+
+	// Trigger config interface
+	output wire [11:0]         trig_cfg_addr,
+	output reg                 trig_cfg_wen,
+	output wire [W_DATA-1:0]   trig_cfg_wdata,
+	input  wire [W_DATA-1:0]   trig_cfg_rdata,
+	output wire                trig_m_en,
 
 	// Other CSR-specific signalling
 	output wire                permit_wfi,
@@ -619,6 +627,25 @@ end
 assign dbg_data0_wdata = wdata;
 assign dbg_data0_wen = debug_mode && wen && addr == DMDATA0;
 
+reg tcontrol_mte;
+reg tcontrol_mpte;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		tcontrol_mpte <= 1'b0;
+		tcontrol_mte <= 1'b0;
+	end else if (wen_m_mode && addr == TCONTROL) begin
+		tcontrol_mpte <= wdata_update[7] && DEBUG_SUPPORT;
+		tcontrol_mte <= wdata_update[3] && DEBUG_SUPPORT;
+	end else if (DEBUG_SUPPORT && trapreg_update_enter) begin
+		tcontrol_mte <= 1'b0;
+		tcontrol_mpte <= tcontrol_mte;
+	end else if (DEBUG_SUPPORT && trapreg_update_exit) begin
+		tcontrol_mte <= tcontrol_mpte;
+		tcontrol_mpte <= 1'b1;
+	end
+end
+
 // ----------------------------------------------------------------------------
 // Read port + detect addressing of unmapped CSRs
 // ----------------------------------------------------------------------------
@@ -637,6 +664,7 @@ always @ (*) begin
 	decode_match = 1'b0;
 	rdata = {XLEN{1'b0}};
 	pmp_cfg_wen = 1'b0;
+	trig_cfg_wen = 1'b0;
 	case (addr)
 
 	// ------------------------------------------------------------------------
@@ -1047,12 +1075,61 @@ always @ (*) begin
 	// ------------------------------------------------------------------------
 	// Trigger Module CSRs
 
-	// If triggers aren't supported, OpenOCD expects the following:
-	// - tselect must be present
-	// - tselect must raise an exception when written to
-	// Otherwise it returns an error instead of 0 count when enumerating triggers
+	// If triggers aren't supported, we implement tselect as hardwired 0,
+	// tinfo as hardwired 1 (meaning type=0 always) and tdata as hardwired 0
+	// (meaning type=0). The debugger will see the first trigger as
+	// unimplemented, and immediately halt discovery.
 	TSELECT: if (DEBUG_SUPPORT) begin
-		decode_match = match_mro;
+		decode_match = match_mrw;
+		if (BREAKPOINT_TRIGGERS > 0) begin
+			trig_cfg_wen = match_mrw && wen;
+			rdata = trig_cfg_rdata;
+		end else begin
+			rdata = 32'h00000000;
+		end
+	end
+
+	TDATA1: if (DEBUG_SUPPORT) begin
+		decode_match = match_mrw;
+		if (BREAKPOINT_TRIGGERS > 0) begin
+			trig_cfg_wen = match_mrw && wen;
+			rdata = trig_cfg_rdata;
+		end else begin
+			rdata = 32'h00000000;
+		end
+	end
+
+	TDATA2: if (DEBUG_SUPPORT) begin
+		decode_match = match_mrw;
+		if (BREAKPOINT_TRIGGERS > 0) begin
+			trig_cfg_wen = match_mrw && wen;
+			rdata = trig_cfg_rdata;
+		end else begin
+			rdata = 32'h00000000;
+		end
+	end
+
+	TINFO: if (DEBUG_SUPPORT) begin
+		// Note tinfo is a read-write CSR (writes don't trap) even though it
+		// is entirely read-only.
+		decode_match = match_mrw;
+		if (BREAKPOINT_TRIGGERS > 0) begin
+			trig_cfg_wen = match_mrw && wen;
+			rdata = trig_cfg_rdata;
+		end else begin
+			rdata = 32'h00000001;
+		end
+	end
+
+	TCONTROL: if (DEBUG_SUPPORT && BREAKPOINT_TRIGGERS > 0) begin
+		decode_match = match_mrw;
+		rdata = {
+			24'h0,
+			tcontrol_mpte,
+			3'h0,
+			tcontrol_mte,
+			3'h0
+		};
 	end
 
 	// ------------------------------------------------------------------------
@@ -1218,10 +1295,10 @@ end
 wire exception_req_any;
 wire halt_delayed_by_exception = exception_req_any || loadstore_dphase_pending;
 
-// This would also include triggers, if/when those are implemented:
 wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
 	dcsr_ebreakm &&  m_mode && except == EXCEPT_EBREAK ||
-	dcsr_ebreaku && !m_mode && except == EXCEPT_EBREAK
+	dcsr_ebreaku && !m_mode && except == EXCEPT_EBREAK ||
+	except_to_d_mode        && except == EXCEPT_EBREAK
 );
 
 // Note exception-like causes (trigger, ebreak) are higher priority than
@@ -1243,7 +1320,7 @@ wire want_halt_irq_if_no_exception = DEBUG_SUPPORT && !debug_mode && !want_halt_
 wire want_halt_irq = want_halt_irq_if_no_exception && !halt_delayed_by_exception;
 
 assign dcause_next =
-	// Trigger would be highest priority if implemented
+	except == EXCEPT_EBREAK && except_to_d_mode                     ? 3'h2 : // trigger (priority 4)
 	except == EXCEPT_EBREAK                                         ? 3'h1 : // ebreak (priority 3)
 	dbg_req_halt_prev || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
 	                                                                  3'h4;  // single-step (priority 0)
@@ -1346,6 +1423,10 @@ assign mcause_code_next = exception_req_any ? except : mcause_irq_num;
 assign pmp_cfg_addr = addr;
 assign pmp_cfg_wdata = wdata_update;
 
+assign trig_cfg_addr = addr;
+assign trig_cfg_wdata = wdata_update;
+assign trig_m_en = tcontrol_mte;
+
 // Effective privilege for execution. Used for:
 // - Privilege level of branch target fetches (frontend keeps fetch privilege
 //   constant during sequential fetch)
@@ -1439,6 +1520,11 @@ always @ (posedge clk) begin
 		assert(trap_enter_vld);
 		// Exception should not be replaced by IRQ
 		assert(!trap_is_irq);
+	end
+
+	// This must be a breakpoint exception (presumably from the trigger unit).
+	if (except_to_d_mode) begin
+		assert(except == EXCEPT_EBREAK);
 	end
 
 end

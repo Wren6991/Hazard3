@@ -1,32 +1,33 @@
-TOP               := tb
-DOTF              := tb.f
+TOP                 := tb
+DOTF                := tb.f
 
-CPU_RESET_VECTOR  := 32'h40
+CPU_RESET_VECTOR    := 32'h40
 
-EXTENSION_C       := 1
-EXTENSION_M       := 1
-EXTENSION_ZBA     := 1
-EXTENSION_ZBB     := 1
-EXTENSION_ZBC     := 1
-EXTENSION_ZBS     := 1
+EXTENSION_C         := 1
+EXTENSION_M         := 1
+EXTENSION_ZBA       := 1
+EXTENSION_ZBB       := 1
+EXTENSION_ZBC       := 1
+EXTENSION_ZBS       := 1
 
-DEBUG_SUPPORT     := 1
-U_MODE            := 1
-PMP_REGIONS       := 4
+DEBUG_SUPPORT       := 1
+BREAKPOINT_TRIGGERS := 4
+U_MODE              := 1
+PMP_REGIONS         := 4
 
-NUM_IRQS          := 32
-IRQ_PRIORITY_BITS := 4
+NUM_IRQS            := 32
+IRQ_PRIORITY_BITS   := 4
 
-MULDIV_UNROLL     := 2
-MUL_FAST          := 1
-MUL_FASTER        := 1
-MULH_FAST         := 1
-FAST_BRANCHCMP    := 1
-REDUCED_BYPASS    := 0
+MULDIV_UNROLL       := 2
+MUL_FAST            := 1
+MUL_FASTER          := 1
+MULH_FAST           := 1
+FAST_BRANCHCMP      := 1
+REDUCED_BYPASS      := 0
 
-MVENDORID_VAL     := 32'hdeadbeef
-MIMPID_VAL        := 32'h12345678
-MCONFIGPTR_VAL    := 32'h9abcdef0
+MVENDORID_VAL       := 32'hdeadbeef
+MIMPID_VAL          := 32'h12345678
+MCONFIGPTR_VAL      := 32'h9abcdef0
 
 .PHONY: clean all
 
@@ -40,6 +41,7 @@ SYNTH_CMD += chparam -set EXTENSION_ZBB $(EXTENSION_ZBB) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_ZBC $(EXTENSION_ZBC) $(TOP);
 SYNTH_CMD += chparam -set EXTENSION_ZBS $(EXTENSION_ZBS) $(TOP);
 SYNTH_CMD += chparam -set DEBUG_SUPPORT $(DEBUG_SUPPORT) $(TOP);
+SYNTH_CMD += chparam -set BREAKPOINT_TRIGGERS $(BREAKPOINT_TRIGGERS) $(TOP);
 SYNTH_CMD += chparam -set U_MODE $(U_MODE) $(TOP);
 SYNTH_CMD += chparam -set PMP_REGIONS $(PMP_REGIONS) $(TOP);
 SYNTH_CMD += chparam -set NUM_IRQS $(NUM_IRQS) $(TOP);

@@ -6,7 +6,7 @@
 //   the next descending priority
 // - Each bottom half hander re-pends the top half handler (which immediately
 //   preempts it) to set the next lower-numbered bottom handler
-// - When top returns to bottom, and that bottom returns to the *next* bottom,
+// - Then top returns to bottom, and that bottom returns to the *next* bottom,
 //   which re-pends the top
 // - So on until all handlers have fired
 // - This should stack within two exception frames and enter the EIRQ vector
