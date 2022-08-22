@@ -644,7 +644,7 @@ always @ (posedge clk or negedge rst_n) begin
 		tcontrol_mpte <= tcontrol_mte;
 	end else if (DEBUG_SUPPORT && trapreg_update_exit) begin
 		tcontrol_mte <= tcontrol_mpte;
-		tcontrol_mpte <= 1'b1;
+		// Unlike mstatus.mie/mpie, tcontrol.mpte is unchanged by trap exit.
 	end
 end
 
