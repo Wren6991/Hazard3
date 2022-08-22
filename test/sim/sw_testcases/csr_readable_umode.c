@@ -176,6 +176,12 @@ CSR was 323
 CSR was 7a0
 -> exception, mcause = 2, mpp = 0 // tdata1
 CSR was 7a1
+-> exception, mcause = 2, mpp = 0 // tdata2
+CSR was 7a2
+-> exception, mcause = 2, mpp = 0 // tinfo
+CSR was 7a4
+-> exception, mcause = 2, mpp = 0 // tcontrol
+CSR was 7a5
 -> exception, mcause = 2, mpp = 0 // dcsr
 CSR was 7b0
 -> exception, mcause = 2, mpp = 0 // dpc
@@ -296,6 +302,9 @@ void read_all_csrs() {
 	(void)read_csr(mhpmevent3);
 	(void)read_csr(tselect);
 	(void)read_csr(tdata1);
+	(void)read_csr(tdata2);
+	(void)read_csr(tinfo);
+	(void)read_csr(tcontrol);
 	(void)read_csr(dcsr);
 	(void)read_csr(dpc);
 	(void)read_csr(dscratch0);

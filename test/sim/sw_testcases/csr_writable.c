@@ -38,12 +38,6 @@ CSR was c80
 CSR was c02
 -> exception, mcause = 2 // write to instreth, read-only
 CSR was c82
--> exception, mcause = 2 // write to tselect, unimplemented but we permit reads as a workaround for an OpenOCD bug
-CSR was 7a0
--> exception, mcause = 2 // read of tdata1, unimplemented
-CSR was 7a1
--> exception, mcause = 2 // write to tdata1, unimplemented
-CSR was 7a1
 -> exception, mcause = 2 // read of dcsr, D-mode
 CSR was 7b0
 -> exception, mcause = 2 // write to dcsr, D-mode
@@ -161,6 +155,9 @@ int main() {
 	write_csr(mhpmevent3,          read_csr(mhpmevent3         ));
 	write_csr(tselect,             read_csr(tselect            ));
 	write_csr(tdata1,              read_csr(tdata1             ));
+	write_csr(tdata2,              read_csr(tdata2             ));
+	write_csr(tinfo,               read_csr(tinfo              ));
+	write_csr(tcontrol,            read_csr(tcontrol           ));
 	write_csr(dcsr,                read_csr(dcsr               ));
 	write_csr(dpc,                 read_csr(dpc                ));
 	write_csr(dscratch0,           read_csr(dscratch0          ));
