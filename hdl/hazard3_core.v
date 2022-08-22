@@ -754,7 +754,7 @@ wire x_jump_req_unchecked = !x_stall_on_raw && (
 	d_branchcond == BCOND_NZERO && x_branch_cmp
 );
 
-assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail || x_trig_break;
+assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail && !x_trig_break;
 
 assign x_btb_set = |BRANCH_PREDICTOR && (
 	x_jump_req_unchecked && d_addr_offs[W_ADDR - 1] && !x_branch_was_predicted &&
