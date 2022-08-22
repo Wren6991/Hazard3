@@ -269,6 +269,8 @@ end
 reg [XLEN-1:0] mie;
 localparam MIE_WMASK = 32'h00000888; // meie, mtie, msie
 
+wire meicontext_clearts = wen_m_mode && wtype != CSR_WTYPE_C && addr == MEICONTEXT && wdata[1];
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		mie <= X0;
@@ -279,8 +281,8 @@ always @ (posedge clk or negedge rst_n) begin
 			// meicontext.clearts/mtiesave/msiesave can be used to clear and
 			// save standard timer and soft IRQ enables, simultaneously with
 			// saving external interrupt context.
-			mie[7] <= (mie[7] || wdata_update[3]) && !wdata_update[1];
-			mie[3] <= (mie[3] || wdata_update[2]) && !wdata_update[1];
+			mie[7] <= (mie[7] || wdata_update[3]) && !meicontext_clearts;
+			mie[3] <= (mie[3] || wdata_update[2]) && !meicontext_clearts;
 		end
 	end
 end
@@ -1220,8 +1222,8 @@ always @ (*) begin
 			meicontext_noirq,
 			2'h0,
 			meicontext_irq,
-			mie[7] && wdata_update[1],
-			mie[3] && wdata_update[1],
+			mie[7] && meicontext_clearts,
+			mie[3] && meicontext_clearts,
 			1'b0,
 			meicontext_mreteirq
 		};
