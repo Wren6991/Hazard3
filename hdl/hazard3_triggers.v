@@ -75,7 +75,9 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		// Handle writes to tselect-indexed registers (note writes to D-mode
 		// triggers in non-D-mode are ignored rather than raising an exception)
 		if (cfg_addr == TDATA1) begin
-			tdata1_dmode[tselect] <= cfg_wdata[27];
+			if (d_mode) begin
+				tdata1_dmode[tselect] <= cfg_wdata[27];
+			end
 			mcontrol_action[tselect] <= cfg_wdata[12];
 			mcontrol_m[tselect] <= cfg_wdata[6];
 			mcontrol_u[tselect] <= cfg_wdata[3];
