@@ -105,7 +105,7 @@ always @ (*) begin
 				2'h0,                              // sizelo = 0, unsized
 				{3'h0, mcontrol_action[tselect]},  // action = 0/1, break to M-mode/D-mode
 				1'b0,                              // chain = 0, chaining is useless for exact matches
-				3'h0,                              // match = 0, exact match only
+				4'h0,                              // match = 0, exact match only
 				mcontrol_m[tselect],
 				1'b0,
 				1'b0,                              // s = 0, no S-mode
