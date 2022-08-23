@@ -146,7 +146,7 @@ always @ (*) begin: match_pc
 	want_m_mode_break = {BREAKPOINT_TRIGGERS{1'b0}};
 	want_d_mode_break = {BREAKPOINT_TRIGGERS{1'b0}};
 	for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
-		if (tdata2[i] == pc && !d_mode && (m_mode ? mcontrol_m[tselect] : mcontrol_u[tselect])) begin
+		if (mcontrol_execute[i] && tdata2[i] == pc && !d_mode && (m_mode ? mcontrol_m[i] : mcontrol_u[i])) begin
 			want_d_mode_break[i] = mcontrol_action[i] && tdata1_dmode[i];
 			want_m_mode_break[i] = !mcontrol_action[i] && trig_m_en;
 		end
