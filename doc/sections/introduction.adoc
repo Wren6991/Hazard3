@@ -4,19 +4,72 @@ Hazard3 is a 3-stage RISC-V processor, providing the following architectural sup
 
 * `RV32I`: 32-bit base instruction set
 * `M`: integer multiply/divide/modulo
-* `A`: atomic memory operations
+* `A`: atomic memory operations, with AHB5 global exclusives
 * `C`: compressed instructions
+* `Zicsr`: CSR access
 * `Zba`: address generation
 * `Zbb`: basic bit manipulation
 * `Zbc`: carry-less multiplication
 * `Zbs`: single-bit manipulation
-* M-mode privileged instructions `ECALL`, `EBREAK`, `MRET`
-* The `WFI` instruction
-* `Zicsr`: CSR access
-* The machine-mode (M-mode) privilege state, and standard M-mode CSRs
-* Debug support, fully compliant with version 0.13.2 of the RISC-V external debug specification
+* `Zbkb`: basic bit manipulation for scalar cryptography
+* Debug, Machine and User privilege/execution modes
+* Privileged instructions `ECALL`, `EBREAK`, `MRET` and `WFI`
+* External debug support
+* Instruction address trigger unit (hardware breakpoints)
 
-The following are planned for future implementation:
+=== Architectural Overview
 
-* Trigger unit for debug mode
-** Likely breakpoints only
+==== Bus Interfaces
+
+Hazard3 implements either one or two industry-standard AHB5 bus interfaces. The AHB family is characterised by a fixed 2-phase bus pipeline, ideal for a 3-stage 2-port processor like Hazard3. AHB5 is distinguished from older AHB standards mainly by its additional bus attributes, and its support for global exclusives, which Hazard3 uses to implement multiprocessor support for the RISC-V atomics extension.
+
+In Hazard3's single-port configuration, a single AHB5 port performs memory accesses for instruction fetch and loads/stores/AMOs. The dual-port configuration adds a dedicated port for instruction fetch. Dual-port yields around 10% higher per-clock performance, as well as a shorter critical address-phase path, but the single-port configuration is simpler to integrate.
+
+==== Pipe Stages
+
+In order, the three stages are:
+
+* `F`: Fetch
+** Contains the data phase for instruction fetch
+** Contains the instruction prefetch buffer
+** Predecodes register numbers `rs1`/`rs2`, for faster register file read and register bypass
+* `X`: Execute
+** Decode and execute instructions
+** Drive the address phase for load/store/AMO
+** Generate jump/branch addresses
+* `M`: Memory
+** Contains the data phase for load/store/AMO
+** Register writeback is at the end of stage `M`
+** Generate exception addresses
+
+The instruction fetch address phase is best thought of as residing in stage `X`, since in general execution the feedback loop between jump/branch decode and address issue in stage `X`, and the fetch data phase in stage `F`, is what defines Hazard3's jump/branch performance. 
+
+==== Multiply/Divide
+
+For basic M-extension support, Hazard3 instantiates a sequential multiply/divide circuit (restoring divide, repeated-addition multiply), which takes 32 cycles to perform a multiply or divide.
+
+For modest performance improvement, this circuit can be unrolled, stacking multiple identical arithmetic circuits within one cycle. This simple approach is enough for 2 or 4 bits per clock, depending on area and frequency targets.
+
+For the best integer multiply performance, a single-cycle multiplier can be instantiated, retiring either to stage 3 (lower timing impact) or stage 2 (no dependency stall). This multiplier can implement either 32-bit `mul` only, which is by far the most common of the four multiply instructions, or can be extended to implement `mulh`/`mulhu`/`mulhsu` as well. If all four multiplies are implemented by the single-cycle multiplier, then multiply support is removed from the sequential multiply/divide circuit.
+
+=== List of RISC-V Specifications
+
+These are links to the ratified versions of the base instruction set and extensions implemented by Hazard3.
+
+[%autowidth.stretch, options="header"]
+|===
+| Extension         | Specification
+| `RV32I` v2.1      | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `M` v2.0          | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `A` v2.1          | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `C` v2.0          | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `Zicsr` v2.0      | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `Zifencei` v2.0   | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `Zba` v1.0.0      | https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf[Bit Manipulation ISA extensions 20210628]
+| `Zbb` v1.0.0      | https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf[Bit Manipulation ISA extensions 20210628]
+| `Zbc` v1.0.0      | https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf[Bit Manipulation ISA extensions 20210628]
+| `Zbs` v1.0.0      | https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf[Bit Manipulation ISA extensions 20210628]
+| `Zbkb` v1.0.1     | https://github.com/riscv/riscv-crypto/releases/download/v1.0.1-scalar/riscv-crypto-spec-scalar-v1.0.1.pdf[Scalar Cryptography ISA extensions 20220218]
+| Machine ISA v1.12 | https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf[Privileged Architecture 20211203]
+| Debug v0.13.2     | https://riscv.org/wp-content/uploads/2019/03/riscv-debug-release.pdf[RISC-V External Debug Support 20190322]
+|===

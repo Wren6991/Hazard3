@@ -10,11 +10,15 @@ include::rev.adoc[]
 
 include::sections/introduction.adoc[]
 
-include::sections/instruction_timings.adoc[]
-
-include::sections/instruction_pseudocode.adoc[]
+include::sections/configuration_and_integration.adoc[]
 
 include::sections/csr.adoc[]
 
 [[debug-chapter]]
 include::sections/debug.adoc[]
+
+[appendix]
+include::sections/instruction_timings.adoc[]
+
+[appendix]
+include::sections/instruction_pseudocode.adoc[]

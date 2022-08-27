@@ -9,6 +9,7 @@ IMPORTANT: The https://github.com/riscv/riscv-isa-manual/releases/download/Priv-
 
 === Standard M-mode Identification CSRs
 
+[[reg-mvendorid]]
 ==== mvendorid
 
 Address: `0xf11`
@@ -35,7 +36,7 @@ Architecture identifier for Hazard3. Read-only, constant.
 | 30:0 | - | 0x1b (decimal 27): the https://github.com/riscv/riscv-isa-manual/blob/master/marchid.md[registered] architecture ID for Hazard3
 |===
 
-
+[[reg-mimpid]]
 ==== mimpid
 
 Address: `0xf13`
@@ -48,6 +49,7 @@ Implementation identifier. Read-only, configurable constant.
 | 31:0 | - | Should contain the git hash of the Hazard3 revision from which the processor was synthesised, or all-zeroes.
 |===
 
+[[reg-mhartid]]
 ==== mhartid
 
 Address: `0xf14`
@@ -60,6 +62,7 @@ Hart identification register. Read-only, configurable constant.
 | 31:0 | - | Hazard3 cores possess only one hardware thread, so this is a unique per-core identifier, assigned consecutively from 0.
 |===
 
+[[reg-mconfigptr]]
 ==== mconfigptr
 
 Address: `0xf15`
@@ -72,6 +75,7 @@ Pointer to configuration data structure. Read-only, configurable constant.
 | 31:0 | - | Either pointer to configuration data structure, containing information about the harts and system, or all-zeroes. At least 4-byte-aligned.
 |===
 
+[[reg-misa]]
 ==== misa
 
 Address: `0x301`
@@ -162,6 +166,7 @@ The table below lists the fields which are _not_ hardwired to 0:
 | 3 | `msip` | Software interrupt pending. In spite of the name, this is not triggered by an instruction on this core, rather it is wired to an external memory-mapped register to provide a cross-hart level-sensitive doorbell interrupt.
 |===
 
+[[reg-mtvec]]
 ==== mtvec
 
 Address: `0x305`
@@ -216,6 +221,7 @@ The following exception causes may be set by Hazard3 hardware:
 [cols="10h,~", options="header"]
 |===
 | Cause | Description
+| 0 | Instruction address misaligned
 | 1 | Instruction access fault
 | 2 | Illegal instruction
 | 3 | Breakpoint

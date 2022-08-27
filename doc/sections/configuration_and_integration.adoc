@@ -1,0 +1,385 @@
+== Configuration and Integration
+
+=== Hazard3 Source Files
+
+Hazard3's source is written in Verilog 2005, and is self-contained. It can be found here: https://github.com/Wren6991/Hazard3/tree/master/hdl[github.com/Wren6991/Hazard3/blob/master/hdl].
+
+The file https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3.f[hdl/hazard3.f] is a list of all the source files required to instantiate Hazard3. This is supposed to be read by a tool called https://github.com/Wren6991/fpgascripts/blob/master/listfiles[listfiles], to generate other file list formats, but it should be simple enough to copy and hand-edit.
+
+Files ending with `.vh` are preprocessor include files used by the Hazard3 source. The most important are:
+
+* https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_config.vh[hazard3_config.vh]: the main Hazard3 configuration header. Lists and describes Hazard3's global configuration parameters, such as ISA extension support
+* https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_config_inst.vh[hazard3_config.vh]: a file which propagates configuration parameters through module instantiations, all the way down from Hazard3's top-level modules through the internals
+
+Therefore there are two ways to configure Hazard3:
+
+* Directly edit the parameter defaults in `hazard3_config.vh` in your local Hazard3 checkout (and then let the top-level parameters default when instantiating Hazard3)
+* Set all configuration parameters in your Hazard3 instantiation, and let the parameters propagate down through the hierarchy
+
+=== Top-level Modules
+
+Hazard3 has two top-level modules:
+
+* https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_cpu_1port.v[hazard3_cpu_1port]
+* https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_cpu_2port.v[hazard3_cpu_2port]
+
+These are both thin wrappers around the https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_core.v[hazard3_core] module. `hazard3_cpu_1port` has a single AHB5 bus port which is shared for instruction fetch, loads, stores and AMOs. `hazard3_cpu_2port` has two AHB5 bus ports, one for instruction fetch, and the other for loads, stores and AMOs. The 2-port wrapper has higher potential for performance, but the 1-port wrapper may be simpler to integrate, since there is no need to arbitrate multiple bus masters externally.
+
+The core module `hazard3_core` can also be instantiated directly, which may be more efficient if support for some other bus standard is desired. However, the interface of `hazard3_core` will not be documented and is not guaranteed to be stable.
+
+=== Configuration Parameters
+
+==== Reset state configuration
+
+===== RESET_VECTOR
+
+Address of the first instruction executed after Hazard3 comes out of reset.
+
+Default value: all-zeroes.
+
+===== MTVEC_INIT
+
+Initial value of the machine trap vector base CSR (<<reg-mtvec>>).
+
+Bits clear in <<param-MTVEC_WMASK>> will never change from this initial value.
+Bits set in <<param-MTVEC_WMASK>> can be written/set/cleared as normal.
+
+Default value: all-zeroes.
+
+==== RISC-V ISA support
+
+[[param-EXTENSION_A]]
+===== EXTENSION_A
+
+Support for the A extension: atomic read/modify/write. 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_C]]
+===== EXTENSION_C
+
+Support for the C extension: compressed (variable-width). 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_M]]
+===== EXTENSION_M
+
+Support for the M extension: hardware multiply/divide/modulo. 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_ZBA]]
+===== EXTENSION_ZBA
+
+Support for Zba address generation instructions. 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_ZBB]]
+===== EXTENSION_ZBB
+
+Support for Zbb basic bit manipulation instructions. 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_ZBC]]
+===== EXTENSION_ZBC
+
+Support for Zbc carry-less multiplication instructions. 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_ZBS]]
+===== EXTENSION_ZBS
+
+Support for Zbs single-bit manipulation instructions. 0 for disable, 1 for enable.
+
+Default value: 1
+
+[[param-EXTENSION_ZBKB]]
+===== EXTENSION_ZBKB
+
+Support for Zbkb basic bit manipulation for cryptography.
+
+Requires: <<param-EXTENSION_ZBB>>. (Since Zbb and Zbkb have a large overlap, this flag enables only those instructions which are in Zbkb but aren't in Zbb. Therefore both flags must be set for full Zbkb support.)
+
+Default value: 1
+
+[[param-EXTENSION_XH3B]]
+===== EXTENSION_XH3B
+
+Custom bit manipulation instructions for Hazard3: `h3.bextm` and `h3.bextmi`.
+
+Default value: 1
+
+[[param-EXTENSION_ZIFENCEI]]
+===== EXTENSION_ZIFENCEI
+
+Support for the fence.i instruction. When the branch predictor is not present,
+this instruction is optional, since a plain branch/jump is sufficient to
+flush the instruction prefetch queue. When the branch predictor is enabled
+(<<param-BRANCH_PREDICTOR>> is 1), this instruction must be implemented.
+
+Default value: 1
+
+==== CSR support
+
+NOTE: the Zicsr extension is implied by any of <<param-CSR_M_MANDATORY>>, <<param-CSR_M_TRAP>>,
+<<param-CSR_COUNTER>>.
+
+[[param-CSR_M_MANDATORY]]
+===== CSR_M_MANDATORY
+
+Bare minimum CSR support e.g. <<reg-misa>>. This flag is an absolute
+requirement for compliance with the RISC-V privileged specification. However,
+the privileged specification itself is an optional extension. Hazard3 allows
+the mandatory CSRs to be disabled to save a small amount of area in
+deeply-embedded implementations.
+
+[[param-CSR_M_TRAP]]
+===== CSR_M_TRAP
+
+Include M-mode trap-handling CSRs, and enable trap support.
+
+[[param-CSR_COUNTER]]
+===== CSR_COUNTER
+
+Include the basic performance counters (`cycle`/`instret`) and relevant CSRs. Note that these performance counters are now in their own separate extension (Zicntr) and are no longer mandatory.
+
+[[param-U_MODE]]
+===== U_MODE
+
+Support the U (user) privilege level. In U-mode, the core performs unprivileged
+bus accesses, and software's access to CSRs is restricted. Additionally, if
+the PMP is included, the core may restrict U-mode software's access to
+memory.
+
+Requires: <<param-CSR_M_TRAP>>.
+
+[[param-PMP_REGIONS]]
+===== PMP_REGIONS
+
+Number of physical memory protection regions, or 0 for no PMP. PMP is more
+useful if U mode is supported, but this is not a requirement.
+
+Hazard3's PMP supports only the NAPOT and(if <<param-PMP_GRAIN>> is 0) NA4
+region types.
+
+Requires: <<param-CSR_M_TRAP>>.
+
+[[param-PMP_GRAIN]]
+===== PMP_GRAIN
+
+This is the _G_ parameter in the privileged spec, which defines the
+granularity of PMP regions. Minimum PMP region size is 1 <<(_G_ + 2) bytes. 
+
+If _G_ > 0, `pmcfg.a` can not be set to NA4 (attempting to do so will set the
+region to OFF instead).
+
+If _G_ > 1, the _G_ - 1 LSBs of pmpaddr are read-only-0 when `pmpcfg.a` is
+OFF, and read-only-1 when `pmpcfg.a` is NAPOT.
+
+Default value: 0
+
+[[param-PMP_HARDWIRED]]
+===== PMP_HARDWIRED
+
+PMPADDR_HARDWIRED: If a bit is 1, the corresponding region's pmpaddr and
+pmpcfg registers are read-only, with their values fixed when the processor is
+instantiated. PMP_GRAIN is ignored on hardwired regions.
+
+Hardwired regions are far cheaper, both in area and comparison delay, than
+dynamically configurable regions.
+
+Hardwired PMP regions are a good option for setting default U-mode permissions
+on regions which have access controls outside of the processor, such as
+peripheral regions. For this case it's recommended to make hardwired regions
+the highest-numbered, so they can be overridden by lower-numbered dynamic
+regions.
+
+Default value: all-zeroes.
+
+[[param-PMP_HARDWIRED_ADDR]]
+===== PMP_HARDWIRED_ADDR
+
+Values of pmpaddr registers whose PMP_HARDWIRED bits are set to 1. Has no effect on PMP regions which are not hardwired.
+
+Default value: all-zeroes.
+
+[[param-PMP_HARDWIRED_CFG]]
+===== PMP_HARDWIRED_CFG
+
+Values of pmpcfg registers whose PMP_HARDWIRED bits are set to 1. Has no effect on PMP regions which are not hardwired.
+
+Default value: all-zeroes.
+
+[[param-DEBUG_SUPPORT]]
+===== DEBUG_SUPPORT
+
+Support for run/halt and instruction injection from an external Debug Module,
+support for Debug Mode, and Debug Mode CSRs.
+
+Requires: <<param-CSR_M_MANDATORY>>, <<param-CSR_M_TRAP>>.
+
+Default value: 0
+
+[[param-BREAKPOINT_TRIGGERS]]
+===== BREAKPOINT_TRIGGERS
+
+Number of hardware breakpoints. A breakpoint is implemented as a trigger that
+supports only exact execution address matches, ignoring instruction size.
+That is, a trigger which supports type=2 execute=1 (but not store/load=1,
+i.e. not a watchpoint).
+
+Requires: <<param-DEBUG_SUPPORT>>
+
+Default value: 0
+
+==== External interrupt support
+
+[[param-NUM_IRQS]]
+===== NUM_IRQS
+
+Number of external IRQs implemented in meiea, meipa, meifa and meipra, if
+<<param-CSR_M_TRAP>> is enabled. Minimum 1, maximum 512.
+
+Default value: 32
+
+[[param-IRQ_PRIORITY_BITS]]
+===== IRQ_PRIORITY_BITS
+
+Number of priority bits implemented for each interrupt in meipra. The
+number of distinct levels is (1 << IRQ_PRIORITY_BITS). Minimum 0, max 4.
+Note that having more than 1 priority level with a large number of IRQs
+will have a severe effect on timing.
+
+Default value: 0
+
+==== Identification Registers
+
+[[param-MVENDORID_VAL]]
+===== MVENDORID_VAL
+
+Value of the <<reg-mvendorid>> CSR. JEDEC JEP106-compliant vendor ID, or
+all-zeroes. 31:7 is continuation code count, 6:0 is ID. Parity bit is not
+stored.
+
+Default value: all-zeroes.
+
+[[param-MIMPID_VAL]]
+===== MIMPID_VAL
+
+Value of the <<reg-mimpid>> CSR. Implementation ID for this specific version of Hazard3. Should be a git hash, or all-zeroes.
+
+Default value: all-zeroes.
+
+[[param-MHARTID_VAL]]
+===== MHARTID_VAL
+
+Value of the <<reg-mhartid>> CSR. Each Hazard3 core has a single hardware thread. Multiple cores should have unique IDs.
+
+Default value: all-zeroes.
+
+[[param-MCONFIGPTR_VAL]]
+===== MCONFIGPTR_VAL
+
+Value of the <<reg-mconfigptr>> CSR. Pointer to configuration structure blob,
+or all-zeroes. Must be at least 4-byte-aligned.
+
+Default value: all-zeroes.
+
+==== Performance/size options
+
+[[param-REDUCED_BYPASS]]
+===== REDUCED_BYPASS
+
+Remove all forwarding paths except X->X (so back-to-back ALU ops can still run
+at 1 CPI), to save area. This has a significant impact on per-clock
+performance, so should only be considered for extremely low-area
+implementations.
+
+Default value: 0
+
+[[param-MULDIV_UNROLL]]
+===== MULDIV_UNROLL
+
+Bits per clock for multiply/divide circuit, if present. Must be a power of 2.
+
+Default value: 1
+
+[[param-MUL_FAST]]
+===== MUL_FAST
+
+Use single-cycle multiply circuit for MUL instructions, retiring to stage 3.
+The sequential multiply/divide circuit is still used for MULH*
+
+Default value: 0
+
+[[param-MUL_FASTER]]
+===== MUL_FASTER
+
+Retire fast multiply results to stage 2 instead of stage 3.
+Throughput is the same, but latency is reduced from 2 cycles to 1 cycle.
+
+Requires: <<param-MUL_FAST>>.
+
+Default value: 0
+
+[[param-MULH_FAST]]
+===== MULH_FAST
+
+Extend the fast multiply circuit to also cover MULH*, and remove
+the multiply functionality from the sequential multiply/divide circuit.
+
+Requires: <<param-MUL_FAST>>
+
+Default value: 0
+
+[[param-FAST_BRANCHCMP]]
+===== FAST_BRANCHCMP
+
+Instantiate a separate comparator (eq/lt/ltu) for branch comparisons, rather
+than using the ALU. Improves fetch address delay, especially if `Zba`
+extension is enabled. Disabling may save area.
+
+Default value: 1
+
+[[param-RESET_REGFILE]]
+===== RESET_REGFILE
+
+Whether to support reset of the general purpose registers. There are around 1k
+bits in the register file, so the reset can be disabled e.g. to permit
+block-RAM inference on FPGA.
+
+Default value: 1
+
+[[param-BRANCH_PREDICTOR]]
+===== BRANCH_PREDICTOR
+
+Enable branch prediction. The branch predictor consists of a single BTB entry
+which is allocated on a taken backward branch, and cleared on a mispredicted
+nontaken branch, a fence.i or a trap. Successful prediction eliminates the
+1-cyle fetch bubble on a taken branch, usually making tight loops faster.
+
+Requires: <<param-EXTENSION_ZIFENCEI>>
+
+Default value: 1
+
+[[param-MTVEC_WMASK]]
+===== MTVEC_WMASK
+
+MTVEC_WMASK: Mask of which bits in mtvec are writable. Full writability (except for bit 1) is
+recommended, because a common idiom in setup code is to set mtvec just
+past code that may trap, as a hardware `try {...} catch` block.
+
+
+* The vectoring mode can be made fixed by clearing the LSB of MTVEC_WMASK
+* In vectored mode, the vector table must be aligned to its size, rounded
+  up to a power of two.
+
+Default: All writable except for bit 1.
+
+=== Interfaces (Top-level Ports)
+
+TODO lol

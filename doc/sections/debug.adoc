@@ -6,7 +6,8 @@ Hazard3, along with its external debug components, implements version 0.13.2 of 
 * Abstract GPR access as required
 * Program Buffer, 2 words plus `impebreak`
 * Automatic trigger of abstract command (`abstractauto`) on `data0` or Program Buffer access for efficient memory block transfers from the host
-* (TODO) Some minimum useful trigger unit -- likely just breakpoints, no watchpoints
+* (Optional) System Bus Access, either through a dedicated AHB-Lite master, or multiplexed with a processor load/store port
+* (Optional) An instruction address trigger unit (hardware breakpoints)
 
 === Debug Topologies
 
