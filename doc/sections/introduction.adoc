@@ -1,6 +1,6 @@
 == Introduction
 
-Hazard3 is a 3-stage RISC-V processor, providing the following architectural support:
+Hazard3 is a configurable 3-stage RISC-V processor, implementing:
 
 * `RV32I`: 32-bit base instruction set
 * `M`: integer multiply/divide/modulo
@@ -19,15 +19,9 @@ Hazard3 is a 3-stage RISC-V processor, providing the following architectural sup
 
 === Architectural Overview
 
-==== Bus Interfaces
-
-Hazard3 implements either one or two industry-standard AHB5 bus interfaces. The AHB family is characterised by a fixed 2-phase bus pipeline, ideal for a 3-stage 2-port processor like Hazard3. AHB5 is distinguished from older AHB standards mainly by its additional bus attributes, and its support for global exclusives, which Hazard3 uses to implement multiprocessor support for the RISC-V atomics extension.
-
-In Hazard3's single-port configuration, a single AHB5 port performs memory accesses for instruction fetch and loads/stores/AMOs. The dual-port configuration adds a dedicated port for instruction fetch. Dual-port yields around 10% higher per-clock performance, as well as a shorter critical address-phase path, but the single-port configuration is simpler to integrate.
-
 ==== Pipe Stages
 
-In order, the three stages are:
+The three stages are:
 
 * `F`: Fetch
 ** Contains the data phase for instruction fetch
@@ -42,15 +36,19 @@ In order, the three stages are:
 ** Register writeback is at the end of stage `M`
 ** Generate exception addresses
 
-The instruction fetch address phase is best thought of as residing in stage `X`, since in general execution the feedback loop between jump/branch decode and address issue in stage `X`, and the fetch data phase in stage `F`, is what defines Hazard3's jump/branch performance. 
+The instruction fetch address phase is best thought of as residing in stage `X`. The 2-cycle feedback loop between jump/branch decode into address issue in stage `X`, and the fetch data phase in stage `F`, is what defines Hazard3's jump/branch performance.
+
+==== Bus Interfaces
+
+Hazard3 implements either one or two AHB5 bus master ports. The single-port configuration is used when ease of integration is a priority, since it supports simpler bus topologies. The dual-port configuration adds a dedicated port for instruction fetch, which improves both the maximum frequency and the clock-for-clock performance.
+
+Hazard3 uses AHB5 specifically, rather than older versions of the AHB standard, because of its support for its global exclusives. This is a bus feature that allows a processor to perform an ordered read-modify-write sequence with a guarantee that no other processor has written to the same address range in between. Hazard3 uses this to implement multiprocessor support for the A (atomics) extension.
 
 ==== Multiply/Divide
 
-For basic M-extension support, Hazard3 instantiates a sequential multiply/divide circuit (restoring divide, repeated-addition multiply), which takes 32 cycles to perform a multiply or divide.
+For minimal M-extension support, Hazard3 instantiates a sequential multiply/divide circuit (restoring divide, naive repeated-addition multiply). Instructions stall in stage `X` until the multiply/divide completes. Optionally, the circuit can be unrolled by a small factor to produce multiple bits ber clock -- 2 or 4 is achievable in practice.
 
-For modest performance improvement, this circuit can be unrolled, stacking multiple identical arithmetic circuits within one cycle. This simple approach is enough for 2 or 4 bits per clock, depending on area and frequency targets.
-
-For the best integer multiply performance, a single-cycle multiplier can be instantiated, retiring either to stage 3 (lower timing impact) or stage 2 (no dependency stall). This multiplier can implement either 32-bit `mul` only, which is by far the most common of the four multiply instructions, or can be extended to implement `mulh`/`mulhu`/`mulhsu` as well. If all four multiplies are implemented by the single-cycle multiplier, then multiply support is removed from the sequential multiply/divide circuit.
+A single-cycle multiplier can be instantiated, retiring either to stage 3 or stage 2 (configurable). By default only 32-bit `mul` is supported, which is by far the most common of the four multiply instructions.
 
 === List of RISC-V Specifications
 

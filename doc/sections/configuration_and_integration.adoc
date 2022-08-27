@@ -2,14 +2,12 @@
 
 === Hazard3 Source Files
 
-Hazard3's source is written in Verilog 2005, and is self-contained. It can be found here: https://github.com/Wren6991/Hazard3/tree/master/hdl[github.com/Wren6991/Hazard3/blob/master/hdl].
+Hazard3's source is written in Verilog 2005, and is self-contained. It can be found here: https://github.com/Wren6991/Hazard3/tree/master/hdl[github.com/Wren6991/Hazard3/blob/master/hdl]. The file https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3.f[hdl/hazard3.f] is a list of all the source files required to instantiate Hazard3.
 
-The file https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3.f[hdl/hazard3.f] is a list of all the source files required to instantiate Hazard3. This is supposed to be read by a tool called https://github.com/Wren6991/fpgascripts/blob/master/listfiles[listfiles], to generate other file list formats, but it should be simple enough to copy and hand-edit.
-
-Files ending with `.vh` are preprocessor include files used by the Hazard3 source. The most important are:
+Files ending with `.vh` are preprocessor include files used by the Hazard3 source. Two to take note of are:
 
 * https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_config.vh[hazard3_config.vh]: the main Hazard3 configuration header. Lists and describes Hazard3's global configuration parameters, such as ISA extension support
-* https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_config_inst.vh[hazard3_config.vh]: a file which propagates configuration parameters through module instantiations, all the way down from Hazard3's top-level modules through the internals
+* https://github.com/Wren6991/Hazard3/blob/master/hdl/hazard3_config_inst.vh[hazard3_config_inst.vh]: a file which propagates configuration parameters through module instantiations, all the way down from Hazard3's top-level modules through the internals
 
 Therefore there are two ways to configure Hazard3:
 
