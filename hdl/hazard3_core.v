@@ -12,7 +12,15 @@ module hazard3_core #(
 ) (
 	// Global signals
 	input wire                clk,
+	input wire                clk_always_on,
 	input wire                rst_n,
+
+	// Power control signals
+	output wire               pwrup_req,
+	input  wire               pwrup_ack,
+	output wire               clk_en,
+	output wire               unblock_out,
+	input  wire               unblock_in,
 
 	`ifdef RISCV_FORMAL
 	`RVFI_OUTPUTS ,
@@ -90,6 +98,8 @@ wire                 f_jump_priv;
 wire                 f_jump_rdy;
 wire                 f_jump_now = f_jump_req && f_jump_rdy;
 
+wire                 f_frontend_pwrdown_ok;
+
 // Predecoded register numbers, for register file access
 wire [W_REGADDR-1:0] f_rs1_coarse;
 wire [W_REGADDR-1:0] f_rs2_coarse;
@@ -151,6 +161,8 @@ hazard3_frontend #(
 	.cir_use              (df_cir_use),
 	.cir_flush_behind     (df_cir_flush_behind),
 
+	.pwrdown_ok           (f_frontend_pwrdown_ok),
+
 	.predecode_rs1_coarse (f_rs1_coarse),
 	.predecode_rs2_coarse (f_rs2_coarse),
 	.predecode_rs1_fine   (f_rs1_fine),
@@ -199,7 +211,9 @@ wire [W_ADDR-1:0]    d_addr_offs;
 wire                 d_addr_is_regoffs;
 wire [W_ADDR-1:0]    d_pc;
 wire [W_EXCEPT-1:0]  d_except;
-wire                 d_wfi;
+wire                 d_sleep_wfi;
+wire                 d_sleep_block;
+wire                 d_sleep_unblock;
 wire                 d_fence_i;
 wire                 d_csr_ren;
 wire                 d_csr_wen;
@@ -254,7 +268,9 @@ hazard3_decode #(
 	.d_addr_offs          (d_addr_offs),
 	.d_addr_is_regoffs    (d_addr_is_regoffs),
 	.d_except             (d_except),
-	.d_wfi                (d_wfi),
+	.d_sleep_wfi          (d_sleep_wfi),
+	.d_sleep_block        (d_sleep_block),
+	.d_sleep_unblock      (d_sleep_unblock),
 	.d_fence_i            (d_fence_i)
 );
 
@@ -297,8 +313,9 @@ reg  [1:0]           xm_addr_align;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_except_to_d_mode;
-reg                  xm_wfi;
-reg                  xm_delay_irq_entry;
+reg                  xm_sleep_wfi;
+reg                  xm_sleep_block;
+reg                  xm_delay_irq_entry_on_ls_dphase;
 
 // ----------------------------------------------------------------------------
 // Stall logic
@@ -376,7 +393,7 @@ assign x_stall =
 	bus_aph_req_d && !bus_aph_ready_d ||
 	x_jump_req && !f_jump_rdy;
 
-wire m_wfi_stall_clear;
+wire m_sleep_stall_release;
 
 wire x_loadstore_pmp_fail;
 wire x_exec_pmp_fail;
@@ -614,7 +631,7 @@ always @ (*) begin
 		x_trig_break ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
-		(xm_wfi && !m_wfi_stall_clear) // FIXME will cause a timing issue, better to stall til *after* clear
+		((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release)
 	);
 end
 
@@ -867,7 +884,7 @@ reg prev_instr_was_32_bit;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		xm_delay_irq_entry <= 1'b0;
+		xm_delay_irq_entry_on_ls_dphase <= 1'b0;
 		prev_instr_was_32_bit <= 1'b0;
 	end else begin
 		// Must hold off IRQ if we are in the second cycle of an address phase or
@@ -879,7 +896,7 @@ always @ (posedge clk or negedge rst_n) begin
 		// Also hold off on AMOs, unless the AMO is transitioning to an address
 		// phase or completing. ("completing" excludes transitions to error phase.)
 
-		xm_delay_irq_entry <= bus_aph_req_d && !bus_aph_ready_d ||
+		xm_delay_irq_entry_on_ls_dphase <= bus_aph_req_d && !bus_aph_ready_d ||
 			d_memop_is_amo && !(
 				x_amo_phase == 3'h3 && bus_dph_ready_d && !bus_dph_err_d ||
 				// Read reservation failure failure also generates error
@@ -916,11 +933,19 @@ wire x_except_counts_as_retire =
 wire x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
 wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 
+wire m_delay_irq_entry = xm_delay_irq_entry_on_ls_dphase || ((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release);
+
+wire m_allow_sleep;
+wire m_allow_power_down;
+wire m_allow_sleep_on_block;
+wire m_wfi_wakeup_req;
+
 hazard3_csr #(
 	.XLEN            (W_DATA),
 `include "hazard3_config_inst.vh"
 ) csr_u (
 	.clk                        (clk),
+	.clk_always_on              (clk_always_on),
 	.rst_n                      (rst_n),
 
 	// Debugger signalling
@@ -958,14 +983,18 @@ hazard3_csr #(
 	.trap_enter_rdy             (m_trap_enter_rdy),
 	.loadstore_dphase_pending   (m_dphase_in_flight),
 	.mepc_in                    (m_exception_return_addr),
-	.wfi_stall_clear            (m_wfi_stall_clear),
+
+	.pwr_allow_sleep            (m_allow_sleep),
+	.pwr_allow_power_down       (m_allow_power_down),
+	.pwr_allow_sleep_on_block   (m_allow_sleep_on_block),
+	.pwr_wfi_wakeup_req         (m_wfi_wakeup_req),
 
 	.m_mode_execution           (x_mmode_execution),
 	.m_mode_loadstore           (x_mmode_loadstore),
 	.m_mode_trap_entry          (m_mmode_trap_entry),
 
 	// IRQ and exception requests
-	.delay_irq_entry            (xm_delay_irq_entry),
+	.delay_irq_entry            (m_delay_irq_entry),
 	.irq                        (irq),
 	.irq_software               (soft_irq),
 	.irq_timer                  (timer_irq),
@@ -995,7 +1024,8 @@ always @ (posedge clk or negedge rst_n) begin
 		xm_memop <= MEMOP_NONE;
 		xm_except <= EXCEPT_NONE;
 		xm_except_to_d_mode <= 1'b0;
-		xm_wfi <= 1'b0;
+		xm_sleep_wfi <= 1'b0;
+		xm_sleep_block <= 1'b0;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
 		if (!m_stall) begin
@@ -1004,7 +1034,8 @@ always @ (posedge clk or negedge rst_n) begin
 			xm_memop <= x_unaligned_addr || x_exec_pmp_fail || x_loadstore_pmp_fail ? MEMOP_NONE : d_memop;
 			xm_except <= x_except;
 			xm_except_to_d_mode <= x_trig_break_d_mode;
-			xm_wfi <= d_wfi && !x_exec_pmp_fail;
+			xm_sleep_wfi <= d_sleep_wfi && !x_exec_pmp_fail;
+			xm_sleep_block <= d_sleep_block && !x_exec_pmp_fail;
 			// Note the d_starved term is required because it is possible
 			// (e.g. PMP X permission fail) to except when the frontend is
 			// starved, and we get a bad mepc if we let this jump ahead:
@@ -1014,7 +1045,8 @@ always @ (posedge clk or negedge rst_n) begin
 				xm_memop <= MEMOP_NONE;
 				xm_except <= EXCEPT_NONE;
 				xm_except_to_d_mode <= 1'b0;
-				xm_wfi <= 1'b0;
+				xm_sleep_wfi <= 1'b0;
+				xm_sleep_block <= 1'b0;
 			end
 		end else if (bus_dph_err_d) begin
 			// First phase of 2-phase AHB5 error response. Pass the exception along on
@@ -1022,11 +1054,14 @@ always @ (posedge clk or negedge rst_n) begin
 			// suppressing any load/store that may currently be in stage X.
 `ifdef HAZARD3_ASSERTIONS
 			assert(xm_memop != MEMOP_NONE);
+			assert(!xm_sleep_wfi);
+			assert(!xm_sleep_block);
 `endif
 			xm_except <=
 				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
 				                xm_memop <= MEMOP_LBU  ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
-			xm_wfi <= 1'b0;
+			xm_sleep_wfi <= 1'b0; // TODO needed?
+			xm_sleep_block <= 1'b0;
 		end
 	end
 end
@@ -1075,6 +1110,8 @@ assign f_jump_target = m_trap_enter_vld	? m_trap_addr : x_jump_target;
 assign f_jump_priv = m_trap_enter_vld ? m_mmode_trap_entry : x_mmode_execution;
 assign x_jump_not_except = !m_trap_enter_vld;
 
+// Stalls and sleep control
+
 // EXCEPT_NONE clause is needed in the following sequence:
 // - Cycle 0: hresp asserted, hready low. We set the exception to squash behind us. Bus stall high.
 // - Cycle 1: hready high. For whatever reason, the frontend can't accept the trap address this cycle.
@@ -1085,7 +1122,7 @@ wire m_bus_stall = m_dphase_in_flight && !bus_dph_ready_d && xm_except == EXCEPT
 
 assign m_stall = m_bus_stall ||
 	(m_trap_enter_vld && !m_trap_enter_rdy && !m_trap_is_irq) ||
-	(xm_wfi && !m_wfi_stall_clear);
+	((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release);
 
 // Exception is taken against the instruction currently in M, so walk the PC
 // back. IRQ is taken "in between" the instruction in M and the instruction
@@ -1095,6 +1132,27 @@ assign m_stall = m_bus_stall ||
 assign m_exception_return_addr = d_pc - (
 	m_trap_is_irq         ? 32'h0 :
 	prev_instr_was_32_bit ? 32'h4 : 32'h2
+);
+
+hazard3_power_ctrl power_ctrl (
+	.clk_always_on          (clk_always_on),
+	.rst_n                  (rst_n),
+
+	.pwrup_req              (pwrup_req),
+	.pwrup_ack              (pwrup_ack),
+	.clk_en                 (clk_en),
+
+	.allow_sleep            (m_allow_sleep),
+	.allow_power_down       (m_allow_power_down),
+	.allow_sleep_on_block   (m_allow_sleep_on_block),
+
+	.frontend_pwrdown_ok    (f_frontend_pwrdown_ok),
+
+	.sleeping_on_wfi        (xm_sleep_wfi),
+	.wfi_wakeup_req         (m_wfi_wakeup_req),
+	.sleeping_on_block      (xm_sleep_wfi),
+	.block_wakeup_req_pulse (unblock_in),
+	.stall_release          (m_sleep_stall_release)
 );
 
 // Load/store data handling
@@ -1229,7 +1287,6 @@ always @ (posedge clk or negedge rst_n) begin
 			mw_rd <= xm_rd;
 	end
 end
-
 
 hazard3_regfile_1w2r #(
 	.RESET_REGS (RESET_REGFILE),

@@ -133,6 +133,12 @@ wire                      sbus_err;
 wire [31:0]               sbus_wdata;
 wire [31:0]               sbus_rdata;
 
+wire                      pwrup_req;
+wire                      pwrup_ack = pwrup_req;
+wire                      clk_en;
+wire                      unblock_out;
+wire                      unblock_in = unblock_out;
+
 hazard3_dm #(
 	.N_HARTS      (N_HARTS),
 	.HAVE_SBA     (1),
@@ -205,7 +211,14 @@ hazard3_cpu_2port #(
 `include "hazard3_config_inst.vh"
 ) cpu (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n_cpu),
+
+	.pwrup_req                  (pwrup_req),
+	.pwrup_ack                  (pwrup_ack),
+	.clk_en                     (clk_en),
+	.unblock_out                (unblock_out),
+	.unblock_in                 (unblock_in),
 
 	.i_haddr                    (i_haddr),
 	.i_hwrite                   (i_hwrite),

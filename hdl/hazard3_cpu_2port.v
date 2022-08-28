@@ -14,7 +14,15 @@ module hazard3_cpu_2port #(
 ) (
 	// Global signals
 	input wire                clk,
+	input wire                clk_always_on,
 	input wire                rst_n,
+
+	// Power control signals
+	output wire               pwrup_req,
+	input  wire               pwrup_ack,
+	output wire               clk_en,
+	output wire               unblock_out,
+	input  wire               unblock_in,
 
 	`ifdef RISCV_FORMAL
 	`RVFI_OUTPUTS ,
@@ -116,7 +124,14 @@ hazard3_core #(
 `include "hazard3_config_inst.vh"
 ) core (
 	.clk                        (clk),
+	.clk_always_on              (clk_always_on),
 	.rst_n                      (rst_n),
+
+	.pwrup_req                  (pwrup_req),
+	.pwrup_ack                  (pwrup_ack),
+	.clk_en                     (clk_en),
+	.unblock_out                (unblock_out),
+	.unblock_in                 (unblock_in),
 
 	`ifdef RISCV_FORMAL
 	`RVFI_CONN ,

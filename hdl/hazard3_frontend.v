@@ -63,6 +63,12 @@ module hazard3_frontend #(
 	//  is dependent on a bus stall signal so can't gate the request.
 	input  wire              cir_flush_behind,
 
+	// Signal to power controller that power down is safe. (When going to
+	// sleep, first the pipeline is stalled, and then the power controller
+	// waits for the frontend to naturally come to a halt before releasing
+	// its power request. This avoids manually halting the frontend.)
+	output wire              pwrdown_ok,
+
 	// Provide the rs1/rs2 register numbers which will be in CIR next cycle.
 	// Coarse: valid if this instruction has a nonzero register operand.
 	// (Suitable for regfile read)
@@ -72,7 +78,6 @@ module hazard3_frontend #(
 	// (Suitable for bypass. Still not precise enough for stall logic.)
 	output reg  [4:0]        predecode_rs1_fine,
 	output reg  [4:0]        predecode_rs2_fine,
-
 
 	// Debugger instruction injection: instruction fetch is suppressed when in
 	// debug halt state, and the DM can then inject instructions into the last
@@ -173,6 +178,8 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 `endif
 	end
 end
+
+assign pwrdown_ok = fifo_full && !jump_target_vld;
 
 // ----------------------------------------------------------------------------
 // Branch target buffer

@@ -55,9 +55,9 @@ assign cmp = aluop == ALUOP_SUB ? |op_xor : lt;
 
 wire [W_DATA-1:0] shift_dout;
 wire shift_right_nleft = aluop == ALUOP_SRL || aluop == ALUOP_SRA ||
-	|EXTENSION_ZBB  && aluop == ALUOP_ROR  ||
-	|EXTENSION_ZBS  && aluop == ALUOP_BEXT ||
-	|EXTENSION_XH3B && aluop == ALUOP_BEXTM;
+	|EXTENSION_ZBB      && aluop == ALUOP_ROR  ||
+	|EXTENSION_ZBS      && aluop == ALUOP_BEXT ||
+	|EXTENSION_XH3BEXTM && aluop == ALUOP_BEXTM;
 
 wire shift_arith = aluop == ALUOP_SRA;
 wire shift_rotate = |EXTENSION_ZBB & (aluop == ALUOP_ROR || aluop == ALUOP_ROL);
@@ -152,7 +152,8 @@ end
 wire [W_DATA-1:0] zbs_mask = {{W_DATA-1{1'b0}}, 1'b1} << op_b[W_SHAMT-1:0];
 
 always @ (*) begin
-	casez ({|EXTENSION_A, |EXTENSION_ZBA, |EXTENSION_ZBB, |EXTENSION_ZBC, |EXTENSION_ZBS, |EXTENSION_ZBKB, |EXTENSION_XH3B, aluop})
+	casez ({|EXTENSION_A, |EXTENSION_ZBA, |EXTENSION_ZBB, |EXTENSION_ZBC,
+	        |EXTENSION_ZBS, |EXTENSION_ZBKB, |EXTENSION_XH3BEXTM, aluop})
 		// Base ISA
 		{7'bzzzzzzz, ALUOP_ADD    }: result = sum;
 		{7'bzzzzzzz, ALUOP_SUB    }: result = sum;

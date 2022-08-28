@@ -19,6 +19,7 @@ module hazard3_csr #(
 `include "hazard3_width_const.vh"
 ) (
 	input  wire               clk,
+	input  wire               clk_always_on,
 	input  wire               rst_n,
 
 	// Debug signalling
@@ -80,7 +81,12 @@ module hazard3_csr #(
 	// mode.
 	input  wire                loadstore_dphase_pending,
 	input  wire [XLEN-1:0]     mepc_in,
-	output wire                wfi_stall_clear,
+
+	// Power control signalling
+	output wire                pwr_allow_sleep,
+	output wire                pwr_allow_power_down,
+	output wire                pwr_allow_sleep_on_block,
+	output wire                pwr_wfi_wakeup_req,
 
 	// Each of these may be performed at a different privilege level from the others:
 	output wire                m_mode_execution,
@@ -426,11 +432,11 @@ end
 wire external_irq_pending;
 
 // Register external IRQ signals (mainly to avoid a through-path from IRQs to
-// bus request signals)
+// bus request signals). Always clocked, as it's used to generate a wakeup.
 
 reg [NUM_IRQS-1:0] irq_r;
 
-always @ (posedge clk or negedge rst_n) begin
+always @ (posedge clk_always_on or negedge rst_n) begin
 	if (!rst_n) begin
 		irq_r <= {NUM_IRQS{1'b0}};
 	end else begin
@@ -503,6 +509,29 @@ hazard3_onehot_encode #(
 );
 
 assign meinext_irq = meinext_irq_unmasked & {9{!meinext_noirq}};
+
+// ----------------------------------------------------------------------------
+// Custom sleep/power control CSRs
+
+reg msleep_sleeponblock;
+reg msleep_powerdown;
+reg msleep_deepsleep;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		msleep_sleeponblock <= 1'b0;
+		msleep_powerdown    <= 1'b0;
+		msleep_deepsleep    <= 1'b0;
+	end else if (wen_m_mode && addr == MSLEEP) begin
+		msleep_sleeponblock <= wdata_update[2] && |EXTENSION_XH3POWER;
+		msleep_powerdown    <= wdata_update[1] && |EXTENSION_XH3POWER;
+		msleep_deepsleep    <= wdata_update[0] && |EXTENSION_XH3POWER;
+	end
+end
+
+assign pwr_allow_sleep_on_block = msleep_sleeponblock;
+assign pwr_allow_power_down = msleep_powerdown;
+assign pwr_allow_sleep = msleep_deepsleep;
 
 // ----------------------------------------------------------------------------
 // Counters
@@ -682,7 +711,8 @@ always @ (*) begin
 			2'd0,              // Z, Y, no
 			|{                 // X is set for any custom extensions
 				|CSR_M_TRAP,
-				|EXTENSION_XH3B
+				|EXTENSION_XH3BEXTM
+				|EXTENSION_XH3POWER
 			},
 			2'd0,              // V, W, no
 			|U_MODE,
@@ -1229,6 +1259,16 @@ always @ (*) begin
 		};
 	end
 
+	MSLEEP: if (EXTENSION_XH3POWER) begin
+		decode_match = match_mrw;
+		rdata = {
+			29'h0,
+			msleep_sleeponblock,
+			msleep_powerdown,
+			msleep_deepsleep
+		};
+	end
+
 	default: begin end
 	endcase
 end
@@ -1247,21 +1287,29 @@ reg pending_dbg_resume_prev;
 
 wire pending_dbg_resume = (pending_dbg_resume_prev || dbg_req_resume_prev) && debug_mode;
 
+// Halt request input register needs to always be clocked, because a WFI needs
+// to fall through if the debugger requests halt of a sleeping core.
+always @ (posedge clk_always_on or negedge rst_n) begin
+	if (!rst_n) begin
+		dbg_req_halt_prev <= 1'b0;
+	end else begin
+		// Just a delayed version of the request from outside of the core.
+		// Delay is fine because the DM awaits ack before deasserting.
+		dbg_req_halt_prev <= dbg_req_halt && DEBUG_SUPPORT != 0;
+	end
+end
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		have_just_reset <= |DEBUG_SUPPORT;
 		step_halt_req <= 1'b0;
 		dbg_req_resume_prev <= 1'b0;
-		dbg_req_halt_prev <= 1'b0;
 		pending_dbg_resume_prev <= 1'b0;
 	end else if (DEBUG_SUPPORT) begin
 		if (instr_ret)
 			have_just_reset <= 1'b0;
 
-		// Just a delayed version of the request from outside of the core.
-		// Delay is fine because the DM awaits ack before deasserting.
 		dbg_req_resume_prev <= dbg_req_resume;
-		dbg_req_halt_prev <= dbg_req_halt;
 
 		if (debug_mode) begin
 			step_halt_req <= 1'b0;
@@ -1346,7 +1394,8 @@ assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE && excep
 reg irq_software_r;
 reg irq_timer_r;
 
-always @ (posedge clk or negedge rst_n) begin
+// Always clocked, as it's used to generate a wakeup.
+always @ (posedge clk_always_on or negedge rst_n) begin
 	if (!rst_n) begin
 		irq_software_r <= 1'b0;
 		irq_timer_r <= 1'b0;
@@ -1370,7 +1419,9 @@ wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
 
 // WFI clear respects individual interrupt enables but ignores mstatus.mie.
 // Additionally, wfi is treated as a nop during single-stepping and D-mode.
-assign wfi_stall_clear = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
+// Note that the IRQs and debug halt request input registers are clocked by
+// clk_always_on, so that a wakeup can be generated when asleep.
+assign pwr_wfi_wakeup_req = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
 
 // Priority order from priv spec: external > software > timer
 wire [3:0] standard_irq_num =

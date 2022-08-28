@@ -61,18 +61,21 @@ parameter EXTENSION_ZBS       = 1,
 // Requires: Zbb. (This flag enables instructions in Zbkb which aren't in Zbb.)
 parameter EXTENSION_ZBKB      = 1,
 
-// EXTENSION_XH3B: Custom bit manipulation instructions for Hazard3
-parameter EXTENSION_XH3B      = 1,
-
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.
 parameter EXTENSION_ZIFENCEI  = 1,
 
-// Note the Zicsr extension is implied by any of CSR_M_MANDATORY, CSR_M_TRAP,
-// CSR_COUNTER.
+// EXTENSION_XH3B: Custom bit-extract-multiple instructions for Hazard3
+parameter EXTENSION_XH3BEXTM   = 1,
+
+// EXTENSION_XH3POWER: Custom power management controls for Hazard3
+parameter EXTENSION_XH3POWER   = 1,
 
 // ----------------------------------------------------------------------------
 // CSR support
+
+// Note the Zicsr extension is implied by any of CSR_M_MANDATORY, CSR_M_TRAP,
+// CSR_COUNTER.
 
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.

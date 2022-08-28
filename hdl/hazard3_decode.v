@@ -51,7 +51,9 @@ module hazard3_decode #(
 	output reg  [W_ADDR-1:0]    d_addr_offs,
 	output reg                  d_addr_is_regoffs,
 	output reg  [W_EXCEPT-1:0]  d_except,
-	output reg                  d_wfi,
+	output reg                  d_sleep_wfi,
+	output reg                  d_sleep_block,
+	output reg                  d_sleep_unblock,
 	output reg                  d_fence_i
 );
 
@@ -199,7 +201,9 @@ always @ (*) begin
 	d_addr_is_regoffs = 1'b0;
 	d_invalid_32bit = 1'b0;
 	d_except = EXCEPT_NONE;
-	d_wfi = 1'b0;
+	d_sleep_wfi = 1'b0;
+	d_sleep_block = 1'b0;
+	d_sleep_unblock = 1'b0;
 	d_fence_i = 1'b0;
 	// Note this funct3/funct7 are valid only for 32-bit instructions. They
 	// are useful for clusters of related ALU ops, such as sh*add, clmul.
@@ -310,8 +314,8 @@ always @ (*) begin
 	`RVOPC_UNZIP:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_UNZIP;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_ZIP:       if (EXTENSION_ZBKB) begin d_aluop = ALUOP_ZIP;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_H3_BEXTM:  if (EXTENSION_XH3B) begin d_aluop = ALUOP_BEXTM;                                                         end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_H3_BEXTMI: if (EXTENSION_XH3B) begin d_aluop = ALUOP_BEXTM;  d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_BEXTM:  if (EXTENSION_XH3BEXTM) begin d_aluop = ALUOP_BEXTM;                                                         end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_BEXTMI: if (EXTENSION_XH3BEXTM) begin d_aluop = ALUOP_BEXTM;  d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 
 	`RVOPC_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
 	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_fence_i = 1'b1; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
@@ -324,7 +328,7 @@ always @ (*) begin
 	`RVOPC_ECALL:     if (HAVE_CSR)               begin d_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_EBREAK:    if (HAVE_CSR)               begin d_except = EXCEPT_EBREAK; d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_MRET:      if (HAVE_CSR && m_mode)     begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_WFI:       if (HAVE_CSR && permit_wfi) begin d_wfi = 1'b1;             d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_WFI:       if (HAVE_CSR && permit_wfi) begin d_sleep_wfi = 1'b1;       d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 
 	default:      begin d_invalid_32bit = 1'b1; end
 	endcase
@@ -338,7 +342,7 @@ always @ (*) begin
 		d_csr_ren    = 1'b0;
 		d_csr_wen    = 1'b0;
 		d_except     = EXCEPT_NONE;
-		d_wfi        = 1'b0;
+		d_sleep_wfi  = 1'b0;
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;
 
