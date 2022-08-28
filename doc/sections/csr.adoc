@@ -676,6 +676,7 @@ Note also that this is not the same as the "rule locking bypass" bit in the ePMP
 
 === Custom Power Control CSRs
 
+[[reg-msleep]]
 ==== msleep
 
 Address: `0xbf0`
@@ -687,25 +688,4 @@ M-mode sleep control register.
 | Bits | Name | Description
 | 31:3 | - | RES0
 | 2    | `deepsleep` | Deassert the clock request signal when entering the block or WFI state, and wait for clock acknowledge to reassert before leaving the block or WFI state.
-| 1    | `block` | Write 1 to enter a WFI sleep state until either an unblock signal is received, or an interrupt is asserted that would cause a WFI to exit. Clears automatically when leaving the blocked state.
-
-If an unblock signal has been received since the last time `block` was written to 1, the write is ignored. In other words, the blocked state falls through immediately in this case.
-
-An unblock signal is received when another hart writes 1 to its `unblock` register, or for some other platform-specified reason.
-| 0    | `unblock` | Write 1 to post an unblock signal to other harts in the system. Always reads back as 0.
-|===
-
-
-==== sleep
-
-Address: `0x8f0`
-
-U-mode sleep control register. A subset of the fields in `msleep`. If `mstatus.tw` is 1, then attempting to access this register from U-mode causes an illegal opcode trap.
-
-[cols="10h,20h,~", options="header"]
-|===
-| Bits | Name | Description
-| 31:2 | - | RES0
-| 1    | `block` | U-mode access to the `msleep.block` bit
-| 0    | `unblock` | U-mode access to the `msleep.unblock` bit
 |===

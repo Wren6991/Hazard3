@@ -25,6 +25,7 @@ These are both thin wrappers around the https://github.com/Wren6991/Hazard3/blob
 
 The core module `hazard3_core` can also be instantiated directly, which may be more efficient if support for some other bus standard is desired. However, the interface of `hazard3_core` will not be documented and is not guaranteed to be stable.
 
+[[config-parameters-section]]
 === Configuration Parameters
 
 ==== Reset state configuration

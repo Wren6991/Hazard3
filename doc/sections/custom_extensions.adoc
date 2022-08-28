@@ -1,0 +1,170 @@
+== Custom Extensions
+
+Hazard3 implements a small number of custom extensions. All are optional: custom extensions are only included if the relevant feature flags are set to 1 when instantiating the processor (<<config-parameters-section>>). Hazard3 is always a _conforming_ RISC-V implementation, and when these extensions are disabled it is also a _standard_ RISC-V implementation.
+
+If any one of these extensions is enabled, the `x` bit in <<reg-misa>> is set to indicate the presence of a nonstandard extension.
+
+=== Xh3power: Hazard3 power management
+
+This extension adds a new M-mode CSR (<<reg-msleep>>), and two new hint instructions, `h3.block` and `h3.unblock`, in the `slt` nop-compatible custom hint space.
+
+The hints are used to allow processors to sleep until woken by other processors in a multiprocessor environment. The `msleep` CSR is used to control some of the details of the processor's WFI sleep state, to trade off sleep power consumption against wakeup latency.
+
+==== h3.block
+
+Enter a WFI sleep state until either an unblock signal is received, or an interrupt is asserted that would cause a WFI to exit.
+
+If `mstatus.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
+
+If an unblock signal has been received in the time since the last `h3.block`, this instruction executes as a `nop`, and the processor does not enter the sleep state. Conceptually, the sleep state falls through immediately because the corresponding unblock signal has already been received.
+
+An unblock signal is received when a neighbouring processor (the exact definition of "neighbouring" being left to the implementor) executes an `h3.unblock` instruction, or for some other platform-defined reason.
+
+This instruction is encoded as `slt x0, x0, x0`, which is part of the custom nop-compatible hint encoding space.
+
+Example C macro:
+
+----
+#define __h3_block() asm ("slt x0, x0, x0")
+----
+
+Example assembly macro:
+
+----
+.macro h3.block
+	slt x0, x0, x0
+.endm
+----
+
+==== h3.unblock
+
+Post an unblock signal to other processors in the system. For example, to notify another processor that a work queue is now nonempty.
+
+If `mstatus.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
+
+This instruction is encoded as `slt x0, x0, x1`, which is part of the custom nop-compatible hint encoding space.
+
+Example C macro:
+
+----
+#define __h3_unblock() asm ("slt x0, x0, x1")
+----
+
+Example assembly macro:
+
+----
+.macro h3.unblock
+	slt x0, x0, x1
+.endm
+----
+
+=== Xh3bextm: Hazard3 bit extract multiple
+
+This is a small extension with multi-bit versions of the "bit extract" instructions from Zbs, used for extracting small, contiguous bit fields.
+
+==== h3.bextm
+
+"Bit extract multiple", a multi-bit version of the `bext` instruction from Zbs. Perform a right-shift followed by a mask of 1-8 LSBs.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name          | Value    | Description
+| 31:29 | `funct7[6:4]` | `0b000`  | RES0
+| 28:26 | `size`        | -        | Number of ones in mask, values 0->7 encode 1->8 bits.
+| 25    | `funct7[0]`   | `0b0`    | RES0, because aligns with `shamt[5]` of potential RV64 version of `h3.bextmi` 
+| 24:20 | `rs2`         | -        | Source register 2 (shift amount)
+| 19:15 | `rs1`         | -        | Source register 1
+| 14:12 | `funct3`      | `0b000`  | `h3.bextm`
+| 11:7  | `rd`          | -        | Destination register
+| 6:2   | `opc`         | `0b01011`| custom0 opcode
+| 1:0   | `size`        | `0b11`   | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+// nbits must be a constant expression
+#define __h3_bextm(nbits, rs1, rs2) ({\
+	uint32_t __h3_bextm_rd; \
+	asm (".insn r 0x0b, 0, %3, %0, %1, %2"\
+		: "=r" (__h3_bextm_rd) \
+		: "r" (rs1), "r" (rs2), "i" ((((nbits) - 1) & 0x7) << 1)\
+	); \
+	__h3_bextm_rd; \
+})
+----
+
+Example assembly macro:
+
+----
+// rd = (rs1 >> rs2[4:0]) & ~(-1 << nbits)
+.macro h3.bextm rd rs1 rs2 nbits
+.if (\nbits < 1) || (\nbits > 8)
+.err
+.endif
+#if NO_HAZARD3_CUSTOM
+    srl  \rd, \rs1, \rs2
+    andi \rd, \rd, ((1 << \nbits) - 1)
+#else
+.insn r 0x0b, 0x0, (((\nbits - 1) & 0x7 ) << 1), \rd, \rs1, \rs2
+#endif
+.endm
+----
+
+==== h3.bextmi
+
+
+Immediate variant of `h3.bextm`.
+
+Encoding (I-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name          | Value    | Description
+| 31:29 | `imm[11:9]`   | `0b000`  | RES0
+| 28:26 | `size`        | -        | Number of ones in mask, values 0->7 encode 1->8 bits.
+| 25    | `imm[5]`      | `0b0`    | RES0, for potential future RV64 version 
+| 24:20 | `shamt`       | -        | Shift amount, 0 through 31 
+| 19:15 | `rs1`         | -        | Source register 1
+| 14:12 | `funct3`      | `0b100`  | `h3.bextmi`
+| 11:7  | `rd`          | -        | Destination register
+| 6:2   | `opc`         | `0b01011`| custom0 opcode
+| 1:0   | `size`        | `0b11`   | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+// nbits and shamt must be constant expressions
+#define __h3_bextmi(nbits, rs1, shamt) ({\
+	uint32_t __h3_bextmi_rd; \
+	asm (".insn i 0x0b, 0x4, %0, %1, %2"\
+		: "=r" (__h3_bextmi_rd) \
+		: "r" (rs1), "i" ((((nbits) - 1) & 0x7) << 6 | ((shamt) & 0x1f)) \
+	); \
+	__h3_bextmi_rd; \
+})
+----
+
+Example assembly macro:
+
+----
+// rd = (rs1 >> shamt) & ~(-1 << nbits)
+.macro h3.bextmi rd rs1 shamt nbits
+.if (\nbits < 1) || (\nbits > 8)
+.err
+.endif
+.if (\shamt < 0) || (\shamt > 31)
+.err
+.endif
+#if NO_HAZARD3_CUSTOM
+    srli \rd, \rs1, \shamt
+    andi \rd, \rd, ((1 << \nbits) - 1)
+#else
+.insn i 0x0b, 0x4, \rd, \rs1, (\shamt & 0x1f) | (((\nbits - 1) & 0x7 ) << 6)
+#endif
+.endm
+----
+
