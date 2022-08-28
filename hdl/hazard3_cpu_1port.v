@@ -5,7 +5,7 @@
 
 // Single-ported top level file for Hazard3 CPU. This file instantiates the
 // Hazard3 core, and arbitrates its instruction fetch and load/store signals
-// down to a single AHB-Lite master port.
+// down to a single AHB5 master port.
 
 `default_nettype none
 
@@ -20,21 +20,21 @@ module hazard3_cpu_1port #(
 	`RVFI_OUTPUTS ,
 	`endif
 
-	// AHB-lite Master port
-	output reg  [W_ADDR-1:0]  ahblm_haddr,
-	output reg                ahblm_hwrite,
-	output reg  [1:0]         ahblm_htrans,
-	output reg  [2:0]         ahblm_hsize,
-	output wire [2:0]         ahblm_hburst,
-	output reg  [3:0]         ahblm_hprot,
-	output wire               ahblm_hmastlock,
-	output reg  [7:0]         ahblm_hmaster,
-	output reg                ahblm_hexcl,
-	input  wire               ahblm_hready,
-	input  wire               ahblm_hresp,
-	input  wire               ahblm_hexokay,
-	output wire [W_DATA-1:0]  ahblm_hwdata,
-	input  wire [W_DATA-1:0]  ahblm_hrdata,
+	// AHB5 Master port
+	output reg  [W_ADDR-1:0]  haddr,
+	output reg                hwrite,
+	output reg  [1:0]         htrans,
+	output reg  [2:0]         hsize,
+	output wire [2:0]         hburst,
+	output reg  [3:0]         hprot,
+	output wire               hmastlock,
+	output reg  [7:0]         hmaster,
+	output reg                hexcl,
+	input  wire               hready,
+	input  wire               hresp,
+	input  wire               hexokay,
+	output wire [W_DATA-1:0]  hwdata,
+	input  wire [W_DATA-1:0]  hrdata,
 
 	// Debugger run/halt control
 	input  wire               dbg_req_halt,
@@ -170,7 +170,7 @@ always @ (posedge clk or negedge rst_n) begin
 		bus_hold_aph <= 1'b0;
 		bus_gnt_ids_prev <= 3'h0;
 	end else begin
-		bus_hold_aph <= ahblm_htrans[1] && !ahblm_hready && !ahblm_hresp;
+		bus_hold_aph <= htrans[1] && !hready && !hresp;
 		bus_gnt_ids_prev <= {bus_gnt_i, bus_gnt_d, bus_gnt_s};
 	end
 end
@@ -204,7 +204,7 @@ always @ (posedge clk or negedge rst_n) begin
 		bus_active_dph_i <= 1'b0;
 		bus_active_dph_d <= 1'b0;
 		bus_active_dph_s <= 1'b0;
-	end else if (ahblm_hready) begin
+	end else if (hready) begin
 		bus_active_dph_i <= bus_gnt_i;
 		bus_active_dph_d <= bus_gnt_d;
 		bus_active_dph_s <= bus_gnt_s;
@@ -235,70 +235,70 @@ wire [3:0] hprot_sbus = {
 	1'b1           // Data access
 };
 
-assign ahblm_hburst = 3'b000;   // HBURST_SINGLE
-assign ahblm_hmastlock = 1'b0;
+assign hburst = 3'b000;   // HBURST_SINGLE
+assign hmastlock = 1'b0;
 
 always @ (*) begin
 	if (bus_gnt_s) begin
-		ahblm_htrans  = HTRANS_NSEQ;
-		ahblm_hexcl   = 1'b0;
-		ahblm_haddr   = dbg_sbus_addr;
-		ahblm_hsize   = {1'b0, dbg_sbus_size};
-		ahblm_hwrite  = dbg_sbus_write;
-		ahblm_hprot   = hprot_sbus;
-		ahblm_hmaster = 8'h01;
+		htrans  = HTRANS_NSEQ;
+		hexcl   = 1'b0;
+		haddr   = dbg_sbus_addr;
+		hsize   = {1'b0, dbg_sbus_size};
+		hwrite  = dbg_sbus_write;
+		hprot   = hprot_sbus;
+		hmaster = 8'h01;
 	end else if (bus_gnt_d) begin
-		ahblm_htrans  = HTRANS_NSEQ;
-		ahblm_hexcl   = core_aph_excl_d;
-		ahblm_haddr   = core_haddr_d;
-		ahblm_hsize   = core_hsize_d;
-		ahblm_hwrite  = core_hwrite_d;
-		ahblm_hprot   = hprot_data;
-		ahblm_hmaster = 8'h00;
+		htrans  = HTRANS_NSEQ;
+		hexcl   = core_aph_excl_d;
+		haddr   = core_haddr_d;
+		hsize   = core_hsize_d;
+		hwrite  = core_hwrite_d;
+		hprot   = hprot_data;
+		hmaster = 8'h00;
 	end else if (bus_gnt_i) begin
-		ahblm_htrans  = HTRANS_NSEQ;
-		ahblm_hexcl   = 1'b0;
-		ahblm_haddr   = core_haddr_i;
-		ahblm_hsize   = core_hsize_i;
-		ahblm_hwrite  = 1'b0;
-		ahblm_hprot   = hprot_instr;
-		ahblm_hmaster = 8'h00;
+		htrans  = HTRANS_NSEQ;
+		hexcl   = 1'b0;
+		haddr   = core_haddr_i;
+		hsize   = core_hsize_i;
+		hwrite  = 1'b0;
+		hprot   = hprot_instr;
+		hmaster = 8'h00;
 	end else begin
-		ahblm_htrans  = HTRANS_IDLE;
-		ahblm_hexcl   = 1'b0;
-		ahblm_haddr   = {W_ADDR{1'b0}};
-		ahblm_hsize   = 3'h0;
-		ahblm_hwrite  = 1'b0;
-		ahblm_hprot   = 4'h0;
-		ahblm_hmaster = 8'h00;
+		htrans  = HTRANS_IDLE;
+		hexcl   = 1'b0;
+		haddr   = {W_ADDR{1'b0}};
+		hsize   = 3'h0;
+		hwrite  = 1'b0;
+		hprot   = 4'h0;
+		hmaster = 8'h00;
 	end
 end
 
-assign ahblm_hwdata = bus_active_dph_s ? dbg_sbus_wdata : core_wdata_d;
+assign hwdata = bus_active_dph_s ? dbg_sbus_wdata : core_wdata_d;
 
 // ----------------------------------------------------------------------------
 // Response routing
 
 // Data buses directly connected
-assign core_rdata_d   = ahblm_hrdata;
-assign core_rdata_i   = ahblm_hrdata;
-assign dbg_sbus_rdata = ahblm_hrdata;
+assign core_rdata_d   = hrdata;
+assign core_rdata_i   = hrdata;
+assign dbg_sbus_rdata = hrdata;
 
 // Handhshake based on grant and bus stall
-assign core_aph_ready_i = ahblm_hready && bus_gnt_i;
-assign core_dph_ready_i = bus_active_dph_i && ahblm_hready;
-assign core_dph_err_i   = bus_active_dph_i && ahblm_hresp;
+assign core_aph_ready_i = hready && bus_gnt_i;
+assign core_dph_ready_i = bus_active_dph_i && hready;
+assign core_dph_err_i   = bus_active_dph_i && hresp;
 
 // D-side errors are reported even when not ready, so that the core can make
 // use of the two-phase error response to cleanly squash a second load/store
 // chasing the faulting one down the pipeline.
-assign core_aph_ready_d  = ahblm_hready && bus_gnt_d;
-assign core_dph_ready_d  = bus_active_dph_d && ahblm_hready;
-assign core_dph_err_d    = bus_active_dph_d && ahblm_hresp;
-assign core_dph_exokay_d = bus_active_dph_d && ahblm_hexokay;
+assign core_aph_ready_d  = hready && bus_gnt_d;
+assign core_dph_ready_d  = bus_active_dph_d && hready;
+assign core_dph_err_d    = bus_active_dph_d && hresp;
+assign core_dph_exokay_d = bus_active_dph_d && hexokay;
 
-assign dbg_sbus_err = bus_active_dph_s && ahblm_hresp;
-assign dbg_sbus_rdy = bus_active_dph_s && ahblm_hready;
+assign dbg_sbus_err = bus_active_dph_s && hresp;
+assign dbg_sbus_rdy = bus_active_dph_s && hready;
 
 endmodule
 

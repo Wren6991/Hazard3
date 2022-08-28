@@ -1017,7 +1017,7 @@ always @ (posedge clk or negedge rst_n) begin
 				xm_wfi <= 1'b0;
 			end
 		end else if (bus_dph_err_d) begin
-			// First phase of 2-phase AHBL error response. Pass the exception along on
+			// First phase of 2-phase AHB5 error response. Pass the exception along on
 			// this cycle, and on the next cycle the trap entry will be asserted,
 			// suppressing any load/store that may currently be in stage X.
 `ifdef HAZARD3_ASSERTIONS

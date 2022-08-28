@@ -5,7 +5,7 @@
 
 // Dual-ported top level file for Hazard3 CPU. This file instantiates the
 // Hazard3 core, and interfaces its instruction fetch and load/store signals
-// to a pair of AHB-Lite master ports.
+// to a pair of AHB5 master ports.
 
 `default_nettype none
 
