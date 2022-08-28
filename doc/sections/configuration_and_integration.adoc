@@ -105,13 +105,6 @@ Requires: <<param-EXTENSION_ZBB>>. (Since Zbb and Zbkb have a large overlap, thi
 
 Default value: 1
 
-[[param-EXTENSION_XH3B]]
-===== EXTENSION_XH3B
-
-Custom bit manipulation instructions for Hazard3: `h3.bextm` and `h3.bextmi`.
-
-Default value: 1
-
 [[param-EXTENSION_ZIFENCEI]]
 ===== EXTENSION_ZIFENCEI
 
@@ -119,6 +112,20 @@ Support for the fence.i instruction. When the branch predictor is not present,
 this instruction is optional, since a plain branch/jump is sufficient to
 flush the instruction prefetch queue. When the branch predictor is enabled
 (<<param-BRANCH_PREDICTOR>> is 1), this instruction must be implemented.
+
+Default value: 1
+
+[[param-EXTENSION_XH3BEXTM]]
+===== EXTENSION_XH3BEXTM
+
+Custom bit manipulation instructions for Hazard3: `h3.bextm` and `h3.bextmi`. See <<extension-xh3bextm-section>>.
+
+Default value: 1
+
+[[param-EXTENSION_XH3POWER]]
+===== EXTENSION_XH3POWER
+
+Custom power management controls for Hazard3. This adds the <<reg-msleep>> CSR, and the `h3.block` and `h3.unblock` hint instructions. See <<extension-xh3power-section>>
 
 Default value: 1
 

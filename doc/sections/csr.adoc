@@ -681,11 +681,15 @@ Note also that this is not the same as the "rule locking bypass" bit in the ePMP
 
 Address: `0xbf0`
 
-M-mode sleep control register.
+M-mode sleep control register. Resets to all-zeroes.
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:3 | - | RES0
-| 2    | `deepsleep` | Deassert the clock request signal when entering the block or WFI state, and wait for clock acknowledge to reassert before leaving the block or WFI state.
+| 2    | `sleeponblock` | Enter the deep sleep state on a `h3.block` instruction as well as a standard `wfi`. If this bit is clear, a `h3.block` is always implemented as a simple pipeline stall.
+| 1    | `powerdown`    | Release the external power request when going to sleep. The function of this is platform-defined -- it may do nothing, it may do something simple like clock-gating the fabric, or it may be tied to some complex system-level power controller.
+
+When waking, the processor reasserts its external power-up request, and will not fetch any instructions until the request is acknowledged. This may add considerable latency to the wakeup.
+| 0   | `deepsleep` | Deassert the processor clock enable when entering the sleep state. If a clock gate is instantiated, this allows most of the processor (everything except the power state machine and the interrupt and halt input registers) to be clock gated whilst asleep, which may reduce the sleep current. This adds one cycle to the wakeup latency.
 |===

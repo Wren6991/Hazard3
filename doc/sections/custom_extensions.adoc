@@ -4,11 +4,14 @@ Hazard3 implements a small number of custom extensions. All are optional: custom
 
 If any one of these extensions is enabled, the `x` bit in <<reg-misa>> is set to indicate the presence of a nonstandard extension.
 
+[[extension-xh3power-section]]
 === Xh3power: Hazard3 power management
 
 This extension adds a new M-mode CSR (<<reg-msleep>>), and two new hint instructions, `h3.block` and `h3.unblock`, in the `slt` nop-compatible custom hint space.
 
-The hints are used to allow processors to sleep until woken by other processors in a multiprocessor environment. The `msleep` CSR is used to control some of the details of the processor's WFI sleep state, to trade off sleep power consumption against wakeup latency.
+The `msleep` CSR controls how deeply the processor sleeps in the WFI sleep state. By default, a WFI is implemented as a normal pipeline stall. By configuring `msleep` appropriately, the processor can gate its own clock when asleep or, with a simple 4-phase req/ack handshake, negotiate power up/down of external hardware with an external power controller. These options can improve the sleep current at the cost of greater wakeup latency.
+
+The hints allow processors to sleep until woken by other processors in a multiprocessor environment. They are implemented on top of the standard WFI state, which means they interact in the same way with external debug, and benefit from the same deep sleep states in `msleep`.
 
 ==== h3.block
 
@@ -58,6 +61,7 @@ Example assembly macro:
 .endm
 ----
 
+[[extension-xh3bextm-section]]
 === Xh3bextm: Hazard3 bit extract multiple
 
 This is a small extension with multi-bit versions of the "bit extract" instructions from Zbs, used for extracting small, contiguous bit fields.
