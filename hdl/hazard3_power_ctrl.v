@@ -116,23 +116,37 @@ always @ (posedge clk_always_on or negedge rst_n) begin
 		end
 		endcase
 	end
-`ifdef HAZARD3_ASSERTIONS
-	// These must always be mutually exclusive.
-	assert(!(sleeping_on_wfi && sleeping_on_block));
-	if (stall_release) begin
-		// Presumably there was a stall which we just released
-		assert($past(sleeping_on_wfi) || $past(sleeping_on_block));
-		// Presumably we are still in that stall
-		assert(sleeping_on_wfi|| sleeping_on_block);
-		// It takes one cycle to do a release and enter a new sleep state, so a
-		// double release should be impossible.
-		assert(!$past(stall_release));
-	end
-	if (state == S_ASLEEP) begin
-		assert(allow_power_down || allow_sleep);
-	end
-`endif
 end
+
+`ifdef HAZARD3_ASSERTIONS
+// Regs are a workaround for the non-constant reset value issue with
+// $past() in yosys-smtbmc.
+reg past_sleeping;
+reg past_stall_release;
+always @ (posedge clk_always_on or negedge rst_n) begin
+	if (!rst_n) begin
+		past_sleeping <= 1'b0;
+		past_stall_release <= 1'b0;
+	end else begin
+		past_sleeping <= sleeping_on_wfi || sleeping_on_block;
+		past_stall_release <= stall_release;
+		// These must always be mutually exclusive.
+		assert(!(sleeping_on_wfi && sleeping_on_block));
+		if (stall_release) begin
+			// Presumably there was a stall which we just released
+			assert(past_sleeping);
+			// Presumably we are still in that stall
+			assert(sleeping_on_wfi|| sleeping_on_block);
+			// It takes one cycle to do a release and enter a new sleep state, so a
+			// double release should be impossible.
+			assert(!past_stall_release);
+		end
+		if (state == S_ASLEEP) begin
+			assert(allow_power_down || allow_sleep);
+		end
+	end
+end
+`endif
 
 // ----------------------------------------------------------------------------
 // Pulse->level for block wakeup

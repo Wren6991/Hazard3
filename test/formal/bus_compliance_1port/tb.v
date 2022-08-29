@@ -11,19 +11,25 @@ always @ (posedge clk)
 // ----------------------------------------------------------------------------
 // DUT
 
-(* keep *) wire [31:0]       ahblm_haddr;
-(* keep *) wire              ahblm_hwrite;
-(* keep *) wire              ahblm_hexcl;
-(* keep *) wire [1:0]        ahblm_htrans;
-(* keep *) wire [2:0]        ahblm_hsize;
-(* keep *) wire [2:0]        ahblm_hburst;
-(* keep *) wire [3:0]        ahblm_hprot;
-(* keep *) wire              ahblm_hmastlock;
-(* keep *) wire              ahblm_hready;
-(* keep *) wire              ahblm_hexokay;
-(* keep *) wire              ahblm_hresp;
-(* keep *) wire [31:0]       ahblm_hwdata;
-(* keep *) wire [31:0]       ahblm_hrdata;
+(* keep *) wire              pwrup_req;
+(* keep *) wire              pwrup_ack;
+(* keep *) wire              clk_en;
+(* keep *) wire              unblock_out;
+(* keep *) wire              unblock_in;
+
+(* keep *) wire [31:0]       haddr;
+(* keep *) wire              hwrite;
+(* keep *) wire              hexcl;
+(* keep *) wire [1:0]        htrans;
+(* keep *) wire [2:0]        hsize;
+(* keep *) wire [2:0]        hburst;
+(* keep *) wire [3:0]        hprot;
+(* keep *) wire              hmastlock;
+(* keep *) wire              hready;
+(* keep *) wire              hexokay;
+(* keep *) wire              hresp;
+(* keep *) wire [31:0]       hwdata;
+(* keep *) wire [31:0]       hrdata;
 
 localparam W_DATA = 32;
 
@@ -56,21 +62,28 @@ localparam W_DATA = 32;
 
 hazard3_cpu_1port dut (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n),
 
-	.ahblm_haddr                (ahblm_haddr),
-	.ahblm_hwrite               (ahblm_hwrite),
-	.ahblm_hexcl                (ahblm_hexcl),
-	.ahblm_htrans               (ahblm_htrans),
-	.ahblm_hsize                (ahblm_hsize),
-	.ahblm_hburst               (ahblm_hburst),
-	.ahblm_hprot                (ahblm_hprot),
-	.ahblm_hmastlock            (ahblm_hmastlock),
-	.ahblm_hready               (ahblm_hready),
-	.ahblm_hexokay              (ahblm_hexokay),
-	.ahblm_hresp                (ahblm_hresp),
-	.ahblm_hwdata               (ahblm_hwdata),
-	.ahblm_hrdata               (ahblm_hrdata),
+	.pwrup_req                  (pwrup_req),
+	.pwrup_ack                  (pwrup_ack),
+	.clk_en                     (clk_en),
+	.unblock_out                (unblock_out),
+	.unblock_in                 (unblock_in),
+
+	.haddr                      (haddr),
+	.hwrite                     (hwrite),
+	.hexcl                      (hexcl),
+	.htrans                     (htrans),
+	.hsize                      (hsize),
+	.hburst                     (hburst),
+	.hprot                      (hprot),
+	.hmastlock                  (hmastlock),
+	.hready                     (hready),
+	.hexokay                    (hexokay),
+	.hresp                      (hresp),
+	.hwdata                     (hwdata),
+	.hrdata                     (hrdata),
 
 	.dbg_req_halt               (dbg_req_halt),
 	.dbg_req_halt_on_reset      (dbg_req_halt_on_reset),
@@ -101,6 +114,43 @@ hazard3_cpu_1port dut (
 );
 
 // ----------------------------------------------------------------------------
+// Power signal properties
+
+(* keep *) wire pwrup_ack_nxt;
+always @ (posedge clk or negedge rst_n) begin
+	 if (!rst_n) begin
+	 	pwrup_ack <= 1'b1;
+	 end else begin
+	 	pwrup_ack <= 1'b1;
+	 end
+end
+
+always @ (posedge clk) if (rst_n) begin
+
+	// Assume the testbench gives fair acks to the processor's reqs
+	if (pwrup_req && pwrup_ack) begin
+		assume(pwrup_ack_nxt);
+	end	
+	if (!pwrup_req && !pwrup_ack) begin
+		assume(!pwrup_ack_nxt);
+	end
+
+	// Assume there is no sbus access when powered down
+	if (!(pwrup_req && pwrup_ack && clk_en)) begin
+		assume(!dbg_sbus_vld);
+	end
+
+	// Assert only one of pwrup_req and pwrup_ack changes on one cycle
+	// (processor upholds its side of the 4-phase handshake)
+	assert((pwrup_ack != $past(pwrup_ack)) + {1'b0, (pwrup_req != $past(pwrup_req))} < 2'd2);
+
+	// Assert rocessor doesn't access the bus whilst asleep
+	if (!(pwrup_req && pwrup_ack && clk_en)) begin
+		assert(htrans == 2'h0);
+	end
+end
+
+// ----------------------------------------------------------------------------
 // Bus properties
 
 // -1 -> unconstrained, >=0 -> max length
@@ -112,39 +162,39 @@ ahbl_slave_assumptions #(
 	.clk             (clk),
 	.rst_n           (rst_n),
 
-	.dst_hready_resp (ahblm_hready),
-	.dst_hready      (ahblm_hready),
-	.dst_hresp       (ahblm_hresp),
-	.dst_hexokay     (ahblm_hexokay),
-	.dst_haddr       (ahblm_haddr),
-	.dst_hwrite      (ahblm_hwrite),
-	.dst_htrans      (ahblm_htrans),
-	.dst_hsize       (ahblm_hsize),
-	.dst_hburst      (ahblm_hburst),
-	.dst_hprot       (ahblm_hprot),
-	.dst_hmastlock   (ahblm_hmastlock),
-	.dst_hexcl       (ahblm_hexcl),
-	.dst_hwdata      (ahblm_hwdata),
-	.dst_hrdata      (ahblm_hrdata)
+	.dst_hready_resp (hready),
+	.dst_hready      (hready),
+	.dst_hresp       (hresp),
+	.dst_hexokay     (hexokay),
+	.dst_haddr       (haddr),
+	.dst_hwrite      (hwrite),
+	.dst_htrans      (htrans),
+	.dst_hsize       (hsize),
+	.dst_hburst      (hburst),
+	.dst_hprot       (hprot),
+	.dst_hmastlock   (hmastlock),
+	.dst_hexcl       (hexcl),
+	.dst_hwdata      (hwdata),
+	.dst_hrdata      (hrdata)
 );
 
 ahbl_master_assertions d_assertions (
 	.clk             (clk),
 	.rst_n           (rst_n),
 
-	.src_hready      (ahblm_hready),
-	.src_hresp       (ahblm_hresp),
-	.src_hexokay     (ahblm_hexokay),
-	.src_haddr       (ahblm_haddr),
-	.src_hwrite      (ahblm_hwrite),
-	.src_htrans      (ahblm_htrans),
-	.src_hsize       (ahblm_hsize),
-	.src_hburst      (ahblm_hburst),
-	.src_hprot       (ahblm_hprot),
-	.src_hmastlock   (ahblm_hmastlock),
-	.src_hexcl       (ahblm_hexcl),
-	.src_hwdata      (ahblm_hwdata),
-	.src_hrdata      (ahblm_hrdata)
+	.src_hready      (hready),
+	.src_hresp       (hresp),
+	.src_hexokay     (hexokay),
+	.src_haddr       (haddr),
+	.src_hwrite      (hwrite),
+	.src_htrans      (htrans),
+	.src_hsize       (hsize),
+	.src_hburst      (hburst),
+	.src_hprot       (hprot),
+	.src_hmastlock   (hmastlock),
+	.src_hexcl       (hexcl),
+	.src_hwdata      (hwdata),
+	.src_hrdata      (hrdata)
 );
 
 sbus_assumptions sbus_assumptions (

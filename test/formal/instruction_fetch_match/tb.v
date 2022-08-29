@@ -11,6 +11,12 @@ always @ (posedge clk)
 // ----------------------------------------------------------------------------
 // DUT
 
+(* keep *) wire              pwrup_req;
+(* keep *) wire              pwrup_ack;
+(* keep *) wire              clk_en;
+(* keep *) wire              unblock_out;
+(* keep *) wire              unblock_in;
+
 (* keep *) wire [31:0]       i_haddr;
 (* keep *) wire              i_hwrite;
 (* keep *) wire [1:0]        i_htrans;
@@ -61,7 +67,14 @@ localparam W_DATA = 32;
 
 hazard3_cpu_2port dut (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n),
+
+	.pwrup_req                  (pwrup_req),
+	.pwrup_ack                  (pwrup_ack),
+	.clk_en                     (clk_en),
+	.unblock_out                (unblock_out),
+	.unblock_in                 (unblock_in),
 
 	.i_haddr                    (i_haddr),
 	.i_hwrite                   (i_hwrite),

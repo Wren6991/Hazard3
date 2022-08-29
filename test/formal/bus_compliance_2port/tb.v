@@ -1,6 +1,8 @@
 // Assume bus responses to both ports are well-formed, assert that bus
 // requests are well-formed.
 
+`default_nettype none
+
 module tb;
 
 reg clk;
@@ -10,6 +12,12 @@ always @ (posedge clk)
 
 // ----------------------------------------------------------------------------
 // DUT
+
+(* keep *) wire              pwrup_req;
+(* keep *) wire              pwrup_ack;
+(* keep *) wire              clk_en;
+(* keep *) wire              unblock_out;
+(* keep *) wire              unblock_in;
 
 (* keep *) wire [31:0]       i_haddr;
 (* keep *) wire              i_hwrite;
@@ -53,14 +61,14 @@ localparam W_DATA = 32;
 (* keep *) wire              dbg_instr_caught_exception;
 (* keep *) wire              dbg_instr_caught_ebreak;
 
-(*keep*) wire [31:0]         dbg_sbus_addr;
-(*keep*) wire                dbg_sbus_write;
-(*keep*) wire [1:0]          dbg_sbus_size;
-(*keep*) wire                dbg_sbus_vld;
-(*keep*) wire                dbg_sbus_rdy;
-(*keep*) wire                dbg_sbus_err;
-(*keep*) wire [31:0]         dbg_sbus_wdata;
-(*keep*) wire [31:0]         dbg_sbus_rdata;
+(* keep *) wire [31:0]       dbg_sbus_addr;
+(* keep *) wire              dbg_sbus_write;
+(* keep *) wire [1:0]        dbg_sbus_size;
+(* keep *) wire              dbg_sbus_vld;
+(* keep *) wire              dbg_sbus_rdy;
+(* keep *) wire              dbg_sbus_err;
+(* keep *) wire [31:0]       dbg_sbus_wdata;
+(* keep *) wire [31:0]       dbg_sbus_rdata;
 
 (* keep *) wire [31:0]       irq;
 (* keep *) wire              soft_irq;
@@ -68,7 +76,14 @@ localparam W_DATA = 32;
 
 hazard3_cpu_2port dut (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n),
+
+	.pwrup_req                  (pwrup_req),
+	.pwrup_ack                  (pwrup_ack),
+	.clk_en                     (clk_en),
+	.unblock_out                (unblock_out),
+	.unblock_in                 (unblock_in),
 
 	.i_haddr                    (i_haddr),
 	.i_hwrite                   (i_hwrite),
@@ -123,6 +138,44 @@ hazard3_cpu_2port dut (
 	.soft_irq                   (soft_irq),
 	.timer_irq                  (timer_irq)
 );
+
+// ----------------------------------------------------------------------------
+// Power signal properties
+
+(* keep *) wire pwrup_ack_nxt;
+always @ (posedge clk or negedge rst_n) begin
+	 if (!rst_n) begin
+	 	pwrup_ack <= 1'b1;
+	 end else begin
+	 	pwrup_ack <= 1'b1;
+	 end
+end
+
+always @ (posedge clk) if (rst_n) begin
+
+	// Assume the testbench gives fair acks to the processor's reqs
+	if (pwrup_req && pwrup_ack) begin
+		assume(pwrup_ack_nxt);
+	end	
+	if (!pwrup_req && !pwrup_ack) begin
+		assume(!pwrup_ack_nxt);
+	end
+
+	// Assume there is no sbus access when powered down
+	if (!(pwrup_req && pwrup_ack && clk_en)) begin
+		assume(!dbg_sbus_vld);
+	end
+
+	// Assert only one of pwrup_req and pwrup_ack changes on one cycle
+	// (processor upholds its side of the 4-phase handshake)
+	assert((pwrup_ack != $past(pwrup_ack)) + {1'b0, (pwrup_req != $past(pwrup_req))} < 2'd2);
+
+	// Assert rocessor doesn't access the bus whilst asleep
+	if (!(pwrup_req && pwrup_ack && clk_en)) begin
+		assert(i_htrans == 2'h0);
+		assert(d_htrans == 2'h0);
+	end
+end
 
 // ----------------------------------------------------------------------------
 // Bus properties
