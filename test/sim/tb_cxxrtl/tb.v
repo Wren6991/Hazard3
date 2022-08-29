@@ -133,12 +133,6 @@ wire                      sbus_err;
 wire [31:0]               sbus_wdata;
 wire [31:0]               sbus_rdata;
 
-wire                      pwrup_req;
-wire                      pwrup_ack = pwrup_req;
-wire                      clk_en;
-wire                      unblock_out;
-wire                      unblock_in = unblock_out;
-
 hazard3_dm #(
 	.N_HARTS      (N_HARTS),
 	.HAVE_SBA     (1),
@@ -206,6 +200,36 @@ hazard3_reset_sync cpu_reset_sync (
 // of the previous "done" is not passed on.
 assign sys_reset_done = rst_n_cpu;
 assign hart_reset_done = rst_n_cpu;
+
+
+wire pwrup_req;
+reg  pwrup_ack;
+wire clk_en;
+wire unblock_out;
+wire unblock_in = unblock_out;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		pwrup_ack <= 1'b1;
+	end else begin
+		pwrup_ack <= pwrup_req;
+	end
+end
+
+// Clock gate is disabled, as CXXRTL currently can't simulated gated clocks
+// due to a limitation of the scheduler design
+
+// // Latching clock gate. Does not insert an NBA delay on the gated clock, so
+// // safe to exchange data between NBAs on the gated and non-gated clock. Does
+// // not glitch as long as clk_en is driven from an NBA on the posedge of clk
+// // (e.g. a normal RTL register). The clock stops *high*.
+
+// reg clk_gated;
+
+// always @ (*) begin
+// 	if (clk_en)
+// 		clk_gated = clk;
+// end
 
 hazard3_cpu_2port #(
 `include "hazard3_config_inst.vh"
