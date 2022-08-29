@@ -714,7 +714,7 @@ always @ (*) begin
 			2'd0,              // Z, Y, no
 			|{                 // X is set for any custom extensions
 				|CSR_M_TRAP,
-				|EXTENSION_XH3BEXTM
+				|EXTENSION_XH3BEXTM,
 				|EXTENSION_XH3POWER
 			},
 			2'd0,              // V, W, no
