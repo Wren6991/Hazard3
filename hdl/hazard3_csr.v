@@ -117,7 +117,8 @@ module hazard3_csr #(
 	output wire                trig_m_en,
 
 	// Other CSR-specific signalling
-	output wire                permit_wfi,
+	output wire                trap_wfi,
+	output wire                wfi_is_nop,
 	input  wire                instr_ret
 );
 
@@ -226,8 +227,11 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// Simply trap all U-mode WFIs if timeout bit is set
-assign permit_wfi = m_mode || !mstatus_tw;
+// Trap all U-mode WFIs if timeout bit is set. Note that the debug spec
+// says "The `wfi` instruction acts as a `nop`" during program buffer
+// execution, and nops do not trap, so in debug mode we uncondi allow WFIs but we inhibit their sleep signal.
+assign trap_wfi = mstatus_tw && !(debug_mode || m_mode);
+assign wfi_is_nop = debug_mode;
 
 reg [XLEN-1:0] mscratch;
 

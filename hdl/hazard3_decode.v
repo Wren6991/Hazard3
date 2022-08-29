@@ -23,7 +23,7 @@ module hazard3_decode #(
 
 	input  wire                 debug_mode,
 	input  wire                 m_mode,
-	input  wire                 permit_wfi,
+	input  wire                 trap_wfi,
 
 	output wire                 d_starved,
 	input  wire                 x_stall,
@@ -233,7 +233,6 @@ always @ (*) begin
 	`RVOPC_ADD:       begin d_aluop = ALUOP_ADD; end
 	`RVOPC_SUB:       begin d_aluop = ALUOP_SUB; end
 	`RVOPC_SLL:       begin d_aluop = ALUOP_SLL; end
-	`RVOPC_SLT:       begin d_aluop = ALUOP_LT;  end
 	`RVOPC_SLTU:      begin d_aluop = ALUOP_LTU; end
 	`RVOPC_XOR:       begin d_aluop = ALUOP_XOR; end
 	`RVOPC_SRL:       begin d_aluop = ALUOP_SRL; end
@@ -248,6 +247,21 @@ always @ (*) begin
 	`RVOPC_SB:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SB;  d_rd = X0; end
 	`RVOPC_SH:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SH;  d_rd = X0; end
 	`RVOPC_SW:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SW;  d_rd = X0; end
+
+	`RVOPC_SLT:       begin
+		d_aluop = ALUOP_LT;
+		if (|EXTENSION_XH3POWER && ~|d_rd && ~|d_rs1) begin
+			if (d_rs2 == 5'h00) begin
+				// h3.block (power management hint)
+				d_invalid_32bit = trap_wfi;
+				d_sleep_block = !trap_wfi;
+			end else if (d_rs2 == 5'h01) begin
+				// h3.unblock (power management hint)
+				d_invalid_32bit = trap_wfi;
+				d_sleep_unblock = !trap_wfi;
+			end
+		end
+	end
 
 	`RVOPC_MUL:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MUL;    end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_MULH:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULH;   end else begin d_invalid_32bit = 1'b1; end
@@ -318,31 +332,33 @@ always @ (*) begin
 	`RVOPC_H3_BEXTMI: if (EXTENSION_XH3BEXTM) begin d_aluop = ALUOP_BEXTM;  d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 
 	`RVOPC_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
-	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_fence_i = 1'b1; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
-	`RVOPC_CSRRW:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRS:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRC:     if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRWI:    if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRSI:    if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRCI:    if (HAVE_CSR)               begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ECALL:     if (HAVE_CSR)               begin d_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_EBREAK:    if (HAVE_CSR)               begin d_except = EXCEPT_EBREAK; d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MRET:      if (HAVE_CSR && m_mode)     begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_WFI:       if (HAVE_CSR && permit_wfi) begin d_sleep_wfi = 1'b1;       d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_fence_i = 1'b1; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
+	`RVOPC_CSRRW:     if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRS:     if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRC:     if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRWI:    if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRSI:    if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRCI:    if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ECALL:     if (HAVE_CSR)              begin d_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_EBREAK:    if (HAVE_CSR)              begin d_except = EXCEPT_EBREAK; d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MRET:      if (HAVE_CSR && m_mode)    begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_WFI:       if (HAVE_CSR && !trap_wfi) begin d_sleep_wfi = 1'b1;       d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
 
 	default:      begin d_invalid_32bit = 1'b1; end
 	endcase
 
 	if (d_invalid || d_starved || d_except_instr_bus_fault || partial_predicted_branch) begin
-		d_rs1        = {W_REGADDR{1'b0}};
-		d_rs2        = {W_REGADDR{1'b0}};
-		d_rd         = {W_REGADDR{1'b0}};
-		d_memop      = MEMOP_NONE;
-		d_branchcond = BCOND_NEVER;
-		d_csr_ren    = 1'b0;
-		d_csr_wen    = 1'b0;
-		d_except     = EXCEPT_NONE;
-		d_sleep_wfi  = 1'b0;
+		d_rs1           = {W_REGADDR{1'b0}};
+		d_rs2           = {W_REGADDR{1'b0}};
+		d_rd            = {W_REGADDR{1'b0}};
+		d_memop         = MEMOP_NONE;
+		d_branchcond    = BCOND_NEVER;
+		d_csr_ren       = 1'b0;
+		d_csr_wen       = 1'b0;
+		d_except        = EXCEPT_NONE;
+		d_sleep_wfi     = 1'b0;
+		d_sleep_block   = 1'b0;
+		d_sleep_unblock = 1'b0;
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;
 

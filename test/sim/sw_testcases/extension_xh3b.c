@@ -1,31 +1,11 @@
 #include "tb_cxxrtl_io.h"
+#include "hazard3_instr.h"
 
 // Smoke test for instructions in the Xh3b extension (Hazard3 custom
 // bitmanip). Currently these are:
 
 // - h3_bextm: multiple bit version of the bext instruction from Zbs (1 to 8 bits)
 // - h3_bextmi: immediate version of the above (as bexti is to bext)
-
-// nbits must be a constant expression
-#define __hazard3_bextm(nbits, rs1, rs2) ({\
-	uint32_t __h3_bextm_rd; \
-	asm (".insn r 0x0b, 0, %3, %0, %1, %2"\
-		: "=r" (__h3_bextm_rd) \
-		: "r" (rs1), "r" (rs2), "i" ((((nbits) - 1) & 0x7) << 1)\
-	); \
-	__h3_bextm_rd; \
-})
-
-// nbits and shamt must be constant expressions
-#define __hazard3_bextmi(nbits, rs1, shamt) ({\
-	uint32_t __h3_bextmi_rd; \
-	asm (".insn i 0x0b, 0x4, %0, %1, %2"\
-		: "=r" (__h3_bextmi_rd) \
-		: "r" (rs1), "i" ((((nbits) - 1) & 0x7) << 6 | ((shamt) & 0x1f)) \
-	); \
-	__h3_bextmi_rd; \
-})
-
 
 // The instruction is just supposed to take a single static size...
 __attribute__((noinline)) uint32_t bextm_dynamic_width(uint nbits, uint32_t rs1, uint32_t rs2) {

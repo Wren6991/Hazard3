@@ -11,69 +11,69 @@ module hazard3_core #(
 `include "hazard3_width_const.vh"
 ) (
 	// Global signals
-	input wire                clk,
-	input wire                clk_always_on,
-	input wire                rst_n,
+	input wire                 clk,
+	input wire                 clk_always_on,
+	input wire                 rst_n,
 
 	// Power control signals
-	output wire               pwrup_req,
-	input  wire               pwrup_ack,
-	output wire               clk_en,
-	output wire               unblock_out,
-	input  wire               unblock_in,
+	output wire                pwrup_req,
+	input  wire                pwrup_ack,
+	output wire                clk_en,
+	output reg                 unblock_out,
+	input  wire                unblock_in,
 
 	`ifdef RISCV_FORMAL
 	`RVFI_OUTPUTS ,
 	`endif
 
 	// Instruction fetch port
-	output wire               bus_aph_req_i,
-	output wire               bus_aph_panic_i, // e.g. branch mispredict + flush
-	input  wire               bus_aph_ready_i,
-	input  wire               bus_dph_ready_i,
-	input  wire               bus_dph_err_i,
+	output wire                bus_aph_req_i,
+	output wire                bus_aph_panic_i, // e.g. branch mispredict + flush
+	input  wire                bus_aph_ready_i,
+	input  wire                bus_dph_ready_i,
+	input  wire                bus_dph_err_i,
 
-	output wire [W_ADDR-1:0]  bus_haddr_i,
-	output wire [2:0]         bus_hsize_i,
-	output wire               bus_priv_i,
-	input  wire [W_DATA-1:0]  bus_rdata_i,
+	output wire [W_ADDR-1:0]   bus_haddr_i,
+	output wire [2:0]          bus_hsize_i,
+	output wire                bus_priv_i,
+	input  wire [W_DATA-1:0]   bus_rdata_i,
 
 	// Load/store port
-	output reg                bus_aph_req_d,
-	output wire               bus_aph_excl_d,
-	input  wire               bus_aph_ready_d,
-	input  wire               bus_dph_ready_d,
-	input  wire               bus_dph_err_d,
-	input  wire               bus_dph_exokay_d,
+	output reg                 bus_aph_req_d,
+	output wire                bus_aph_excl_d,
+	input  wire                bus_aph_ready_d,
+	input  wire                bus_dph_ready_d,
+	input  wire                bus_dph_err_d,
+	input  wire                bus_dph_exokay_d,
 
-	output reg  [W_ADDR-1:0]  bus_haddr_d,
-	output reg  [2:0]         bus_hsize_d,
-	output reg                bus_priv_d,
-	output reg                bus_hwrite_d,
-	output reg  [W_DATA-1:0]  bus_wdata_d,
-	input  wire [W_DATA-1:0]  bus_rdata_d,
+	output reg  [W_ADDR-1:0]   bus_haddr_d,
+	output reg  [2:0]          bus_hsize_d,
+	output reg                 bus_priv_d,
+	output reg                 bus_hwrite_d,
+	output reg  [W_DATA-1:0]   bus_wdata_d,
+	input  wire [W_DATA-1:0]   bus_rdata_d,
 
 	// Debugger run/halt control
-	input  wire               dbg_req_halt,
-	input  wire               dbg_req_halt_on_reset,
-	input  wire               dbg_req_resume,
-	output wire               dbg_halted,
-	output wire               dbg_running,
+	input  wire                dbg_req_halt,
+	input  wire                dbg_req_halt_on_reset,
+	input  wire                dbg_req_resume,
+	output wire                dbg_halted,
+	output wire                dbg_running,
 	// Debugger access to data0 CSR
-	input  wire [W_DATA-1:0]  dbg_data0_rdata,
-	output wire [W_DATA-1:0]  dbg_data0_wdata,
-	output wire               dbg_data0_wen,
+	input  wire [W_DATA-1:0]   dbg_data0_rdata,
+	output wire [W_DATA-1:0]   dbg_data0_wdata,
+	output wire                dbg_data0_wen,
 	// Debugger instruction injection
-	input  wire [W_DATA-1:0]  dbg_instr_data,
-	input  wire               dbg_instr_data_vld,
-	output wire               dbg_instr_data_rdy,
-	output wire               dbg_instr_caught_exception,
-	output wire               dbg_instr_caught_ebreak,
+	input  wire [W_DATA-1:0]   dbg_instr_data,
+	input  wire                dbg_instr_data_vld,
+	output wire                dbg_instr_data_rdy,
+	output wire                dbg_instr_caught_exception,
+	output wire                dbg_instr_caught_ebreak,
 
 	// Level-sensitive interrupt sources
-	input wire [NUM_IRQS-1:0] irq,       // -> mip.meip
-	input wire                soft_irq,  // -> mip.msip
-	input wire                timer_irq  // -> mip.mtip
+	input  wire [NUM_IRQS-1:0] irq,       // -> mip.meip
+	input  wire                soft_irq,  // -> mip.msip
+	input  wire                timer_irq  // -> mip.mtip
 );
 
 `include "hazard3_ops.vh"
@@ -222,7 +222,7 @@ wire                 d_csr_w_imm;
 
 wire                 x_jump_not_except;
 wire                 x_mmode_execution;
-wire                 x_permit_wfi;
+wire                 x_trap_wfi;
 
 hazard3_decode #(
 `include "hazard3_config_inst.vh"
@@ -241,7 +241,7 @@ hazard3_decode #(
 
 	.debug_mode           (debug_mode),
 	.m_mode               (x_mmode_execution),
-	.permit_wfi           (x_permit_wfi),
+	.trap_wfi             (x_trap_wfi),
 
 	.d_starved            (d_starved),
 	.x_stall              (x_stall),
@@ -933,11 +933,14 @@ wire x_except_counts_as_retire =
 wire x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
 wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 
-wire m_delay_irq_entry = xm_delay_irq_entry_on_ls_dphase || ((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release);
+// Need to delay IRQ entry on sleep exit because, for deep sleep states, we
+// can't access the bus until the power handshake has completed.
+wire m_delay_irq_entry = xm_delay_irq_entry_on_ls_dphase ||
+	((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release);
 
-wire m_allow_sleep;
-wire m_allow_power_down;
-wire m_allow_sleep_on_block;
+wire m_pwr_allow_sleep;
+wire m_pwr_allow_power_down;
+wire m_pwr_allow_sleep_on_block;
 wire m_wfi_wakeup_req;
 
 hazard3_csr #(
@@ -984,9 +987,9 @@ hazard3_csr #(
 	.loadstore_dphase_pending   (m_dphase_in_flight),
 	.mepc_in                    (m_exception_return_addr),
 
-	.pwr_allow_sleep            (m_allow_sleep),
-	.pwr_allow_power_down       (m_allow_power_down),
-	.pwr_allow_sleep_on_block   (m_allow_sleep_on_block),
+	.pwr_allow_sleep            (m_pwr_allow_sleep),
+	.pwr_allow_power_down       (m_pwr_allow_power_down),
+	.pwr_allow_sleep_on_block   (m_pwr_allow_sleep_on_block),
 	.pwr_wfi_wakeup_req         (m_wfi_wakeup_req),
 
 	.m_mode_execution           (x_mmode_execution),
@@ -1013,7 +1016,7 @@ hazard3_csr #(
 	.trig_m_en                  (x_trig_m_en),
 
 	// Other CSR-specific signalling
-	.permit_wfi                 (x_permit_wfi),
+	.trap_wfi                   (x_trap_wfi),
 	.instr_ret                  (x_instr_ret)
 );
 
@@ -1026,27 +1029,31 @@ always @ (posedge clk or negedge rst_n) begin
 		xm_except_to_d_mode <= 1'b0;
 		xm_sleep_wfi <= 1'b0;
 		xm_sleep_block <= 1'b0;
+		unblock_out <= 1'b0;
 		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
 	end else begin
+		unblock_out <= 1'b0;
 		if (!m_stall) begin
 			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
 			// If some X-sourced exception has squashed the address phase, need to squash the data phase too.
-			xm_memop <= x_unaligned_addr || x_exec_pmp_fail || x_loadstore_pmp_fail ? MEMOP_NONE : d_memop;
-			xm_except <= x_except;
+			xm_memop            <= x_except != EXCEPT_NONE ? MEMOP_NONE : d_memop;
+			xm_except           <= x_except;
 			xm_except_to_d_mode <= x_trig_break_d_mode;
-			xm_sleep_wfi <= d_sleep_wfi && !x_exec_pmp_fail;
-			xm_sleep_block <= d_sleep_block && !x_exec_pmp_fail;
+			xm_sleep_wfi        <= x_except == EXCEPT_NONE && d_sleep_wfi;
+			xm_sleep_block      <= x_except == EXCEPT_NONE && d_sleep_block;
+			unblock_out         <= x_except == EXCEPT_NONE && d_sleep_unblock;
 			// Note the d_starved term is required because it is possible
 			// (e.g. PMP X permission fail) to except when the frontend is
 			// starved, and we get a bad mepc if we let this jump ahead:
 			if (x_stall || d_starved || m_trap_enter_soon) begin
 				// Insert bubble
-				xm_rd <= {W_REGADDR{1'b0}};
-				xm_memop <= MEMOP_NONE;
-				xm_except <= EXCEPT_NONE;
+				xm_rd               <= {W_REGADDR{1'b0}};
+				xm_memop            <= MEMOP_NONE;
+				xm_except           <= EXCEPT_NONE;
 				xm_except_to_d_mode <= 1'b0;
-				xm_sleep_wfi <= 1'b0;
-				xm_sleep_block <= 1'b0;
+				xm_sleep_wfi        <= 1'b0;
+				xm_sleep_block      <= 1'b0;
+				unblock_out         <= 1'b0;
 			end
 		end else if (bus_dph_err_d) begin
 			// First phase of 2-phase AHB5 error response. Pass the exception along on
@@ -1056,6 +1063,7 @@ always @ (posedge clk or negedge rst_n) begin
 			assert(xm_memop != MEMOP_NONE);
 			assert(!xm_sleep_wfi);
 			assert(!xm_sleep_block);
+			assert(!unblock_out);
 `endif
 			xm_except <=
 				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
@@ -1142,15 +1150,15 @@ hazard3_power_ctrl power_ctrl (
 	.pwrup_ack              (pwrup_ack),
 	.clk_en                 (clk_en),
 
-	.allow_sleep            (m_allow_sleep),
-	.allow_power_down       (m_allow_power_down),
-	.allow_sleep_on_block   (m_allow_sleep_on_block),
+	.allow_sleep            (m_pwr_allow_sleep),
+	.allow_power_down       (m_pwr_allow_power_down),
+	.allow_sleep_on_block   (m_pwr_allow_sleep_on_block),
 
 	.frontend_pwrdown_ok    (f_frontend_pwrdown_ok),
 
 	.sleeping_on_wfi        (xm_sleep_wfi),
 	.wfi_wakeup_req         (m_wfi_wakeup_req),
-	.sleeping_on_block      (xm_sleep_wfi),
+	.sleeping_on_block      (xm_sleep_block),
 	.block_wakeup_req_pulse (unblock_in),
 	.stall_release          (m_sleep_stall_release)
 );
