@@ -1423,8 +1423,11 @@ wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
 // WFI clear respects individual interrupt enables but ignores mstatus.mie.
 // Additionally, wfi is treated as a nop during single-stepping and D-mode.
 // Note that the IRQs and debug halt request input registers are clocked by
-// clk_always_on, so that a wakeup can be generated when asleep.
-assign pwr_wfi_wakeup_req = |(mip & mie) || dcsr_step || debug_mode || want_halt_irq_if_no_exception;
+// clk_always_on, so that a wakeup can be generated when asleep. Note also
+// that want_halt_irq_if_no_exception can be masked while asleep, so also
+// feed in the raw halt request as a wakeup source.
+assign pwr_wfi_wakeup_req = |(mip & mie) || dcsr_step || debug_mode ||
+	want_halt_irq_if_no_exception || dbg_req_halt_prev;
 
 // Priority order from priv spec: external > software > timer
 wire [3:0] standard_irq_num =
