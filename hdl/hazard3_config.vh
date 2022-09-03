@@ -17,7 +17,7 @@
 // Reset state configuration
 
 // RESET_VECTOR: Address of first instruction executed.
-parameter RESET_VECTOR    = 32'h0,
+parameter RESET_VECTOR    = 64'h0,
 
 // MTVEC_INIT: Initial value of trap vector base. Bits clear in MTVEC_WMASK
 // will never change from this initial value. Bits set in MTVEC_WMASK can be
@@ -31,45 +31,45 @@ parameter RESET_VECTOR    = 32'h0,
 // (all traps go to mtvec), vectored if == 1 (exceptions go to mtvec, IRQs to
 // mtvec + mcause * 4). This means MTVEC_INIT also sets the initial vectoring
 // mode.
-parameter MTVEC_INIT      = 32'h00000000,
+parameter MTVEC_INIT      = 64'h00000000,
 
 // ----------------------------------------------------------------------------
 // RISC-V ISA support
 
 // EXTENSION_A: Support for atomic read/modify/write instructions
-parameter EXTENSION_A         = 1,
+parameter EXTENSION_A         = 0,
 
 // EXTENSION_C: Support for compressed (variable-width) instructions
-parameter EXTENSION_C         = 1,
+parameter EXTENSION_C         = 0,
 
 // EXTENSION_M: Support for hardware multiply/divide/modulo instructions
-parameter EXTENSION_M         = 1,
+parameter EXTENSION_M         = 0,
 
 // EXTENSION_ZBA: Support for Zba address generation instructions
-parameter EXTENSION_ZBA       = 1,
+parameter EXTENSION_ZBA       = 0,
 
 // EXTENSION_ZBB: Support for Zbb basic bit manipulation instructions
-parameter EXTENSION_ZBB       = 1,
+parameter EXTENSION_ZBB       = 0,
 
 // EXTENSION_ZBC: Support for Zbc carry-less multiplication instructions
-parameter EXTENSION_ZBC       = 1,
+parameter EXTENSION_ZBC       = 0,
 
 // EXTENSION_ZBS: Support for Zbs single-bit manipulation instructions
-parameter EXTENSION_ZBS       = 1,
+parameter EXTENSION_ZBS       = 0,
 
 // EXTENSION_ZBKB: Support for Zbkb basic bit manipulation for cryptography
 // Requires: Zbb. (This flag enables instructions in Zbkb which aren't in Zbb.)
-parameter EXTENSION_ZBKB      = 1,
+parameter EXTENSION_ZBKB      = 0,
 
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.
-parameter EXTENSION_ZIFENCEI  = 1,
+parameter EXTENSION_ZIFENCEI  = 0,
 
 // EXTENSION_XH3B: Custom bit-extract-multiple instructions for Hazard3
-parameter EXTENSION_XH3BEXTM   = 1,
+parameter EXTENSION_XH3BEXTM  = 0,
 
 // EXTENSION_XH3POWER: Custom power management controls for Hazard3
-parameter EXTENSION_XH3POWER   = 1,
+parameter EXTENSION_XH3POWER  = 0,
 
 // ----------------------------------------------------------------------------
 // CSR support
@@ -79,13 +79,13 @@ parameter EXTENSION_XH3POWER   = 1,
 
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.
-parameter CSR_M_MANDATORY     = 1,
+parameter CSR_M_MANDATORY     = 0,
 
 // CSR_M_TRAP: Include M-mode trap-handling CSRs, and enable trap support.
-parameter CSR_M_TRAP          = 1,
+parameter CSR_M_TRAP          = 0,
 
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
-parameter CSR_COUNTER         = 1,
+parameter CSR_COUNTER         = 0,
 
 // U_MODE: Support the U (user) execution mode. In U mode, the core performs
 // unprivileged bus accesses, and software's access to CSRs is restricted.
@@ -112,7 +112,7 @@ parameter PMP_HARDWIRED       = PMP_REGIONS > 0 ? {PMP_REGIONS{1'b0}} : 1'b0,
 
 // PMPADDR_HARDWIRED_ADDR: Values of pmpaddr registers whose PMP_HARDWIRED
 // bits are set to 1. Non-hardwired regions reset to all-zeroes.
-parameter PMP_HARDWIRED_ADDR  = PMP_REGIONS > 0 ? {PMP_REGIONS{32'h0}} : 1'b0,
+parameter PMP_HARDWIRED_ADDR  = PMP_REGIONS > 0 ? {PMP_REGIONS{64'h0}} : 1'b0,
 
 // PMPCFG_RESET_VAL: Values of pmpcfg registers whose PMP_HARDWIRED bits are
 // set to 1. Non-hardwired regions reset to all zeroes.
@@ -146,17 +146,17 @@ parameter IRQ_PRIORITY_BITS   = 0,
 // JEDEC JEP106-compliant vendor ID, can be left at 0 if "not implemented or
 // [...] this is a non-commercial implementation" (RISC-V spec).
 // 31:7 is continuation code count, 6:0 is ID. Parity bit is not stored.
-parameter MVENDORID_VAL       = 32'h0,
+parameter MVENDORID_VAL       = 64'h0,
 
 // Implementation ID for this specific version of Hazard3. Git hash is perfect.
-parameter MIMPID_VAL          = 32'h0,
+parameter MIMPID_VAL          = 64'h0,
 
 // Each core has a single hardware thread. Multiple cores should have unique IDs.
-parameter MHARTID_VAL         = 32'h0,
+parameter MHARTID_VAL         = 64'h0,
 
 // Pointer to configuration structure blob, or all-zeroes. Must be at least
 // 4-byte-aligned.
-parameter MCONFIGPTR_VAL      = 32'h0,
+parameter MCONFIGPTR_VAL      = 64'h0,
 
 // ----------------------------------------------------------------------------
 // Performance/size options
@@ -186,7 +186,7 @@ parameter MULH_FAST           = 0,
 // FAST_BRANCHCMP: Instantiate a separate comparator (eq/lt/ltu) for branch
 // comparisons, rather than using the ALU. Improves fetch address delay,
 // especially if Zba extension is enabled. Disabling may save area.
-parameter FAST_BRANCHCMP      = 1,
+parameter FAST_BRANCHCMP      = 0,
 
 // RESET_REGFILE: whether to support reset of the general purpose registers.
 // There are around 1k bits in the register file, so the reset can be
@@ -198,7 +198,7 @@ parameter RESET_REGFILE       = 1,
 // cleared on a mispredicted nontaken branch, a fence.i or a trap. Successful
 // prediction eliminates the 1-cyle fetch bubble on a taken branch, usually
 // making tight loops faster.
-parameter BRANCH_PREDICTOR    = 1,
+parameter BRANCH_PREDICTOR    = 0,
 
 // MTVEC_WMASK: Mask of which bits in mtvec are writable. Full writability is
 // recommended, because a common idiom in setup code is to set mtvec just
@@ -208,10 +208,11 @@ parameter BRANCH_PREDICTOR    = 1,
 //
 // - In vectored mode, the vector table must be aligned to its size, rounded
 //   up to a power of two.
-parameter MTVEC_WMASK         = 32'hfffffffd,
+parameter MTVEC_WMASK         = 64'hffffffff_fffffffd,
 
 // ----------------------------------------------------------------------------
 // Port size parameters (do not modify)
 
-parameter W_ADDR              = 32,   // Do not modify
-parameter W_DATA              = 32    // Do not modify
+parameter W_ADDR              = 64,   // Do not modify
+parameter W_DATA              = 64,   // Do not modify
+parameter W_INST              = 32

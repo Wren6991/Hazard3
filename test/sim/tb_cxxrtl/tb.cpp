@@ -52,7 +52,7 @@ struct mem_io_state {
 
 	bool monitor_enabled;
 	bool reservation_valid[2];
-	uint32_t reservation_addr[2];
+	uint64_t reservation_addr[2];
 
 	mem_io_state() {
 		mtime = 0;
@@ -81,21 +81,22 @@ struct mem_io_state {
 typedef enum {
 	SIZE_BYTE = 0,
 	SIZE_HWORD = 1,
-	SIZE_WORD = 2
+	SIZE_WORD = 2,
+	SIZE_DWORD = 2
 } bus_size_t;
 
 struct bus_request {
-	uint32_t addr;
+	uint64_t addr;
 	bus_size_t size;
 	bool write;
 	bool excl;
-	uint32_t wdata;
+	uint64_t wdata;
 	int reservation_id;
 	bus_request(): addr(0), size(SIZE_BYTE), write(0), excl(0), wdata(0), reservation_id(0) {}
 };
 
 struct bus_response {
-	uint32_t rdata;
+	uint64_t rdata;
 	int stall_cycles;
 	bool err;
 	bool exokay;
@@ -148,7 +149,7 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		if (memio.monitor_enabled && req.excl && !resp.exokay) {
 			// Failed exclusive write; do nothing
 		}
-		else if (req.addr <= MEM_SIZE - 4u) {
+		else if (req.addr <= MEM_SIZE - 8u) {
 			unsigned int n_bytes = 1u << (int)req.size;
 			// Note we are relying on hazard3's byte lane replication
 			for (unsigned int i = 0; i < n_bytes; ++i) {
@@ -159,7 +160,7 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 			putchar(req.wdata);
 		}
 		else if (req.addr == IO_BASE + IO_PRINT_U32) {
-			printf("%08x\n", req.wdata);
+			printf("%08x\n", (uint32_t)req.wdata);
 		}
 		else if (req.addr == IO_BASE + IO_EXIT) {
 			if (!memio.exit_req) {
@@ -183,6 +184,7 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() & ~req.wdata);
 		}
 		else if (req.addr == IO_BASE + IO_MTIME) {
+			// TODO 64-bit IO
 			memio.mtime = (memio.mtime & 0xffffffff00000000u) | req.wdata;
 		}
 		else if (req.addr == IO_BASE + IO_MTIMEH) {
@@ -200,14 +202,19 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 	}
 	else {
 		if (req.addr <= MEM_SIZE - (1u << (int)req.size)) {
-			req.addr &= ~0x3u;
+			req.addr &= ~0x7u;
 			resp.rdata =
-				(uint32_t)memio.mem[req.addr] |
-				memio.mem[req.addr + 1] << 8 |
-				memio.mem[req.addr + 2] << 16 |
-				memio.mem[req.addr + 3] << 24;
+				(uint64_t)memio.mem[req.addr] |
+				(uint64_t)memio.mem[req.addr + 1] << 8 |
+				(uint64_t)memio.mem[req.addr + 2] << 16 |
+				(uint64_t)memio.mem[req.addr + 3] << 24 |
+				(uint64_t)memio.mem[req.addr + 4] << 32 |
+				(uint64_t)memio.mem[req.addr + 5] << 40 |
+				(uint64_t)memio.mem[req.addr + 6] << 48 |
+				(uint64_t)memio.mem[req.addr + 7] << 56;
 		}
 		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ || req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
+			// TODO 64-bit IO
 			resp.rdata = tb.p_soft__irq.get<uint8_t>();
 		}
 		else if (req.addr == IO_BASE + IO_SET_IRQ || req.addr == IO_BASE + IO_CLR_IRQ) {
@@ -503,7 +510,7 @@ int main(int argc, char **argv) {
 			top.p_d__hresp.set<bool>(false);
 
 			// Handle current data phase
-			req_d.wdata = top.p_d__hwdata.get<uint32_t>();
+			req_d.wdata = top.p_d__hwdata.get<uint64_t>();
 			bus_response resp;
 			if (req_d_vld)
 				resp = mem_access(top, memio, req_d);
@@ -514,14 +521,14 @@ int main(int argc, char **argv) {
 				top.p_d__hready.set<bool>(false);
 				top.p_d__hresp.set<bool>(true);
 			}
-			top.p_d__hrdata.set<uint32_t>(resp.rdata);
+			top.p_d__hrdata.set<uint64_t>(resp.rdata);
 			top.p_d__hexokay.set<bool>(resp.exokay);
 
 			// Progress current address phase to data phase
 			req_d_vld = top.p_d__htrans.get<uint8_t>() >> 1;
 			req_d.write = top.p_d__hwrite.get<bool>();
 			req_d.size = (bus_size_t)top.p_d__hsize.get<uint8_t>();
-			req_d.addr = top.p_d__haddr.get<uint32_t>();
+			req_d.addr = top.p_d__haddr.get<uint64_t>();
 			req_d.excl = top.p_d__hexcl.get<bool>();
 		}
 		else {
@@ -534,7 +541,7 @@ int main(int argc, char **argv) {
 		if (top.p_i__hready.get<bool>()) {
 			top.p_i__hresp.set<bool>(false);
 
-			req_i.wdata = top.p_i__hwdata.get<uint32_t>();
+			req_i.wdata = top.p_i__hwdata.get<uint64_t>();
 			bus_response resp;
 			if (req_i_vld)
 				resp = mem_access(top, memio, req_i);
@@ -545,14 +552,14 @@ int main(int argc, char **argv) {
 				top.p_i__hready.set<bool>(false);
 				top.p_i__hresp.set<bool>(true);
 			}
-			top.p_i__hrdata.set<uint32_t>(resp.rdata);
+			top.p_i__hrdata.set<uint64_t>((resp.rdata >> (req_i.addr & 0x4 ? 32 : 0)) & 0xffffffffu);
 			top.p_i__hexokay.set<bool>(resp.exokay);
 
 			// Progress current address phase to data phase
 			req_i_vld = top.p_i__htrans.get<uint8_t>() >> 1;
 			req_i.write = top.p_i__hwrite.get<bool>();
 			req_i.size = (bus_size_t)top.p_i__hsize.get<uint8_t>();
-			req_i.addr = top.p_i__haddr.get<uint32_t>();
+			req_i.addr = top.p_i__haddr.get<uint64_t>();
 			req_i.excl = top.p_i__hexcl.get<bool>();
 		}
 		else {

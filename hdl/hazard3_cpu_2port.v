@@ -39,8 +39,8 @@ module hazard3_cpu_2port #(
 	output wire [7:0]         i_hmaster,
 	input  wire               i_hready,
 	input  wire               i_hresp,
-	output wire [W_DATA-1:0]  i_hwdata,
-	input  wire [W_DATA-1:0]  i_hrdata,
+	output wire [W_INST-1:0]  i_hwdata,
+	input  wire [W_INST-1:0]  i_hrdata,
 
 	// Load/store port
 	output wire [W_ADDR-1:0]  d_haddr,

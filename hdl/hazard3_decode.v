@@ -81,11 +81,11 @@ hazard3_instr_decompress #(
 );
 
 // Decode various immmediate formats
-wire [31:0] d_imm_i = {{21{d_instr[31]}}, d_instr[30:20]};
-wire [31:0] d_imm_s = {{21{d_instr[31]}}, d_instr[30:25], d_instr[11:7]};
-wire [31:0] d_imm_b = {{20{d_instr[31]}}, d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
-wire [31:0] d_imm_u = {d_instr[31:12], {12{1'b0}}};
-wire [31:0] d_imm_j = {{12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
+wire [63:0] d_imm_i = {{32{d_instr[31]}}, {21{d_instr[31]}}, d_instr[30:20]};
+wire [63:0] d_imm_s = {{32{d_instr[31]}}, {21{d_instr[31]}}, d_instr[30:25], d_instr[11:7]};
+wire [63:0] d_imm_b = {{32{d_instr[31]}}, {20{d_instr[31]}}, d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
+wire [63:0] d_imm_u = {{32{d_instr[31]}}, d_instr[31:12], {12{1'b0}}};
+wire [63:0] d_imm_j = {{32{d_instr[31]}}, {12{d_instr[31]}}, d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
 
 // ----------------------------------------------------------------------------
 // PC/CIR control
@@ -221,32 +221,44 @@ always @ (*) begin
 	`RVOPC_JAL:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_rs1 = X0;               d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
 	`RVOPC_LUI:       begin d_aluop = ALUOP_RS2; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_rs1 = X0; end
 	`RVOPC_AUIPC:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_alusrc_a = ALUSRCA_PC;  d_rs1 = X0; end
-	`RVOPC_ADDI:      begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SLLI:      begin d_aluop = ALUOP_SLL; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SLTI:      begin d_aluop = ALUOP_LT;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SLTIU:     begin d_aluop = ALUOP_LTU; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_XORI:      begin d_aluop = ALUOP_XOR; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SRLI:      begin d_aluop = ALUOP_SRL; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SRAI:      begin d_aluop = ALUOP_SRA; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_ORI:       begin d_aluop = ALUOP_OR;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_ANDI:      begin d_aluop = ALUOP_AND; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_ADD:       begin d_aluop = ALUOP_ADD; end
-	`RVOPC_SUB:       begin d_aluop = ALUOP_SUB; end
-	`RVOPC_SLL:       begin d_aluop = ALUOP_SLL; end
-	`RVOPC_SLTU:      begin d_aluop = ALUOP_LTU; end
-	`RVOPC_XOR:       begin d_aluop = ALUOP_XOR; end
-	`RVOPC_SRL:       begin d_aluop = ALUOP_SRL; end
-	`RVOPC_SRA:       begin d_aluop = ALUOP_SRA; end
-	`RVOPC_OR:        begin d_aluop = ALUOP_OR;  end
-	`RVOPC_AND:       begin d_aluop = ALUOP_AND; end
+	`RVOPC_ADDI:      begin d_aluop = ALUOP_ADD;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_ADDIW:     begin d_aluop = ALUOP_ADDW; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SLLI:      begin d_aluop = ALUOP_SLL;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SLLIW:     begin d_aluop = ALUOP_SLLW; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SLTI:      begin d_aluop = ALUOP_LT;   d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SLTIU:     begin d_aluop = ALUOP_LTU;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_XORI:      begin d_aluop = ALUOP_XOR;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SRLI:      begin d_aluop = ALUOP_SRL;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SRLIW:     begin d_aluop = ALUOP_SRLW; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SRAI:      begin d_aluop = ALUOP_SRA;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_SRAIW:     begin d_aluop = ALUOP_SRAW; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_ORI:       begin d_aluop = ALUOP_OR;   d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_ANDI:      begin d_aluop = ALUOP_AND;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
+	`RVOPC_ADD:       begin d_aluop = ALUOP_ADD;  end
+	`RVOPC_ADDW:      begin d_aluop = ALUOP_ADDW; end
+	`RVOPC_SUB:       begin d_aluop = ALUOP_SUB;  end
+	`RVOPC_SUBW:      begin d_aluop = ALUOP_SUBW; end
+	`RVOPC_SLL:       begin d_aluop = ALUOP_SLL;  end
+	`RVOPC_SLLW:      begin d_aluop = ALUOP_SLLW; end
+	`RVOPC_SLTU:      begin d_aluop = ALUOP_LTU;  end
+	`RVOPC_XOR:       begin d_aluop = ALUOP_XOR;  end
+	`RVOPC_SRL:       begin d_aluop = ALUOP_SRL;  end
+	`RVOPC_SRLW:      begin d_aluop = ALUOP_SRLW; end
+	`RVOPC_SRA:       begin d_aluop = ALUOP_SRA;  end
+	`RVOPC_SRAW:      begin d_aluop = ALUOP_SRAW; end
+	`RVOPC_OR:        begin d_aluop = ALUOP_OR;   end
+	`RVOPC_AND:       begin d_aluop = ALUOP_AND;  end
 	`RVOPC_LB:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LB;  end
 	`RVOPC_LH:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LH;  end
 	`RVOPC_LW:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LW;  end
+	`RVOPC_LD:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LD;  end
+	`RVOPC_LWU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LWU;  end
 	`RVOPC_LBU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LBU; end
 	`RVOPC_LHU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LHU; end
 	`RVOPC_SB:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SB;  d_rd = X0; end
 	`RVOPC_SH:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SH;  d_rd = X0; end
 	`RVOPC_SW:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SW;  d_rd = X0; end
+	`RVOPC_SD:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SD;  d_rd = X0; end
 
 	`RVOPC_SLT:       begin
 		d_aluop = ALUOP_LT;

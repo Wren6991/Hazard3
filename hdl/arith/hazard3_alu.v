@@ -24,7 +24,7 @@ module hazard3_alu #(
 // ----------------------------------------------------------------------------
 // Fiddle around with add/sub, comparisons etc (all related).
 
-wire sub = !(aluop == ALUOP_ADD || (|EXTENSION_ZBA && aluop == ALUOP_SHXADD));
+wire sub = !(aluop == ALUOP_ADD || aluop == ALUOP_ADDW || (|EXTENSION_ZBA && aluop == ALUOP_SHXADD));
 
 wire inv_op_b = sub && !(
 	aluop == ALUOP_AND || aluop == ALUOP_OR || aluop == ALUOP_XOR || aluop == ALUOP_RS2
@@ -53,20 +53,37 @@ assign cmp = aluop == ALUOP_SUB ? |op_xor : lt;
 // ----------------------------------------------------------------------------
 // Separate units for shift, ctz etc
 
+// Sign- or zero-extend input for narrow right shifts.
+wire [W_DATA-1:0] shift_din = {
+	aluop == ALUOP_SRLW ? {W_DATA/2{1'b0}} :
+	aluop == ALUOP_SRAW ? {W_DATA/2{op_a[W_DATA / 2 - 1]}} : op_a[W_DATA / 2 +: W_DATA / 2],
+	op_a[0 +: W_DATA / 2]
+};
+
+wire [5:0] shamt = {
+	op_b[5] && !aluop[4],
+	op_b[4:0]
+};
+
 wire [W_DATA-1:0] shift_dout;
-wire shift_right_nleft = aluop == ALUOP_SRL || aluop == ALUOP_SRA ||
+
+wire shift_right_nleft =
+	aluop == ALUOP_SRL  ||
+	aluop == ALUOP_SRA  ||
+	aluop == ALUOP_SRLW ||
+	aluop == ALUOP_SRAW ||
 	|EXTENSION_ZBB      && aluop == ALUOP_ROR  ||
 	|EXTENSION_ZBS      && aluop == ALUOP_BEXT ||
 	|EXTENSION_XH3BEXTM && aluop == ALUOP_BEXTM;
 
-wire shift_arith = aluop == ALUOP_SRA;
+wire shift_arith = aluop == ALUOP_SRA || aluop == ALUOP_SRAW;
 wire shift_rotate = |EXTENSION_ZBB & (aluop == ALUOP_ROR || aluop == ALUOP_ROL);
 
 hazard3_shift_barrel #(
 `include "hazard3_config_inst.vh"
 ) shifter (
-	.din         (op_a),
-	.shamt       (op_b[4:0]),
+	.din         (shift_din),
+	.shamt       (shamt),
 	.right_nleft (shift_right_nleft),
 	.rotate      (shift_rotate),
 	.arith       (shift_arith),
@@ -162,6 +179,12 @@ always @ (*) begin
 		{7'bzzzzzzz, ALUOP_SRL    }: result = shift_dout;
 		{7'bzzzzzzz, ALUOP_SRA    }: result = shift_dout;
 		{7'bzzzzzzz, ALUOP_SLL    }: result = shift_dout;
+		// RV64 narrow ops
+		{7'bzzzzzzz, ALUOP_ADDW   }: result = {{W_DATA/2{sum[31]}}, sum[31:0]};
+		{7'bzzzzzzz, ALUOP_SUBW   }: result = {{W_DATA/2{sum[31]}}, sum[31:0]};
+		{7'bzzzzzzz, ALUOP_SRLW   }: result = {{W_DATA/2{1'b0          }}, shift_dout[31:0]};
+		{7'bzzzzzzz, ALUOP_SRAW   }: result = {{W_DATA/2{shift_dout[31]}}, shift_dout[31:0]};
+		{7'bzzzzzzz, ALUOP_SRLW   }: result = {{W_DATA/2{1'b0          }}, shift_dout[31:0]};
 		// A (duplicates of Zbb)
 		{7'b1zzzzzz, ALUOP_MAX    }: result = lt ? op_b : op_a;
 		{7'b1zzzzzz, ALUOP_MAXU   }: result = lt ? op_b : op_a;

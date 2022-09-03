@@ -23,7 +23,7 @@ module hazard3_frontend #(
 	output wire              mem_priv,
 	output wire              mem_addr_vld,
 	input  wire              mem_addr_rdy,
-	input  wire [W_DATA-1:0] mem_data,
+	input  wire [W_INST-1:0] mem_data,
 	input  wire              mem_data_err,
 	input  wire              mem_data_vld,
 
@@ -83,7 +83,7 @@ module hazard3_frontend #(
 	// debug halt state, and the DM can then inject instructions into the last
 	// entry of the prefetch queue using the vld/rdy handshake.
 	input  wire              debug_mode,
-	input  wire [W_DATA-1:0] dbg_instr_data,
+	input  wire [W_INST-1:0] dbg_instr_data,
 	input  wire              dbg_instr_data_vld,
 	output wire              dbg_instr_data_rdy
 );
@@ -109,13 +109,13 @@ reg [1:0] mem_data_predbranch;
 // Bus errors travel alongside data. They cause an exception if the core tries
 // to decode the instruction, but until then can be flushed harmlessly.
 
-reg  [W_DATA-1:0]    fifo_mem        [0:FIFO_DEPTH];
+reg  [W_INST-1:0]    fifo_mem        [0:FIFO_DEPTH];
 reg                  fifo_err        [0:FIFO_DEPTH];
 reg  [1:0]           fifo_predbranch [0:FIFO_DEPTH];
 reg  [1:0]           fifo_valid_hw   [0:FIFO_DEPTH];
 reg                  fifo_valid      [0:FIFO_DEPTH];
 
-wire [W_DATA-1:0] fifo_rdata       = fifo_mem[0];
+wire [W_INST-1:0] fifo_rdata       = fifo_mem[0];
 wire              fifo_full        = fifo_valid[FIFO_DEPTH - 1];
 wire              fifo_empty       = !fifo_valid[0];
 wire              fifo_almost_full = fifo_valid[FIFO_DEPTH - 2];
@@ -419,7 +419,7 @@ end
 reg [1:0] buf_level;
 reg [W_BUNDLE-1:0] hwbuf;
 
-wire [W_DATA-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
+wire [W_INST-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
 wire [1:0] fetch_data_hwvld = fifo_empty ? mem_data_hwvld : fifo_valid_hw[0];
 wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
 

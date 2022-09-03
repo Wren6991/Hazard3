@@ -8,7 +8,7 @@ endif
 
 CCFLAGS      ?=
 LDSCRIPT     ?= ../common/memmap.ld
-CROSS_PREFIX ?= riscv32-unknown-elf-
+CROSS_PREFIX ?= riscv64-unknown-elf-
 TBDIR        ?= ../tb_cxxrtl
 INCDIR       ?= ../common
 MAX_CYCLES   ?= 100000

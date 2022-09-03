@@ -36,7 +36,7 @@ module hazard3_core #(
 	output wire [W_ADDR-1:0]   bus_haddr_i,
 	output wire [2:0]          bus_hsize_i,
 	output wire                bus_priv_i,
-	input  wire [W_DATA-1:0]   bus_rdata_i,
+	input  wire [W_INST-1:0]   bus_rdata_i,
 
 	// Load/store port
 	output reg                 bus_aph_req_d,
@@ -81,6 +81,7 @@ module hazard3_core #(
 wire x_stall;
 wire m_stall;
 
+localparam HSIZE_DWORD = 3'd3;
 localparam HSIZE_WORD  = 3'd2;
 localparam HSIZE_HWORD = 3'd1;
 localparam HSIZE_BYTE  = 3'd0;
@@ -309,7 +310,7 @@ reg  [W_REGADDR-1:0] xm_rs1;
 reg  [W_REGADDR-1:0] xm_rs2;
 reg  [W_REGADDR-1:0] xm_rd;
 reg  [W_DATA-1:0]    xm_result;
-reg  [1:0]           xm_addr_align;
+reg  [2:0]           xm_addr_align;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_except_to_d_mode;
@@ -333,7 +334,7 @@ wire x_stall_on_trap = m_trap_enter_vld && !m_trap_enter_rdy ||
 wire d_memop_is_amo = |EXTENSION_A && d_memop == MEMOP_AMO;
 
 wire x_stall_on_exclusive_overlap = |EXTENSION_A && (
-	(d_memop_is_amo || d_memop == MEMOP_SC_W || d_memop == MEMOP_LR_W) &&
+	(d_memop_is_amo || d_memop == MEMOP_SC_W || d_memop == MEMOP_LR_W) && // TODO RV64A
 	(xm_memop == MEMOP_SC_W || xm_memop	== MEMOP_LR_W)
 );
 
@@ -355,9 +356,7 @@ wire x_stall_on_amo = |EXTENSION_A && d_memop_is_amo && !m_trap_enter_soon && (
 
 wire m_fast_mul_result_vld;
 wire m_generating_result =
-	xm_memop < MEMOP_SW ||
-	|EXTENSION_A && xm_memop == MEMOP_LR_W ||
-	|EXTENSION_A && xm_memop == MEMOP_SC_W || // sc.w success result is data phase
+	~|(xm_memop & 6'h28) ||
 	|EXTENSION_M && m_fast_mul_result_vld;
 
 reg x_stall_on_raw;
@@ -375,7 +374,12 @@ always @ (*) begin
 			x_stall_on_raw = 1'b1;
 		end else if (|xm_rd && xm_rd == d_rs2) begin
 			// Store data can be bypassed in M. Any other instructions must stall.
-			x_stall_on_raw = !(d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB);
+			x_stall_on_raw = !(
+				d_memop == MEMOP_SD ||
+				d_memop == MEMOP_SW ||
+				d_memop == MEMOP_SH ||
+				d_memop == MEMOP_SB
+			);
 		end
 	end
 end
@@ -489,20 +493,21 @@ hazard3_alu #(
 // Load/store bus request
 
 wire x_unaligned_addr = d_memop != MEMOP_NONE && (
-	bus_hsize_d == HSIZE_WORD && |bus_haddr_d[1:0] ||
-	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0]
+	bus_hsize_d == HSIZE_DWORD && |bus_haddr_d[2:0] ||
+	bus_hsize_d == HSIZE_WORD  && |bus_haddr_d[1:0] ||
+	bus_hsize_d == HSIZE_HWORD &&  bus_haddr_d[0]
 );
 
 reg mw_local_exclusive_reserved;
 
 wire x_memop_vld = d_memop != MEMOP_NONE && !(
-	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved ||
+	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved || // TODO RV64A
 	|EXTENSION_A && d_memop_is_amo && x_amo_phase != 3'h0 && x_amo_phase != 3'h2
 );
 
 wire x_memop_write =
-	d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB ||
-	|EXTENSION_A && d_memop == MEMOP_SC_W ||
+	d_memop == MEMOP_SD || d_memop == MEMOP_SW || d_memop == MEMOP_SH || d_memop == MEMOP_SB ||
+	|EXTENSION_A && d_memop == MEMOP_SC_W || // TODO RV64A
 	|EXTENSION_A && d_memop_is_amo && x_amo_phase == 3'h2;
 
 // Always query the global monitor, except for store-conditional suppressed by local monitor.
@@ -613,7 +618,10 @@ always @ (*) begin
 	bus_hwrite_d = x_memop_write;
 	bus_priv_d = x_mmode_loadstore;
 	case (d_memop)
+		MEMOP_LD:  bus_hsize_d = HSIZE_DWORD;
+		MEMOP_SD:  bus_hsize_d = HSIZE_DWORD;
 		MEMOP_LW:  bus_hsize_d = HSIZE_WORD;
+		MEMOP_LWU: bus_hsize_d = HSIZE_WORD;
 		MEMOP_SW:  bus_hsize_d = HSIZE_WORD;
 		MEMOP_LH:  bus_hsize_d = HSIZE_HWORD;
 		MEMOP_LHU: bus_hsize_d = HSIZE_HWORD;
@@ -621,7 +629,7 @@ always @ (*) begin
 		MEMOP_LB:  bus_hsize_d = HSIZE_BYTE;
 		MEMOP_LBU: bus_hsize_d = HSIZE_BYTE;
 		MEMOP_SB:  bus_hsize_d = HSIZE_BYTE;
-		default:   bus_hsize_d = HSIZE_WORD;
+		default:   bus_hsize_d = HSIZE_WORD; // FIXME atomics have variable size on RV64A
 	endcase
 	bus_aph_req_d = x_memop_vld && !(
 		x_stall_on_raw ||
@@ -1066,7 +1074,7 @@ always @ (posedge clk or negedge rst_n) begin
 			assert(!unblock_out);
 `endif
 			xm_except <=
-				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
+				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT : // TODO RV64A
 				                xm_memop <= MEMOP_LBU  ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
 			xm_sleep_wfi <= 1'b0; // TODO needed?
 			xm_sleep_block <= 1'b0;
@@ -1091,7 +1099,7 @@ end
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_result <= {W_DATA{1'b0}};
-		xm_addr_align <= 2'b00;
+		xm_addr_align <= 3'b00;
 	end else if (!m_stall && !(|EXTENSION_A && x_amo_phase == 3'h3 && !bus_dph_ready_d)) begin
 		// AMOs need special attention (of course):
 		// - Steer captured read phase data in mw_result back through xm_result at end of AMO
@@ -1102,7 +1110,7 @@ always @ (posedge clk or negedge rst_n) begin
 			|MUL_FASTER  && x_use_fast_mul          ? m_fast_mul_result :
 			|EXTENSION_M && d_aluop == ALUOP_MULDIV ? x_muldiv_result   :
 			                                          x_alu_result;
-		xm_addr_align <= x_addr_sum[1:0];
+		xm_addr_align <= x_addr_sum[2:0];
 	end
 end
 
@@ -1165,6 +1173,13 @@ hazard3_power_ctrl power_ctrl (
 
 // Load/store data handling
 
+function [63:0] sext8;  input [7:0]  x; begin sext8  = {{56{x[7] }}, x}; end endfunction
+function [63:0] sext16; input [15:0] x; begin sext16 = {{48{x[15]}}, x}; end endfunction
+function [63:0] sext32; input [31:0] x; begin sext32 = {{32{x[31]}}, x}; end endfunction
+function [63:0] zext8;  input [7:0]  x; begin zext8  = {{56{1'b0 }}, x}; end endfunction
+function [63:0] zext16; input [15:0] x; begin zext16 = {{48{1'b0 }}, x}; end endfunction
+function [63:0] zext32; input [31:0] x; begin zext32 = {{32{1'b0 }}, x}; end endfunction
+
 always @ (*) begin
 	// Local forwarding of store data
 	if (|mw_rd && xm_rs2 == mw_rd && !REDUCED_BYPASS) begin
@@ -1173,28 +1188,22 @@ always @ (*) begin
 		m_wdata = xm_result;
 	end
 	// Replicate store data to ensure appropriate byte lane is driven
-	case (xm_memop)
-		MEMOP_SH: bus_wdata_d = {2{m_wdata[15:0]}};
-		MEMOP_SB: bus_wdata_d = {4{m_wdata[7:0]}};
+	case (xm_memop[2:1])
+		2'h1: bus_wdata_d = {2{m_wdata[31:0]}};
+		2'h2: bus_wdata_d = {4{m_wdata[15:0]}};
+		2'h3: bus_wdata_d = {8{m_wdata[ 7:0]}};
 		default:  bus_wdata_d = m_wdata;
 	endcase
 
-	casez ({xm_memop, xm_addr_align[1:0]})
-		{MEMOP_LH  , 2'b0z}: m_rdata_pick_sext = {{16{bus_rdata_d[15]}}, bus_rdata_d[15: 0]};
-		{MEMOP_LH  , 2'b1z}: m_rdata_pick_sext = {{16{bus_rdata_d[31]}}, bus_rdata_d[31:16]};
-		{MEMOP_LHU , 2'b0z}: m_rdata_pick_sext = {{16{1'b0           }}, bus_rdata_d[15: 0]};
-		{MEMOP_LHU , 2'b1z}: m_rdata_pick_sext = {{16{1'b0           }}, bus_rdata_d[31:16]};
-		{MEMOP_LB  , 2'b00}: m_rdata_pick_sext = {{24{bus_rdata_d[ 7]}}, bus_rdata_d[ 7: 0]};
-		{MEMOP_LB  , 2'b01}: m_rdata_pick_sext = {{24{bus_rdata_d[15]}}, bus_rdata_d[15: 8]};
-		{MEMOP_LB  , 2'b10}: m_rdata_pick_sext = {{24{bus_rdata_d[23]}}, bus_rdata_d[23:16]};
-		{MEMOP_LB  , 2'b11}: m_rdata_pick_sext = {{24{bus_rdata_d[31]}}, bus_rdata_d[31:24]};
-		{MEMOP_LBU , 2'b00}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[ 7: 0]};
-		{MEMOP_LBU , 2'b01}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[15: 8]};
-		{MEMOP_LBU , 2'b10}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[23:16]};
-		{MEMOP_LBU , 2'b11}: m_rdata_pick_sext = {{24{1'b0           }}, bus_rdata_d[31:24]};
-		{MEMOP_LW  , 2'bzz}: m_rdata_pick_sext = bus_rdata_d;
-		{MEMOP_LR_W, 2'bzz}: m_rdata_pick_sext = bus_rdata_d;
-		default:             m_rdata_pick_sext = 32'hxxxx_xxxx;
+	case (xm_memop)
+		MEMOP_LB:   m_rdata_pick_sext = sext8 (bus_rdata_d[8 *  xm_addr_align      +: 8 ]);
+		MEMOP_LBU:  m_rdata_pick_sext = zext8 (bus_rdata_d[8 *  xm_addr_align      +: 8 ]);
+		MEMOP_LH:   m_rdata_pick_sext = sext16(bus_rdata_d[16 * xm_addr_align[2:1] +: 16]);
+		MEMOP_LHU:  m_rdata_pick_sext = zext16(bus_rdata_d[16 * xm_addr_align[2:1] +: 16]);
+		MEMOP_LW:   m_rdata_pick_sext = sext32(bus_rdata_d[32 * xm_addr_align[2]   +: 32]);
+		MEMOP_LWU:  m_rdata_pick_sext = zext32(bus_rdata_d[32 * xm_addr_align[2]   +: 32]);
+		MEMOP_LD:   m_rdata_pick_sext = bus_rdata_d;
+		default:    m_rdata_pick_sext = 32'hxxxx_xxxx; // TODO RV64A
 	endcase
 
 	if (|EXTENSION_A && x_amo_phase == 3'h1) begin
@@ -1225,7 +1234,7 @@ always @ (posedge clk or negedge rst_n) begin
 		if (|EXTENSION_A && (!m_stall || bus_dph_err_d)) begin
 			if (d_memop_is_amo) begin
 				mw_local_exclusive_reserved <= 1'b0;
-			end else if (xm_memop == MEMOP_SC_W && (bus_dph_ready_d || bus_dph_err_d)) begin
+			end else if (xm_memop == MEMOP_SC_W && (bus_dph_ready_d || bus_dph_err_d)) begin // TODO RV64A
 				mw_local_exclusive_reserved <= 1'b0;
 			end else if (xm_memop == MEMOP_LR_W && bus_dph_ready_d) begin
 				// In theory, the bus should never report HEXOKAY when HRESP is asserted.
