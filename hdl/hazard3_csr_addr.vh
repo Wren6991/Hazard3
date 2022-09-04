@@ -17,7 +17,6 @@ localparam MCONFIGPTR     = 12'hf15; // Pointer to configuration data structure.
 
 // Machine Trap Setup (RW)
 localparam MSTATUS        = 12'h300; // Machine status register.
-localparam MSTATUSH       = 12'h310; // As of priv-1.12 this must be present even if tied 0.
 localparam MISA           = 12'h301; // ISA and extensions
 localparam MEDELEG        = 12'h302; // Machine exception delegation register.
 localparam MIDELEG        = 12'h303; // Machine interrupt delegation register.
@@ -55,7 +54,6 @@ localparam PMPADDR14      = 12'h3be;
 localparam PMPADDR15      = 12'h3bf;
 
 localparam MSECCFG        = 12'h747;
-localparam MSECCFGH       = 12'h757;
 
 // Performance counters (RW)
 localparam MCYCLE         = 12'hb00; // Raw cycles since start of day
@@ -90,38 +88,6 @@ localparam MHPMCOUNTER29  = 12'hb1d; // WARL (we tie to 0)
 localparam MHPMCOUNTER30  = 12'hb1e; // WARL (we tie to 0)
 localparam MHPMCOUNTER31  = 12'hb1f; // WARL (we tie to 0)
 
-localparam MCYCLEH        = 12'hb80; // High halves of each counter
-localparam MINSTRETH      = 12'hb82;
-localparam MHPMCOUNTER3H  = 12'hb83;
-localparam MHPMCOUNTER4H  = 12'hb84;
-localparam MHPMCOUNTER5H  = 12'hb85;
-localparam MHPMCOUNTER6H  = 12'hb86;
-localparam MHPMCOUNTER7H  = 12'hb87;
-localparam MHPMCOUNTER8H  = 12'hb88;
-localparam MHPMCOUNTER9H  = 12'hb89;
-localparam MHPMCOUNTER10H = 12'hb8a;
-localparam MHPMCOUNTER11H = 12'hb8b;
-localparam MHPMCOUNTER12H = 12'hb8c;
-localparam MHPMCOUNTER13H = 12'hb8d;
-localparam MHPMCOUNTER14H = 12'hb8e;
-localparam MHPMCOUNTER15H = 12'hb8f;
-localparam MHPMCOUNTER16H = 12'hb90;
-localparam MHPMCOUNTER17H = 12'hb91;
-localparam MHPMCOUNTER18H = 12'hb92;
-localparam MHPMCOUNTER19H = 12'hb93;
-localparam MHPMCOUNTER20H = 12'hb94;
-localparam MHPMCOUNTER21H = 12'hb95;
-localparam MHPMCOUNTER22H = 12'hb96;
-localparam MHPMCOUNTER23H = 12'hb97;
-localparam MHPMCOUNTER24H = 12'hb98;
-localparam MHPMCOUNTER25H = 12'hb99;
-localparam MHPMCOUNTER26H = 12'hb9a;
-localparam MHPMCOUNTER27H = 12'hb9b;
-localparam MHPMCOUNTER28H = 12'hb9c;
-localparam MHPMCOUNTER29H = 12'hb9d;
-localparam MHPMCOUNTER30H = 12'hb9e;
-localparam MHPMCOUNTER31H = 12'hb9f;
-
 localparam MCOUNTINHIBIT  = 12'h320; // Count inhibit register for mcycle/minstret
 localparam MHPMEVENT3     = 12'h323; // WARL (we tie to 0)
 localparam MHPMEVENT4     = 12'h324; // WARL (we tie to 0)
@@ -155,7 +121,6 @@ localparam MHPMEVENT31    = 12'h33f; // WARL (we tie to 0)
 
 // Other standard M-mode CSRs:
 localparam MENVCFG        = 12'h30a;
-localparam MENVCFGH       = 12'h31a;
 
 // Custom M-mode CSRs:
 localparam PMPCFGM0       = 12'hbd0; // Make PMP regions M-mode without locking
@@ -177,9 +142,6 @@ localparam MSLEEP         = 12'hbf0; // M-mode sleep control register
 localparam CYCLE          = 12'hc00;
 localparam TIME           = 12'hc01;
 localparam INSTRET        = 12'hc02;
-localparam CYCLEH         = 12'hc80;
-localparam TIMEH          = 12'hc81;
-localparam INSTRETH       = 12'hc82;
 
 // Custom U-mode CSRs
 localparam SLEEP          = 12'h8f0; // U-mode subset of M-mode sleep control

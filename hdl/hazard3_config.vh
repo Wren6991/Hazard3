@@ -79,20 +79,20 @@ parameter EXTENSION_XH3POWER  = 0,
 
 // CSR_M_MANDATORY: Bare minimum CSR support e.g. misa. Spec says must = 1 if
 // CSRs are present, but I won't tell anyone.
-parameter CSR_M_MANDATORY     = 0,
+parameter CSR_M_MANDATORY     = 1,
 
 // CSR_M_TRAP: Include M-mode trap-handling CSRs, and enable trap support.
-parameter CSR_M_TRAP          = 0,
+parameter CSR_M_TRAP          = 1,
 
 // CSR_COUNTER: Include performance counters and relevant M-mode CSRs
-parameter CSR_COUNTER         = 0,
+parameter CSR_COUNTER         = 1,
 
 // U_MODE: Support the U (user) execution mode. In U mode, the core performs
 // unprivileged bus accesses, and software's access to CSRs is restricted.
 // Additionally, if the PMP is included, the core may restrict U-mode
 // software's access to memory.
 // Requires: CSR_M_TRAP.
-parameter U_MODE              = 0,
+parameter U_MODE              = 1,
 
 // PMP_REGIONS: Number of physical memory protection regions, or 0 for no PMP.
 // PMP is more useful if U mode is supported, but this is not a requirement.
