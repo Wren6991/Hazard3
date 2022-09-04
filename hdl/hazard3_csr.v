@@ -328,8 +328,6 @@ end
 // Custom external IRQ handling CSRs
 
 localparam MAX_IRQS = 512;
-localparam [MAX_IRQS-1:0] IRQ_IMPL_MASK = ~({MAX_IRQS{1'b1}} << NUM_IRQS);
-
 localparam [3:0] IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
 
 // Assigned later:
@@ -342,31 +340,48 @@ reg  [MAX_IRQS-1:0]   meiea;
 reg  [MAX_IRQS-1:0]   meifa;
 reg  [4*MAX_IRQS-1:0] meipra;
 
-always @ (posedge clk or negedge rst_n) begin
+always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
+	integer i;
 	if (!rst_n) begin
 		meiea <= {MAX_IRQS{1'b0}};
 		meifa <= {MAX_IRQS{1'b0}};
 		meipra <= {4*MAX_IRQS{1'b0}};
 	end else begin
-		// Tie off unimplemented fields with a constant mask, then rely on
-		// further constant folding. Otherwise subsequent RTL will get a bit
-		// out of hand.
+		// Assign as though all 512 IRQs existed.
 		if (wen_m_mode && addr == MEIEA) begin
-			meiea[16 * wdata[4:0] +: 16]  <= IRQ_IMPL_MASK[16 * wdata[4:0] +: 16] & wdata_update[31:16];
+			meiea[16 * wdata[4:0] +: 16]  <= wdata_update[31:16];
 		end else if (wen_m_mode && addr == MEIFA) begin
-			meifa[16 * wdata[4:0] +: 16]  <= IRQ_IMPL_MASK[16 * wdata[4:0] +: 16] & wdata_update[31:16];
+			meifa[16 * wdata[4:0] +: 16]  <= wdata_update[31:16];
 		end else if (wen_m_mode && addr == MEIPRA) begin
-			meipra[16 * wdata[6:0] +: 16] <= {
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 3]}},
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 2]}},
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 1]}},
-				{4{IRQ_IMPL_MASK[4 * wdata[6:0] + 0]}}
-			} & {4{IRQ_PRIORITY_MASK}} & wdata_update[31:16];
+			meipra[16 * wdata[6:0] +: 16] <= wdata_update[31:16];
 		end
 		// Clear IRQ force when the corresponding IRQ is sample from meinext
 		// (so that an IRQ can be posted *once* without modifying the ISR source)
 		if (ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
 			meifa[meinext_irq] <= 1'b0;
+		end
+		// Finally, force all nonimplemented register fields to 0 so they are
+		// trimmed. Some tools have trouble propagating constants through the
+		// indexed assignments used above -- a final assignment makes the
+		// propagation simpler as this is the head of the decision tree.
+		for (i = 0; i < MAX_IRQS; i = i + 1) begin
+			if (i >= NUM_IRQS) begin
+				meiea[i] <= 1'b0;
+				meifa[i] <= 1'b0;
+				meipra[4 * i +: 4] <= 4'h0;
+			end
+			if (IRQ_PRIORITY_BITS < 4) begin
+				meipra[4 * i + 0] <= 1'b0;
+			end
+			if (IRQ_PRIORITY_BITS < 3) begin
+				meipra[4 * i + 1] <= 1'b0;
+			end
+			if (IRQ_PRIORITY_BITS < 2) begin
+				meipra[4 * i + 2] <= 1'b0;
+			end
+			if (IRQ_PRIORITY_BITS < 1) begin
+				meipra[4 * i + 3] <= 1'b0;
+			end
 		end
 	end
 end
