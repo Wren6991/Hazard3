@@ -36,6 +36,19 @@ module hazard3_triggers #(
 
 `include "hazard3_csr_addr.vh"
 
+generate
+if (BREAKPOINT_TRIGGERS == 0) begin: no_triggers
+
+// The instantiation of this block should already be stubbed out in core.v if
+// there are no triggers, but we still get warnings for elaborating this
+// module with zero triggers, so add a generate block here too.
+
+always @ (*) cfg_rdata = {W_DATA{1'b0}};
+assign break_any = 1'b0;
+assign break_d_mode = 1'b0;
+
+end else begin: have_triggers
+
 // ----------------------------------------------------------------------------
 // Configuration state
 
@@ -155,6 +168,9 @@ end
 
 assign break_any    = |want_m_mode_break || |want_d_mode_break;
 assign break_d_mode = |want_d_mode_break;
+
+end
+endgenerate
 
 endmodule
 

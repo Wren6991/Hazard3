@@ -39,6 +39,19 @@ localparam PMP_A_NAPOT = 2'b11;
 
 `include "hazard3_csr_addr.vh"
 
+generate
+if (PMP_REGIONS == 0) begin: no_pmp
+
+// This should already be stubbed out in core.v, but use a generate here too
+// so that we don't get a warning for elaborating this module with a region
+// count of 0.
+
+always @ (*) cfg_rdata = {W_DATA{1'b0}};
+assign i_kill = 1'b0;
+assign d_kill = 1'b0;
+
+end else begin: have_pmp
+
 // ----------------------------------------------------------------------------
 // Config registers and read/write interface
 
@@ -278,6 +291,9 @@ assign d_kill = (!d_m_mode || d_l || d_m) && (
 assign i_kill = i_partial_match || (
 	(!i_m_mode || i_l || i_m) && !i_x
 );
+
+end
+endgenerate
 
 endmodule
 
