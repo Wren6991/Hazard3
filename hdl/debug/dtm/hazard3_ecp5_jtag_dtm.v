@@ -191,4 +191,4 @@ endmodule
 
 `ifndef YOSYS
 `default_nettype wire
-`ifndef YOSYS
+`endif
