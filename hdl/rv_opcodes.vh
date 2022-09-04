@@ -177,8 +177,8 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_C_LI        16'b010???????????01
 // addi16sp when rd=2:
 `define RVOPC_C_LUI       16'b011???????????01 // *** reserved if imm 0 (for both LUI and ADDI16SP)
-`define RVOPC_C_SRLI      16'b100000????????01 // On RV32 imm[5] (instr[12]) must be 0, else reserved NSE.
-`define RVOPC_C_SRAI      16'b100001????????01 // On RV32 imm[5] (instr[12]) must be 0, else reserved NSE.
+`define RVOPC_C_SRLI      16'b100?00????????01 // On RV32 imm[5] (instr[12]) must be 0, else reserved NSE.
+`define RVOPC_C_SRAI      16'b100?01????????01 // On RV32 imm[5] (instr[12]) must be 0, else reserved NSE.
 `define RVOPC_C_ANDI      16'b100?10????????01
 `define RVOPC_C_SUB       16'b100011???00???01
 `define RVOPC_C_SUBW      16'b100111???00???01
@@ -188,7 +188,7 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_C_BEQZ      16'b110???????????01
 `define RVOPC_C_BNEZ      16'b111???????????01
 
-`define RVOPC_C_SLLI      16'b0000??????????10 // On RV32 imm[5] (instr[12]) must be 0, else reserved NSE.
+`define RVOPC_C_SLLI      16'b000???????????10 // On RV32 imm[5] (instr[12]) must be 0, else reserved NSE.
 // jr if !rs2:
 `define RVOPC_C_MV        16'b1000??????????10 // *** reserved if JR and !rs1 (instr[11:7])
 // jalr if !rs2:
@@ -245,11 +245,13 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_NOZ_LD      32'b00000000000000000011000000000011
 `define RVOPC_NOZ_LBU     32'b00000000000000000100000000000011
 `define RVOPC_NOZ_LHU     32'b00000000000000000101000000000011
-`define RVOPC_NOZ_LW      32'b00000000000000000110000000000011
+`define RVOPC_NOZ_LWU     32'b00000000000000000110000000000011
 `define RVOPC_NOZ_SB      32'b00000000000000000000000000100011
 `define RVOPC_NOZ_SH      32'b00000000000000000001000000100011
 `define RVOPC_NOZ_SW      32'b00000000000000000010000000100011
 `define RVOPC_NOZ_SD      32'b00000000000000000011000000100011
+`define RVOPC_NOZ_FENCE   32'b00000000000000000000000000001111
+`define RVOPC_NOZ_FENCE_I 32'b00000000000000000001000000001111
 `define RVOPC_NOZ_ECALL   32'b00000000000000000000000001110011
 `define RVOPC_NOZ_EBREAK  32'b00000000000100000000000001110011
 `define RVOPC_NOZ_CSRRW   32'b00000000000000000001000001110011
@@ -260,5 +262,6 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_NOZ_CSRRCI  32'b00000000000000000111000001110011
 `define RVOPC_NOZ_MRET    32'b00110000001000000000000001110011
 `define RVOPC_NOZ_SYSTEM  32'b00000000000000000000000001110011
+`define RVOPC_NOZ_WFI     32'b00010000010100000000000001110011
 
 `endif

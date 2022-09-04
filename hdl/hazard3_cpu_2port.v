@@ -69,7 +69,7 @@ module hazard3_cpu_2port #(
 	output wire [W_DATA-1:0]  dbg_data0_wdata,
 	output wire               dbg_data0_wen,
 	// Debugger instruction injection
-	input  wire [W_DATA-1:0]  dbg_instr_data,
+	input  wire [W_INST-1:0]  dbg_instr_data,
 	input  wire               dbg_instr_data_vld,
 	output wire               dbg_instr_data_rdy,
 	output wire               dbg_instr_caught_exception,

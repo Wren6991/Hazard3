@@ -36,6 +36,14 @@ wire [31:0] imm_ci = {
 	20'h00000
 };
 
+// Non-sign-extended CI-type:
+wire [31:0] imm_shamt = {
+	6'h0,
+	instr_in[12],
+	instr_in[6:2],
+	20'h00000
+};
+
 wire [31:0] imm_cj = {
 	instr_in[12],
 	instr_in[8],
@@ -107,9 +115,9 @@ end else begin: instr_decompress
 				end
 				invalid = ~|{instr_in[12], instr_in[6:2]}; // RESERVED if imm == 0
 			end
-			`RVOPC_C_SLLI:     instr_out = `RVOPC_NOZ_SLLI | rfmt_rd(rs1_l) | rfmt_rs1(rs1_l) | imm_ci;
-			`RVOPC_C_SRAI:     instr_out = `RVOPC_NOZ_SRAI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
-			`RVOPC_C_SRLI:     instr_out = `RVOPC_NOZ_SRLI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
+			`RVOPC_C_SLLI:     instr_out = `RVOPC_NOZ_SLLI | rfmt_rd(rs1_l) | rfmt_rs1(rs1_l) | imm_shamt;
+			`RVOPC_C_SRAI:     instr_out = `RVOPC_NOZ_SRAI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_shamt;
+			`RVOPC_C_SRLI:     instr_out = `RVOPC_NOZ_SRLI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_shamt;
 			`RVOPC_C_ANDI:     instr_out = `RVOPC_NOZ_ANDI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
 			`RVOPC_C_AND:      instr_out = `RVOPC_NOZ_AND  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
 			`RVOPC_C_OR:       instr_out = `RVOPC_NOZ_OR   | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
