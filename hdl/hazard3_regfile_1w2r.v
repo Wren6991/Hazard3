@@ -51,6 +51,12 @@ if (RESET_REGS) begin: real_dualport_reset
 	end
 end else begin: real_dualport_noreset
 	// This should be inference-compatible on FPGAs with dual-port BRAMs
+	`ifdef YOSYS
+	`ifdef FPGA_ICE40
+	// We do not require write-to-read bypass logic on the BRAM
+	(* no_rw_check *)
+	`endif
+	`endif
 	reg [W_DATA-1:0] mem [0:N_REGS-1];
 
 	always @ (posedge clk) begin
