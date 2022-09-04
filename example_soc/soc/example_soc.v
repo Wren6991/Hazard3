@@ -235,12 +235,15 @@ wire              proc_hexokay = 1'b1; // No global monitor
 wire [W_DATA-1:0] proc_hwdata;
 wire [W_DATA-1:0] proc_hrdata;
 
-wire uart_irq;
-wire timer_irq;
+wire              pwrup_req;
+wire              unblock_out;
+
+wire              uart_irq;
+wire              timer_irq;
 
 hazard3_cpu_1port #(
 	// These must have the values given here for you to end up with a useful SoC:
-	.RESET_VECTOR    (32'h0000_00c0),
+	.RESET_VECTOR    (32'h0000_0040),
 	.MTVEC_INIT      (32'h0000_0000),
 	.CSR_M_MANDATORY (1),
 	.CSR_M_TRAP      (1),
@@ -249,24 +252,47 @@ hazard3_cpu_1port #(
 	.RESET_REGFILE   (0),
 	// Can be overridden from the defaults in hazard3_config.vh during
 	// instantiation of example_soc():
-	.EXTENSION_A     (EXTENSION_A),
-	.EXTENSION_C     (EXTENSION_C),
-	.EXTENSION_M     (EXTENSION_M),
-	.EXTENSION_ZBA   (EXTENSION_ZBA),
-	.EXTENSION_ZBB   (EXTENSION_ZBB),
-	.EXTENSION_ZBC   (EXTENSION_ZBC),
-	.EXTENSION_ZBS   (EXTENSION_ZBS),
-	.CSR_COUNTER     (CSR_COUNTER),
-	.MVENDORID_VAL   (MVENDORID_VAL),
-	.MIMPID_VAL      (MIMPID_VAL),
-	.MHARTID_VAL     (MHARTID_VAL),
-	.REDUCED_BYPASS  (REDUCED_BYPASS),
-	.MULDIV_UNROLL   (MULDIV_UNROLL),
-	.MUL_FAST        (MUL_FAST),
-	.MTVEC_WMASK     (MTVEC_WMASK)
+	.EXTENSION_A         (EXTENSION_A),
+	.EXTENSION_C         (EXTENSION_C),
+	.EXTENSION_M         (EXTENSION_M),
+	.EXTENSION_ZBA       (EXTENSION_ZBA),
+	.EXTENSION_ZBB       (EXTENSION_ZBB),
+	.EXTENSION_ZBC       (EXTENSION_ZBC),
+	.EXTENSION_ZBS       (EXTENSION_ZBS),
+	.EXTENSION_ZBKB      (EXTENSION_ZBKB),
+	.EXTENSION_ZIFENCEI  (EXTENSION_ZIFENCEI),
+	.EXTENSION_XH3BEXTM  (EXTENSION_XH3BEXTM),
+	.EXTENSION_XH3POWER  (EXTENSION_XH3POWER),
+	.CSR_COUNTER         (CSR_COUNTER),
+	.U_MODE              (U_MODE),
+	.PMP_REGIONS         (PMP_REGIONS),
+	.PMP_GRAIN           (PMP_GRAIN),
+	.PMP_HARDWIRED       (PMP_HARDWIRED),
+	.PMP_HARDWIRED_ADDR  (PMP_HARDWIRED_ADDR),
+	.PMP_HARDWIRED_CFG   (PMP_HARDWIRED_CFG),
+	.MVENDORID_VAL       (MVENDORID_VAL),
+	.BREAKPOINT_TRIGGERS (BREAKPOINT_TRIGGERS),
+	.IRQ_PRIORITY_BITS   (IRQ_PRIORITY_BITS),
+	.MIMPID_VAL          (MIMPID_VAL),
+	.MHARTID_VAL         (MHARTID_VAL),
+	.REDUCED_BYPASS      (REDUCED_BYPASS),
+	.MULDIV_UNROLL       (MULDIV_UNROLL),
+	.MUL_FAST            (MUL_FAST),
+	.MUL_FASTER          (MUL_FASTER),
+	.MULH_FAST           (MULH_FAST),
+	.FAST_BRANCHCMP      (FAST_BRANCHCMP),
+	.BRANCH_PREDICTOR    (BRANCH_PREDICTOR),
+	.MTVEC_WMASK         (MTVEC_WMASK)
 ) cpu (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n_cpu),
+
+	.pwrup_req                  (pwrup_req),
+	.pwrup_ack                  (pwrup_req),   // Tied back
+	.clk_en                     (/* unused */),
+	.unblock_out                (unblock_out),
+	.unblock_in                 (unblock_out), // Tied back
 
 	.haddr                      (proc_haddr),
 	.hwrite                     (proc_hwrite),
