@@ -18,7 +18,7 @@ module hazard3_dm #(
 	parameter HAVE_SBA     = 0,
 
 	// Do not modify:
-	parameter XLEN         = 32,                               // Do not modify
+	parameter XLEN         = 64,                               // Do not modify
 	parameter W_HARTSEL    = N_HARTS > 1 ? $clog2(N_HARTS) : 1 // Do not modify
 ) (
 	// DM is assumed to be in same clock domain as core; clock crossing
@@ -62,7 +62,7 @@ module hazard3_dm #(
 	input  wire [N_HARTS-1:0]        hart_data0_wen,
 
 	// Hart instruction injection
-	output wire [N_HARTS*XLEN-1:0]   hart_instr_data,
+	output wire [N_HARTS*32-1:0]     hart_instr_data,
 	output wire [N_HARTS-1:0]        hart_instr_data_vld,
 	input  wire [N_HARTS-1:0]        hart_instr_data_rdy,
 	input  wire [N_HARTS-1:0]        hart_instr_caught_exception,
@@ -98,6 +98,7 @@ localparam PROGBUF_SIZE = 2;
 // Address constants
 
 localparam ADDR_DATA0        = 7'h04;
+localparam ADDR_DATA1        = 7'h05;
 // Other data registers not present.
 localparam ADDR_DMCONTROL    = 7'h10;
 localparam ADDR_DMSTATUS     = 7'h11;
@@ -456,36 +457,39 @@ wire abstractcs_busy;
 //
 // The DM can also read/write data0 at all times.
 
-reg [XLEN-1:0] abstract_data0;
+reg [31:0] abstract_data0;
+reg [31:0] abstract_data1;
 
-assign hart_data0_rdata = {N_HARTS{abstract_data0}};
+assign hart_data0_rdata = {N_HARTS{{abstract_data1, abstract_data0}}};
 
 always @ (posedge clk or negedge rst_n) begin: update_hart_data0
 	integer i;
 	if (!rst_n) begin
-		abstract_data0 <= {XLEN{1'b0}};
+		{abstract_data1, abstract_data0} <= {XLEN{1'b0}};
 	end else if (!dmactive) begin
-		abstract_data0 <= {XLEN{1'b0}};
+		{abstract_data1, abstract_data0} <= {XLEN{1'b0}};
 	end else if (dmi_write && dmi_regaddr == ADDR_DATA0) begin
 		abstract_data0 <= dmi_pwdata;
+	end else if (dmi_write && dmi_regaddr == ADDR_DATA1) begin
+		abstract_data1 <= dmi_pwdata;
 	end else begin
 		for (i = 0; i < N_HARTS; i = i + 1) begin
 			if (hartsel == i && hart_data0_wen[i] && hart_halted[i] && abstractcs_busy)
-				abstract_data0 <= hart_data0_wdata[i * XLEN +: XLEN];
+				{abstract_data1, abstract_data0} <= hart_data0_wdata[i * XLEN +: XLEN];
 		end
 	end
 end
 
-reg [XLEN-1:0] progbuf0;
-reg [XLEN-1:0] progbuf1;
+reg [31:0] progbuf0;
+reg [31:0] progbuf1;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		progbuf0 <= {XLEN{1'b0}};
-		progbuf1 <= {XLEN{1'b0}};
+		progbuf0 <= 32'h0;
+		progbuf1 <= 32'h0;
 	end else if (!dmactive) begin
-		progbuf0 <= {XLEN{1'b0}};
-		progbuf1 <= {XLEN{1'b0}};
+		progbuf0 <= 32'h0;
+		progbuf1 <= 32'h0;
 	end else if (dmi_write && !abstractcs_busy) begin
 		if (dmi_regaddr == ADDR_PROGBUF0)
 			progbuf0 <= dmi_pwdata;
@@ -495,18 +499,18 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // We only support abstractauto on data0 update (use case is bulk memory read/write)
-reg       abstractauto_autoexecdata;
+reg [1:0] abstractauto_autoexecdata;
 reg [1:0] abstractauto_autoexecprogbuf;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		abstractauto_autoexecdata <= 1'b0;
-		abstractauto_autoexecprogbuf <= 2'b00;
+		abstractauto_autoexecdata <= 2'h0;
+		abstractauto_autoexecprogbuf <= 2'h0;
 	end else if (!dmactive) begin
-		abstractauto_autoexecdata <= 1'b0;
-		abstractauto_autoexecprogbuf <= 2'b00;
+		abstractauto_autoexecdata <= 2'h0;
+		abstractauto_autoexecprogbuf <= 2'h0;
 	end else if (dmi_write && dmi_regaddr == ADDR_ABSTRACTAUTO) begin
-		abstractauto_autoexecdata <= dmi_pwdata[0];
+		abstractauto_autoexecdata <= dmi_pwdata[1:0];
 		abstractauto_autoexecprogbuf <= dmi_pwdata[17:16];
 	end
 end
@@ -540,7 +544,8 @@ assign abstractcs_busy = acmd_state != S_IDLE;
 
 wire start_abstract_cmd = abstractcs_cmderr == CMDERR_OK && !abstractcs_busy && (
 	(dmi_write && dmi_regaddr == ADDR_COMMAND) ||
-	((dmi_write || dmi_read) && abstractauto_autoexecdata && dmi_regaddr == ADDR_DATA0) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecdata[0] && dmi_regaddr == ADDR_DATA0) ||
+	((dmi_write || dmi_read) && abstractauto_autoexecdata[1] && dmi_regaddr == ADDR_DATA1) ||
 	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[0] && dmi_regaddr == ADDR_PROGBUF0) ||
 	((dmi_write || dmi_read) && abstractauto_autoexecprogbuf[1] && dmi_regaddr == ADDR_PROGBUF1)
 );
@@ -548,9 +553,9 @@ wire start_abstract_cmd = abstractcs_cmderr == CMDERR_OK && !abstractcs_busy && 
 wire dmi_access_illegal_when_busy =
 	(dmi_write && (
 		dmi_regaddr == ADDR_ABSTRACTCS || dmi_regaddr == ADDR_COMMAND || dmi_regaddr == ADDR_ABSTRACTAUTO ||
-		dmi_regaddr == ADDR_DATA0 || dmi_regaddr == ADDR_PROGBUF0 || dmi_regaddr == ADDR_PROGBUF0)) ||
+		dmi_regaddr == ADDR_DATA0 || dmi_regaddr == ADDR_DATA1 || dmi_regaddr == ADDR_PROGBUF0 || dmi_regaddr == ADDR_PROGBUF0)) ||
 	(dmi_read && (
-		dmi_regaddr == ADDR_DATA0 || dmi_regaddr == ADDR_PROGBUF0 || dmi_regaddr == ADDR_PROGBUF0));
+		dmi_regaddr == ADDR_DATA0 || dmi_regaddr == ADDR_DATA1 || dmi_regaddr == ADDR_PROGBUF0 || dmi_regaddr == ADDR_PROGBUF0));
 
 // Decode what acmd may be triggered on this cycle, and whether it is
 // supported -- command source may be a registered version of most recent
@@ -570,7 +575,7 @@ wire [4:0] acmd_new_regno       = dmi_pwdata[4:0];
 // the transfer flag is not set.
 wire       acmd_new_unsupported =
 	(dmi_pwdata[31:24] != 8'h00                    ) || // Only Access Register command supported
-	(dmi_pwdata[22:20] != 3'h2 && acmd_new_transfer) || // Must be 32 bits in size
+	(dmi_pwdata[22:20] != 3'h3 && acmd_new_transfer) || // Must be 64 bits in size
 	(dmi_pwdata[19]                                ) || // aarpostincrement not supported
 	(dmi_pwdata[15:12] != 4'h1 && acmd_new_transfer) || // Only core register access supported
 	(dmi_pwdata[11:5]  != 7'h0 && acmd_new_transfer);   // Only GPRs supported
@@ -737,6 +742,7 @@ endfunction
 always @ (*) begin
 	case (dmi_regaddr)
 	ADDR_DATA0:        dmi_prdata = abstract_data0;
+	ADDR_DATA1:        dmi_prdata = abstract_data1;
 	ADDR_DMCONTROL:    dmi_prdata = {
 		1'b0,                             // haltreq is a W-only field
 		1'b0,                             // resumereq is a W1 field
@@ -778,11 +784,11 @@ always @ (*) begin
 		                                  // the spec doesn't reserve a location for it.
 	};
 	ADDR_HALTSUM0:     dmi_prdata = {
-		{XLEN - N_HARTS{1'b0}},
+		{32 - N_HARTS{1'b0}},
 		hart_halted & hart_available
 	};
 	ADDR_HALTSUM1:     dmi_prdata = {
-		{XLEN - 1{1'b0}},
+		{32 - 1{1'b0}},
 		|(hart_halted & hart_available)
 	};
 	ADDR_HAWINDOWSEL:  dmi_prdata = 32'h00000000;
@@ -798,13 +804,13 @@ always @ (*) begin
 		1'b0,
 		abstractcs_cmderr,
 		4'h0,
-		4'd1                              // datacount = 1
+		4'd2                              // datacount = 2
 	};
 	ADDR_ABSTRACTAUTO: dmi_prdata = {
 		14'h0,
 		abstractauto_autoexecprogbuf,     // only progbuf0,1 present
-		15'h0,
-		abstractauto_autoexecdata         // only data0 present
+		14'h0,
+		abstractauto_autoexecdata         // only data0,1 present
 	};
 	ADDR_SBCS:          dmi_prdata = {
 		3'h1,                             // version = 1

@@ -101,7 +101,7 @@ hazard3_jtag_dtm #(
 );
 
 localparam N_HARTS = 1;
-localparam XLEN = 32;
+localparam XLEN = 64;
 
 wire                      sys_reset_req;
 wire                      sys_reset_done;
@@ -118,7 +118,7 @@ wire [N_HARTS*XLEN-1:0]   hart_data0_rdata;
 wire [N_HARTS*XLEN-1:0]   hart_data0_wdata;
 wire [N_HARTS-1:0]        hart_data0_wen;
 
-wire [N_HARTS*XLEN-1:0]   hart_instr_data;
+wire [N_HARTS*32-1:0]     hart_instr_data;
 wire [N_HARTS-1:0]        hart_instr_data_vld;
 wire [N_HARTS-1:0]        hart_instr_data_rdy;
 wire [N_HARTS-1:0]        hart_instr_caught_exception;
