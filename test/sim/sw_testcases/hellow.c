@@ -7,6 +7,6 @@ Hello world from Hazard3 + CXXRTL!
 *******************************************************************************/
 
 int main() {
-	tb_puts("Hello world from RV64I!\n");
+	tb_puts("Hello world from Hazard3 + CXXRTL!\n");
 	return 0;
 }

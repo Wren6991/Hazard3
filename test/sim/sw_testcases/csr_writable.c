@@ -24,7 +24,7 @@ CSR was f14
 CSR was f15
 -> exception, mcause = 2 // read of medeleg, unimplemented
 CSR was 302
--> exception, mcause = 2 // write to medegeleg, unimplemented
+-> exception, mcause = 2 // write to medeleg, unimplemented
 CSR was 302
 -> exception, mcause = 2 // read of mideleg, unimplemented
 CSR was 303
@@ -32,12 +32,8 @@ CSR was 303
 CSR was 303
 -> exception, mcause = 2 // write to cycle, read-only
 CSR was c00
--> exception, mcause = 2 // write to cycleh, read-only
-CSR was c80
 -> exception, mcause = 2 // write to instret, read-only
 CSR was c02
--> exception, mcause = 2 // write to instreth, read-only
-CSR was c82
 -> exception, mcause = 2 // read of dcsr, D-mode
 CSR was 7b0
 -> exception, mcause = 2 // write to dcsr, D-mode
@@ -70,7 +66,6 @@ int main() {
 	write_csr(misa,                read_csr(misa               ));
 
 	write_csr(mstatus,             read_csr(mstatus            ));
-	write_csr(mstatush,            read_csr(mstatush           ));
 	write_csr(medeleg,             read_csr(medeleg            ));
 	write_csr(mideleg,             read_csr(mideleg            ));
 	write_csr(mie,                 read_csr(mie                ));
@@ -82,9 +77,7 @@ int main() {
 	write_csr(mtval,               read_csr(mtval              ));
 
 	write_csr(mcycle,              read_csr(mcycle             ));
-	write_csr(mcycleh,             read_csr(mcycleh            ));
 	write_csr(minstret,            read_csr(minstret           ));
-	write_csr(minstreth,           read_csr(minstreth          ));
 
 	write_csr(mhpmcounter3,        read_csr(mhpmcounter3       ));
 	write_csr(mhpmcounter4,        read_csr(mhpmcounter4       ));
@@ -116,40 +109,8 @@ int main() {
 	write_csr(mhpmcounter30,       read_csr(mhpmcounter30      ));
 	write_csr(mhpmcounter31,       read_csr(mhpmcounter31      ));
 
-	write_csr(mhpmcounter3h,       read_csr(mhpmcounter3h      ));
-	write_csr(mhpmcounter4h,       read_csr(mhpmcounter4h      ));
-	write_csr(mhpmcounter5h,       read_csr(mhpmcounter5h      ));
-	write_csr(mhpmcounter6h,       read_csr(mhpmcounter6h      ));
-	write_csr(mhpmcounter7h,       read_csr(mhpmcounter7h      ));
-	write_csr(mhpmcounter8h,       read_csr(mhpmcounter8h      ));
-	write_csr(mhpmcounter9h,       read_csr(mhpmcounter9h      ));
-	write_csr(mhpmcounter10h,      read_csr(mhpmcounter10h     ));
-	write_csr(mhpmcounter11h,      read_csr(mhpmcounter11h     ));
-	write_csr(mhpmcounter12h,      read_csr(mhpmcounter12h     ));
-	write_csr(mhpmcounter13h,      read_csr(mhpmcounter13h     ));
-	write_csr(mhpmcounter14h,      read_csr(mhpmcounter14h     ));
-	write_csr(mhpmcounter15h,      read_csr(mhpmcounter15h     ));
-	write_csr(mhpmcounter16h,      read_csr(mhpmcounter16h     ));
-	write_csr(mhpmcounter17h,      read_csr(mhpmcounter17h     ));
-	write_csr(mhpmcounter18h,      read_csr(mhpmcounter18h     ));
-	write_csr(mhpmcounter19h,      read_csr(mhpmcounter19h     ));
-	write_csr(mhpmcounter20h,      read_csr(mhpmcounter20h     ));
-	write_csr(mhpmcounter21h,      read_csr(mhpmcounter21h     ));
-	write_csr(mhpmcounter22h,      read_csr(mhpmcounter22h     ));
-	write_csr(mhpmcounter23h,      read_csr(mhpmcounter23h     ));
-	write_csr(mhpmcounter24h,      read_csr(mhpmcounter24h     ));
-	write_csr(mhpmcounter25h,      read_csr(mhpmcounter25h     ));
-	write_csr(mhpmcounter26h,      read_csr(mhpmcounter26h     ));
-	write_csr(mhpmcounter27h,      read_csr(mhpmcounter27h     ));
-	write_csr(mhpmcounter28h,      read_csr(mhpmcounter28h     ));
-	write_csr(mhpmcounter29h,      read_csr(mhpmcounter29h     ));
-	write_csr(mhpmcounter30h,      read_csr(mhpmcounter30h     ));
-	write_csr(mhpmcounter31h,      read_csr(mhpmcounter31h     ));
-
 	write_csr(cycle,               read_csr(cycle              ));
-	write_csr(cycleh,              read_csr(cycleh             ));
 	write_csr(instret,             read_csr(instret            ));
-	write_csr(instreth,            read_csr(instreth           ));
 
 	write_csr(mcountinhibit,       read_csr(mcountinhibit      ));
 	write_csr(mhpmevent3,          read_csr(mhpmevent3         ));

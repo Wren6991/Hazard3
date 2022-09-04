@@ -45,7 +45,6 @@ int main() {
 	(void)read_csr(misa);
 
 	(void)read_csr(mstatus);
-	(void)read_csr(mstatush);
 	(void)read_csr(medeleg);
 	(void)read_csr(mideleg);
 	(void)read_csr(mie);
@@ -57,9 +56,7 @@ int main() {
 	(void)read_csr(mtval);
 
 	(void)read_csr(mcycle);
-	(void)read_csr(mcycleh);
 	(void)read_csr(minstret);
-	(void)read_csr(minstreth);
 
 	(void)read_csr(mhpmcounter3);
 	(void)read_csr(mhpmcounter4);
@@ -91,40 +88,8 @@ int main() {
 	(void)read_csr(mhpmcounter30);
 	(void)read_csr(mhpmcounter31);
 
-	(void)read_csr(mhpmcounter3h);
-	(void)read_csr(mhpmcounter4h);
-	(void)read_csr(mhpmcounter5h);
-	(void)read_csr(mhpmcounter6h);
-	(void)read_csr(mhpmcounter7h);
-	(void)read_csr(mhpmcounter8h);
-	(void)read_csr(mhpmcounter9h);
-	(void)read_csr(mhpmcounter10h);
-	(void)read_csr(mhpmcounter11h);
-	(void)read_csr(mhpmcounter12h);
-	(void)read_csr(mhpmcounter13h);
-	(void)read_csr(mhpmcounter14h);
-	(void)read_csr(mhpmcounter15h);
-	(void)read_csr(mhpmcounter16h);
-	(void)read_csr(mhpmcounter17h);
-	(void)read_csr(mhpmcounter18h);
-	(void)read_csr(mhpmcounter19h);
-	(void)read_csr(mhpmcounter20h);
-	(void)read_csr(mhpmcounter21h);
-	(void)read_csr(mhpmcounter22h);
-	(void)read_csr(mhpmcounter23h);
-	(void)read_csr(mhpmcounter24h);
-	(void)read_csr(mhpmcounter25h);
-	(void)read_csr(mhpmcounter26h);
-	(void)read_csr(mhpmcounter27h);
-	(void)read_csr(mhpmcounter28h);
-	(void)read_csr(mhpmcounter29h);
-	(void)read_csr(mhpmcounter30h);
-	(void)read_csr(mhpmcounter31h);
-
 	(void)read_csr(cycle);
-	(void)read_csr(cycleh);
 	(void)read_csr(instret);
-	(void)read_csr(instreth);
 
 	(void)read_csr(mcountinhibit);
 	(void)read_csr(mhpmevent3);
@@ -151,7 +116,7 @@ int main() {
 void __attribute__((interrupt)) handle_exception() {
 	tb_printf("-> exception, mcause = %u\n", read_csr(mcause));
 	write_csr(mcause, 0);
-	uint32_t mepc = read_csr(mepc);
+	uintptr_t mepc = read_csr(mepc);
 	if ((*(uint16_t*)mepc & 0x3) == 0x3) {
 		tb_printf("CSR was %03x\n", *(uint16_t*)(mepc + 2) >> 4);
 		mepc += 4;

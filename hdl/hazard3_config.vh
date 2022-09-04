@@ -40,7 +40,7 @@ parameter MTVEC_INIT      = 64'h00000000,
 parameter EXTENSION_A         = 0,
 
 // EXTENSION_C: Support for compressed (variable-width) instructions
-parameter EXTENSION_C         = 0,
+parameter EXTENSION_C         = 1,
 
 // EXTENSION_M: Support for hardware multiply/divide/modulo instructions
 parameter EXTENSION_M         = 0,
@@ -63,7 +63,7 @@ parameter EXTENSION_ZBKB      = 0,
 
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.
-parameter EXTENSION_ZIFENCEI  = 0,
+parameter EXTENSION_ZIFENCEI  = 1,
 
 // EXTENSION_XH3B: Custom bit-extract-multiple instructions for Hazard3
 parameter EXTENSION_XH3BEXTM  = 0,
@@ -121,7 +121,7 @@ parameter PMP_HARDWIRED_CFG   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.
 // Requires: CSR_M_MANDATORY, CSR_M_TRAP.
-parameter DEBUG_SUPPORT       = 0,
+parameter DEBUG_SUPPORT       = 1,
 
 // BREAKPOINT_TRIGGERS: Number of triggers which support type=2 execute=1
 // (but not store/load=1, i.e. not a watchpoint). Requires: DEBUG_SUPPORT
@@ -186,7 +186,7 @@ parameter MULH_FAST           = 0,
 // FAST_BRANCHCMP: Instantiate a separate comparator (eq/lt/ltu) for branch
 // comparisons, rather than using the ALU. Improves fetch address delay,
 // especially if Zba extension is enabled. Disabling may save area.
-parameter FAST_BRANCHCMP      = 0,
+parameter FAST_BRANCHCMP      = 1,
 
 // RESET_REGFILE: whether to support reset of the general purpose registers.
 // There are around 1k bits in the register file, so the reset can be

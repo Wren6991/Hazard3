@@ -26,6 +26,7 @@ Done
 void __attribute__((naked)) test() {
 	asm volatile (
 		// Word-aligned word-sized
+		".option push\n"
 		".option norvc\n"
 		"ebreak\n"
 		".option rvc\n"
@@ -39,6 +40,7 @@ void __attribute__((naked)) test() {
 		"c.ebreak\n"
 
 		"ret\n"
+		".option pop\n"
 	);
 }
 

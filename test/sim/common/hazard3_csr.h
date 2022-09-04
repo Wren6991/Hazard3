@@ -17,9 +17,9 @@
 #define hazard3_csr_msleep     0xbf0 // M-mode sleep control register
 
 #define _read_csr(csrname) ({ \
-  uint32_t __csr_tmp_u32; \
-  asm volatile ("csrr %0, " #csrname : "=r" (__csr_tmp_u32)); \
-  __csr_tmp_u32; \
+  uint64_t __csr_tmp_u64; \
+  asm volatile ("csrr %0, " #csrname : "=r" (__csr_tmp_u64)); \
+  __csr_tmp_u64; \
 })
 
 #define _write_csr(csrname, data) ({ \
@@ -35,21 +35,21 @@
 })
 
 #define _read_write_csr(csrname, data) ({ \
-  uint32_t __csr_tmp_u32; \
-  asm volatile ("csrrw %0, " #csrname ", %1" : "=r" (__csr_tmp_u32) : "r" (data)); \
-  __csr_tmp_u32; \
+  uint64_t __csr_tmp_u64; \
+  asm volatile ("csrrw %0, " #csrname ", %1" : "=r" (__csr_tmp_u64) : "r" (data)); \
+  __csr_tmp_u64; \
 })
 
 #define _read_set_csr(csrname, data) ({ \
-  uint32_t __csr_tmp_u32; \
-  asm volatile ("csrrs %0, " #csrname ", %1" : "=r" (__csr_tmp_u32) : "r" (data)); \
-  __csr_tmp_u32; \
+  uint64_t __csr_tmp_u64; \
+  asm volatile ("csrrs %0, " #csrname ", %1" : "=r" (__csr_tmp_u64) : "r" (data)); \
+  __csr_tmp_u64; \
 })
 
 #define _read_clear_csr(csrname, data) ({ \
-  uint32_t __csr_tmp_u32; \
-  asm volatile ("csrrc %0, " #csrname ", %1" : "=r" (__csr_tmp_u32) : "r" (data)); \
-  __csr_tmp_u32; \
+  uint64_t __csr_tmp_u64; \
+  asm volatile ("csrrc %0, " #csrname ", %1" : "=r" (__csr_tmp_u64) : "r" (data)); \
+  __csr_tmp_u64; \
 })
 
 // Argument macro expansion layer
