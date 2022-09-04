@@ -8,29 +8,33 @@ module rvfi_wrapper (
 // Memory Interface
 // ----------------------------------------------------------------------------
 
-(* keep *) wire               [31:0]  i_haddr;
-(* keep *) wire                       i_hwrite;
-(* keep *) wire               [1:0]   i_htrans;
-(* keep *) wire               [2:0]   i_hsize;
-(* keep *) wire               [2:0]   i_hburst;
-(* keep *) wire               [3:0]   i_hprot;
-(* keep *) wire                       i_hmastlock;
-(* keep *) `rvformal_rand_reg         i_hready;
-(* keep *) `rvformal_rand_reg         i_hresp;
-(* keep *) wire               [31:0]  i_hwdata;
-(* keep *) `rvformal_rand_reg [31:0]  i_hrdata;
+localparam W_ADDR = 64;
+localparam W_DATA = 64;
+localparam W_INST = 32;
 
-(* keep *) wire               [31:0]  d_haddr;
-(* keep *) wire                       d_hwrite;
-(* keep *) wire               [1:0]   d_htrans;
-(* keep *) wire               [2:0]   d_hsize;
-(* keep *) wire               [2:0]   d_hburst;
-(* keep *) wire               [3:0]   d_hprot;
-(* keep *) wire                       d_hmastlock;
-(* keep *) `rvformal_rand_reg         d_hready;
-(* keep *) `rvformal_rand_reg         d_hresp;
-(* keep *) wire               [31:0]  d_hwdata;
-(* keep *) `rvformal_rand_reg [31:0]  d_hrdata;
+(* keep *) wire               [W_ADDR-1:0]  i_haddr;
+(* keep *) wire                             i_hwrite;
+(* keep *) wire               [1:0]         i_htrans;
+(* keep *) wire               [2:0]         i_hsize;
+(* keep *) wire               [2:0]         i_hburst;
+(* keep *) wire               [3:0]         i_hprot;
+(* keep *) wire                             i_hmastlock;
+(* keep *) `rvformal_rand_reg               i_hready;
+(* keep *) `rvformal_rand_reg               i_hresp;
+(* keep *) wire               [W_INST-1:0]  i_hwdata;
+(* keep *) `rvformal_rand_reg [W_INST-1:0]  i_hrdata;
+
+(* keep *) wire               [W_ADDR-1:0]  d_haddr;
+(* keep *) wire                             d_hwrite;
+(* keep *) wire               [1:0]         d_htrans;
+(* keep *) wire               [2:0]         d_hsize;
+(* keep *) wire               [2:0]         d_hburst;
+(* keep *) wire               [3:0]         d_hprot;
+(* keep *) wire                             d_hmastlock;
+(* keep *) `rvformal_rand_reg               d_hready;
+(* keep *) `rvformal_rand_reg               d_hresp;
+(* keep *) wire               [W_DATA-1:0]  d_hwdata;
+(* keep *) `rvformal_rand_reg [W_DATA-1:0]  d_hrdata;
 
 `ifdef RISCV_FORMAL_FAIRNESS
 localparam MAX_BUS_STALL = 8;
@@ -39,6 +43,8 @@ localparam MAX_BUS_STALL = -1;
 `endif
 
 ahbl_slave_assumptions #(
+	.W_ADDR        (W_ADDR),
+	.W_DATA        (W_INST),
 	.MAX_BUS_STALL (MAX_BUS_STALL)
 ) i_slave_assumptions (
 	.clk             (clock),
@@ -60,6 +66,8 @@ ahbl_slave_assumptions #(
 
 
 ahbl_slave_assumptions #(
+	.W_ADDR        (W_ADDR),
+	.W_DATA        (W_DATA),
 	.MAX_BUS_STALL (MAX_BUS_STALL)
 ) d_slave_assumptions (
 	.clk             (clock),
@@ -93,49 +101,58 @@ wire        soft_irq = 0;
 wire        timer_irq = 0;
 // (* keep *) `rvformal_rand_reg [15:0] irq;
 
-localparam W_DATA = 32;
-
-(* keep *) wire              dbg_req_halt;
-(* keep *) wire              dbg_req_halt_on_reset;
-(* keep *) wire              dbg_req_resume;
+(* keep *) wire              dbg_req_halt = 1'b0;
+(* keep *) wire              dbg_req_halt_on_reset = 1'b0;
+(* keep *) wire              dbg_req_resume = 1'b0;
 (* keep *) wire              dbg_halted;
 (* keep *) wire              dbg_running;
-(* keep *) wire [W_DATA-1:0] dbg_data0_rdata;
+(* keep *) wire [W_DATA-1:0] dbg_data0_rdata = 64'h0;
 (* keep *) wire [W_DATA-1:0] dbg_data0_wdata;
 (* keep *) wire              dbg_data0_wen;
-(* keep *) wire [W_DATA-1:0] dbg_instr_data;
-(* keep *) wire              dbg_instr_data_vld;
+(* keep *) wire [W_INST-1:0] dbg_instr_data = 32'h0;
+(* keep *) wire              dbg_instr_data_vld = 1'b0;
 (* keep *) wire              dbg_instr_data_rdy;
 (* keep *) wire              dbg_instr_caught_exception;
 (* keep *) wire              dbg_instr_caught_ebreak;
 
-hazard3_cpu_2port #(
-	.RESET_VECTOR       (0),
+(* keep *) wire [W_ADDR-1:0] dbg_sbus_addr  = 64'h0;
+(* keep *) wire              dbg_sbus_write = 1'b0;
+(* keep *) wire [1:0]        dbg_sbus_size  = 2'h0;
+(* keep *) wire              dbg_sbus_vld   = 1'b0;
+(* keep *) wire              dbg_sbus_rdy;
+(* keep *) wire              dbg_sbus_err;
+(* keep *) wire [W_DATA-1:0] dbg_sbus_wdata = 64'h0;
+(* keep *) wire [W_DATA-1:0] dbg_sbus_rdata;
 
-	.EXTENSION_M        (1),
-	.EXTENSION_A        (0), // FIXME
-	.EXTENSION_C        (1),
+hazard3_cpu_2port
+// #(
+// 	.RESET_VECTOR       (0),
 
-	.EXTENSION_ZBA      (0),
-	.EXTENSION_ZBB      (0),
-	.EXTENSION_ZBC      (0),
-	.EXTENSION_ZBS      (0),
+// 	.EXTENSION_M        (1),
+// 	.EXTENSION_A        (0), // FIXME
+// 	.EXTENSION_C        (1),
 
-	.CSR_M_MANDATORY    (1),
-	.CSR_M_TRAP         (1),
-	.CSR_COUNTER        (1),
-	.DEBUG_SUPPORT      (0), // FIXME
+// 	.EXTENSION_ZBA      (0),
+// 	.EXTENSION_ZBB      (0),
+// 	.EXTENSION_ZBC      (0),
+// 	.EXTENSION_ZBS      (0),
 
-	.NUM_IRQ            (32),
+// 	.CSR_M_MANDATORY    (1),
+// 	.CSR_M_TRAP         (1),
+// 	.CSR_COUNTER        (1),
+// 	.DEBUG_SUPPORT      (0), // FIXME
 
-	.EXTENSION_ZIFENCEI (1),
+// 	.NUM_IRQ            (32),
 
-	.REDUCED_BYPASS     (0),
-	.FAST_BRANCHCMP     (1),
-	.MUL_FAST           (1),
-	.MULH_FAST          (1),
-	.MULDIV_UNROLL      (2)
-) dut (
+// 	.EXTENSION_ZIFENCEI (1),
+
+// 	.REDUCED_BYPASS     (0),
+// 	.FAST_BRANCHCMP     (1),
+// 	.MUL_FAST           (1),
+// 	.MULH_FAST          (1),
+// 	.MULDIV_UNROLL      (2)
+// )
+dut (
 	.clk                        (clock),
 	.rst_n                      (!reset),
 
@@ -178,6 +195,15 @@ hazard3_cpu_2port #(
 	.dbg_instr_data_rdy         (dbg_instr_data_rdy),
 	.dbg_instr_caught_exception (dbg_instr_caught_exception),
 	.dbg_instr_caught_ebreak    (dbg_instr_caught_ebreak),
+
+	.dbg_sbus_addr              (dbg_sbus_addr),
+	.dbg_sbus_write             (dbg_sbus_write),
+	.dbg_sbus_size              (dbg_sbus_size),
+	.dbg_sbus_vld               (dbg_sbus_vld),
+	.dbg_sbus_rdy               (dbg_sbus_rdy),
+	.dbg_sbus_err               (dbg_sbus_err),
+	.dbg_sbus_wdata             (dbg_sbus_wdata),
+	.dbg_sbus_rdata             (dbg_sbus_rdata),
 
 	.irq                        (irq),
 	.soft_irq                   (soft_irq),

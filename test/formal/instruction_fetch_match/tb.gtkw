@@ -2,7 +2,7 @@
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
 [*] Thu Jun 16 01:20:52 2022
 [*]
-[dumpfile] "/home/luke/proj/hazard3/test/formal/instruction_fetch_match/tb.vcd"
+[dumpfile] "/home/luke/proj/hazard3-64/test/formal/instruction_fetch_match/tb.vcd"
 [dumpfile_mtime] "Thu Jun 16 00:55:13 2022"
 [dumpfile_size] 205426
 [savefile] "/home/luke/proj/hazard3/test/formal/instruction_fetch_match/tb.gtkw"

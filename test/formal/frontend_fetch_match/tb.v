@@ -54,8 +54,8 @@ always @ (posedge clk)
 (*keep*) wire [4:0]        predecode_rs2_fine;
 
 (*keep*) wire              debug_mode;
-(*keep*) wire [31:0]       dbg_instr_data;
-(*keep*) wire              dbg_instr_data_vld;
+(*keep*) wire [31:0]       dbg_instr_data = 32'h0;
+(*keep*) wire              dbg_instr_data_vld = 1'b0;
 (*keep*) wire              dbg_instr_data_rdy;
 
 
