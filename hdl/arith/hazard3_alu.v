@@ -249,9 +249,9 @@ always @ (posedge clk) begin
 	ALUOP_AND: assert(result == (op_a & op_b));
 	ALUOP_OR:  assert(result == (op_a | op_b));
 	ALUOP_XOR: assert(result == (op_a ^ op_b));
-	ALUOP_SRL: assert(result == op_a >> op_b[4:0]);
-	ALUOP_SRA: assert($signed(result) == $signed(op_a) >>> $signed(op_b[4:0]));
-	ALUOP_SLL: assert(result == op_a << op_b[4:0]);
+	ALUOP_SRL: assert(result == op_a >> op_b[5:0]);
+	ALUOP_SRA: assert($signed(result) == $signed(op_a) >>> $signed(op_b[5:0]));
+	ALUOP_SLL: assert(result == op_a << op_b[5:0]);
 	endcase
 end
 `endif

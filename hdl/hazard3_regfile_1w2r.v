@@ -10,9 +10,9 @@
 
 module hazard3_regfile_1w2r #(
 	parameter RESET_REGS = 0,	// Unsupported for FAKE_DUALPORT
-	parameter N_REGS = 16,
+	parameter N_REGS = 32,
 	parameter W_DATA = 32,
-	parameter W_ADDR = $clog2(W_DATA)	// should be localparam. ISIM...
+	parameter W_ADDR = $clog2(N_REGS)	// should be localparam. ISIM...
 ) (
 	input wire clk,
 	input wire rst_n,

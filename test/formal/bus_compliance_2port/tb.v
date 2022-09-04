@@ -19,7 +19,7 @@ always @ (posedge clk)
 (* keep *) wire              unblock_out;
 (* keep *) wire              unblock_in;
 
-(* keep *) wire [31:0]       i_haddr;
+(* keep *) wire [63:0]       i_haddr;
 (* keep *) wire              i_hwrite;
 (* keep *) wire [1:0]        i_htrans;
 (* keep *) wire [2:0]        i_hsize;
@@ -31,7 +31,7 @@ always @ (posedge clk)
 (* keep *) wire [31:0]       i_hwdata;
 (* keep *) wire [31:0]       i_hrdata;
 
-(* keep *) wire [31:0]       d_haddr;
+(* keep *) wire [63:0]       d_haddr;
 (* keep *) wire              d_hwrite;
 (* keep *) wire [1:0]        d_htrans;
 (* keep *) wire [2:0]        d_hsize;
@@ -42,10 +42,10 @@ always @ (posedge clk)
 (* keep *) wire              d_hready;
 (* keep *) wire              d_hresp;
 (* keep *) wire              d_hexokay;
-(* keep *) wire [31:0]       d_hwdata;
-(* keep *) wire [31:0]       d_hrdata;
+(* keep *) wire [63:0]       d_hwdata;
+(* keep *) wire [63:0]       d_hrdata;
 
-localparam W_DATA = 32;
+localparam W_DATA = 64;
 
 (* keep *) wire              dbg_req_halt;
 (* keep *) wire              dbg_req_halt_on_reset;
@@ -61,16 +61,16 @@ localparam W_DATA = 32;
 (* keep *) wire              dbg_instr_caught_exception;
 (* keep *) wire              dbg_instr_caught_ebreak;
 
-(* keep *) wire [31:0]       dbg_sbus_addr;
+(* keep *) wire [63:0]       dbg_sbus_addr;
 (* keep *) wire              dbg_sbus_write;
 (* keep *) wire [1:0]        dbg_sbus_size;
 (* keep *) wire              dbg_sbus_vld;
 (* keep *) wire              dbg_sbus_rdy;
 (* keep *) wire              dbg_sbus_err;
-(* keep *) wire [31:0]       dbg_sbus_wdata;
-(* keep *) wire [31:0]       dbg_sbus_rdata;
+(* keep *) wire [63:0]       dbg_sbus_wdata;
+(* keep *) wire [63:0]       dbg_sbus_rdata;
 
-(* keep *) wire [31:0]       irq;
+(* keep *) wire [63:0]       irq;
 (* keep *) wire              soft_irq;
 (* keep *) wire              timer_irq;
 
@@ -184,7 +184,9 @@ end
 localparam MAX_BUS_STALL = -1;
 
 ahbl_slave_assumptions #(
-	.MAX_BUS_STALL (MAX_BUS_STALL)
+	.MAX_BUS_STALL (MAX_BUS_STALL),
+	.W_ADDR        (64),
+	.W_DATA        (32)
 ) i_assumptions (
 	.clk             (clk),
 	.rst_n           (rst_n),
@@ -206,7 +208,9 @@ ahbl_slave_assumptions #(
 );
 
 ahbl_slave_assumptions #(
-	.MAX_BUS_STALL (MAX_BUS_STALL)
+	.MAX_BUS_STALL (MAX_BUS_STALL),
+	.W_ADDR        (64),
+	.W_DATA        (64)
 ) d_assumptions (
 	.clk             (clk),
 	.rst_n           (rst_n),
@@ -227,7 +231,10 @@ ahbl_slave_assumptions #(
 	.dst_hrdata      (d_hrdata)
 );
 
-ahbl_master_assertions i_assertions (
+ahbl_master_assertions #(
+	.W_ADDR (64),
+	.W_DATA (32)
+) i_assertions (
 	.clk             (clk),
 	.rst_n           (rst_n),
 
@@ -247,7 +254,10 @@ ahbl_master_assertions i_assertions (
 );
 
 
-ahbl_master_assertions d_assertions (
+ahbl_master_assertions #(
+	.W_ADDR (64),
+	.W_DATA (64)
+) d_assertions (
 	.clk             (clk),
 	.rst_n           (rst_n),
 
@@ -266,7 +276,10 @@ ahbl_master_assertions d_assertions (
 	.src_hrdata      (d_hrdata)
 );
 
-sbus_assumptions sbus_assumptions (
+sbus_assumptions #(
+	.W_ADDR (64),
+	.W_DATA (64)
+) sbus_assumptions (
 	.clk            (clk),
 	.rst_n          (rst_n),
 
