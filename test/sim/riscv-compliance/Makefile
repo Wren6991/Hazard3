@@ -7,6 +7,8 @@ CROSS_PREFIX = riscv64-unknown-elf-
 TESTLIST= \
   add-01 \
   addi-01 \
+  addiw-01 \
+  addw-01 \
   and-01 \
   andi-01 \
   auipc-01 \
@@ -21,25 +23,35 @@ TESTLIST= \
   jalr-01 \
   lb-align-01 \
   lbu-align-01 \
+  ld-align-01 \
   lh-align-01 \
   lhu-align-01 \
   lui-01 \
   lw-align-01 \
+  lwu-align-01 \
   or-01 \
   ori-01 \
   sb-align-01 \
+  sd-align-01 \
   sh-align-01 \
   sll-01 \
   slli-01 \
+  slliw-01 \
+  sllw-01 \
   slt-01 \
   slti-01 \
   sltiu-01 \
   sltu-01 \
   sra-01 \
   srai-01 \
+  sraiw-01 \
+  sraw-01 \
   srl-01 \
   srli-01 \
+  srliw-01 \
+  srlw-01 \
   sub-01 \
+  subw-01 \
   sw-align-01 \
   xor-01 \
   xori-01

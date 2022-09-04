@@ -182,9 +182,9 @@ always @ (*) begin
 		// RV64 narrow ops
 		{7'bzzzzzzz, ALUOP_ADDW   }: result = {{W_DATA/2{sum[31]}}, sum[31:0]};
 		{7'bzzzzzzz, ALUOP_SUBW   }: result = {{W_DATA/2{sum[31]}}, sum[31:0]};
-		{7'bzzzzzzz, ALUOP_SRLW   }: result = {{W_DATA/2{1'b0          }}, shift_dout[31:0]};
+		{7'bzzzzzzz, ALUOP_SLLW   }: result = {{W_DATA/2{shift_dout[31]}}, shift_dout[31:0]};
 		{7'bzzzzzzz, ALUOP_SRAW   }: result = {{W_DATA/2{shift_dout[31]}}, shift_dout[31:0]};
-		{7'bzzzzzzz, ALUOP_SRLW   }: result = {{W_DATA/2{1'b0          }}, shift_dout[31:0]};
+		{7'bzzzzzzz, ALUOP_SRLW   }: result = {{W_DATA/2{shift_dout[31]}}, shift_dout[31:0]};
 		// A (duplicates of Zbb)
 		{7'b1zzzzzz, ALUOP_MAX    }: result = lt ? op_b : op_a;
 		{7'b1zzzzzz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
