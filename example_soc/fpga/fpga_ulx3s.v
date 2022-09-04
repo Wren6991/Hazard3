@@ -60,4 +60,6 @@ example_soc #(
 	.uart_rx (uart_rx)
 );
 
+assign dbg = 8'h00;
+
 endmodule
