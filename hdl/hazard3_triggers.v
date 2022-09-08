@@ -84,7 +84,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		end
 	end else if (cfg_wen && cfg_addr == TSELECT) begin
 		tselect <= cfg_wdata[W_TSELECT-1:0];
-	end else if (cfg_wen && tselect < BREAKPOINT_TRIGGERS && !(tdata1_dmode[i] && !d_mode)) begin
+	end else if (cfg_wen && tselect < BREAKPOINT_TRIGGERS && !(tdata1_dmode[tselect] && !d_mode)) begin
 		// Handle writes to tselect-indexed registers (note writes to D-mode
 		// triggers in non-D-mode are ignored rather than raising an exception)
 		if (cfg_addr == TDATA1) begin
