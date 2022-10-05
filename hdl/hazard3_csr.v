@@ -331,45 +331,48 @@ localparam MAX_IRQS = 512;
 localparam [3:0] IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
 
 // Assigned later:
-wire [MAX_IRQS-1:0]   meipa;
+wire [NUM_IRQS-1:0]   meipa;
 wire [8:0]            meinext_irq;
 wire                  meinext_noirq;
 reg  [3:0]            eirq_highest_priority;
 
-reg  [MAX_IRQS-1:0]   meiea;
-reg  [MAX_IRQS-1:0]   meifa;
-reg  [4*MAX_IRQS-1:0] meipra;
+// Interrupt array registers:
+reg  [NUM_IRQS-1:0]   meiea;
+reg  [NUM_IRQS-1:0]   meifa;
+reg  [4*NUM_IRQS-1:0] meipra;
+
+// Padded vectors for CSR readout
+wire [MAX_IRQS-1:0]   meiea_rdata  = {{MAX_IRQS{1'b0}}, meiea};
+wire [MAX_IRQS-1:0]   meifa_rdata  = {{MAX_IRQS{1'b0}}, meifa};
+wire [4*MAX_IRQS-1:0] meipra_rdata = {{4*MAX_IRQS{1'b0}}, meipra};
 
 always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
 	integer i;
 	if (!rst_n) begin
-		meiea <= {MAX_IRQS{1'b0}};
-		meifa <= {MAX_IRQS{1'b0}};
-		meipra <= {4*MAX_IRQS{1'b0}};
+		meiea <= {NUM_IRQS{1'b0}};
+		meifa <= {NUM_IRQS{1'b0}};
+		meipra <= {4*NUM_IRQS{1'b0}};
 	end else begin
-		// Assign as though all 512 IRQs existed.
-		if (wen_m_mode && addr == MEIEA) begin
-			meiea[16 * wdata[4:0] +: 16]  <= wdata_update[31:16];
-		end else if (wen_m_mode && addr == MEIFA) begin
-			meifa[16 * wdata[4:0] +: 16]  <= wdata_update[31:16];
-		end else if (wen_m_mode && addr == MEIPRA) begin
-			meipra[16 * wdata[6:0] +: 16] <= wdata_update[31:16];
-		end
-		// Clear IRQ force when the corresponding IRQ is sample from meinext
-		// (so that an IRQ can be posted *once* without modifying the ISR source)
-		if (ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
-			meifa[meinext_irq] <= 1'b0;
-		end
-		// Finally, force all nonimplemented register fields to 0 so they are
-		// trimmed. Some tools have trouble propagating constants through the
-		// indexed assignments used above -- a final assignment makes the
-		// propagation simpler as this is the head of the decision tree.
-		for (i = 0; i < MAX_IRQS; i = i + 1) begin
-			if (i >= NUM_IRQS) begin
-				meiea[i] <= 1'b0;
-				meifa[i] <= 1'b0;
-				meipra[4 * i +: 4] <= 4'h0;
+		for (i = 0; i < NUM_IRQS; i = i + 1) begin
+			// CSR write update
+			if (wen_m_mode && addr == MEIEA && wdata[4:0] == i / 16) begin
+				meiea[i]  <= wdata_update[16 + (i % 16)];
 			end
+			if (wen_m_mode && addr == MEIFA && wdata[4:0] == i / 16) begin
+				meifa[i]  <= wdata_update[16 + (i % 16)];
+			end
+			if (wen_m_mode && addr == MEIPRA && wdata[6:0] == i / 4) begin
+				meipra[4 * i +: 4] <= wdata_update[16 + 4 * (i % 4) +: 4];
+			end
+			// Clear IRQ force when the corresponding IRQ is sampled from meinext
+			// (so that an IRQ can be posted *once* without modifying the ISR source)
+			if (meinext_irq == i && ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
+				meifa[meinext_irq] <= 1'b0;
+			end
+			// Finally, force nonimplemented priority fields to 0 so they are
+			// trimmed. Some tools have trouble propagating constants through
+			// the indexed assignments used above -- a final assignment makes
+			// the propagation simpler as this is the head of the decision tree.
 			if (IRQ_PRIORITY_BITS < 4) begin
 				meipra[4 * i + 0] <= 1'b0;
 			end
@@ -1221,7 +1224,7 @@ always @ (*) begin
 	MEIEA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
 		rdata = {
-			meiea[wdata[4:0] * 16 +: 16],
+			meiea_rdata[wdata[4:0] * 16 +: 16],
 			16'h0
 		};
 	end
@@ -1237,7 +1240,7 @@ always @ (*) begin
 	MEIFA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
 		rdata = {
-			meifa[wdata[4:0] * 16 +: 16],
+			meifa_rdata[wdata[4:0] * 16 +: 16],
 			16'h0
 		};
 	end
@@ -1245,7 +1248,7 @@ always @ (*) begin
 	MEIPRA: if (CSR_M_TRAP) begin
 		decode_match = match_mrw;
 		rdata = {
-			meipra[wdata[6:0] * 16 +: 16],
+			meipra_rdata[wdata[6:0] * 16 +: 16],
 			16'h0
 		};
 	end
