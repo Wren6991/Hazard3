@@ -72,7 +72,9 @@ parameter EXTENSION_ZIFENCEI  = 1,
 parameter EXTENSION_XH3BEXTM  = 1,
 
 // EXTENSION_XH3IRQ: Custom preemptive, prioritised interrupt support. Can be
-// disabled if an external interrupt controller (e.g. PLIC) is used.
+// disabled if an external interrupt controller (e.g. PLIC) is used. If
+// disabled, and NUM_IRQS > 1, the external interrupts are simply OR'd into
+// mip.meip.
 parameter EXTENSION_XH3IRQ    = 1,
 
 // EXTENSION_XH3PMPM: PMPCFGMx CSRs to enforce PMP regions in M-mode without
@@ -142,9 +144,7 @@ parameter BREAKPOINT_TRIGGERS = 0,
 // External interrupt support
 
 // NUM_IRQS: Number of external IRQs implemented in meiea, meipa, meifa and
-// meipra, if CSR_M_TRAP is enabled. Minimum 1, maximum 512. If
-// EXTENSION_XH3IRQ is disabled, NUM_IRQS must be 1, and an external
-// interrupt controller (e.g. PLIC) is required.
+// meipra, if CSR_M_TRAP is enabled. Minimum 1, maximum 512.
 parameter NUM_IRQS            = 32,
 
 // IRQ_PRIORITY_BITS: Number of priority bits implemented for each interrupt

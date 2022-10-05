@@ -362,9 +362,19 @@ if (|EXTENSION_XH3IRQ) begin: have_irq_ctrl
 
 end else begin: no_irq_ctrl
 
+	reg external_irq_pending_r;
+
+	always @ (posedge clk_always_on or negedge rst_n) begin
+		if (!rst_n) begin
+			external_irq_pending_r <= 1'b0;
+		end else begin
+			external_irq_pending_r <= |irq;
+		end
+	end
+
 	assign irq_ctrl_rdata = {W_DATA{1'b0}};
-	assign external_irq_pending = |irq;
 	assign meicontext_clearts = 1'b0;
+	assign external_irq_pending = external_irq_pending_r;
 
 end
 endgenerate
