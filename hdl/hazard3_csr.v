@@ -331,7 +331,7 @@ localparam MAX_IRQS = 512;
 localparam [3:0] IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
 
 // Assigned later:
-wire [NUM_IRQS-1:0]   meipa;
+wire [MAX_IRQS-1:0]   meipa;
 wire [8:0]            meinext_irq;
 wire                  meinext_noirq;
 reg  [3:0]            eirq_highest_priority;
@@ -342,9 +342,9 @@ reg  [NUM_IRQS-1:0]   meifa;
 reg  [4*NUM_IRQS-1:0] meipra;
 
 // Padded vectors for CSR readout
-wire [MAX_IRQS-1:0]   meiea_rdata  = {{MAX_IRQS{1'b0}}, meiea};
-wire [MAX_IRQS-1:0]   meifa_rdata  = {{MAX_IRQS{1'b0}}, meifa};
-wire [4*MAX_IRQS-1:0] meipra_rdata = {{4*MAX_IRQS{1'b0}}, meipra};
+wire [MAX_IRQS-1:0]   meiea_rdata  = {{MAX_IRQS-NUM_IRQS{1'b0}}, meiea};
+wire [MAX_IRQS-1:0]   meifa_rdata  = {{MAX_IRQS-NUM_IRQS{1'b0}}, meifa};
+wire [4*MAX_IRQS-1:0] meipra_rdata = {{4*(MAX_IRQS-NUM_IRQS){1'b0}}, meipra};
 
 always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
 	integer i;
@@ -470,7 +470,7 @@ end
 // preemption level: this masking helps avoid re-taking IRQs in frames that you
 // have preempted. 
 
-assign meipa = {{MAX_IRQS-NUM_IRQS{1'b0}}, irq_r} | meifa;
+assign meipa = {{MAX_IRQS-NUM_IRQS{1'b0}}, irq_r | meifa};
 
 reg [NUM_IRQS-1:0] eirq_active_above_preempt;
 reg [NUM_IRQS-1:0] eirq_active_above_ppreempt;
