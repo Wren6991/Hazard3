@@ -278,7 +278,7 @@ end
 reg [XLEN-1:0] mie;
 localparam MIE_WMASK = 32'h00000888; // meie, mtie, msie
 
-wire meicontext_clearts = wen_m_mode && wtype != CSR_WTYPE_C && addr == MEICONTEXT && wdata[1];
+wire meicontext_clearts;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -325,211 +325,49 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // ----------------------------------------------------------------------------
-// Custom external IRQ handling CSRs
+// Custom external IRQ controller
 
-localparam MAX_IRQS = 512;
-localparam [3:0] IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
+wire [XLEN-1:0] irq_ctrl_rdata;
+wire            external_irq_pending;
 
-// Assigned later:
-wire [MAX_IRQS-1:0]   meipa;
-wire [8:0]            meinext_irq;
-wire                  meinext_noirq;
-reg  [3:0]            eirq_highest_priority;
+generate
+if (|EXTENSION_XH3IRQ) begin: have_irq_ctrl
 
-// Interrupt array registers:
-reg  [NUM_IRQS-1:0]   meiea;
-reg  [NUM_IRQS-1:0]   meifa;
-reg  [4*NUM_IRQS-1:0] meipra;
+	hazard3_irq_ctrl #(
+	`include "hazard3_config_inst.vh"
+	) irq_ctrl (
+		.clk                  (clk),
+		.clk_always_on        (clk_always_on),
+		.rst_n                (rst_n),
 
-// Padded vectors for CSR readout
-wire [MAX_IRQS-1:0]   meiea_rdata  = {{MAX_IRQS-NUM_IRQS{1'b0}}, meiea};
-wire [MAX_IRQS-1:0]   meifa_rdata  = {{MAX_IRQS-NUM_IRQS{1'b0}}, meifa};
-wire [4*MAX_IRQS-1:0] meipra_rdata = {{4*(MAX_IRQS-NUM_IRQS){1'b0}}, meipra};
+		.addr                 (addr),
+		.wtype                (wtype),
+		.wen_m_mode           (wen_m_mode),
+		.ren_m_mode           (ren_m_mode),
+		.wdata_raw            (wdata),
+		.wdata                (wdata_update),
+		.rdata                (irq_ctrl_rdata),
 
-always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
-	integer i;
-	if (!rst_n) begin
-		meiea <= {NUM_IRQS{1'b0}};
-		meifa <= {NUM_IRQS{1'b0}};
-		meipra <= {4*NUM_IRQS{1'b0}};
-	end else begin
-		for (i = 0; i < NUM_IRQS; i = i + 1) begin
-			// CSR write update
-			if (wen_m_mode && addr == MEIEA && wdata[4:0] == i / 16) begin
-				meiea[i]  <= wdata_update[16 + (i % 16)];
-			end
-			if (wen_m_mode && addr == MEIFA && wdata[4:0] == i / 16) begin
-				meifa[i]  <= wdata_update[16 + (i % 16)];
-			end
-			if (wen_m_mode && addr == MEIPRA && wdata[6:0] == i / 4) begin
-				meipra[4 * i +: 4] <= wdata_update[16 + 4 * (i % 4) +: 4];
-			end
-			// Clear IRQ force when the corresponding IRQ is sampled from meinext
-			// (so that an IRQ can be posted *once* without modifying the ISR source)
-			if (meinext_irq == i && ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
-				meifa[meinext_irq] <= 1'b0;
-			end
-			// Finally, force nonimplemented priority fields to 0 so they are
-			// trimmed. Some tools have trouble propagating constants through
-			// the indexed assignments used above -- a final assignment makes
-			// the propagation simpler as this is the head of the decision tree.
-			if (IRQ_PRIORITY_BITS < 4) begin
-				meipra[4 * i + 0] <= 1'b0;
-			end
-			if (IRQ_PRIORITY_BITS < 3) begin
-				meipra[4 * i + 1] <= 1'b0;
-			end
-			if (IRQ_PRIORITY_BITS < 2) begin
-				meipra[4 * i + 2] <= 1'b0;
-			end
-			if (IRQ_PRIORITY_BITS < 1) begin
-				meipra[4 * i + 3] <= 1'b0;
-			end
-		end
-	end
+		.trapreg_update_enter (trapreg_update_enter),
+		.trapreg_update_exit  (trapreg_update_exit),
+		.trap_entry_is_eirq   (mcause_irq_next && mcause_code_next == 4'hb),
+
+		.meicontext_clearts   (meicontext_clearts),
+		.mie_mtie             (mie[7]),
+		.mie_msie             (mie[3]),
+
+		.irq                  (irq),
+		.external_irq_pending (external_irq_pending)
+	);
+
+end else begin: no_irq_ctrl
+
+	assign irq_ctrl_rdata = {W_DATA{1'b0}};
+	assign external_irq_pending = |irq;
+	assign meicontext_clearts = 1'b0;
+
 end
-
-reg [3:0] meicontext_pppreempt;
-reg [3:0] meicontext_ppreempt;
-reg [4:0] meicontext_preempt;
-reg       meicontext_noirq;
-reg [8:0] meicontext_irq;
-reg       meicontext_mreteirq;
-
-wire [4:0] preempt_level_next = meinext_noirq ? 5'h10 : (
-	(5'd1 << (4 - IRQ_PRIORITY_BITS)) + {1'b0, eirq_highest_priority}
-);
-
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		meicontext_pppreempt <= 4'h0;
-		meicontext_ppreempt <= 4'h0;
-		meicontext_preempt <= 5'h0;
-		meicontext_noirq <= 1'b1;
-		meicontext_irq <= 9'h0;
-		meicontext_mreteirq <= 1'b0;
-	end else if (trapreg_update_enter) begin
-		if (mcause_irq_next && mcause_code_next == 4'hb) begin
-			// Priority save. Note the MSB of preempt needn't be saved since,
-			// when it is set, preemption is impossible, so we won't be here.
-			meicontext_pppreempt <= meicontext_ppreempt & IRQ_PRIORITY_MASK;
-			meicontext_ppreempt <= meicontext_preempt[3:0] & IRQ_PRIORITY_MASK;
-			// Setting preempt isn't strictly necessary, since an updating read
-			// of meinext ought to be performed before re-enabling IRQs via
-			// mstatus.mie, but it seems the least surprising thing to do:
-			meicontext_preempt <= preempt_level_next & {1'b1, IRQ_PRIORITY_MASK};
-			meicontext_mreteirq <= 1'b1;
-		end else begin
-			meicontext_mreteirq <= 1'b0;
-		end
-	end else if (trapreg_update_exit) begin
-		meicontext_mreteirq <= 1'b0;
-		if (meicontext_mreteirq) begin
-			// Priority restore
-			meicontext_pppreempt <= 4'h0;
-			meicontext_ppreempt <= meicontext_pppreempt & IRQ_PRIORITY_MASK;
-			meicontext_preempt <= {1'b0, meicontext_ppreempt & IRQ_PRIORITY_MASK};
-		end
-	end else if (wen_m_mode && addr == MEICONTEXT) begin
-		meicontext_pppreempt <= wdata_update[31:28] & IRQ_PRIORITY_MASK;
-		meicontext_ppreempt <= wdata_update[27:24] & IRQ_PRIORITY_MASK;
-		meicontext_preempt <= wdata_update[20:16] & {1'b1, IRQ_PRIORITY_MASK};
-		meicontext_noirq <= wdata_update[15];
-		meicontext_irq <= wdata_update[12:4];
-		meicontext_mreteirq <= wdata_update[0];
-	end else if (wen_m_mode && addr == MEINEXT && wdata_update[0]) begin
-		// Interrupt has been sampled, with the update request set, so update
-		// the context (including preemption level) appropriately.
-		meicontext_preempt <= preempt_level_next & {1'b1, IRQ_PRIORITY_MASK};
-		meicontext_noirq <= meinext_noirq;
-		meicontext_irq <= meinext_irq;
-	end
-end
-// ----------------------------------------------------------------------------
-// External interrupt logic
-
-// Signal to standard IRQ logic (mip etc) that at least one of the external IRQ
-// signals should cause a trap to the mip.meip vector:
-wire external_irq_pending;
-
-// Register external IRQ signals (mainly to avoid a through-path from IRQs to
-// bus request signals). Always clocked, as it's used to generate a wakeup.
-
-reg [NUM_IRQS-1:0] irq_r;
-
-always @ (posedge clk_always_on or negedge rst_n) begin
-	if (!rst_n) begin
-		irq_r <= {NUM_IRQS{1'b0}};
-	end else begin
-		irq_r <= irq;
-	end
-end
-
-// Trap request is asserted when there is an interrupt at or above our current
-// preemption level. meinext displays interrupts at or above our *previous*
-// preemption level: this masking helps avoid re-taking IRQs in frames that you
-// have preempted. 
-
-assign meipa = {{MAX_IRQS-NUM_IRQS{1'b0}}, irq_r | meifa};
-
-reg [NUM_IRQS-1:0] eirq_active_above_preempt;
-reg [NUM_IRQS-1:0] eirq_active_above_ppreempt;
-
-always @ (*) begin: eirq_compare
-	integer i;
-	for (i = 0; i < NUM_IRQS; i = i + 1) begin
-		eirq_active_above_preempt[i]  = meipa[i] && meiea[i] && {1'b0, meipra[i * 4 +: 4]} >= meicontext_preempt;
-		eirq_active_above_ppreempt[i] = meipa[i] && meiea[i] &&        meipra[i * 4 +: 4]  >= meicontext_ppreempt;
-	end
-end
-
-assign external_irq_pending =  |eirq_active_above_preempt;
-assign meinext_noirq        = ~|eirq_active_above_ppreempt;
-
-// Two things remaining to calculate:
-//
-// - What is the IRQ number of the highest-priority pending IRQ that is above
-//   meicontext.ppreempt
-// - What is the priority of that IRQ
-//
-// In the second case we can relax the calculation to ignore ppreempt, since it
-// only needs to be valid if such an IRQ exists. Currently we choose to reuse
-// the same priority selector (possibly longer critpath while saving area), but
-// we could use a second priority selector that ignores ppreempt masking.
-
-wire [NUM_IRQS-1:0] highest_eirq_onehot;
-wire [8:0]          meinext_irq_unmasked;
-
-hazard3_onehot_priority_dynamic #(
-	.W_REQ                 (NUM_IRQS),
-	.N_PRIORITIES          (16),
-	.PRIORITY_HIGHEST_WINS (1),
-	.TIEBREAK_HIGHEST_WINS (0)
-) eirq_priority_u (
-	.pri (meipra[4*NUM_IRQS-1:0] & {NUM_IRQS{IRQ_PRIORITY_MASK}}),
-	.req (eirq_active_above_ppreempt),
-	.gnt (highest_eirq_onehot)
-);
-
-always @ (*) begin: get_highest_eirq_priority
-	integer i;
-	eirq_highest_priority = 4'h0;
-	for (i = 0; i < NUM_IRQS; i = i + 1) begin
-		eirq_highest_priority = eirq_highest_priority | (
-			meipra[4 * i +: 4] & {4{highest_eirq_onehot[i]}}
-		);
-	end
-end
-
-hazard3_onehot_encode #(
-	.W_REQ (NUM_IRQS),
-	.W_GNT (9)
-) eirq_encode_u (
-	.req (highest_eirq_onehot),
-	.gnt (meinext_irq_unmasked)
-);
-
-assign meinext_irq = meinext_irq_unmasked & {9{!meinext_noirq}};
+endgenerate
 
 // ----------------------------------------------------------------------------
 // Custom sleep/power control CSRs
@@ -731,8 +569,9 @@ always @ (*) begin
 
 			2'd0,              // Z, Y, no
 			|{                 // X is set for any custom extensions
-				|CSR_M_TRAP,
 				|EXTENSION_XH3BEXTM,
+				|EXTENSION_XH3IRQ,
+				|EXTENSION_XH3PMPM,
 				|EXTENSION_XH3POWER
 			},
 			2'd0,              // V, W, no
@@ -1221,63 +1060,40 @@ always @ (*) begin
 	// ------------------------------------------------------------------------
 	// Custom CSRs
 
-	MEIEA: if (CSR_M_TRAP) begin
+	PMPCFGM0: if (PMP_REGIONS > 0 && EXTENSION_XH3PMPM) begin
 		decode_match = match_mrw;
-		rdata = {
-			meiea_rdata[wdata[4:0] * 16 +: 16],
-			16'h0
-		};
+		pmp_cfg_wen = match_mrw && wen;
+		rdata = pmp_cfg_rdata;
 	end
 
-	MEIPA: if (CSR_M_TRAP) begin
+	MEIEA: if (CSR_M_TRAP && EXTENSION_XH3IRQ) begin
 		decode_match = match_mrw;
-		rdata = {
-			meipa[wdata[4:0] * 16 +: 16],
-			16'h0
-		};
+		rdata = irq_ctrl_rdata;
 	end
 
-	MEIFA: if (CSR_M_TRAP) begin
+	MEIPA: if (CSR_M_TRAP && EXTENSION_XH3IRQ) begin
 		decode_match = match_mrw;
-		rdata = {
-			meifa_rdata[wdata[4:0] * 16 +: 16],
-			16'h0
-		};
+		rdata = irq_ctrl_rdata;
 	end
 
-	MEIPRA: if (CSR_M_TRAP) begin
+	MEIFA: if (CSR_M_TRAP && EXTENSION_XH3IRQ) begin
 		decode_match = match_mrw;
-		rdata = {
-			meipra_rdata[wdata[6:0] * 16 +: 16],
-			16'h0
-		};
+		rdata = irq_ctrl_rdata;
 	end
 
-	MEINEXT: if (CSR_M_TRAP) begin
+	MEIPRA: if (CSR_M_TRAP && EXTENSION_XH3IRQ) begin
 		decode_match = match_mrw;
-		rdata = {
-			meinext_noirq,
-			20'h0,
-			meinext_irq,
-			2'h0
-		};
+		rdata = irq_ctrl_rdata;
 	end
 
-	MEICONTEXT: if (CSR_M_TRAP) begin
+	MEINEXT: if (CSR_M_TRAP && EXTENSION_XH3IRQ) begin
 		decode_match = match_mrw;
-		rdata = {
-			meicontext_pppreempt,
-			meicontext_ppreempt,
-			3'h0,
-			meicontext_preempt,
-			meicontext_noirq,
-			2'h0,
-			meicontext_irq,
-			mie[7] && meicontext_clearts,
-			mie[3] && meicontext_clearts,
-			1'b0,
-			meicontext_mreteirq
-		};
+		rdata = irq_ctrl_rdata;
+	end
+
+	MEICONTEXT: if (CSR_M_TRAP && EXTENSION_XH3IRQ) begin
+		decode_match = match_mrw;
+		rdata = irq_ctrl_rdata;
 	end
 
 	MSLEEP: if (EXTENSION_XH3POWER) begin
@@ -1549,6 +1365,17 @@ always @ (posedge clk) begin
 	// feeding in invalid instructions
 	if (in_trap)
 		assume(except == EXCEPT_NONE || except == EXCEPT_MRET);
+
+	// Note the actual IRQ registers have been moved into hazard3_irq_ctrl
+	// (and are now optional) so repeat them here for the property
+	reg [NUM_IRQS-1:0] irq_r;
+	always @ (posedge clk_always_on or negedge rst_n) begin
+		if (!rst_n) begin
+			irq_r <= {NUM_IRQS{1'b0}};
+		end else begin
+			irq_r <= irq;
+		end
+	end
 
 	// Assume IRQs are not deasserted on cycles where exception entry does not
 	// take place

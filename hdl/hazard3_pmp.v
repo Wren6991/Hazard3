@@ -117,7 +117,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 			end
 		end
 		if (cfg_addr == PMPCFGM0) begin
-			pmpcfg_m <= cfg_wdata[PMP_REGIONS-1:0] & ~PMP_HARDWIRED;
+			pmpcfg_m <= cfg_wdata[PMP_REGIONS-1:0] & ~PMP_HARDWIRED & {PMP_REGIONS{|EXTENSION_XH3PMPM}};
 		end
 	end
 end
@@ -149,7 +149,7 @@ always @ (*) begin: cfg_read
 		end
 	end
 	if (cfg_addr == PMPCFGM0) begin
-		cfg_rdata = {{32-PMP_REGIONS{1'b0}}, pmpcfg_m};
+		cfg_rdata = {{32-PMP_REGIONS{1'b0}}, pmpcfg_m} & {32{|EXTENSION_XH3PMPM}};
 	end
 end
 

@@ -34,7 +34,7 @@ parameter RESET_VECTOR    = 32'h0,
 parameter MTVEC_INIT      = 32'h00000000,
 
 // ----------------------------------------------------------------------------
-// RISC-V ISA support
+// Standard RISC-V ISA support
 
 // EXTENSION_A: Support for atomic read/modify/write instructions
 parameter EXTENSION_A         = 1,
@@ -65,14 +65,25 @@ parameter EXTENSION_ZBKB      = 1,
 // Optional, since a plain branch/jump will also flush the prefetch queue.
 parameter EXTENSION_ZIFENCEI  = 1,
 
+// ----------------------------------------------------------------------------
+// Custom RISC-V extensions
+
 // EXTENSION_XH3B: Custom bit-extract-multiple instructions for Hazard3
-parameter EXTENSION_XH3BEXTM   = 1,
+parameter EXTENSION_XH3BEXTM  = 1,
+
+// EXTENSION_XH3IRQ: Custom preemptive, prioritised interrupt support. Can be
+// disabled if an external interrupt controller (e.g. PLIC) is used.
+parameter EXTENSION_XH3IRQ    = 1,
+
+// EXTENSION_XH3PMPM: PMPCFGMx CSRs to enforce PMP regions in M-mode without
+// locking. Unlike ePMP mseccfg.rlb, locked and unlocked regions can coexist
+parameter EXTENSION_XH3PMPM   = 1,
 
 // EXTENSION_XH3POWER: Custom power management controls for Hazard3
-parameter EXTENSION_XH3POWER   = 1,
+parameter EXTENSION_XH3POWER  = 1,
 
 // ----------------------------------------------------------------------------
-// CSR support
+// Standard CSR support
 
 // Note the Zicsr extension is implied by any of CSR_M_MANDATORY, CSR_M_TRAP,
 // CSR_COUNTER.
@@ -131,14 +142,21 @@ parameter BREAKPOINT_TRIGGERS = 0,
 // External interrupt support
 
 // NUM_IRQS: Number of external IRQs implemented in meiea, meipa, meifa and
-// meipra, if CSR_M_TRAP is enabled. Minimum 1, maximum 512.
+// meipra, if CSR_M_TRAP is enabled. Minimum 1, maximum 512. If
+// EXTENSION_XH3IRQ is disabled, NUM_IRQS must be 1, and an external
+// interrupt controller (e.g. PLIC) is required.
 parameter NUM_IRQS            = 32,
 
-// Number of priority bits implemented for each interrupt in meipra. The
-// number of distinct levels is (1 << IRQ_PRIORITY_BITS). Minimum 0, max 4.
-// Note that having more than 1 priority level with a large number of IRQs
-// will have a severe effect on timing.
+// IRQ_PRIORITY_BITS: Number of priority bits implemented for each interrupt
+// in meipra. The number of distinct levels is (1 << IRQ_PRIORITY_BITS).
+// Minimum 0, max 4. Note that having more than 1 priority level with a large
+// number of IRQs will have a severe effect on timing. Ignored if
+// EXTENSION_XH3IRQ is disabled.
 parameter IRQ_PRIORITY_BITS   = 0,
+
+// IRQ_INPUT_BYPASS: disable the input registers on the external interrupts,
+// to reduce latency by one cycle. Can be done on an IRQ-by-IRQ basis.
+parameter IRQ_INPUT_BYPASS    = {NUM_IRQS{1'b0}},
 
 // ----------------------------------------------------------------------------
 // ID registers

@@ -14,6 +14,7 @@ file hazard3_csr.v
 file hazard3_decode.v
 file hazard3_frontend.v
 file hazard3_instr_decompress.v
+file hazard3_irq_ctrl.v
 file hazard3_pmp.v
 file hazard3_power_ctrl.v
 file hazard3_regfile_1w2r.v
