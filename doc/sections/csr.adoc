@@ -86,7 +86,7 @@ Read-only, constant. Value depends on which ISA extensions Hazard3 is configured
 |===
 | Bits | Name | Description
 | 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
-| 23 | `x` | 1 if the core is configured to support trap-handling, otherwise 0. Hazard3 has nonstandard CSRs to enable/disable external interrupts on a per-interrupt basis, see <<reg-meiea>> and <<reg-meipa>>. The `misa.x` bit must be set to indicate their presence. Hazard3 does not implement any custom instructions.
+| 23 | `x` | 1 if any custom extension is enabled (<<cfg-custom-extensions>>), otherwise 0.
 | 20 | `u` | 1 if User mode is supported, otherwise 0.
 | 12 | `m` | 1 if the M extension is present, otherwise 0.
 | 2 | `c` | 1 if the C extension is present, otherwise 0.
@@ -148,6 +148,7 @@ The table below lists the fields which are _not_ hardwired to 0:
 
 NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-meiea>>, and keeps the upper half of `mie` reserved.
 
+[[reg-mip]]
 ==== mip
 
 Address: `0x344`
@@ -527,6 +528,7 @@ Bits can be cleared by software, and are cleared automatically by hardware upon 
 | 4:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
 
+[[reg-meipra]]
 ==== meipra
 
 Address: `0xbe3`
@@ -543,6 +545,7 @@ When an interrupt's priority is lower than the current preemption priority `meic
 | 6:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
 
+[[reg-meinext]]
 ==== meinext
 
 Address: `0xbe4`
@@ -655,6 +658,7 @@ no_more_irqs:
 
 === Custom Memory Protection CSRs
 
+[[reg-pmpcfgm0]]
 ==== pmpcfgm0
 
 Address: 0xbd0

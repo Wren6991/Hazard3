@@ -4,6 +4,31 @@ Hazard3 implements a small number of custom extensions. All are optional: custom
 
 If any one of these extensions is enabled, the `x` bit in <<reg-misa>> is set to indicate the presence of a nonstandard extension.
 
+[[extension-xh3irq-section]]
+=== Xh3irq: Hazard3 interrupt controller
+
+This is a lightweight extension to control up to 512 external interrupts, with up to 16 levels of preemption.
+
+This extension does not add any instructions, but does add several CSRs:
+
+* <<reg-meiea>>
+* <<reg-meipa>>
+* <<reg-meifa>>
+* <<reg-meipra>>
+* <<reg-meinext>>
+* <<reg-meicontext>>
+
+If this extension is disabled then Hazard3 supports a single external interrupt input (or multiple inputs that it simply ORs together in an uncontrolled fashion), so an external PLIC can be used for standard interrupt support.
+
+Note that, besides the additional CSRs, this extension is effectively a slightly more complicated way of driving the standard `mip.meip` flag (<<reg-mip>>). The RISC-V trap handling CSRs themselves are always completely standard.
+
+[[extension-xh3pmpm-section]]
+=== Xh3pmpm: M-mode PMP regions
+
+This extension adds a new M-mode CSR, <<reg-pmpcfgm0>>, which allows a PMP region to be enforced in M-mode without locking the region.
+
+This is useful when the PMP is used for non-security-related purposes such as stack guarding, or trapping and emulation of peripheral accesses.
+
 [[extension-xh3power-section]]
 === Xh3power: Hazard3 power management
 

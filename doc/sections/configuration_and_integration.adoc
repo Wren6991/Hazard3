@@ -45,7 +45,7 @@ Bits set in <<param-MTVEC_WMASK>> can be written/set/cleared as normal.
 
 Default value: all-zeroes.
 
-==== RISC-V ISA support
+==== Standard RISC-V ISA support
 
 [[param-EXTENSION_A]]
 ===== EXTENSION_A
@@ -121,6 +121,25 @@ Default value: 1
 Custom bit manipulation instructions for Hazard3: `h3.bextm` and `h3.bextmi`. See <<extension-xh3bextm-section>>.
 
 Default value: 1
+
+[[cfg-custom-extensions]]
+==== Custom Hazard3 Extensions
+
+[[param-EXTENSION_XH3IRQ]]
+===== EXTENSION_XH3IRQ
+
+Custom preemptive, prioritised interrupt support. Can be disabled if an
+external interrupt controller (e.g. PLIC) is used. If disabled, and
+NUM_IRQS > 1, the external interrupts are simply OR'd into mip.meip. See <<extension-xh3irq-section>>.
+
+Default value: 1
+
+
+[[param-EXTENSION_XH3PMPM]]
+===== EXTENSION_XH3PMPM
+
+Custom PMPCFGMx CSRs to enforce PMP regions in M-mode without locking. See <<extension-xh3pmpm-section>>.
+
 
 [[param-EXTENSION_XH3POWER]]
 ===== EXTENSION_XH3POWER
@@ -261,6 +280,14 @@ Note that having more than 1 priority level with a large number of IRQs
 will have a severe effect on timing.
 
 Default value: 0
+
+[[param-IRQ_INPUT_BYPASS]]
+===== IRQ_INPUT_BYPASS
+
+Disable the input registers on the external interrupts, to reduce latency by
+one cycle. Can be done on an IRQ-by-IRQ basis.
+
+Default value: all-zeroes (not bypassed).
 
 ==== Identification Registers
 
