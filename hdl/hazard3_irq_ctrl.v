@@ -200,11 +200,6 @@ assign meicontext_clearts = wen_m_mode && wtype != CSR_WTYPE_C && addr == MEICON
 // ----------------------------------------------------------------------------
 // External interrupt logic
 
-// Signal to standard IRQ logic (mip etc) that at least one of the external IRQ
-// signals should cause a trap to the mip.meip vector:
-wire external_irq_pending;
-
-
 // Trap request is asserted when there is an interrupt at or above our current
 // preemption level. meinext displays interrupts at or above our *previous*
 // preemption level: this masking helps avoid re-taking IRQs in frames that you
