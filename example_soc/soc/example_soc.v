@@ -9,8 +9,9 @@
 `default_nettype none
 
 module example_soc #(
-	parameter DTM_TYPE = "JTAG",    // can be "JTAG" or "ECP5"
-	parameter SRAM_DEPTH = 1 << 15, // default 32 kwords -> 128 kB
+	parameter DTM_TYPE   = "JTAG",  // Can be "JTAG" or "ECP5"
+	parameter SRAM_DEPTH = 1 << 15, // Default 32 kwords -> 128 kB
+	parameter CLK_MHZ    = 12,      // For timer timebase
 
 	`include "hazard3_config.vh"
 ) (
@@ -262,6 +263,8 @@ hazard3_cpu_1port #(
 	.EXTENSION_ZBKB      (EXTENSION_ZBKB),
 	.EXTENSION_ZIFENCEI  (EXTENSION_ZIFENCEI),
 	.EXTENSION_XH3BEXTM  (EXTENSION_XH3BEXTM),
+	.EXTENSION_XH3IRQ    (EXTENSION_XH3IRQ),
+	.EXTENSION_XH3PMPM   (EXTENSION_XH3PMPM),
 	.EXTENSION_XH3POWER  (EXTENSION_XH3POWER),
 	.CSR_COUNTER         (CSR_COUNTER),
 	.U_MODE              (U_MODE),
@@ -538,30 +541,43 @@ uart_mini uart_u (
 	.dreq         (/* unused */)
 );
 
-// hazard3_riscv_timer timer_u (
-// 	.clk       (clk),
-// 	.rst_n     (rst_n),
+// Microsecond timebase for timer
 
-// 	.psel      (timer_psel),
-// 	.penable   (timer_penable),
-// 	.pwrite    (timer_pwrite),
-// 	.paddr     (timer_paddr),
-// 	.pwdata    (timer_pwdata),
-// 	.prdata    (timer_prdata),
-// 	.pready    (timer_pready),
-// 	.pslverr   (timer_pslverr),
+reg [$clog2(CLK_MHZ)-1:0] timer_tick_ctr;
+reg                       timer_tick;
 
-// 	.dbg_halt  (&hart_halted),
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		timer_tick_ctr <= {$clog2(CLK_MHZ){1'b0}};
+		timer_tick <= 1'b0;
+	end else begin
+		if (|timer_tick_ctr) begin
+			timer_tick_ctr <= timer_tick_ctr - 1'b1;
+		end else begin
+			timer_tick_ctr <= CLK_MHZ - 1;
+		end
+		timer_tick <= ~|timer_tick_ctr;
+	end
+end
 
-// 	// Tie high for 64-cycle timebase:
-// 	.tick      (1'b1),
+hazard3_riscv_timer timer_u (
+	.clk       (clk),
+	.rst_n     (rst_n),
 
-// 	.timer_irq (timer_irq)
-// );
+	.psel      (timer_psel),
+	.penable   (timer_penable),
+	.pwrite    (timer_pwrite),
+	.paddr     (timer_paddr),
+	.pwdata    (timer_pwdata),
+	.prdata    (timer_prdata),
+	.pready    (timer_pready),
+	.pslverr   (timer_pslverr),
 
-assign timer_pslverr = 1'b0;
-assign timer_pready = 1'b1;
-assign timer_prdata = 32'h0;
-assign timer_irq = 1'b0;
+	.dbg_halt  (&hart_halted),
+
+	.tick      (timer_tick),
+
+	.timer_irq (timer_irq)
+);
 
 endmodule

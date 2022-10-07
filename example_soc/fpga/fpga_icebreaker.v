@@ -62,6 +62,7 @@ activity_led #(
 );
 
 example_soc #(
+	.CLK_MHZ             (12),
 	.EXTENSION_A         (1),
 	.EXTENSION_C         (0),
 	.EXTENSION_M         (1),
@@ -72,6 +73,7 @@ example_soc #(
 	.EXTENSION_ZBKB      (0),
 	.EXTENSION_ZIFENCEI  (0),
 	.EXTENSION_XH3BEXTM  (0),
+	.EXTENSION_XH3PMPM   (0),
 	.EXTENSION_XH3POWER  (0),
 	.CSR_COUNTER         (0),
 	.U_MODE              (0),
