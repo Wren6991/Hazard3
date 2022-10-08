@@ -311,14 +311,14 @@ always @ (*) begin
 	mem_priv_r = fetch_priv;
 	mem_addr_vld_r = 1'b1;
 	case (1'b1)
-		mem_addr_hold               : begin mem_addr_r = fetch_addr; end
-		jump_target_vld             : begin
-		                                    mem_addr_r = {jump_target[W_ADDR-1:2], 2'b00};
-		                                    mem_priv_r = jump_priv || !U_MODE;
+		mem_addr_hold                    : begin mem_addr_r = fetch_addr; end
+		jump_target_vld || reset_holdoff : begin
+		                                         mem_addr_r = {jump_target[W_ADDR-1:2], 2'b00};
+		                                         mem_priv_r = jump_priv || !U_MODE;
 		end
-		DEBUG_SUPPORT && debug_mode : begin mem_addr_vld_r = 1'b0; end
-		!fetch_stall                : begin mem_addr_r = fetch_addr; end
-		default                     : begin mem_addr_vld_r = 1'b0; end
+		DEBUG_SUPPORT && debug_mode      : begin mem_addr_vld_r = 1'b0; end
+		!fetch_stall                     : begin mem_addr_r = fetch_addr; end
+		default                          : begin mem_addr_vld_r = 1'b0; end
 	endcase
 end
 

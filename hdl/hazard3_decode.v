@@ -348,17 +348,20 @@ always @ (*) begin
 	endcase
 
 	if (d_invalid || d_starved || d_except_instr_bus_fault || partial_predicted_branch) begin
-		d_rs1           = {W_REGADDR{1'b0}};
-		d_rs2           = {W_REGADDR{1'b0}};
-		d_rd            = {W_REGADDR{1'b0}};
-		d_memop         = MEMOP_NONE;
-		d_branchcond    = BCOND_NEVER;
-		d_csr_ren       = 1'b0;
-		d_csr_wen       = 1'b0;
-		d_except        = EXCEPT_NONE;
-		d_sleep_wfi     = 1'b0;
-		d_sleep_block   = 1'b0;
-		d_sleep_unblock = 1'b0;
+		d_rs1             = {W_REGADDR{1'b0}};
+		d_rs2             = {W_REGADDR{1'b0}};
+		d_rd              = {W_REGADDR{1'b0}};
+		d_memop           = MEMOP_NONE;
+		d_branchcond      = BCOND_NEVER;
+		d_csr_ren         = 1'b0;
+		d_csr_wen         = 1'b0;
+		d_except          = EXCEPT_NONE;
+		d_sleep_wfi       = 1'b0;
+		d_sleep_block     = 1'b0;
+		d_sleep_unblock   = 1'b0;
+		// Ensure address bus is 0 in reset if register file is resettable:
+		d_addr_is_regoffs = 1'b1;
+
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;
 
