@@ -111,28 +111,12 @@ always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
 				meifa[i]  <= wdata[16 + (i % 16)];
 			end
 			if (wen_m_mode && addr == MEIPRA && wdata_raw[6:0] == i / 4) begin
-				meipra[4 * i +: 4] <= wdata[16 + 4 * (i % 4) +: 4];
+				meipra[4 * i +: 4] <= wdata[16 + 4 * (i % 4) +: 4] & IRQ_PRIORITY_MASK;
 			end
 			// Clear IRQ force when the corresponding IRQ is sampled from meinext
 			// (so that an IRQ can be posted *once* without modifying the ISR source)
 			if (meinext_irq == i && ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
 				meifa[meinext_irq] <= 1'b0;
-			end
-			// Finally, force nonimplemented priority fields to 0 so they are
-			// trimmed. Some tools have trouble propagating constants through
-			// the indexed assignments used above -- a final assignment makes
-			// the propagation simpler as this is the head of the decision tree.
-			if (IRQ_PRIORITY_BITS < 4) begin
-				meipra[4 * i + 0] <= 1'b0;
-			end
-			if (IRQ_PRIORITY_BITS < 3) begin
-				meipra[4 * i + 1] <= 1'b0;
-			end
-			if (IRQ_PRIORITY_BITS < 2) begin
-				meipra[4 * i + 2] <= 1'b0;
-			end
-			if (IRQ_PRIORITY_BITS < 1) begin
-				meipra[4 * i + 3] <= 1'b0;
 			end
 		end
 	end
