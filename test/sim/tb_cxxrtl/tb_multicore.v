@@ -4,7 +4,8 @@
 `default_nettype none
 
 module tb #(
-`include "hazard3_config.vh"
+	parameter W_ADDR = 32, // do not modify
+	parameter W_DATA = 32  // do not modify
 ) (
 	// Global signals
 	input wire                clk,
@@ -208,6 +209,11 @@ hazard3_reset_sync cpu1_reset_sync (
 // of the previous "done" is not passed on.
 assign sys_reset_done = rst_n_cpu0 && rst_n_cpu1;
 assign hart_reset_done = {rst_n_cpu1, rst_n_cpu0};
+
+`ifndef CONFIG_HEADER
+`define CONFIG_HEADER "config_default.vh"
+`endif
+`include `CONFIG_HEADER
 
 hazard3_cpu_1port #(
 	.MHARTID_VAL (32'h0000_0000),

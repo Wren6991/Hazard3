@@ -4,7 +4,8 @@
 `default_nettype none
 
 module tb #(
-`include "hazard3_config.vh"
+	parameter W_DATA = 32, // do not modify
+	parameter W_ADDR = 32  // do not modify
 ) (
 	// Global signals
 	input wire                clk,
@@ -230,6 +231,11 @@ end
 // 	if (clk_en)
 // 		clk_gated = clk;
 // end
+
+`ifndef CONFIG_HEADER
+`define CONFIG_HEADER "config_default.vh"
+`endif
+`include `CONFIG_HEADER
 
 hazard3_cpu_2port #(
 `include "hazard3_config_inst.vh"

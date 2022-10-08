@@ -17,21 +17,18 @@
 // Reset state configuration
 
 // RESET_VECTOR: Address of first instruction executed.
-parameter RESET_VECTOR    = 32'h0,
+parameter RESET_VECTOR        = 32'h00000000,
 
 // MTVEC_INIT: Initial value of trap vector base. Bits clear in MTVEC_WMASK
 // will never change from this initial value. Bits set in MTVEC_WMASK can be
 // written/set/cleared as normal.
-//
-// Note that, if CSR_M_TRAP is set, MTVEC_INIT should probably have a
-// different value from RESET_VECTOR.
 //
 // Note that mtvec bits 1:0 do not affect the trap base (as per RISC-V spec).
 // Bit 1 is don't care, bit 0 selects the vectoring mode: unvectored if == 0
 // (all traps go to mtvec), vectored if == 1 (exceptions go to mtvec, IRQs to
 // mtvec + mcause * 4). This means MTVEC_INIT also sets the initial vectoring
 // mode.
-parameter MTVEC_INIT      = 32'h00000000,
+parameter MTVEC_INIT          = 32'h00000000,
 
 // ----------------------------------------------------------------------------
 // Standard RISC-V ISA support
