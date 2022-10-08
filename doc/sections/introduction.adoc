@@ -42,7 +42,7 @@ The instruction fetch address phase is best thought of as residing in stage `X`.
 
 Hazard3 implements either one or two AHB5 bus master ports. The single-port configuration is used when ease of integration is a priority, since it supports simpler bus topologies. The dual-port configuration adds a dedicated port for instruction fetch, which improves both the maximum frequency and the clock-for-clock performance.
 
-Hazard3 uses AHB5 specifically, rather than older versions of the AHB standard, because of its support for its global exclusives. This is a bus feature that allows a processor to perform an ordered read-modify-write sequence with a guarantee that no other processor has written to the same address range in between. Hazard3 uses this to implement multiprocessor support for the A (atomics) extension.
+Hazard3 uses AHB5 specifically, rather than older versions of the AHB standard, because of its support for global exclusives. This is a bus feature that allows a processor to perform an ordered read-modify-write sequence with a guarantee that no other processor has written to the same address range in between. Hazard3 uses this to implement multiprocessor support for the A (atomics) extension.
 
 ==== Multiply/Divide
 
