@@ -34,7 +34,6 @@ module hazard3_decode #(
 	input  wire                 f_jump_now,
 	input  wire [W_ADDR-1:0]    f_jump_target,
 	input  wire                 x_jump_not_except,
-	input  wire [W_ADDR-1:0]    d_btb_target_addr,
 
 	output reg  [W_DATA-1:0]    d_imm,
 	output reg  [W_REGADDR-1:0] d_rs1,
@@ -132,11 +131,6 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-reg  [W_ADDR-1:0] pc;
-wire [W_ADDR-1:0] pc_seq_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
-assign d_pc = pc;
-assign debug_dpc_rdata = pc;
-
 // Frontend should mark the whole instruction, and nothing but the
 // instruction, as a predicted branch. This goes wrong when we execute the
 // address containing the predicted branch twice with different 16-bit
@@ -146,6 +140,11 @@ wire partial_predicted_branch = !d_starved &&
 	|BRANCH_PREDICTOR && d_instr_is_32bit && ^fd_cir_predbranch;
 
 wire predicted_branch = |BRANCH_PREDICTOR && fd_cir_predbranch[0];
+
+reg  [W_ADDR-1:0] pc;
+wire [W_ADDR-1:0] pc_seq_next = pc + (predicted_branch ? d_imm_b : d_instr_is_32bit ? 32'h4 : 32'h2);
+assign d_pc = pc;
+assign debug_dpc_rdata = pc;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -158,10 +157,7 @@ always @ (posedge clk or negedge rst_n) begin
 		end else if ((f_jump_now && !assert_cir_lock) || (cir_lock_prev && deassert_cir_lock)) begin
 			pc <= f_jump_target;
 		end else if (!d_stall && !cir_lock) begin
-			// If this instruction is a predicted-taken branch (and has not
-			// generated a mispredict recovery jump) then set PC to the
-			// prediction target instead of the sequentially next PC
-			pc <= predicted_branch ? d_btb_target_addr : pc_seq_next;
+			pc <= pc_seq_next;
 		end
 	end
 end

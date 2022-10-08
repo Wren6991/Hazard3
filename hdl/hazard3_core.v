@@ -119,8 +119,6 @@ wire                 x_btb_set_src_size;
 wire [W_ADDR-1:0]    x_btb_set_target_addr;
 wire                 x_btb_clear;
 
-wire [W_ADDR-1:0]    d_btb_target_addr;
-
 assign bus_aph_panic_i = 1'b0;
 
 wire f_mem_size;
@@ -152,7 +150,6 @@ hazard3_frontend #(
 	.btb_set_src_size     (x_btb_set_src_size),
 	.btb_set_target_addr  (x_btb_set_target_addr),
 	.btb_clear            (x_btb_clear),
-	.btb_target_addr_out  (d_btb_target_addr),
 
 	.cir                  (fd_cir),
 	.cir_err              (fd_cir_err),
@@ -255,7 +252,6 @@ hazard3_decode #(
 	.x_stall              (x_stall),
 	.f_jump_now           (f_jump_now),
 	.f_jump_target        (f_jump_target),
-	.d_btb_target_addr    (d_btb_target_addr),
 
 	.d_imm                (d_imm),
 	.d_rs1                (d_rs1),

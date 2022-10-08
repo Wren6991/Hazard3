@@ -44,7 +44,6 @@ module hazard3_frontend #(
 	input  wire              btb_set_src_size,
 	input  wire [W_ADDR-1:0] btb_set_target_addr,
 	input  wire              btb_clear,
-	output wire [W_ADDR-1:0] btb_target_addr_out,
 
 	// Interface to Decode
 	// Note reg/wire distinction
@@ -186,8 +185,9 @@ assign pwrdown_ok = fifo_full && !jump_target_vld;
 
 reg [W_ADDR-1:0] btb_src_addr;
 reg              btb_src_size;
-reg [W_ADDR-1:0] btb_target_addr;
+reg [13:0]       btb_target_addr_offs;
 reg              btb_valid;
+
 
 generate
 if (BRANCH_PREDICTOR) begin: have_btb
@@ -195,7 +195,7 @@ if (BRANCH_PREDICTOR) begin: have_btb
 		if (!rst_n) begin
 			btb_src_addr <= {W_ADDR{1'b0}};
 			btb_src_size <= 1'b0;
-			btb_target_addr <= {W_ADDR{1'b0}};
+			btb_target_addr_offs <= 14'h0;
 			btb_valid <= 1'b0;
 		end else if (btb_clear) begin
 			// Clear takes precedences over set. E.g. if a taken branch is in
@@ -204,14 +204,19 @@ if (BRANCH_PREDICTOR) begin: have_btb
 		end else if (btb_set) begin
 			btb_src_addr <= btb_set_src_addr;
 			btb_src_size <= btb_set_src_size;
-			btb_target_addr <= btb_set_target_addr;
+			// Offset is from the value that fetch_addr will have at the point
+			// the prediction is made (i.e. the address of the word
+			// containing the last halfword of the instruction)
+			btb_target_addr_offs <= btb_set_target_addr[13:0] -
+				((btb_set_src_addr[13:0] + {btb_set_src_size, 1'b0}) & 14'h3ffc);
 			btb_valid <= 1'b1;
 		end
 	end
 end else begin: no_btb
 	always @ (*) begin
 		btb_src_addr = {W_ADDR{1'b0}};
-		btb_target_addr = {W_ADDR{1'b0}};
+		btb_target_addr_offs = {14{1'b0}};
+		btb_src_size = 1'b0;
 		btb_valid = 1'b0;
 	end
 end
@@ -226,7 +231,7 @@ endgenerate
 // target address to change is when an older branch is taken, which would
 // flush the younger predicted-taken branch before it reaches decode. 
 
-assign btb_target_addr_out = btb_target_addr;
+wire [W_ADDR-1:0] btb_target_addr;
 
 // ----------------------------------------------------------------------------
 // Fetch request generation
@@ -237,6 +242,8 @@ reg              fetch_priv;
 reg              btb_prev_start_of_overhanging;
 reg [1:0]        mem_aph_hwvld;
 reg              mem_addr_hold;
+
+assign btb_target_addr = {{W_ADDR-14{1'b1}}, btb_target_addr_offs} + fetch_addr;
 
 wire btb_match_word = |BRANCH_PREDICTOR && btb_valid && (
 	fetch_addr[W_ADDR-1:2] == btb_src_addr[W_ADDR-1:2]
