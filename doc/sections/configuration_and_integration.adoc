@@ -73,28 +73,28 @@ Default value: 1
 
 Support for Zba address generation instructions. 0 for disable, 1 for enable.
 
-Default value: 1
+Default value: 0
 
 [[param-EXTENSION_ZBB]]
 ===== EXTENSION_ZBB
 
 Support for Zbb basic bit manipulation instructions. 0 for disable, 1 for enable.
 
-Default value: 1
+Default value: 0
 
 [[param-EXTENSION_ZBC]]
 ===== EXTENSION_ZBC
 
 Support for Zbc carry-less multiplication instructions. 0 for disable, 1 for enable.
 
-Default value: 1
+Default value: 0
 
 [[param-EXTENSION_ZBS]]
 ===== EXTENSION_ZBS
 
 Support for Zbs single-bit manipulation instructions. 0 for disable, 1 for enable.
 
-Default value: 1
+Default value: 0
 
 [[param-EXTENSION_ZBKB]]
 ===== EXTENSION_ZBKB
@@ -103,7 +103,7 @@ Support for Zbkb basic bit manipulation for cryptography.
 
 Requires: <<param-EXTENSION_ZBB>>. (Since Zbb and Zbkb have a large overlap, this flag enables only those instructions which are in Zbkb but aren't in Zbb. Therefore both flags must be set for full Zbkb support.)
 
-Default value: 1
+Default value: 0
 
 [[param-EXTENSION_ZIFENCEI]]
 ===== EXTENSION_ZIFENCEI
@@ -113,17 +113,17 @@ this instruction is optional, since a plain branch/jump is sufficient to
 flush the instruction prefetch queue. When the branch predictor is enabled
 (<<param-BRANCH_PREDICTOR>> is 1), this instruction must be implemented.
 
-Default value: 1
+Default value: 0
+
+[[cfg-custom-extensions]]
+==== Custom Hazard3 Extensions
 
 [[param-EXTENSION_XH3BEXTM]]
 ===== EXTENSION_XH3BEXTM
 
 Custom bit manipulation instructions for Hazard3: `h3.bextm` and `h3.bextmi`. See <<extension-xh3bextm-section>>.
 
-Default value: 1
-
-[[cfg-custom-extensions]]
-==== Custom Hazard3 Extensions
+Default value: 0
 
 [[param-EXTENSION_XH3IRQ]]
 ===== EXTENSION_XH3IRQ
@@ -132,21 +132,21 @@ Custom preemptive, prioritised interrupt support. Can be disabled if an
 external interrupt controller (e.g. PLIC) is used. If disabled, and
 NUM_IRQS > 1, the external interrupts are simply OR'd into mip.meip. See <<extension-xh3irq-section>>.
 
-Default value: 1
-
+Default value: 0
 
 [[param-EXTENSION_XH3PMPM]]
 ===== EXTENSION_XH3PMPM
 
 Custom PMPCFGMx CSRs to enforce PMP regions in M-mode without locking. See <<extension-xh3pmpm-section>>.
 
+Default value: 0
 
 [[param-EXTENSION_XH3POWER]]
 ===== EXTENSION_XH3POWER
 
 Custom power management controls for Hazard3. This adds the <<reg-msleep>> CSR, and the `h3.block` and `h3.unblock` hint instructions. See <<extension-xh3power-section>>
 
-Default value: 1
+Default value: 0
 
 ==== CSR support
 
@@ -162,15 +162,21 @@ the privileged specification itself is an optional extension. Hazard3 allows
 the mandatory CSRs to be disabled to save a small amount of area in
 deeply-embedded implementations.
 
+Default value: 1
+
 [[param-CSR_M_TRAP]]
 ===== CSR_M_TRAP
 
 Include M-mode trap-handling CSRs, and enable trap support.
 
+Default value: 1
+
 [[param-CSR_COUNTER]]
 ===== CSR_COUNTER
 
 Include the basic performance counters (`cycle`/`instret`) and relevant CSRs. Note that these performance counters are now in their own separate extension (Zicntr) and are no longer mandatory.
+
+Default value: 0
 
 [[param-U_MODE]]
 ===== U_MODE
@@ -182,22 +188,26 @@ memory.
 
 Requires: <<param-CSR_M_TRAP>>.
 
+Default value: 0
+
 [[param-PMP_REGIONS]]
 ===== PMP_REGIONS
 
 Number of physical memory protection regions, or 0 for no PMP. PMP is more
-useful if U mode is supported, but this is not a requirement.
+useful if U-mode is supported, but this is not a requirement.
 
 Hazard3's PMP supports only the NAPOT and(if <<param-PMP_GRAIN>> is 0) NA4
 region types.
 
 Requires: <<param-CSR_M_TRAP>>.
 
+Default value: 0
+
 [[param-PMP_GRAIN]]
 ===== PMP_GRAIN
 
 This is the _G_ parameter in the privileged spec, which defines the
-granularity of PMP regions. Minimum PMP region size is 1 <<(_G_ + 2) bytes. 
+granularity of PMP regions. Minimum PMP region size is 1 << (_G_ + 2) bytes. 
 
 If _G_ > 0, `pmcfg.a` can not be set to NA4 (attempting to do so will set the
 region to OFF instead).
@@ -266,18 +276,19 @@ Default value: 0
 [[param-NUM_IRQS]]
 ===== NUM_IRQS
 
-Number of external IRQs implemented in meiea, meipa, meifa and meipra, if
-<<param-CSR_M_TRAP>> is enabled. Minimum 1, maximum 512.
+NUM_IRQS: Number of external IRQs. Minimum 1, maximum 512. Note that if
+<<param-EXTENSION_XH3IRQ>> (Hazard3 interrupt controller) is disabled then
+multiple external interrupts are simply OR'd into mip.meip.
 
-Default value: 32
+Default value: 1
 
 [[param-IRQ_PRIORITY_BITS]]
 ===== IRQ_PRIORITY_BITS
 
-Number of priority bits implemented for each interrupt in meipra. The
-number of distinct levels is (1 << IRQ_PRIORITY_BITS). Minimum 0, max 4.
-Note that having more than 1 priority level with a large number of IRQs
-will have a severe effect on timing.
+IRQ_PRIORITY_BITS: Number of priority bits implemented for each interrupt
+in meipra, if EXTENSION_XH3IRQ is enabled. The number of distinct levels
+is (1 << IRQ_PRIORITY_BITS). Minimum 0, max 4. Note that multiple priority
+levels with a large number of IRQs will have a severe effect on timing.
 
 Default value: 0
 
@@ -285,7 +296,9 @@ Default value: 0
 ===== IRQ_INPUT_BYPASS
 
 Disable the input registers on the external interrupts, to reduce latency by
-one cycle. Can be done on an IRQ-by-IRQ basis.
+one cycle. Can be applied on an IRQ-by-IRQ basis.
+
+Ignored if <<param-EXTENSION_XH3IRQ>> is disabled.
 
 Default value: all-zeroes (not bypassed).
 
@@ -397,7 +410,7 @@ nontaken branch, a fence.i or a trap. Successful prediction eliminates the
 
 Requires: <<param-EXTENSION_ZIFENCEI>>
 
-Default value: 1
+Default value: 0
 
 [[param-MTVEC_WMASK]]
 ===== MTVEC_WMASK

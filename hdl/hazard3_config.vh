@@ -43,43 +43,43 @@ parameter EXTENSION_C         = 1,
 parameter EXTENSION_M         = 1,
 
 // EXTENSION_ZBA: Support for Zba address generation instructions
-parameter EXTENSION_ZBA       = 1,
+parameter EXTENSION_ZBA       = 0,
 
 // EXTENSION_ZBB: Support for Zbb basic bit manipulation instructions
-parameter EXTENSION_ZBB       = 1,
+parameter EXTENSION_ZBB       = 0,
 
 // EXTENSION_ZBC: Support for Zbc carry-less multiplication instructions
-parameter EXTENSION_ZBC       = 1,
+parameter EXTENSION_ZBC       = 0,
 
 // EXTENSION_ZBS: Support for Zbs single-bit manipulation instructions
-parameter EXTENSION_ZBS       = 1,
+parameter EXTENSION_ZBS       = 0,
 
 // EXTENSION_ZBKB: Support for Zbkb basic bit manipulation for cryptography
 // Requires: Zbb. (This flag enables instructions in Zbkb which aren't in Zbb.)
-parameter EXTENSION_ZBKB      = 1,
+parameter EXTENSION_ZBKB      = 0,
 
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.
-parameter EXTENSION_ZIFENCEI  = 1,
+parameter EXTENSION_ZIFENCEI  = 0,
 
 // ----------------------------------------------------------------------------
 // Custom RISC-V extensions
 
 // EXTENSION_XH3B: Custom bit-extract-multiple instructions for Hazard3
-parameter EXTENSION_XH3BEXTM  = 1,
+parameter EXTENSION_XH3BEXTM  = 0,
 
 // EXTENSION_XH3IRQ: Custom preemptive, prioritised interrupt support. Can be
 // disabled if an external interrupt controller (e.g. PLIC) is used. If
 // disabled, and NUM_IRQS > 1, the external interrupts are simply OR'd into
 // mip.meip.
-parameter EXTENSION_XH3IRQ    = 1,
+parameter EXTENSION_XH3IRQ    = 0,
 
 // EXTENSION_XH3PMPM: PMPCFGMx CSRs to enforce PMP regions in M-mode without
 // locking. Unlike ePMP mseccfg.rlb, locked and unlocked regions can coexist
-parameter EXTENSION_XH3PMPM   = 1,
+parameter EXTENSION_XH3PMPM   = 0,
 
 // EXTENSION_XH3POWER: Custom power management controls for Hazard3
-parameter EXTENSION_XH3POWER  = 1,
+parameter EXTENSION_XH3POWER  = 0,
 
 // ----------------------------------------------------------------------------
 // Standard CSR support
@@ -94,8 +94,8 @@ parameter CSR_M_MANDATORY     = 1,
 // CSR_M_TRAP: Include M-mode trap-handling CSRs, and enable trap support.
 parameter CSR_M_TRAP          = 1,
 
-// CSR_COUNTER: Include performance counters and relevant M-mode CSRs
-parameter CSR_COUNTER         = 1,
+// CSR_COUNTER: Include performance counters and Zicntr CSRs
+parameter CSR_COUNTER         = 0,
 
 // U_MODE: Support the U (user) execution mode. In U mode, the core performs
 // unprivileged bus accesses, and software's access to CSRs is restricted.
@@ -140,19 +140,20 @@ parameter BREAKPOINT_TRIGGERS = 0,
 // ----------------------------------------------------------------------------
 // External interrupt support
 
-// NUM_IRQS: Number of external IRQs implemented in meiea, meipa, meifa and
-// meipra, if CSR_M_TRAP is enabled. Minimum 1, maximum 512.
-parameter NUM_IRQS            = 32,
+// NUM_IRQS: Number of external IRQs. Minimum 1, maximum 512. Note that if
+// EXTENSION_XH3IRQ (Hazard3 interrupt controller) is disabled then multiple
+// external interrupts are simply OR'd into mip.meip.
+parameter NUM_IRQS            = 1,
 
 // IRQ_PRIORITY_BITS: Number of priority bits implemented for each interrupt
-// in meipra. The number of distinct levels is (1 << IRQ_PRIORITY_BITS).
-// Minimum 0, max 4. Note that having more than 1 priority level with a large
-// number of IRQs will have a severe effect on timing. Ignored if
-// EXTENSION_XH3IRQ is disabled.
+// in meipra, if EXTENSION_XH3IRQ is enabled. The number of distinct levels
+// is (1 << IRQ_PRIORITY_BITS). Minimum 0, max 4. Note that multiple priority
+// levels with a large number of IRQs will have a severe effect on timing.
 parameter IRQ_PRIORITY_BITS   = 0,
 
 // IRQ_INPUT_BYPASS: disable the input registers on the external interrupts,
-// to reduce latency by one cycle. Can be done on an IRQ-by-IRQ basis.
+// to reduce latency by one cycle. Can be applied on an IRQ-by-IRQ basis.
+// Ignored if EXTENSION_XH3IRQ is disabled.
 parameter IRQ_INPUT_BYPASS    = {NUM_IRQS{1'b0}},
 
 // ----------------------------------------------------------------------------
@@ -213,7 +214,7 @@ parameter RESET_REGFILE       = 1,
 // cleared on a mispredicted nontaken branch, a fence.i or a trap. Successful
 // prediction eliminates the 1-cyle fetch bubble on a taken branch, usually
 // making tight loops faster.
-parameter BRANCH_PREDICTOR    = 1,
+parameter BRANCH_PREDICTOR    = 0,
 
 // MTVEC_WMASK: Mask of which bits in mtvec are writable. Full writability is
 // recommended, because a common idiom in setup code is to set mtvec just
