@@ -224,6 +224,10 @@ wire                 x_jump_not_except;
 wire                 x_mmode_execution;
 wire                 x_trap_wfi;
 
+wire [W_ADDR-1:0]    debug_dpc_wdata;
+wire                 debug_dpc_wen;
+wire [W_ADDR-1:0]    debug_dpc_rdata;
+
 hazard3_decode #(
 `include "hazard3_config_inst.vh"
 ) decode_u (
@@ -242,6 +246,10 @@ hazard3_decode #(
 	.debug_mode           (debug_mode),
 	.m_mode               (x_mmode_execution),
 	.trap_wfi             (x_trap_wfi),
+
+	.debug_dpc_wdata      (debug_dpc_wdata),
+	.debug_dpc_wen        (debug_dpc_wen),
+	.debug_dpc_rdata      (debug_dpc_rdata),
 
 	.d_starved            (d_starved),
 	.x_stall              (x_stall),
@@ -963,6 +971,10 @@ hazard3_csr #(
 	.dbg_data0_rdata            (dbg_data0_rdata),
 	.dbg_data0_wdata            (dbg_data0_wdata),
 	.dbg_data0_wen              (dbg_data0_wen),
+
+	.debug_dpc_wdata            (debug_dpc_wdata),
+	.debug_dpc_wen              (debug_dpc_wen),
+	.debug_dpc_rdata            (debug_dpc_rdata),
 
 	// CSR access port
 	// *en_soon are early access strobes which are not a function of bus stall.

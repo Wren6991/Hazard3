@@ -25,6 +25,10 @@ module hazard3_decode #(
 	input  wire                 m_mode,
 	input  wire                 trap_wfi,
 
+	input  wire [W_ADDR-1:0]    debug_dpc_wdata,
+	input  wire                 debug_dpc_wen,
+	output wire [W_ADDR-1:0]    debug_dpc_rdata,
+
 	output wire                 d_starved,
 	input  wire                 x_stall,
 	input  wire                 f_jump_now,
@@ -131,6 +135,7 @@ end
 reg  [W_ADDR-1:0] pc;
 wire [W_ADDR-1:0] pc_seq_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
 assign d_pc = pc;
+assign debug_dpc_rdata = pc;
 
 // Frontend should mark the whole instruction, and nothing but the
 // instruction, as a predicted branch. This goes wrong when we execute the
@@ -146,7 +151,11 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		pc <= RESET_VECTOR;
 	end else begin
-		if ((f_jump_now && !assert_cir_lock) || (cir_lock_prev && deassert_cir_lock)) begin
+		if (debug_dpc_wen) begin
+			pc <= debug_dpc_wdata;
+		end else if (debug_mode) begin
+			pc <= pc;
+		end else if ((f_jump_now && !assert_cir_lock) || (cir_lock_prev && deassert_cir_lock)) begin
 			pc <= f_jump_target;
 		end else if (!d_stall && !cir_lock) begin
 			// If this instruction is a predicted-taken branch (and has not

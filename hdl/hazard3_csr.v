@@ -36,6 +36,10 @@ module hazard3_csr #(
 	output wire [W_DATA-1:0]  dbg_data0_wdata,
 	output wire               dbg_data0_wen,
 
+	output wire [W_ADDR-1:0]  debug_dpc_wdata,
+	output wire               debug_dpc_wen,
+	input  wire [W_ADDR-1:0]  debug_dpc_rdata,
+
 	// Read port is combinatorial.
 	// Write port is synchronous, and write effects will be observed on the next clock cycle.
 	// The *_soon strobes are versions which the core does not gate with its stall signal.
@@ -510,20 +514,14 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-reg [XLEN-1:0] dpc;
+// DPC is mapped to the real PC in the decode module. We set it to the
+// exception return address when entering Debug Mode, and whilst in Debug
+// Mode we can write to it as though it were a CSR. Note only IALIGN'd values
+// can be written to dpc.
+assign debug_dpc_wdata = (debug_mode ? wdata_update       : mepc_in) & (~X0 << 2 - EXTENSION_C);
+assign debug_dpc_wen   =  debug_mode ? wen && addr == DPC : enter_debug_mode;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		dpc <= X0;
-	end else if (DEBUG_SUPPORT) begin
-		if (enter_debug_mode)
-			dpc <= mepc_in;
-		else if (debug_mode && wen && addr == DPC)
-			// 1 or 2 LSBs are hardwired to 0, depending on IALIGN.
-			dpc <= wdata_update & (~X0 << 2 - EXTENSION_C);
-	end
-end
-
+// Debug Module's data0 register is mapped into the core's CSR space:
 assign dbg_data0_wdata = wdata;
 assign dbg_data0_wen = debug_mode && wen && addr == DMDATA0;
 
@@ -1059,7 +1057,7 @@ always @ (*) begin
 
 	DPC: if (DEBUG_SUPPORT) begin
 		decode_match = match_drw;
-		rdata = dpc;
+		rdata = debug_dpc_rdata;
 	end
 
 	DMDATA0: if (DEBUG_SUPPORT) begin
@@ -1290,8 +1288,8 @@ wire [3:0] mcause_irq_num =	irq_active ? standard_irq_num : 4'd0;
 wire [3:0] vector_sel =	!exception_req_any && irq_vector_enable ? mcause_irq_num : 4'd0;
 
 assign trap_addr =
-	except == EXCEPT_MRET ? mepc :
-	pending_dbg_resume    ? dpc  : mtvec | {26'h0, vector_sel, 2'h0};
+	except == EXCEPT_MRET ? mepc             :
+	pending_dbg_resume    ? debug_dpc_rdata  : mtvec | {26'h0, vector_sel, 2'h0};
 
 // Check for exception-like or IRQ-like trap entry; any debug mode entry takes
 // priority over any regular trap.
