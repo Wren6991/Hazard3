@@ -981,6 +981,7 @@ hazard3_csr #(
 	// Can generate access faults (hence traps), but do not actually perform access.
 	.addr                       (fd_cir[31:20]), // Always I-type immediate
 	.wdata                      (x_csr_wdata),
+	.wen_raw                    (d_csr_wen),
 	.wen_soon                   (d_csr_wen && !m_trap_enter_soon),
 	.wen                        (d_csr_wen && !m_trap_enter_soon && !x_stall),
 	.wtype                      (d_csr_wtype),

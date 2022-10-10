@@ -49,6 +49,7 @@ module hazard3_csr #(
 	input  wire [XLEN-1:0]    wdata,
 	input  wire               wen,
 	input  wire               wen_soon, // wen will be asserted once some stall condition clears
+	input  wire               wen_raw,  // raw, ungated instruction decode signal, for D-mode regs
 	input  wire [1:0]         wtype,
 	output reg  [XLEN-1:0]    rdata,
 	input  wire               ren,
@@ -217,7 +218,7 @@ always @ (posedge clk or negedge rst_n) begin
 			// Note only the MSB of MPP is implemented. It reads back as 11 or 00.
 			mstatus_mpp  <= wdata_update[12] || !U_MODE;
 			mstatus_tw   <= wdata_update[21] && U_MODE;
-		end else if (wen && debug_mode && addr == DCSR && U_MODE && DEBUG_SUPPORT) begin
+		end else if (wen_raw && debug_mode && addr == DCSR && U_MODE && DEBUG_SUPPORT) begin
 			// Debugger can change/observe core state directly through
 			// dcsr.prv (this doesn't affect debugger operation, as all
 			// operations have an effective level of M-mode whilst the core
@@ -438,7 +439,7 @@ always @ (posedge clk or negedge rst_n) begin
 			if (addr == MINSTRET)
 				minstret <= wdata_update & {XLEN{|CSR_COUNTER}};
 			if (addr == MCOUNTINHIBIT) begin
-				{mcountinhibit_ir, mcountinhibit_cy} <= {wdata_update[2], wdata_update[0]} & {2{|CSR_COUNTER}};
+				{mcountinhibit_ir, mcountinhibit_cy} <= {wdata_update[2], wdata_update[0]} | {2{~|CSR_COUNTER}};
 			end
 		end
 	end
@@ -492,8 +493,11 @@ always @ (posedge clk or negedge rst_n) begin
 		dcsr_ebreaku <= 1'b0;
 		dcsr_step <= 1'b0;
 		dcsr_cause <= 3'h0;
-	end else if (DEBUG_SUPPORT) begin
-		if (debug_mode && wen && addr == DCSR) begin
+	end else begin
+		// Note we can use the ungated write enable in debug mode since a CSR
+		// write to a valid D-mode CSR address is guaranteed not to generate
+		// an exception (of any kind, including PMP) in D-mode.
+		if (debug_mode && wen_raw && addr == DCSR) begin
 			{dcsr_ebreakm, dcsr_ebreaku, dcsr_step} <= {
 				wdata_update[15],
 				wdata_update[12] && U_MODE,
@@ -510,12 +514,12 @@ end
 // exception return address when entering Debug Mode, and whilst in Debug
 // Mode we can write to it as though it were a CSR. Note only IALIGN'd values
 // can be written to dpc.
-assign debug_dpc_wdata = (debug_mode ? wdata_update       : mepc_in) & (~X0 << 2 - EXTENSION_C);
-assign debug_dpc_wen   =  debug_mode ? wen && addr == DPC : enter_debug_mode;
+assign debug_dpc_wdata = (debug_mode ? wdata_update           : mepc_in) & (~X0 << 2 - EXTENSION_C);
+assign debug_dpc_wen   =  debug_mode ? wen_raw && addr == DPC : enter_debug_mode;
 
 // Debug Module's data0 register is mapped into the core's CSR space:
 assign dbg_data0_wdata = wdata;
-assign dbg_data0_wen = debug_mode && wen && addr == DMDATA0;
+assign dbg_data0_wen = debug_mode && wen_raw && addr == DMDATA0;
 
 reg tcontrol_mte;
 reg tcontrol_mpte;
