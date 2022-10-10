@@ -11,9 +11,6 @@
 
 module hazard3_csr #(
 	parameter XLEN            = 32,   // Must be 32
-	parameter W_COUNTER       = 64,   // This *should* be 64, but can be reduced to save gates.
-	                                  // The full 64 bits is writeable, so high-word increment can
-	                                  // be implemented in software, and a narrower hw counter used
 `include "hazard3_config.vh"
 ,
 `include "hazard3_width_const.vh"
@@ -426,26 +423,22 @@ always @ (posedge clk or negedge rst_n) begin
 		// Counters inhibited by default to save energy
 		mcountinhibit_cy <= 1'b1;
 		mcountinhibit_ir <= 1'b1;
-	end else if (CSR_COUNTER) begin
-		// Optionally hold the top (2 * XLEN - W_COUNTER) bits constant to
-		// save gates (noncompliant if enabled)
+	end else begin
 		if (!(mcountinhibit_cy || debug_mode))
-			{mcycleh, mcycle} <= (({mcycleh, mcycle} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
-				| ({mcycleh, mcycle} & ({2*XLEN{1'b1}} << W_COUNTER));
+			{mcycleh, mcycle} <= ({mcycleh, mcycle} + 1'b1) & {2*XLEN{|CSR_COUNTER}};
 		if (!(mcountinhibit_ir || debug_mode) && instr_ret)
-			{minstreth, minstret} <= (({minstreth, minstret} + 1'b1) & ~({2*XLEN{1'b1}} << W_COUNTER))
-				| ({minstreth, minstret} & ({2*XLEN{1'b1}} << W_COUNTER));
+			{minstreth, minstret} <= ({minstreth, minstret} + 1'b1) & {2*XLEN{|CSR_COUNTER}};
 		if (wen_m_mode) begin
 			if (addr == MCYCLEH)
-				mcycleh <= wdata_update;
+				mcycleh <= wdata_update & {XLEN{|CSR_COUNTER}};
 			if (addr == MCYCLE)
-				mcycle <= wdata_update;
+				mcycle <= wdata_update & {XLEN{|CSR_COUNTER}};
 			if (addr == MINSTRETH)
-				minstreth <= wdata_update;
+				minstreth <= wdata_update & {XLEN{|CSR_COUNTER}};
 			if (addr == MINSTRET)
-				minstret <= wdata_update;
+				minstret <= wdata_update & {XLEN{|CSR_COUNTER}};
 			if (addr == MCOUNTINHIBIT) begin
-				{mcountinhibit_ir, mcountinhibit_cy} <= {wdata_update[2], wdata_update[0]};
+				{mcountinhibit_ir, mcountinhibit_cy} <= {wdata_update[2], wdata_update[0]} & {2{|CSR_COUNTER}};
 			end
 		end
 	end
@@ -464,11 +457,10 @@ always @ (posedge clk or negedge rst_n) begin
 		mcounteren_cy <= 1'b0;
 		mcounteren_tm <= 1'b0;
 		mcounteren_ir <= 1'b0;
-	end else if (CSR_COUNTER && U_MODE && wen_m_mode && addr == MCOUNTEREN) begin
-		// Note this register only exists when U mode is implemented.
-		mcounteren_cy <= wdata_update[0];
-		mcounteren_tm <= wdata_update[1];
-		mcounteren_ir <= wdata_update[2];
+	end else if (wen_m_mode && addr == MCOUNTEREN) begin
+		mcounteren_cy <= wdata_update[0] && |CSR_COUNTER && |U_MODE;
+		mcounteren_tm <= wdata_update[1] && |CSR_COUNTER && |U_MODE;
+		mcounteren_ir <= wdata_update[2] && |CSR_COUNTER && |U_MODE;
 	end
 end
 
@@ -506,10 +498,10 @@ always @ (posedge clk or negedge rst_n) begin
 				wdata_update[15],
 				wdata_update[12] && U_MODE,
 				wdata_update[2]
-			};
+			} & {3{|DEBUG_SUPPORT}};
 		end
 		if (enter_debug_mode) begin
-			dcsr_cause <= dcause_next;
+			dcsr_cause <= dcause_next & {3{|DEBUG_SUPPORT}};
 		end
 	end
 end
