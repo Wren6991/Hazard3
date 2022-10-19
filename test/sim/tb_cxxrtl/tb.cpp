@@ -258,6 +258,22 @@ void exit_help(std::string errtext = "") {
 	exit(-1);
 }
 
+int wait_for_connection(int server_fd, uint16_t port, struct sockaddr *sock_addr, socklen_t *sock_addr_len) {
+	int sock_fd;
+	printf("Waiting for connection on port %u\n", port);
+	if (listen(server_fd, 3) < 0) {
+		fprintf(stderr, "listen failed\n");
+		exit(-1);
+	}
+	sock_fd = accept(server_fd, sock_addr, sock_addr_len);
+	if (sock_fd < 0) {
+		fprintf(stderr, "accept failed\n");
+		exit(-1);
+	}
+	printf("Connected\n");
+	return sock_fd;
+}
+
 static const int TCP_BUF_SIZE = 256;
 
 int main(int argc, char **argv) {
@@ -355,17 +371,7 @@ int main(int argc, char **argv) {
 			exit(-1);
 		}
 
-		printf("Waiting for connection on port %u\n", port);
-		if (listen(server_fd, 3) < 0) {
-			fprintf(stderr, "listen failed\n");
-			exit(-1);
-		}
-		sock_fd = accept(server_fd, (struct sockaddr *)&sock_addr, &sock_addr_len);
-		if (sock_fd < 0) {
-			fprintf(stderr, "accept failed\n");
-			exit(-1);
-		}
-		printf("Connected\n");
+		sock_fd = wait_for_connection(server_fd, port, (struct sockaddr *)&sock_addr, &sock_addr_len);
 	}
 
 	mem_io_state memio;
@@ -485,6 +491,10 @@ int main(int argc, char **argv) {
 					}	
 					rx_ptr = 0;
 					rx_remaining = read(sock_fd, &rxbuf, TCP_BUF_SIZE);
+					if (rx_remaining == 0) {
+						// The socket is closed. Wait for another connection.
+						sock_fd = wait_for_connection(server_fd, port, (struct sockaddr *)&sock_addr, &sock_addr_len);
+					}
 				}
 			}
 		}
