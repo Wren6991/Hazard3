@@ -78,7 +78,8 @@ hazard3_reset_sync dmi_reset_sync_u (
 );
 
 hazard3_jtag_dtm #(
-	.IDCODE (IDCODE)
+	.IDCODE          (IDCODE),
+	.DTMCS_IDLE_HINT (8)
 ) inst_hazard3_jtag_dtm (
 	.tck              (tck),
 	.trst_n           (trst_n),

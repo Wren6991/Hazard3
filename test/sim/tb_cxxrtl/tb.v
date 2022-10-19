@@ -77,8 +77,13 @@ hazard3_reset_sync dmi_reset_sync_u (
 	.rst_n_out (rst_n_dmi)
 );
 
+// Note the idle hint of 8 cycles was empirically found to be the correct
+// value for a 1:2 TCK:clk_dmi ratio. OpenOCD doesn't particularly care
+// because it will just increase idle cycles until it stops seeing BUSY.
+
 hazard3_jtag_dtm #(
-	.IDCODE (IDCODE)
+	.IDCODE          (IDCODE),
+	.DTMCS_IDLE_HINT (8)
 ) inst_hazard3_jtag_dtm (
 	.tck              (tck),
 	.trst_n           (trst_n),
