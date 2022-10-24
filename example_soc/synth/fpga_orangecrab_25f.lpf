@@ -1,0 +1,44 @@
+# Reference: https://github.com/emard/ulx3s/blob/master/doc/constraints/ulx3s_v20.lpf
+
+LOCATE COMP "clk_osc" SITE "A9";
+IOBUF PORT "clk_osc" PULLMODE=NONE IO_TYPE=LVCMOS33;
+FREQUENCY PORT "clk_osc" 48 MHZ;
+
+# UART TX/RX (from FPGA's point of view, i.e. TX is an output)
+
+LOCATE COMP "uart_tx" SITE "N17"; # FPGA transmits to ftdi
+LOCATE COMP "uart_rx" SITE "M18"; # FPGA receives from ftdi
+IOBUF  PORT "uart_tx" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "uart_rx" PULLMODE=UP IO_TYPE=LVCMOS33;
+
+# 8 pins on an IO header for bringing signals out to a logic analyser
+
+LOCATE COMP "dbg[0]"  SITE "H2"; # PCLK      # "gn[0]"
+LOCATE COMP "dbg[1]"  SITE "A8"; # PCLK      # "gn[1]"
+LOCATE COMP "dbg[2]"  SITE "B8"; # GR_PCLK   # "gn[2]"
+LOCATE COMP "dbg[3]"  SITE "C8";             # "gn[3]"
+LOCATE COMP "dbg[4]"  SITE "B9"; # PCLK      # "gp[0]"
+LOCATE COMP "dbg[5]"  SITE "B10"; # PCLK      # "gp[1]"
+LOCATE COMP "dbg[6]"  SITE "L4";  # GR_PCLK   # "gp[2]"
+LOCATE COMP "dbg[7]"  SITE "N3";              # "gp[3]"
+
+IOBUF PORT  "dbg[0]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[1]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[2]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[3]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[4]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[5]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[6]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT  "dbg[7]" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+
+LOCATE COMP "rgb_led0_r" SITE "K4";
+IOBUF PORT "rgb_led0_r" IO_TYPE=LVCMOS33;
+LOCATE COMP "rgb_led0_g" SITE "M3";
+IOBUF PORT "rgb_led0_g" IO_TYPE=LVCMOS33;
+LOCATE COMP "rgb_led0_b" SITE "J3";
+IOBUF PORT "rgb_led0_b" IO_TYPE=LVCMOS33;
+
+LOCATE COMP "usr_btn" SITE "J17";
+IOBUF PORT "usr_btn" IO_TYPE=SSTL135_I;
+LOCATE COMP "rst_n" SITE "V17";
+IOBUF PORT "rst_n" IO_TYPE=LVCMOS33;
