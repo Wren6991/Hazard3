@@ -162,6 +162,7 @@ hazard3_frontend #(
 	.cir_flush_behind     (df_cir_flush_behind),
 
 	.pwrdown_ok           (f_frontend_pwrdown_ok),
+	.delay_first_fetch    (!pwrup_ack),
 
 	.predecode_rs1_coarse (f_rs1_coarse),
 	.predecode_rs2_coarse (f_rs2_coarse),

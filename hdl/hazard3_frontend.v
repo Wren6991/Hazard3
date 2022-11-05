@@ -68,6 +68,9 @@ module hazard3_frontend #(
 	// waits for the frontend to naturally come to a halt before releasing
 	// its power request. This avoids manually halting the frontend.)
 	output wire              pwrdown_ok,
+	// Signal to delay the first instruction fetch following reset, because
+	// powerup has not yet been negotiated.
+	input  wire              delay_first_fetch,
 
 	// Provide the rs1/rs2 register numbers which will be in CIR next cycle.
 	// Coarse: valid if this instruction has a nonzero register operand.
@@ -284,7 +287,7 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		reset_holdoff <= 1'b1;
 	end else begin
-		reset_holdoff <= 1'b0;
+		reset_holdoff <= (|EXTENSION_XH3POWER && delay_first_fetch) ? reset_holdoff : 1'b0;
 		// This should be impossible, but assert to be sure, because it *will*
 		// change the fetch address (and we shouldn't check it in hardware if
 		// we can prove it doesn't happen)
