@@ -324,7 +324,7 @@ reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_except_to_d_mode;
 reg                  xm_sleep_wfi;
 reg                  xm_sleep_block;
-reg                  xm_delay_irq_entry_on_ls_dphase;
+reg                  xm_delay_irq_entry_on_ls_stagex;
 
 // ----------------------------------------------------------------------------
 // Stall logic
@@ -893,7 +893,7 @@ reg prev_instr_was_32_bit;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		xm_delay_irq_entry_on_ls_dphase <= 1'b0;
+		xm_delay_irq_entry_on_ls_stagex <= 1'b0;
 		prev_instr_was_32_bit <= 1'b0;
 	end else begin
 		// Must hold off IRQ if we are in the second cycle of an address phase or
@@ -905,7 +905,7 @@ always @ (posedge clk or negedge rst_n) begin
 		// Also hold off on AMOs, unless the AMO is transitioning to an address
 		// phase or completing. ("completing" excludes transitions to error phase.)
 
-		xm_delay_irq_entry_on_ls_dphase <= bus_aph_req_d && !bus_aph_ready_d ||
+		xm_delay_irq_entry_on_ls_stagex <= bus_aph_req_d && !bus_aph_ready_d ||
 			d_memop_is_amo && !(
 				x_amo_phase == 3'h3 && bus_dph_ready_d && !bus_dph_err_d ||
 				// Read reservation failure failure also generates error
@@ -944,7 +944,7 @@ wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 
 // Need to delay IRQ entry on sleep exit because, for deep sleep states, we
 // can't access the bus until the power handshake has completed.
-wire m_delay_irq_entry = xm_delay_irq_entry_on_ls_dphase ||
+wire m_delay_irq_entry = xm_delay_irq_entry_on_ls_stagex ||
 	((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release);
 
 wire m_pwr_allow_sleep;
@@ -999,6 +999,7 @@ hazard3_csr #(
 	.trap_enter_vld             (m_trap_enter_vld),
 	.trap_enter_rdy             (m_trap_enter_rdy),
 	.loadstore_dphase_pending   (m_dphase_in_flight),
+	.delay_irq_entry            (m_delay_irq_entry),
 	.mepc_in                    (m_exception_return_addr),
 
 	.pwr_allow_sleep            (m_pwr_allow_sleep),
@@ -1011,7 +1012,6 @@ hazard3_csr #(
 	.m_mode_trap_entry          (m_mmode_trap_entry),
 
 	// IRQ and exception requests
-	.delay_irq_entry            (m_delay_irq_entry),
 	.irq                        (irq),
 	.irq_software               (soft_irq),
 	.irq_timer                  (timer_irq),
@@ -1085,6 +1085,14 @@ always @ (posedge clk or negedge rst_n) begin
 			xm_sleep_wfi <= 1'b0; // TODO needed?
 			xm_sleep_block <= 1'b0;
 		end
+`ifdef HAZARD3_ASSERTIONS
+		// Some of the exception->ls paths are cut as they are supposed to be
+		// impossible -- make sure there is no way to have a load/store that
+		// is not squashed. (This includes debug entry!)
+		if (m_trap_enter_vld) begin
+			assert(!bus_aph_req_d);
+		end
+`endif
 	end
 end
 

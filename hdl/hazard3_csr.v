@@ -79,9 +79,12 @@ module hazard3_csr #(
 	// addresses.
 	output wire                trap_enter_soon,
 	// We need to know about load/stores in data phase because their exception
-	// status is still unknown, so we fence off on them before entering debug
-	// mode.
+	// status is still unknown, so fence them off before entering debug mode.
 	input  wire                loadstore_dphase_pending,
+	// Asserted when the instruction in stage 2 can't be squashed (e.g. to
+	// keep an AHB address phase stable), or instruction fetch request can't
+	// be issued (e.g. waiting for wake from wfi state).
+	input  wire                delay_irq_entry,
 	input  wire [XLEN-1:0]     mepc_in,
 
 	// Power control signalling
@@ -100,7 +103,6 @@ module hazard3_csr #(
 	input  wire                except_to_d_mode,
 
 	// Level-sensitive interrupt sources
-	input  wire                delay_irq_entry,
 	input  wire [NUM_IRQS-1:0] irq,
 	input  wire                irq_software,
 	input  wire                irq_timer,
@@ -1197,7 +1199,7 @@ wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
 //
 // We must mask halt_req with delay_irq_entry (true on cycle 2 and beyond of
 // load/store address phase) because at that point we can't suppress the bus
-// access..
+// access. Others are fine because they are never mid-instruction in stage 2.
 wire want_halt_irq_if_no_exception = DEBUG_SUPPORT && !debug_mode && !want_halt_except && (
 	(dbg_req_halt_prev && !delay_irq_entry) ||
 	(dbg_req_halt_on_reset && have_just_reset) ||
@@ -1299,7 +1301,6 @@ assign trap_is_irq = DEBUG_SUPPORT && (want_halt_except || want_halt_irq) ?
 // in progress, because that dphase could subsequently except, and sample the
 // IRQ vector PC instead of the load/store instruction PC.
 
-// delay_irq_entry also applies to IRQ-like debug entries.
 assign trap_enter_vld =
 	CSR_M_TRAP && (exception_req_any ||
 		!delay_irq_entry && !debug_mode && irq_active && !loadstore_dphase_pending) ||
@@ -1343,7 +1344,7 @@ assign m_mode_trap_entry = !U_MODE || (
 // - Privilege level of load/stores on the bus
 // - Checking load/stores against PMP read/write permission
 
-assign m_mode_loadstore = !U_MODE || debug_mode || ( // FIXME how does this interact with load/store racing against debug entry?
+assign m_mode_loadstore = !U_MODE || debug_mode || (
 	mstatus_mprv ? mstatus_mpp : m_mode
 );
 
@@ -1435,6 +1436,18 @@ always @ (posedge clk) begin
 		assert(except == EXCEPT_EBREAK);
 	end
 
+	// Exceptions should squash load/stores before they reach dphase.
+	if (except != EXCEPT_NONE && !(except == EXCEPT_LOAD_FAULT || except == EXCEPT_STORE_FAULT)) begin
+		assert(!loadstore_dphase_pending);
+	end
+
+	// Debug entries are trap entries! (we should also assert in core.v that
+	// trap entries are never coincident with active load/store address
+	// phases, which gives some confidence that debug entry does not gobble
+	// load/stores.)
+	if (enter_debug_mode) begin
+		assert(trap_enter_vld);
+	end
 end
 
 `endif
