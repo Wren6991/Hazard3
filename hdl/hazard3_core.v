@@ -1069,21 +1069,37 @@ always @ (posedge clk or negedge rst_n) begin
 				xm_sleep_block      <= 1'b0;
 				unblock_out         <= 1'b0;
 			end
+`ifdef HAZARD3_ASSERTIONS
+			// Assuming downstream bus is compliant, err && !stalled is the
+			// last cycle of an error response, in which case this must have
+			// been previously captured as an exception.
+			if (bus_dph_err_d && x_amo_phase == 3'h0) begin
+				assert(xm_except == EXCEPT_LOAD_FAULT || xm_except == EXCEPT_STORE_FAULT);
+			end
+`endif
 		end else if (bus_dph_err_d) begin
 			// First phase of 2-phase AHB5 error response. Pass the exception along on
 			// this cycle, and on the next cycle the trap entry will be asserted,
 			// suppressing any load/store that may currently be in stage X.
+			xm_except <=
+				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
+				                xm_memop <= MEMOP_LBU  ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
 `ifdef HAZARD3_ASSERTIONS
+			// There should be a bus transfer in stage 3 corresponding to this bus error
 			assert(xm_memop != MEMOP_NONE);
+			// We should capture this error exactly once, and if there were
+			// any other source of exception then the load/store should not
+			// have happened in the first place. Only exception is when the
+			// entry of the load/store trap is stalled on the frontend.
+			assert(xm_except == EXCEPT_NONE || (!m_trap_enter_rdy && (
+				xm_except == EXCEPT_LOAD_FAULT || xm_except == EXCEPT_STORE_FAULT
+			)));
+			// Make sure we don't have to clear any of the other stage 3 flags
+			assert(!xm_except_to_d_mode);
 			assert(!xm_sleep_wfi);
 			assert(!xm_sleep_block);
 			assert(!unblock_out);
 `endif
-			xm_except <=
-				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
-				                xm_memop <= MEMOP_LBU  ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
-			xm_sleep_wfi <= 1'b0; // TODO needed?
-			xm_sleep_block <= 1'b0;
 		end
 `ifdef HAZARD3_ASSERTIONS
 		// Some of the exception->ls paths are cut as they are supposed to be
