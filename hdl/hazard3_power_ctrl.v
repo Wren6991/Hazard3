@@ -28,7 +28,7 @@ module hazard3_power_ctrl #(
 	output reg               clk_en,
 
 	// Power state controls from CSRs
-	input  wire              allow_sleep,
+	input  wire              allow_clkgate,
 	input  wire              allow_power_down,
 	input  wire              allow_sleep_on_block,
 
@@ -82,10 +82,10 @@ always @ (posedge clk_always_on or negedge rst_n) begin
 			end else if (active_wake_req) begin
 				// Skip deep sleep if it would immediately fall through.
 				stall_release <= 1'b1;
-			end else if ((allow_power_down || allow_sleep) && (sleeping_on_wfi || allow_sleep_on_block)) begin
+			end else if ((allow_power_down || allow_clkgate) && (sleeping_on_wfi || allow_sleep_on_block)) begin
 				if (frontend_pwrdown_ok) begin
 					pwrup_req <= !allow_power_down;
-					clk_en <= !allow_sleep;
+					clk_en <= !allow_clkgate;
 					state <= allow_power_down ? S_ENTER_ASLEEP : S_ASLEEP;
 				end else begin
 					// Stay awake until it is safe to power down (i.e. until our
@@ -142,7 +142,7 @@ always @ (posedge clk_always_on or negedge rst_n) begin
 			assert(!past_stall_release);
 		end
 		if (state == S_ASLEEP) begin
-			assert(allow_power_down || allow_sleep);
+			assert(allow_power_down || allow_clkgate);
 		end
 	end
 end

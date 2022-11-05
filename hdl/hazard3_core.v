@@ -947,7 +947,7 @@ wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 wire m_delay_irq_entry = xm_delay_irq_entry_on_ls_stagex ||
 	((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release);
 
-wire m_pwr_allow_sleep;
+wire m_pwr_allow_clkgate;
 wire m_pwr_allow_power_down;
 wire m_pwr_allow_sleep_on_block;
 wire m_wfi_wakeup_req;
@@ -1002,7 +1002,7 @@ hazard3_csr #(
 	.delay_irq_entry            (m_delay_irq_entry),
 	.mepc_in                    (m_exception_return_addr),
 
-	.pwr_allow_sleep            (m_pwr_allow_sleep),
+	.pwr_allow_clkgate          (m_pwr_allow_clkgate),
 	.pwr_allow_power_down       (m_pwr_allow_power_down),
 	.pwr_allow_sleep_on_block   (m_pwr_allow_sleep_on_block),
 	.pwr_wfi_wakeup_req         (m_wfi_wakeup_req),
@@ -1172,7 +1172,7 @@ hazard3_power_ctrl power_ctrl (
 	.pwrup_ack              (pwrup_ack),
 	.clk_en                 (clk_en),
 
-	.allow_sleep            (m_pwr_allow_sleep),
+	.allow_clkgate          (m_pwr_allow_clkgate),
 	.allow_power_down       (m_pwr_allow_power_down),
 	.allow_sleep_on_block   (m_pwr_allow_sleep_on_block),
 

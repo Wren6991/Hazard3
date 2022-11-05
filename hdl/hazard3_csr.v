@@ -88,7 +88,7 @@ module hazard3_csr #(
 	input  wire [XLEN-1:0]     mepc_in,
 
 	// Power control signalling
-	output wire                pwr_allow_sleep,
+	output wire                pwr_allow_clkgate,
 	output wire                pwr_allow_power_down,
 	output wire                pwr_allow_sleep_on_block,
 	output wire                pwr_wfi_wakeup_req,
@@ -404,7 +404,7 @@ end
 
 assign pwr_allow_sleep_on_block = msleep_sleeponblock;
 assign pwr_allow_power_down = msleep_powerdown;
-assign pwr_allow_sleep = msleep_deepsleep;
+assign pwr_allow_clkgate = msleep_deepsleep;
 
 // ----------------------------------------------------------------------------
 // Counters
