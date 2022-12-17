@@ -170,7 +170,7 @@ always @ (posedge clk) if (rst_n) begin
 	// (processor upholds its side of the 4-phase handshake)
 	assert((pwrup_ack != $past(pwrup_ack)) + {1'b0, (pwrup_req != $past(pwrup_req))} < 2'd2);
 
-	// Assert rocessor doesn't access the bus whilst asleep
+	// Assert processor doesn't access the bus whilst asleep
 	if (!(pwrup_req && pwrup_ack && clk_en)) begin
 		assert(i_htrans == 2'h0);
 		assert(d_htrans == 2'h0);
