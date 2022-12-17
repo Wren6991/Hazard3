@@ -12,12 +12,12 @@ module fpga_orangecrab_25f (
 	output wire       uart_tx,
 	input  wire       uart_rx,
 
-    output rgb_led0_r,
-    output rgb_led0_g,
-    output rgb_led0_b,
+	output rgb_led0_r,
+	output rgb_led0_g,
+	output rgb_led0_b,
 
-    output rst_n,
-    input usr_btn
+	output rst_n,
+	input usr_btn
 );
 
 wire clk_sys = clk_osc;
@@ -71,28 +71,28 @@ example_soc #(
 	.uart_rx (uart_rx)
 );
 
-    // Create a 27 bit register
-    reg [26:0] counter = 0;
+	// Create a 27 bit register
+	reg [26:0] counter = 0;
 
-    // Every positive edge increment register by 1
-    always @(posedge clk_sys) begin
-        counter <= counter + 1;
-    end
+	// Every positive edge increment register by 1
+	always @(posedge clk_sys) begin
+		counter <= counter + 1;
+	end
 
-    // Output inverted values of counter onto LEDs
-    assign rgb_led0_r = ~counter[24];
-    assign rgb_led0_g = ~counter[25];
-    assign rgb_led0_b = 0;
+	// Output inverted values of counter onto LEDs
+	assign rgb_led0_r = ~counter[24];
+	assign rgb_led0_g = ~counter[25];
+	assign rgb_led0_b = 0;
 
 	assign dbg = 8'hff;
 
 	// Reset logic on button press.
-    // this will enter the bootloader
-    reg reset_sr = 1'b1;
-    always @(posedge clk_sys) begin
-        reset_sr <= {usr_btn};
-    end
-    assign rst_n = reset_sr;
+	// this will enter the bootloader
+	reg reset_sr = 1'b1;
+	always @(posedge clk_sys) begin
+		reset_sr <= {usr_btn};
+	end
+	assign rst_n = reset_sr;
 
 
 endmodule
