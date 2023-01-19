@@ -1126,6 +1126,7 @@ reg have_just_reset;
 reg step_halt_req;
 reg dbg_req_resume_prev;
 reg dbg_req_halt_prev;
+reg dbg_req_halt_on_reset_sticky;
 reg pending_dbg_resume_prev;
 
 wire pending_dbg_resume = (pending_dbg_resume_prev || dbg_req_resume_prev) && debug_mode;
@@ -1145,12 +1146,20 @@ end
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		have_just_reset <= |DEBUG_SUPPORT;
+		dbg_req_halt_on_reset_sticky <= 1'b0;
 		step_halt_req <= 1'b0;
 		dbg_req_resume_prev <= 1'b0;
 		pending_dbg_resume_prev <= 1'b0;
 	end else if (DEBUG_SUPPORT) begin
-		if (instr_ret)
-			have_just_reset <= 1'b0;
+		have_just_reset <= 1'b0;
+
+		// One-cycle delay on assertion of reset halt req is harmless because
+		// of a matching delay on the first instruction fetch (reset_holdoff).
+		if (have_just_reset && dbg_req_halt_on_reset) begin
+			dbg_req_halt_on_reset_sticky <= 1'b1;
+		end else if (enter_debug_mode) begin
+			dbg_req_halt_on_reset_sticky <= 1'b0;
+		end
 
 		dbg_req_resume_prev <= dbg_req_resume;
 
@@ -1202,7 +1211,7 @@ wire want_halt_except = DEBUG_SUPPORT && !debug_mode && (
 // access. Others are fine because they are never mid-instruction in stage 2.
 wire want_halt_irq_if_no_exception = DEBUG_SUPPORT && !debug_mode && !want_halt_except && (
 	(dbg_req_halt_prev && !delay_irq_entry) ||
-	(dbg_req_halt_on_reset && have_just_reset) ||
+	dbg_req_halt_on_reset_sticky ||
 	step_halt_req
 );
 
@@ -1213,10 +1222,10 @@ wire want_halt_irq_if_no_exception = DEBUG_SUPPORT && !debug_mode && !want_halt_
 wire want_halt_irq = want_halt_irq_if_no_exception && !halt_delayed_by_exception;
 
 assign dcause_next =
-	except == EXCEPT_EBREAK && except_to_d_mode                     ? 3'h2 : // trigger (priority 4)
-	except == EXCEPT_EBREAK                                         ? 3'h1 : // ebreak (priority 3)
-	dbg_req_halt_prev || (dbg_req_halt_on_reset && have_just_reset) ? 3'h3 : // halt or reset-halt (priority 1, 2)
-	                                                                  3'h4;  // single-step (priority 0)
+	except == EXCEPT_EBREAK && except_to_d_mode ? 3'h2 : // trigger (priority 4)
+	except == EXCEPT_EBREAK                     ? 3'h1 : // ebreak (priority 3)
+	dbg_req_halt_prev || dbg_req_halt_on_reset  ? 3'h3 : // halt or reset-halt (priority 1, 2)
+	                                              3'h4;  // single-step (priority 0)
 
 assign trap_is_debug_entry = |DEBUG_SUPPORT && !debug_mode && (want_halt_irq || want_halt_except);
 assign enter_debug_mode = trap_is_debug_entry && trap_enter_rdy;
@@ -1229,7 +1238,8 @@ assign dbg_instr_caught_ebreak = debug_mode && except == EXCEPT_EBREAK && trap_e
 
 // Note we exclude ebreak from here regardless of dcsr.ebreakm, since we are
 // already in debug mode at this point
-assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE && except != EXCEPT_EBREAK && trap_enter_rdy;
+assign dbg_instr_caught_exception = debug_mode && except != EXCEPT_NONE &&
+	except != EXCEPT_EBREAK && trap_enter_rdy;
 
 // ----------------------------------------------------------------------------
 // Trap request generation
