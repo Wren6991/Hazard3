@@ -326,6 +326,8 @@ reg        sbbusy;
 reg        sbautoincrement;
 reg [2:0]  sbaccess; // Size of the transfer
 
+wire sbdata_write_blocked;
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		sbaddress <= {32{1'b0}};
@@ -334,7 +336,9 @@ always @ (posedge clk or negedge rst_n) begin
 		sbaddress <= {32{1'b0}};
 		sbdata <= {32{1'b0}};
 	end else if (HAVE_SBA) begin
-		if (dmi_write && dmi_regaddr == ADDR_SBDATA0 && !sbbusy) begin
+		if (dmi_write && dmi_regaddr == ADDR_SBDATA0 && !sbdata_write_blocked) begin
+			// Note sbbusyerror and sberror block writes to sbdata0, as the
+			// write is required to have no side effects when they are set.
 			sbdata <= dmi_pwdata;
 		end else if (sbus_vld && sbus_rdy && !sbus_write && !sbus_err) begin
 			// Make sure the lower byte lanes see appropriately shifted data as
@@ -344,8 +348,14 @@ always @ (posedge clk or negedge rst_n) begin
 			          sbaddress[1:0] == 2'b11 ? {sbus_rdata[31:8],  sbus_rdata[31:24]} : sbus_rdata;
 		end
 		if (dmi_write && dmi_regaddr == ADDR_SBADDRESS0 && !sbbusy) begin
+			// Note sbaddress can't be written when busy, but
+			// sberror/sbbusyerror do not prevent writes.
 			sbaddress <= dmi_pwdata;
-		end else if (sbus_vld && sbus_rdy && sbautoincrement) begin
+		end else if (sbus_vld && sbus_rdy && !sbus_err && sbautoincrement) begin
+			// Note: address increments only following a successful transfer.
+			// Spec 0.13.2 weirdly implies address should increment following
+			// a sbdata0 read with sbautoincrement=1 and sbreadondata=0, but
+			// this seems to be a typo, fixed in later versions.
 			sbaddress <= sbaddress + (
 				sbaccess[1:0] == 2'b00 ? 3'h1 :
 				sbaccess[1:0] == 2'b01 ? 3'h2 : 3'h4
@@ -366,6 +376,31 @@ localparam SBERROR_OK       = 3'h0;
 localparam SBERROR_BADADDR  = 3'h2;
 localparam SBERROR_BADALIGN = 3'h3;
 localparam SBERROR_BADSIZE  = 3'h4;
+
+assign sbdata_write_blocked = sbbusy || sbbusyerror || |sberror;
+
+// Notes on behaviour of sbbusyerror: the sbbusyerror description says:
+//
+//  "Set when the debugger attempts to read data while a read is in progress,
+//   or when the debugger initiates a new access while one is already in
+//   progress (while sbbusy is set)."
+//
+// However, sbaddress0 description says:
+//
+//  "When the system bus master is busy, writes to this register will set
+//   sbbusyerror and don’t do anything else."
+//
+// ...not conditioned on sbreadonaddr. Likewise the sbdata0 description says:
+//
+//   "If the bus master is busy then accesses set sbbusyerror, and don’t do
+//    anything else."
+//
+// ...not conditioned on sbreadondata. We are going to take the union of all
+// the cases where the spec says we should raise an error:
+
+wire sb_access_illegal_when_busy =
+	dmi_regaddr == ADDR_SBDATA0 && (dmi_read || dmi_write) ||
+	dmi_regaddr == ADDR_SBADDRESS0 && dmi_write;
 
 wire sb_want_start_write = dmi_write && dmi_regaddr == ADDR_SBDATA0;
 
@@ -412,7 +447,7 @@ always @ (posedge clk or negedge rst_n) begin
 			sberror         <= sberror & ~dmi_pwdata[14:12];
 		end
 		if (sbbusy) begin
-			if (sb_want_start_read || sb_want_start_write) begin
+			if (sb_access_illegal_when_busy) begin
 				sbbusyerror <= 1'b1;
 			end
 			if (sbus_vld && sbus_rdy) begin
@@ -699,9 +734,9 @@ assign hart_instr_data_vld = {{N_HARTS{1'b0}},
 assign hart_instr_data = {N_HARTS{
 	acmd_state == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, dmdata0
 	acmd_state == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw dmdata0, xx
-	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                    :
-	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                    :
-	                                  32'h00100073                                  // ebreak
+	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                       :
+	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                       :
+	                                  32'h00100073                                     // ebreak
 }};
 
 // ----------------------------------------------------------------------------
