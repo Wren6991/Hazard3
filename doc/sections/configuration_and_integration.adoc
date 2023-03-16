@@ -105,6 +105,17 @@ Requires: <<param-EXTENSION_ZBB>>. (Since Zbb and Zbkb have a large overlap, thi
 
 Default value: 0
 
+[[param-EXTENSION_ZCB]]
+===== EXTENSION_ZCB:
+
+Support for Zcb basic additional compressed instructions
+
+Requires: <<param-EXTENSION_C>>. (Some Zcb instructions also require Zbb or M, as they are 16-bit aliases of 32-bit instructions present in those extensions.)
+
+Note Zca is equivalent to C, as we do not support the F extension.
+
+Default value: 0
+
 [[param-EXTENSION_ZIFENCEI]]
 ===== EXTENSION_ZIFENCEI
 

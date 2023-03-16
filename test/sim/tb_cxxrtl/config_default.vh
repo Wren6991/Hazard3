@@ -10,6 +10,7 @@ localparam EXTENSION_ZBB       = 1;
 localparam EXTENSION_ZBC       = 1;
 localparam EXTENSION_ZBS       = 1;
 localparam EXTENSION_ZBKB      = 1;
+localparam EXTENSION_ZCB       = 1;
 localparam EXTENSION_ZIFENCEI  = 1;
 localparam EXTENSION_XH3BEXTM  = 1;
 localparam EXTENSION_XH3IRQ    = 1;

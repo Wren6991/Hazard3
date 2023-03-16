@@ -181,6 +181,19 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_C_LWSP      16'b010???????????10
 `define RVOPC_C_SWSP      16'b110???????????10
 
+// Zcb simple additional compressed instructions
+`define RVOPC_C_LBU       16'b100000????????00
+`define RVOPC_C_LHU       16'b100001???0????00
+`define RVOPC_C_LH        16'b100001???1????00
+`define RVOPC_C_SB        16'b100010????????00
+`define RVOPC_C_SH        16'b100011???0????00
+`define RVOPC_C_ZEXT_B    16'b100111???1100001
+`define RVOPC_C_SEXT_B    16'b100111???1100101
+`define RVOPC_C_ZEXT_H    16'b100111???1101001
+`define RVOPC_C_SEXT_H    16'b100111???1101101
+`define RVOPC_C_NOT       16'b100111???1110101
+`define RVOPC_C_MUL       16'b100111???10???01
+
 // Copies provided here with 0 instead of ? so that these can be used to build 32-bit instructions in the decompressor
 
 `define RVOPC_NOZ_BEQ     32'b00000000000000000000000001100011
@@ -231,5 +244,11 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_NOZ_CSRRSI  32'b00000000000000000110000001110011
 `define RVOPC_NOZ_CSRRCI  32'b00000000000000000111000001110011
 `define RVOPC_NOZ_SYSTEM  32'b00000000000000000000000001110011
+
+// Non-RV32I instructions for Zcb:
+`define RVOPC_NOZ_MUL     32'b00000010000000000000000000110011
+`define RVOPC_NOZ_SEXT_B  32'b01100000010000000001000000010011
+`define RVOPC_NOZ_SEXT_H  32'b01100000010100000001000000010011
+`define RVOPC_NOZ_ZEXT_H  32'b00001000000000000100000000110011
 
 `endif

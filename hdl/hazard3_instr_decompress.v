@@ -6,7 +6,7 @@
 `default_nettype none
 
 module hazard3_instr_decompress #(
-	parameter PASSTHROUGH = 0
+`include "hazard3_config.vh"
 ) (
 	input wire [31:0] instr_in,
 	output reg instr_is_32bit,
@@ -17,6 +17,7 @@ module hazard3_instr_decompress #(
 `include "rv_opcodes.vh"
 
 localparam W_REGADDR = 5;
+localparam PASSTHROUGH = ~|EXTENSION_C;
 
 // Long-register formats: cr, ci, css
 // Short-register formats: ciw, cl, cs, cb, cj
@@ -58,6 +59,20 @@ wire [31:0] imm_cb ={
 	instr_in[4:3],
 	instr_in[12],
 	7'h00
+};
+
+wire [31:0] imm_c_lb = {
+	10'h0,
+	instr_in[5],
+	instr_in[6],
+	20'h00000
+};
+
+wire [31:0] imm_c_lh = {
+	10'h000,
+	instr_in[5],
+	1'b0,
+	20'h00000
 };
 
 function [31:0] rfmt_rd;  input [4:0] rd;  begin rfmt_rd  = {20'h00000, rd, 7'h00};   end endfunction
@@ -137,6 +152,53 @@ end else begin: instr_decompress
 				| {4'h0, instr_in[8:7], instr_in[12], 13'h0000, instr_in[11:9], 2'b00, 7'h00};
 			`RVOPC_C_BEQZ:     instr_out = `RVOPC_NOZ_BEQ | rfmt_rs1(rs1_s) | imm_cb;
 			`RVOPC_C_BNEZ:     instr_out = `RVOPC_NOZ_BNE | rfmt_rs1(rs1_s) | imm_cb;
+
+			// Optional Zbc instructions:
+			`RVOPC_C_LBU: begin
+				instr_out = `RVOPC_NOZ_LBU    | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lb;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_LHU: begin
+				instr_out = `RVOPC_NOZ_LHU    | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_LH: begin
+				instr_out = `RVOPC_NOZ_LH     | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_SB: begin
+				instr_out = `RVOPC_NOZ_SB     | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lb;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_SH: begin
+				instr_out = `RVOPC_NOZ_SH     | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_ZEXT_B: begin
+				instr_out = `RVOPC_NOZ_ANDI   | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | 32'h0ff00000;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_SEXT_B: begin
+				instr_out = `RVOPC_NOZ_SEXT_B | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s);
+				invalid = ~|EXTENSION_ZCB || ~|EXTENSION_ZBB;
+			end
+			`RVOPC_C_ZEXT_H: begin
+				instr_out = `RVOPC_NOZ_ZEXT_H | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s);
+				invalid = ~|EXTENSION_ZCB || ~|EXTENSION_ZBB;
+			end
+			`RVOPC_C_SEXT_H: begin
+				instr_out = `RVOPC_NOZ_SEXT_H | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s);
+				invalid = ~|EXTENSION_ZCB || ~|EXTENSION_ZBB;
+			end
+			`RVOPC_C_NOT: begin
+				instr_out = `RVOPC_NOZ_XORI   | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | 32'hfff00000;
+				invalid = ~|EXTENSION_ZCB;
+			end
+			`RVOPC_C_MUL: begin
+				instr_out = `RVOPC_NOZ_MUL    | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
+				invalid = ~|EXTENSION_ZCB || ~|EXTENSION_M;
+			end
+
 			default: invalid = 1'b1;
 			endcase
 		end
@@ -146,4 +208,6 @@ endgenerate
 
 endmodule
 
+`ifndef YOSYS
 `default_nettype wire
+`endif

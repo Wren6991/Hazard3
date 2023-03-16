@@ -76,7 +76,7 @@ reg         d_invalid_32bit;
 wire        d_invalid = d_invalid_16bit || d_invalid_32bit;
 
 hazard3_instr_decompress #(
-	.PASSTHROUGH(!EXTENSION_C)
+`include "hazard3_config_inst.vh"
 ) decomp (
 	.instr_in       (fd_cir),
 	.instr_is_32bit (d_instr_is_32bit),
