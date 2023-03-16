@@ -549,7 +549,7 @@ always @ (*) begin
 
 	casez ({next_instr_is_32bit, next_instr[1:0], next_instr[15:13]})
 	{1'b1, 2'bzz, 3'bzzz}: predecode_rs1_coarse = next_instr[19:15]; // 32-bit R, S, B formats
-	{1'b0, 2'b00, 3'bz00}: predecode_rs1_coarse = 5'd2;              // c.addi4spn + don't care
+	{1'b0, 2'b00, 3'b00z}: predecode_rs1_coarse = 5'd2;              // c.addi4spn + don't care
 	{1'b0, 2'b01, 3'b0zz}: predecode_rs1_coarse = next_instr[11:7];  // c.addi, c.addi16sp + don't care (jal, li)
 	{1'b0, 2'b10, 3'bz1z}: predecode_rs1_coarse = 5'd2;              // c.lwsp, c.lwsp + don't care
 	{1'b0, 2'b10, 3'bz0z}: predecode_rs1_coarse = next_instr[11:7];
