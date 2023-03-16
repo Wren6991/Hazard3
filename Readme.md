@@ -11,7 +11,7 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` instruction set 
 * `Zbc`: carry-less multiplication
 * `Zbs`: single-bit manipulation
 * `Zbkb`: basic bit manipulation for scalar cryptography
-* `Zcb`: basic additional compressed instructions *(experimental)*
+* `Zcb`: basic additional compressed instructions
 * Debug, Machine and User privilege/execution modes
 * Privileged instructions `ECALL`, `EBREAK`, `MRET` and `WFI`
 * Physical memory protection (PMP) with up to 16 naturally aligned regions

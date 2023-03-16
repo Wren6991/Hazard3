@@ -155,23 +155,23 @@ end else begin: instr_decompress
 
 			// Optional Zbc instructions:
 			`RVOPC_C_LBU: begin
-				instr_out = `RVOPC_NOZ_LBU    | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lb;
+				instr_out = `RVOPC_NOZ_LBU    | rfmt_rd(rd_s)  | rfmt_rs1(rs1_s) | imm_c_lb;
 				invalid = ~|EXTENSION_ZCB;
 			end
 			`RVOPC_C_LHU: begin
-				instr_out = `RVOPC_NOZ_LHU    | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh;
+				instr_out = `RVOPC_NOZ_LHU    | rfmt_rd(rd_s)  | rfmt_rs1(rs1_s) | imm_c_lh;
 				invalid = ~|EXTENSION_ZCB;
 			end
 			`RVOPC_C_LH: begin
-				instr_out = `RVOPC_NOZ_LH     | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh;
+				instr_out = `RVOPC_NOZ_LH     | rfmt_rd(rd_s)  | rfmt_rs1(rs1_s) | imm_c_lh;
 				invalid = ~|EXTENSION_ZCB;
 			end
 			`RVOPC_C_SB: begin
-				instr_out = `RVOPC_NOZ_SB     | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lb;
+				instr_out = `RVOPC_NOZ_SB     | rfmt_rs2(rd_s) | rfmt_rs1(rs1_s) | imm_c_lb >> 13;
 				invalid = ~|EXTENSION_ZCB;
 			end
 			`RVOPC_C_SH: begin
-				instr_out = `RVOPC_NOZ_SH     | rfmt_rd(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh;
+				instr_out = `RVOPC_NOZ_SH     | rfmt_rs2(rd_s) | rfmt_rs1(rs1_s) | imm_c_lh >> 13;
 				invalid = ~|EXTENSION_ZCB;
 			end
 			`RVOPC_C_ZEXT_B: begin
