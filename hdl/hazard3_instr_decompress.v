@@ -1,17 +1,38 @@
 /*****************************************************************************\
-|                      Copyright (C) 2021-2022 Luke Wren                      |
+|                      Copyright (C) 2021-2023 Luke Wren                      |
 |                     SPDX-License-Identifier: Apache-2.0                     |
 \*****************************************************************************/
+
+// Little instructions go in, big instructions come out
 
 `default_nettype none
 
 module hazard3_instr_decompress #(
 `include "hazard3_config.vh"
 ) (
-	input wire [31:0] instr_in,
-	output reg instr_is_32bit,
-	output reg [31:0] instr_out,
-	output reg invalid
+	input  wire        clk,
+	input  wire        rst_n,
+
+	input  wire [31:0] instr_in,
+	output reg         instr_is_32bit,
+
+	output reg  [31:0] instr_out,
+	// Indicate instr_out is a uop, and more uops follow in this sequence.
+	// Should suppress PC update, and null the PC offset in the mepc address
+	// in stage 3.
+	output wire        instr_out_uop_nonfinal,
+	// Indicate instr_out is a uop from the noninterruptible part of a uop
+	// sequence. If one uop is noninterruptible, all following uops until the
+	// end of the sequence are also noninterruptible.
+	output wire        instr_out_uop_atomic,
+	// Current ucode sequence is stalled on downstream execution
+	input  wire        instr_out_uop_stall,
+	input  wire        instr_out_uop_clear,
+
+	// To regnum decoder in frontend
+	output wire [3:0]  df_uop_step_next,
+
+	output reg         invalid
 );
 
 `include "rv_opcodes.vh"
@@ -79,6 +100,69 @@ function [31:0] rfmt_rd;  input [4:0] rd;  begin rfmt_rd  = {20'h00000, rd, 7'h0
 function [31:0] rfmt_rs1; input [4:0] rs1; begin rfmt_rs1 = {12'h000, rs1, 15'h0000}; end endfunction
 function [31:0] rfmt_rs2; input [4:0] rs2; begin rfmt_rs2 = {7'h00, rs2, 20'h00000};  end endfunction
 
+// ----------------------------------------------------------------------------
+// Push/pop and friends
+
+// The longest uop sequence is a maximal cm.popretz:
+//
+// - 13x lw                     (counter = 0..12)
+// - 1x addi to set a0 to zero  (counter = 13   ) < atomic section
+// - 1x addi to adjust sp       (counter = 14   ) < atomic section
+// - 1x jalr to jump through ra (counter = 15   ) < atomic section
+
+reg [3:0] uop_ctr;
+reg [3:0] uop_ctr_nxt;
+reg       in_uop_seq;
+reg       uop_seq_end;
+reg       uop_atomic;
+
+assign instr_out_uop_nonfinal = in_uop_seq && !uop_seq_end;
+assign instr_out_uop_atomic = uop_atomic;
+assign df_uop_step_next = uop_ctr_nxt;
+
+// The offset from current sp value to the lowest-addressed saved register, +64.
+wire [3:0] zcmp_rlist = instr_in[7:4];
+wire [3:0] zcmp_n_regs = zcmp_rlist == 4'hf ? 4'hd : zcmp_rlist - 4'h3;
+
+wire [6:0] zcmp_stack_adj_base =
+	zcmp_rlist[3]   == 1'b0 ? 7'h10 :
+	zcmp_rlist[3:2] == 2'h2 ? 7'h20 :
+	zcmp_rlist[3:0] == 4'hf ? 7'h40 : 7'h30;
+
+wire [11:0] zcmp_stack_lw_offset = {6'h00, uop_ctr, 2'h0};
+wire [11:0] zcmp_stack_sw_offset = zcmp_stack_lw_offset - {5'h00, zcmp_stack_adj_base};
+
+wire [4:0] zcmp_ls_reg =
+	uop_ctr == 4'h0 ? 5'd01 : // ra
+	uop_ctr == 4'h1 ? 5'd08 : // s0
+	uop_ctr == 4'h2 ? 5'd09 : // s1
+	5'd15 + {1'b0, uop_ctr};  // s2-s11 (s2 == x18)
+
+wire [31:0] zcmp_push_sw_instr = `RVOPC_NOZ_SW | rfmt_rs1(5'd2) | rfmt_rs2(zcmp_ls_reg) | {
+	zcmp_stack_sw_offset[11:5], 13'h0000, zcmp_stack_sw_offset[4:0], 7'h00
+};
+
+wire [31:0] zcmp_pop_lw_instr = `RVOPC_NOZ_LW | rfmt_rd(zcmp_ls_reg) | rfmt_rs1(5'd2)| {
+	zcmp_stack_lw_offset[11:0], 20'h00000
+};
+
+wire [11:0] zcmp_abs_stack_adj = {5'h00, zcmp_stack_adj_base} + {6'h00, instr_in[3:2], 4'h0};
+
+wire [31:0] zcmp_push_stack_adj_instr = `RVOPC_NOZ_ADDI | rfmt_rd(5'd2) | rfmt_rs1(5'd2) | {
+	-zcmp_abs_stack_adj,
+	20'h00000
+};
+
+wire [31:0] zcmp_pop_stack_adj_instr = `RVOPC_NOZ_ADDI | rfmt_rd(5'd2) | rfmt_rs1(5'd2) | {
+	zcmp_abs_stack_adj,
+	20'h00000
+};
+
+wire zcmp_sa01_r1s = {|instr_in[9:8], ~&instr_in[9:8], instr_in[9:7]};
+wire zcmp_sa01_r2s = {|instr_in[2:1], ~&instr_in[2:1], instr_in[2:0]};
+
+// ----------------------------------------------------------------------------
+
 generate
 if (PASSTHROUGH) begin: instr_passthrough
 	always @ (*) begin
@@ -92,10 +176,18 @@ end else begin: instr_decompress
 			instr_is_32bit = 1'b1;
 			instr_out = instr_in;
 			invalid = 1'b0;
+			uop_seq_end = 1'b0;
+			in_uop_seq = 1'b0;
+			uop_atomic = 1'b0;
+			uop_ctr_nxt = uop_ctr;
 		end else begin
 			instr_is_32bit = 1'b0;
 			instr_out = 32'h0;
 			invalid = 1'b0;
+			uop_seq_end = 1'b0;
+			in_uop_seq = 1'b0;
+			uop_atomic = 1'b0;
+			uop_ctr_nxt = uop_ctr;
 			casez (instr_in[15:0])
 			16'h0:         invalid = 1'b1;
 			`RVOPC_C_ADDI4SPN: instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_s) | rfmt_rs1(5'h2)
@@ -199,10 +291,149 @@ end else begin: instr_decompress
 				invalid = ~|EXTENSION_ZCB || ~|EXTENSION_M;
 			end
 
+			// Optional Zcmp instructions:
+			`RVOPC_CM_PUSH: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
+				invalid = 1'b1;
+			end else if (uop_ctr == 4'he) begin
+				in_uop_seq = 1'b1;
+				uop_seq_end = 1'b1;
+				uop_ctr_nxt = 4'h0;
+				instr_out = zcmp_push_stack_adj_instr;
+			end else begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = zcmp_push_sw_instr;
+				if (uop_ctr_nxt == zcmp_n_regs) begin
+					uop_ctr_nxt = 4'he;
+				end
+			end
+
+			`RVOPC_CM_POP: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
+				invalid = 1'b1;
+			end else if (uop_ctr == 4'he) begin
+				in_uop_seq = 1'b1;
+				uop_seq_end = 1'b1;
+				uop_ctr_nxt = 4'h0;
+				uop_atomic = 1'b1;
+				instr_out = zcmp_pop_stack_adj_instr;
+			end else begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = zcmp_pop_lw_instr;
+				if (uop_ctr_nxt == zcmp_n_regs) begin
+					uop_ctr_nxt = 4'he;
+				end
+			end
+
+			`RVOPC_CM_POPRET: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
+				invalid = 1'b1;
+			end else if (uop_ctr == 4'he) begin
+				// Note we don't set the uop_atomic flag on the first uop in
+				// the uninterruptible sequence -- the rule is *if* one
+				// executes, they all execute. Having none execute is fine.
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = zcmp_pop_stack_adj_instr;
+			end else if (uop_ctr == 4'hf) begin
+				in_uop_seq = 1'b1;
+				uop_seq_end = 1'b1;
+				uop_atomic = 1'b1;
+				uop_ctr_nxt = 4'h0;
+				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
+			end else begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = zcmp_pop_lw_instr;
+				if (uop_ctr_nxt == zcmp_n_regs) begin
+					uop_ctr_nxt = 4'he;
+				end
+			end
+
+			`RVOPC_CM_POPRETZ: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
+				invalid = 1'b1;
+			end else if (uop_ctr == 4'hd) begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd8); // li a0, 0				
+			end else if (uop_ctr == 4'he) begin
+				in_uop_seq = 1'b1;
+				uop_atomic = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = zcmp_pop_stack_adj_instr;
+			end else if (uop_ctr == 4'hf) begin
+				in_uop_seq = 1'b1;
+				uop_seq_end = 1'b1;
+				uop_atomic = 1'b1;
+				uop_ctr_nxt = 4'h0;
+				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
+			end else begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = zcmp_pop_lw_instr;
+				if (uop_ctr_nxt == zcmp_n_regs) begin
+					uop_ctr_nxt = 4'hd;
+				end
+			end
+
+			`RVOPC_CM_MVSA01: if (~|EXTENSION_ZCMP) begin
+				invalid = 1'b1;
+			end else if (uop_ctr == 4'h0) begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(zcmp_sa01_r1s) | rfmt_rs1(5'd10);
+			end else begin
+				in_uop_seq = 1'b1;
+				uop_seq_end = 1'b1;
+				uop_atomic = 1'b1;
+				uop_ctr_nxt = 4'h0;
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(zcmp_sa01_r2s) | rfmt_rs1(5'd11);
+			end
+
+			`RVOPC_CM_MVA01S: if (~|EXTENSION_ZCMP) begin
+				invalid = 1'b1;
+			end else if (uop_ctr == 4'h0) begin
+				in_uop_seq = 1'b1;
+				uop_ctr_nxt = uop_ctr + 4'h1;
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd10) | rfmt_rs1(zcmp_sa01_r1s);
+			end else begin
+				in_uop_seq = 1'b1;
+				uop_seq_end = 1'b1;
+				uop_atomic = 1'b1;
+				uop_ctr_nxt = 4'h0;
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd11) | rfmt_rs1(zcmp_sa01_r2s);
+			end
+
 			default: invalid = 1'b1;
 			endcase
+
+			if (instr_out_uop_clear) begin
+				uop_ctr_nxt = 4'h0;
+			end else if (instr_out_uop_stall) begin
+				uop_ctr_nxt = uop_ctr;
+			end
 		end
 	end
+end
+endgenerate
+
+generate
+if (EXTENSION_ZCMP) begin: have_uop_ctr;
+	always @ (posedge clk or negedge rst_n) begin
+		if (!rst_n) begin
+			uop_ctr <= 4'h0;
+		end else begin
+			uop_ctr <= uop_ctr_nxt;
+`ifdef HAZARD3_ASSERTIONS
+			assert(uop_ctr == 4'h0 || in_uop_seq);
+			if (uop_seq_end) begin
+				assert(in_uop_seq));
+				assert(instr_out_uop_stall || uop_ctr_nxt == 4'h0);
+			end
+`endif
+		end
+	end
+end else begin: no_uop_ctr
+	always @ (*) uop_ctr = 4'h0;
 end
 endgenerate
 

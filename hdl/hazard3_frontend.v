@@ -62,6 +62,8 @@ module hazard3_frontend #(
 	//  stalled instruction may assert a jump request, because e.g. the stall
 	//  is dependent on a bus stall signal so can't gate the request.
 	input  wire              cir_flush_behind,
+	// Required for regnum predecode when Zcmp is enabled:
+	input  wire [3:0]        df_uop_step_next,
 
 	// Signal to power controller that power down is safe. (When going to
 	// sleep, first the pipeline is stalled, and then the power controller
@@ -545,21 +547,46 @@ assign cir_predbranch = cir_predbranch_reg[1:0];
 wire [31:0] next_instr = instr_data_plus_fetch[31:0];
 wire next_instr_is_32bit = next_instr[1:0] == 2'b11 || ~|EXTENSION_C;
 
+
+wire [3:0] uop_ctr = df_uop_step_next & {4{|EXTENSION_ZCMP}};
+
+wire [4:0] zcmp_pushpop_rs2 =
+	uop_ctr == 4'h0 ? 5'd01                   : // ra
+	uop_ctr == 4'h1 ? 5'd08                   : // s0
+	uop_ctr == 4'h2 ? 5'd09                   : // s1
+	                  5'd15 + {1'b0, uop_ctr} ; // s2-s11
+
+wire [4:0] zcmp_pushpop_rs1 =
+	uop_ctr <  4'hd ? 5'd02 :                   // sp   (addr base reg)
+	uop_ctr == 4'hd ? 5'd00 :                   // zero (clear a0)
+	uop_ctr == 4'he ? 5'd02 :                   // sp   (stack adj)
+	                  5'd01 ;                   // ra   (ret)
+
+wire [4:0] zcmp_sa01_r1s  = {|next_instr[9:8], ~&next_instr[9:8], next_instr[9:7]};
+wire [4:0] zcmp_sa01_r2s  = {|next_instr[2:1], ~&next_instr[2:1], next_instr[2:0]};
+
+wire [4:0] zcmp_mvsa01_rs1 = {4'h4, uop_ctr[0]};
+wire [4:0] zcmp_mva01s_rs1 = uop_ctr[0] ? zcmp_sa01_r2s : zcmp_sa01_r1s;
+
 always @ (*) begin
 
-	casez ({next_instr_is_32bit, next_instr[1:0], next_instr[15:13]})
-	{1'b1, 2'bzz, 3'bzzz}: predecode_rs1_coarse = next_instr[19:15]; // 32-bit R, S, B formats
-	{1'b0, 2'b00, 3'b00z}: predecode_rs1_coarse = 5'd2;              // c.addi4spn + don't care
-	{1'b0, 2'b01, 3'b0zz}: predecode_rs1_coarse = next_instr[11:7];  // c.addi, c.addi16sp + don't care (jal, li)
-	{1'b0, 2'b10, 3'bz1z}: predecode_rs1_coarse = 5'd2;              // c.lwsp, c.lwsp + don't care
-	{1'b0, 2'b10, 3'bz0z}: predecode_rs1_coarse = next_instr[11:7];
-	default:               predecode_rs1_coarse = {2'b01, next_instr[9:7]};
+	casez ({next_instr_is_32bit, |EXTENSION_ZCMP, next_instr[15:0]})
+	{1'b1, 1'bz, 16'bzzzzzzzzzzzzzzzz}: predecode_rs1_coarse = next_instr[19:15]; // 32-bit R, S, B formats
+	{1'b0, 1'bz, 16'b00zzzzzzzzzzzz00}: predecode_rs1_coarse = 5'd2;              // c.addi4spn + don't care
+	{1'b0, 1'bz, 16'b0zzzzzzzzzzzzz01}: predecode_rs1_coarse = next_instr[11:7];  // c.addi, c.addi16sp + don't care (jal, li)
+	{1'b0, 1'bz, 16'b100zzzzzzzzzzz10}: predecode_rs1_coarse = next_instr[11:7];  // c.add
+	{1'b0, 1'bz, 16'bz10zzzzzzzzzzz10}: predecode_rs1_coarse = 5'd2;              // c.lwsp, c.swsp
+	{1'b0, 1'b1, 16'b1z11zzzzzzzzzz10}: predecode_rs1_coarse = zcmp_pushpop_rs1;  // cm.push, cm.pop*
+	{1'b0, 1'b1, 16'b1z10zzzzz0zzzz10}: predecode_rs1_coarse = zcmp_mvsa01_rs1;   // cm.mvsa01
+	{1'b0, 1'b1, 16'b1z10zzzzz1zzzz10}: predecode_rs1_coarse = zcmp_mva01s_rs1;   // cm.mva01s
+	default:                            predecode_rs1_coarse = {2'b01, next_instr[9:7]};
 	endcase
 
-	casez ({next_instr_is_32bit, next_instr[1:0]})
-	{1'b1, 2'bzz}: predecode_rs2_coarse = next_instr[24:20];
-	{1'b0, 2'b10}: predecode_rs2_coarse = next_instr[6:2];
-	default:       predecode_rs2_coarse = {2'b01, next_instr[4:2]};
+	casez ({next_instr_is_32bit, next_instr[1:0], next_instr[13]})
+	{1'b1, 2'bzz, 1'bz}: predecode_rs2_coarse = next_instr[24:20];
+	{1'b0, 2'b10, 1'b0}: predecode_rs2_coarse = next_instr[6:2];    // c.add, c.swsp
+	{1'b0, 2'b10, 1'b1}: predecode_rs2_coarse = zcmp_pushpop_rs2;   // cm.push
+	default:             predecode_rs2_coarse = {2'b01, next_instr[4:2]};
 	endcase
 
 	// The "fine" predecode targets those instructions which either:

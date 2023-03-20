@@ -8,7 +8,7 @@
 // - h3_bextmi: immediate version of the above (as bexti is to bext)
 
 // The instruction is just supposed to take a single static size...
-__attribute__((noinline)) uint32_t bextm_dynamic_width(uint nbits, uint32_t rs1, uint32_t rs2) {
+__attribute__((noinline)) uint32_t bextm_dynamic_width(unsigned int nbits, uint32_t rs1, uint32_t rs2) {
 	switch (nbits) {
 	case 1:
 		return __hazard3_bextm(1, rs1, rs2);

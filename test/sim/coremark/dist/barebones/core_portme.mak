@@ -19,23 +19,27 @@
 #	Use this flag to define how to to get an executable (e.g -o)
 OUTFLAG= -o
 
-CC 		= /opt/riscv/unstable/bin/riscv32-unknown-elf-gcc
-LD		= /opt/riscv/unstable/bin/riscv32-unknown-elf-gcc
-AS		= /opt/riscv/unstable/bin/riscv32-unknown-elf-gcc
-# Flag : CFLAGS
-#	Use this flag to define compiler options. Note, you can add compiler options from the command line using XCFLAGS="other flags"
-PORT_CFLAGS = -O3 -g -march=rv32im_zicsr_zba_zbb_zbc_zbs -fno-common -funroll-loops -finline-functions --param max-inline-insns-auto=20 -falign-functions=4 -falign-jumps=4 -falign-loops=4
+MARCH        = rv32im_zicsr_zba_zbb_zbc_zbs_zca_zcb_zcmp
+CROSS_PREFIX = /opt/riscv/gcc-riscv32-corev/bin/riscv32-corev-elf-
+
+CC           =  $(CROSS_PREFIX)gcc
+LD           =  $(CROSS_PREFIX)gcc
+AS           =  $(CROSS_PREFIX)gcc
+
+PORT_CFLAGS = -O3 -g -march=$(MARCH) -fno-common -funroll-loops -finline-functions --param max-inline-insns-auto=20 -falign-functions=4 -falign-jumps=4 -falign-loops=4
 FLAGS_STR = "$(PORT_CFLAGS) $(XCFLAGS) $(XLFLAGS) $(LFLAGS_END)"
 CFLAGS = $(PORT_CFLAGS) -I$(PORT_DIR) -I. -DFLAGS_STR=\"$(FLAGS_STR)\" 
+
 #Flag : LFLAGS_END
 #	Define any libraries needed for linking or other flags that should come at the end of the link line (e.g. linker scripts). 
-#	Note : On certain platforms, the default clock_gettime implementation is supported but requires linking of librt.
+
 SEPARATE_COMPILE=1
 # Flag : SEPARATE_COMPILE
 # You must also define below how to create an object file, and how to link.
+
 OBJOUT 	= -o
-LFLAGS 	= -T ../../common/memmap.ld
-ASFLAGS = -c -march=rv32im_zicsr
+LFLAGS 	= -T ../../common/memmap.ld -Wl,--noinhibit-exec
+ASFLAGS = -c -march=$(MARCH)
 OFLAG 	= -o
 COUT 	= -c
 

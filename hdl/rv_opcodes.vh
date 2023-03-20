@@ -194,6 +194,14 @@ localparam RV_RD_BITS = 5;
 `define RVOPC_C_NOT       16'b100111???1110101
 `define RVOPC_C_MUL       16'b100111???10???01
 
+// Zcmp push/pop instructions
+`define RVOPC_CM_PUSH     16'b10111000??????10
+`define RVOPC_CM_POP      16'b10111010??????10
+`define RVOPC_CM_POPRETZ  16'b10111100??????10
+`define RVOPC_CM_POPRET   16'b10111110??????10
+`define RVOPC_CM_MVSA01   16'b101011???01???10
+`define RVOPC_CM_MVA01S   16'b101011???11???10
+
 // Copies provided here with 0 instead of ? so that these can be used to build 32-bit instructions in the decompressor
 
 `define RVOPC_NOZ_BEQ     32'b00000000000000000000000001100011

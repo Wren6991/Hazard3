@@ -58,10 +58,14 @@ parameter EXTENSION_ZBS       = 0,
 // Requires: Zbb. (This flag enables instructions in Zbkb which aren't in Zbb.)
 parameter EXTENSION_ZBKB      = 0,
 
-// EXTENSION_ZCB: Support for ZCB basic additional compressed instructions
-// Requires: C. (Some Zcb instructions also require Zbb or M.)
+// EXTENSION_ZCB: Support for Zcb basic additional compressed instructions
+// Requires: EXTENSION_C. (Some Zcb instructions also require Zbb or M.)
 // Note Zca is equivalent to C, as we do not support the F extension.
 parameter EXTENSION_ZCB       = 0,
+
+// EXTENSION_ZCMP: Support for Zcmp push/pop instructions.
+// Requires: EXTENSION_C.
+parameter EXTENSION_ZCMP      = 0,
 
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.

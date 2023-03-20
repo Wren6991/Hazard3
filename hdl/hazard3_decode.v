@@ -1,5 +1,5 @@
 /*****************************************************************************\
-|                      Copyright (C) 2021-2022 Luke Wren                      |
+|                      Copyright (C) 2021-2023 Luke Wren                      |
 |                     SPDX-License-Identifier: Apache-2.0                     |
 \*****************************************************************************/
 
@@ -19,6 +19,7 @@ module hazard3_decode #(
 	input  wire [1:0]           fd_cir_vld,
 	output wire [1:0]           df_cir_use,
 	output wire                 df_cir_flush_behind,
+	output wire [3:0]           df_uop_step_next,
 	output wire [W_ADDR-1:0]    d_pc,
 
 	input  wire                 debug_mode,
@@ -58,6 +59,8 @@ module hazard3_decode #(
 	output reg                  d_sleep_wfi,
 	output reg                  d_sleep_block,
 	output reg                  d_sleep_unblock,
+	output wire                 d_no_pc_increment,
+	output wire                 d_uninterruptible,
 	output reg                  d_fence_i
 );
 
@@ -75,14 +78,34 @@ wire        d_invalid_16bit;
 reg         d_invalid_32bit;
 wire        d_invalid = d_invalid_16bit || d_invalid_32bit;
 
+wire        uop_nonfinal;
+wire        uop_uninterruptible;
+wire        uop_stall;
+wire        uop_clear;
+
 hazard3_instr_decompress #(
 `include "hazard3_config_inst.vh"
 ) decomp (
-	.instr_in       (fd_cir),
-	.instr_is_32bit (d_instr_is_32bit),
-	.instr_out      (d_instr),
-	.invalid        (d_invalid_16bit)
+	.clk                           (clk),
+	.rst_n                         (rst_n),
+
+	.instr_in                      (fd_cir),
+	.instr_is_32bit                (d_instr_is_32bit),
+	.instr_out                     (d_instr),
+	.instr_out_uop_nonfinal        (uop_nonfinal),
+	.instr_out_uop_uninterruptible (uop_uninterruptible),
+	.instr_out_uop_stall           (uop_stall),
+	.instr_out_uop_clear           (uop_clear),
+
+	.df_uop_step_next              (df_uop_step_next),
+
+	.invalid                       (d_invalid_16bit)
 );
+
+assign d_uninterruptible = uop_uninterruptible && !d_invalid;
+assign d_no_pc_increment = uop_nonfinal && !d_invalid;
+assign uop_stall         = x_stall || d_starved;
+assign uop_clear         = f_jump_now;
 
 // Decode various immmediate formats
 wire [31:0] d_imm_i = {{21{d_instr[31]}}, d_instr[30:20]};
@@ -102,7 +125,7 @@ wire d_except_instr_bus_fault = fd_cir_vld > 2'd0 && fd_cir_err[0] ||
 	fd_cir_vld > 2'd1 && d_instr_is_32bit && fd_cir_err[1];
 
 assign d_starved = ~|fd_cir_vld || fd_cir_vld[0] && d_instr_is_32bit;
-wire d_stall = x_stall || d_starved;
+wire d_stall = x_stall || d_starved || uop_nonfinal;
 
 assign df_cir_use =
 	d_starved || d_stall ? 2'h0 :
@@ -133,7 +156,11 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 reg  [W_ADDR-1:0] pc;
-wire [W_ADDR-1:0] pc_seq_next = pc + (d_instr_is_32bit ? 32'h4 : 32'h2);
+wire [W_ADDR-1:0] pc_seq_next = pc + (
+	|EXTENSION_ZCMP && uop_nonfinal ? 32'h0 :
+	d_instr_is_32bit                ? 32'h4 : 32'h2
+);
+
 assign d_pc = pc;
 assign debug_dpc_rdata = pc;
 

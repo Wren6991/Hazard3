@@ -1,5 +1,5 @@
 /*****************************************************************************\
-|                      Copyright (C) 2021-2022 Luke Wren                      |
+|                      Copyright (C) 2021-2023 Luke Wren                      |
 |                     SPDX-License-Identifier: Apache-2.0                     |
 \*****************************************************************************/
 
@@ -112,6 +112,7 @@ wire [1:0]           fd_cir_predbranch;
 wire [1:0]           fd_cir_vld;
 wire [1:0]           df_cir_use;
 wire                 df_cir_flush_behind;
+wire [3:0]           df_uop_step_next;
 
 wire                 x_btb_set;
 wire [W_ADDR-1:0]    x_btb_set_src_addr;
@@ -160,6 +161,7 @@ hazard3_frontend #(
 	.cir_vld              (fd_cir_vld),
 	.cir_use              (df_cir_use),
 	.cir_flush_behind     (df_cir_flush_behind),
+	.df_uop_step_next     (df_uop_step_next),
 
 	.pwrdown_ok           (f_frontend_pwrdown_ok),
 	.delay_first_fetch    (!pwrup_ack),
@@ -215,6 +217,8 @@ wire [W_EXCEPT-1:0]  d_except;
 wire                 d_sleep_wfi;
 wire                 d_sleep_block;
 wire                 d_sleep_unblock;
+wire                 d_no_pc_increment;
+wire                 d_uninterruptible;
 wire                 d_fence_i;
 wire                 d_csr_ren;
 wire                 d_csr_wen;
@@ -241,6 +245,7 @@ hazard3_decode #(
 	.fd_cir_vld           (fd_cir_vld),
 	.df_cir_use           (df_cir_use),
 	.df_cir_flush_behind  (df_cir_flush_behind),
+	.df_uop_step_next     (df_uop_step_next),
 	.d_pc                 (d_pc),
 	.x_jump_not_except    (x_jump_not_except),
 
@@ -280,6 +285,8 @@ hazard3_decode #(
 	.d_sleep_wfi          (d_sleep_wfi),
 	.d_sleep_block        (d_sleep_block),
 	.d_sleep_unblock      (d_sleep_unblock),
+	.d_no_pc_increment    (d_no_pc_increment),
+	.d_uninterruptible    (d_uninterruptible),
 	.d_fence_i            (d_fence_i)
 );
 
@@ -322,6 +329,7 @@ reg  [1:0]           xm_addr_align;
 reg  [W_MEMOP-1:0]   xm_memop;
 reg  [W_EXCEPT-1:0]  xm_except;
 reg                  xm_except_to_d_mode;
+reg                  xm_no_pc_increment;
 reg                  xm_sleep_wfi;
 reg                  xm_sleep_block;
 reg                  xm_delay_irq_entry_on_ls_stagex;
@@ -999,7 +1007,7 @@ hazard3_csr #(
 	.trap_enter_vld             (m_trap_enter_vld),
 	.trap_enter_rdy             (m_trap_enter_rdy),
 	.loadstore_dphase_pending   (m_dphase_in_flight),
-	.delay_irq_entry            (m_delay_irq_entry),
+	.delay_irq_entry            (m_delay_irq_entry || d_uninterruptible),
 	.mepc_in                    (m_exception_return_addr),
 
 	.pwr_allow_clkgate          (m_pwr_allow_clkgate),
@@ -1044,11 +1052,18 @@ always @ (posedge clk or negedge rst_n) begin
 		xm_sleep_wfi <= 1'b0;
 		xm_sleep_block <= 1'b0;
 		unblock_out <= 1'b0;
-		{xm_rs1, xm_rs2, xm_rd} <= {3 * W_REGADDR{1'b0}};
+		xm_rs1 <= {W_REGADDR{1'b0}};
+		xm_rs2 <= {W_REGADDR{1'b0}};
+		xm_rd <= {W_REGADDR{1'b0}};
+		xm_no_pc_increment <= 1'b0;
 	end else begin
 		unblock_out <= 1'b0;
 		if (!m_stall) begin
-			{xm_rs1, xm_rs2, xm_rd} <= {d_rs1, d_rs2, d_rd};
+			xm_rs1 <= d_rs1;
+			xm_rs2 <= d_rs2;
+			xm_rd <= d_rd;
+			// PC increment is suppressed non-final micro-ops, only needed for Zcmp:
+			xm_no_pc_increment <= d_no_pc_increment && ~|EXTENSION_ZCMP;
 			// If some X-sourced exception has squashed the address phase, need to squash the data phase too.
 			xm_memop            <= x_except != EXCEPT_NONE ? MEMOP_NONE : d_memop;
 			xm_except           <= x_except;
@@ -1177,6 +1192,7 @@ assign m_stall = m_bus_stall ||
 // was *not* a taken branch, which is why we can just walk back the PC.
 assign m_exception_return_addr = d_pc - (
 	m_trap_is_irq         ? 32'h0 :
+	xm_no_pc_increment    ? 32'h0 :
 	prev_instr_was_32_bit ? 32'h4 : 32'h2
 );
 
