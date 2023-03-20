@@ -19,12 +19,11 @@
 
 #define FRAME_SIZE_WORDS 32
 uint32_t test_frame[FRAME_SIZE_WORDS];
+uint32_t sp_save;
 
-#define test_zcmp_push(instr, test_frame) \
+#define test_zcmp_push(instr_bits, instr_name, test_frame) \
 	test_sp = &test_frame[FRAME_SIZE_WORDS];\
-	tb_puts("Test: " instr "\n"); \
-	tb_puts("Initial sp:\n"); \
-	tb_put_u32((uint32_t)test_sp); \
+	tb_puts("Test: " instr_name "\n"); \
 	for (int i = 0; i < 32; ++i) test_frame[i] = 0xdead0000 + i; \
 	asm volatile ( \
 		/* Save all clobbered registers on the real stack */ \
@@ -44,7 +43,8 @@ uint32_t test_frame[FRAME_SIZE_WORDS];
 		"sw x26, 44(sp)\n" \
 		"sw x27, 48(sp)\n" \
 		/* Save stack pointer and install test sp */ \
-		"csrw mscratch, sp\n" \
+		"la x1, sp_save\n" \
+		"sw sp, 0(x1)\n" \
 		"mv sp, %0\n" \
 		/* Give unique values to all registers that can be pushed */ \
 		"li x1,  0xa5000000 + 1\n" \
@@ -61,11 +61,12 @@ uint32_t test_frame[FRAME_SIZE_WORDS];
 		"li x26, 0xa5000000 + 26\n" \
 		"li x27, 0xa5000000 + 27\n" \
 		/* Let's go */ \
-		instr "\n" \
+		".hword " #instr_bits "\n" \
 		/* Updated test sp is returned  */ \
 		"mv a0, sp\n" \
 		/* Restore original sp, and clobbered registers */ \
-		"csrr sp, mscratch\n" \
+		"la x1, sp_save\n" \
+		"lw sp,   0(x1)\n" \
 		"lw x1,   0(sp)\n" \
 		"lw x8,   4(sp)\n" \
 		"lw x9,   8(sp)\n" \
@@ -83,66 +84,1843 @@ uint32_t test_frame[FRAME_SIZE_WORDS];
 		"mv %0, a0\n" \
 		: "+r"(test_sp) : : "a0"\
 	); \
-	tb_puts("Final sp:\n"); \
-	tb_put_u32((uint32_t)test_sp); \
+	tb_puts("SP diff:\n"); \
+	tb_put_u32((uint32_t)test_sp - (uint32_t)&test_frame[FRAME_SIZE_WORDS]); \
 	tb_puts("Frame data\n"); \
 	for (int i = 0; i < FRAME_SIZE_WORDS; ++i) tb_put_u32(test_frame[i]); \
 	tb_puts("\n");
 
 int main() {
 	volatile uint32_t *test_sp;
-	test_zcmp_push("cm.push {ra},-16"         , test_frame);
-	test_zcmp_push("cm.push {ra},-32"         , test_frame);
-	test_zcmp_push("cm.push {ra},-48"         , test_frame);
-	test_zcmp_push("cm.push {ra},-64"         , test_frame);
-	test_zcmp_push("cm.push {ra,s0},-16"      , test_frame);
-	test_zcmp_push("cm.push {ra,s0},-32"      , test_frame);
-	test_zcmp_push("cm.push {ra,s0},-48"      , test_frame);
-	test_zcmp_push("cm.push {ra,s0},-64"      , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s1},-16"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s1},-32"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s1},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s1},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s2},-16"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s2},-32"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s2},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s2},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s3},-32"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s3},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s3},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s3},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s4},-32"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s4},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s4},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s4},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s5},-32"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s5},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s5},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s5},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s6},-32"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s6},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s6},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s6},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s7},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s7},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s7},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s7},-96"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s8},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s8},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s8},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s8},-96"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s9},-48"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s9},-64"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s9},-80"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s9},-96"   , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s11},-64"  , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s11},-80"  , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s11},-96"  , test_frame);
-	test_zcmp_push("cm.push {ra,s0-s11},-112" , test_frame);
+	test_zcmp_push(0xb842, "cm.push {ra},-16"         , test_frame);
+	test_zcmp_push(0xb846, "cm.push {ra},-32"         , test_frame);
+	test_zcmp_push(0xb84a, "cm.push {ra},-48"         , test_frame);
+	test_zcmp_push(0xb84e, "cm.push {ra},-64"         , test_frame);
+	test_zcmp_push(0xb852, "cm.push {ra,s0},-16"      , test_frame);
+	test_zcmp_push(0xb856, "cm.push {ra,s0},-32"      , test_frame);
+	test_zcmp_push(0xb85a, "cm.push {ra,s0},-48"      , test_frame);
+	test_zcmp_push(0xb85e, "cm.push {ra,s0},-64"      , test_frame);
+	test_zcmp_push(0xb862, "cm.push {ra,s0-s1},-16"   , test_frame);
+	test_zcmp_push(0xb866, "cm.push {ra,s0-s1},-32"   , test_frame);
+	test_zcmp_push(0xb86a, "cm.push {ra,s0-s1},-48"   , test_frame);
+	test_zcmp_push(0xb86e, "cm.push {ra,s0-s1},-64"   , test_frame);
+	test_zcmp_push(0xb872, "cm.push {ra,s0-s2},-16"   , test_frame);
+	test_zcmp_push(0xb876, "cm.push {ra,s0-s2},-32"   , test_frame);
+	test_zcmp_push(0xb87a, "cm.push {ra,s0-s2},-48"   , test_frame);
+	test_zcmp_push(0xb87e, "cm.push {ra,s0-s2},-64"   , test_frame);
+	test_zcmp_push(0xb882, "cm.push {ra,s0-s3},-32"   , test_frame);
+	test_zcmp_push(0xb886, "cm.push {ra,s0-s3},-48"   , test_frame);
+	test_zcmp_push(0xb88a, "cm.push {ra,s0-s3},-64"   , test_frame);
+	test_zcmp_push(0xb88e, "cm.push {ra,s0-s3},-80"   , test_frame);
+	test_zcmp_push(0xb892, "cm.push {ra,s0-s4},-32"   , test_frame);
+	test_zcmp_push(0xb896, "cm.push {ra,s0-s4},-48"   , test_frame);
+	test_zcmp_push(0xb89a, "cm.push {ra,s0-s4},-64"   , test_frame);
+	test_zcmp_push(0xb89e, "cm.push {ra,s0-s4},-80"   , test_frame);
+	test_zcmp_push(0xb8a2, "cm.push {ra,s0-s5},-32"   , test_frame);
+	test_zcmp_push(0xb8a6, "cm.push {ra,s0-s5},-48"   , test_frame);
+	test_zcmp_push(0xb8aa, "cm.push {ra,s0-s5},-64"   , test_frame);
+	test_zcmp_push(0xb8ae, "cm.push {ra,s0-s5},-80"   , test_frame);
+	test_zcmp_push(0xb8b2, "cm.push {ra,s0-s6},-32"   , test_frame);
+	test_zcmp_push(0xb8b6, "cm.push {ra,s0-s6},-48"   , test_frame);
+	test_zcmp_push(0xb8ba, "cm.push {ra,s0-s6},-64"   , test_frame);
+	test_zcmp_push(0xb8be, "cm.push {ra,s0-s6},-80"   , test_frame);
+	test_zcmp_push(0xb8c2, "cm.push {ra,s0-s7},-48"   , test_frame);
+	test_zcmp_push(0xb8c6, "cm.push {ra,s0-s7},-64"   , test_frame);
+	test_zcmp_push(0xb8ca, "cm.push {ra,s0-s7},-80"   , test_frame);
+	test_zcmp_push(0xb8ce, "cm.push {ra,s0-s7},-96"   , test_frame);
+	test_zcmp_push(0xb8d2, "cm.push {ra,s0-s8},-48"   , test_frame);
+	test_zcmp_push(0xb8d6, "cm.push {ra,s0-s8},-64"   , test_frame);
+	test_zcmp_push(0xb8da, "cm.push {ra,s0-s8},-80"   , test_frame);
+	test_zcmp_push(0xb8de, "cm.push {ra,s0-s8},-96"   , test_frame);
+	test_zcmp_push(0xb8e2, "cm.push {ra,s0-s9},-48"   , test_frame);
+	test_zcmp_push(0xb8e6, "cm.push {ra,s0-s9},-64"   , test_frame);
+	test_zcmp_push(0xb8ea, "cm.push {ra,s0-s9},-80"   , test_frame);
+	test_zcmp_push(0xb8ee, "cm.push {ra,s0-s9},-96"   , test_frame);
+	test_zcmp_push(0xb8f2, "cm.push {ra,s0-s11},-64"  , test_frame);
+	test_zcmp_push(0xb8f6, "cm.push {ra,s0-s11},-80"  , test_frame);
+	test_zcmp_push(0xb8fa, "cm.push {ra,s0-s11},-96"  , test_frame);
+	test_zcmp_push(0xb8fe, "cm.push {ra,s0-s11},-112" , test_frame);
 
 	return 0;
 }
 
+// Test output extracted from spike:
 /*EXPECTED-OUTPUT***************************************************************
+
+Test: cm.push {ra},-16
+SP diff:
+fffffff0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+dead001e
+a5000001
+
+Test: cm.push {ra},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+dead001e
+a5000001
+
+Test: cm.push {ra},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+dead001e
+a5000001
+
+Test: cm.push {ra},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+dead001e
+a5000001
+
+Test: cm.push {ra,s0},-16
+SP diff:
+fffffff0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+a5000001
+a5000008
+
+Test: cm.push {ra,s0},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+a5000001
+a5000008
+
+Test: cm.push {ra,s0},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+a5000001
+a5000008
+
+Test: cm.push {ra,s0},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+dead001d
+a5000001
+a5000008
+
+Test: cm.push {ra,s0-s1},-16
+SP diff:
+fffffff0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+a5000001
+a5000008
+a5000009
+
+Test: cm.push {ra,s0-s1},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+a5000001
+a5000008
+a5000009
+
+Test: cm.push {ra,s0-s1},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+a5000001
+a5000008
+a5000009
+
+Test: cm.push {ra,s0-s1},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+dead001c
+a5000001
+a5000008
+a5000009
+
+Test: cm.push {ra,s0-s2},-16
+SP diff:
+fffffff0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+a5000001
+a5000008
+a5000009
+a5000012
+
+Test: cm.push {ra,s0-s2},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+a5000001
+a5000008
+a5000009
+a5000012
+
+Test: cm.push {ra,s0-s2},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+a5000001
+a5000008
+a5000009
+a5000012
+
+Test: cm.push {ra,s0-s2},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+dead001b
+a5000001
+a5000008
+a5000009
+a5000012
+
+Test: cm.push {ra,s0-s3},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+
+Test: cm.push {ra,s0-s3},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+
+Test: cm.push {ra,s0-s3},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+
+Test: cm.push {ra,s0-s3},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+dead001a
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+
+Test: cm.push {ra,s0-s4},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+
+Test: cm.push {ra,s0-s4},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+
+Test: cm.push {ra,s0-s4},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+
+Test: cm.push {ra,s0-s4},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+dead0019
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+
+Test: cm.push {ra,s0-s5},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+
+Test: cm.push {ra,s0-s5},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+
+Test: cm.push {ra,s0-s5},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+
+Test: cm.push {ra,s0-s5},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+dead0018
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+
+Test: cm.push {ra,s0-s6},-32
+SP diff:
+ffffffe0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+
+Test: cm.push {ra,s0-s6},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+
+Test: cm.push {ra,s0-s6},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+
+Test: cm.push {ra,s0-s6},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+dead0017
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+
+Test: cm.push {ra,s0-s7},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+
+Test: cm.push {ra,s0-s7},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+
+Test: cm.push {ra,s0-s7},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+
+Test: cm.push {ra,s0-s7},-96
+SP diff:
+ffffffa0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+dead0016
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+
+Test: cm.push {ra,s0-s8},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+
+Test: cm.push {ra,s0-s8},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+
+Test: cm.push {ra,s0-s8},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+
+Test: cm.push {ra,s0-s8},-96
+SP diff:
+ffffffa0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+dead0015
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+
+Test: cm.push {ra,s0-s9},-48
+SP diff:
+ffffffd0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+
+Test: cm.push {ra,s0-s9},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+
+Test: cm.push {ra,s0-s9},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+
+Test: cm.push {ra,s0-s9},-96
+SP diff:
+ffffffa0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+dead0013
+dead0014
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+
+Test: cm.push {ra,s0-s11},-64
+SP diff:
+ffffffc0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+a500001a
+a500001b
+
+Test: cm.push {ra,s0-s11},-80
+SP diff:
+ffffffb0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+a500001a
+a500001b
+
+Test: cm.push {ra,s0-s11},-96
+SP diff:
+ffffffa0
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+a500001a
+a500001b
+
+Test: cm.push {ra,s0-s11},-112
+SP diff:
+ffffff90
+Frame data
+dead0000
+dead0001
+dead0002
+dead0003
+dead0004
+dead0005
+dead0006
+dead0007
+dead0008
+dead0009
+dead000a
+dead000b
+dead000c
+dead000d
+dead000e
+dead000f
+dead0010
+dead0011
+dead0012
+a5000001
+a5000008
+a5000009
+a5000012
+a5000013
+a5000014
+a5000015
+a5000016
+a5000017
+a5000018
+a5000019
+a500001a
+a500001b
 
 *******************************************************************************/

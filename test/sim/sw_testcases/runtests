@@ -104,7 +104,14 @@ for test in testlist:
 				if "//" in l:
 					expected_lines[i] = l.split("//")[0].rstrip()
 
-			if expected_lines != output_lines[:-2]:
+			# Drop last two lines, which should just be tb output (checked in BADRET)
+			output_lines = output_lines[:-2]
+			while output_lines[0].strip() == "":
+				del output_lines[0]
+			while output_lines[-1].strip() == "":
+				del output_lines[-1]
+
+			if expected_lines != output_lines:
 				good_output = False
 		except:
 			good_output = False
