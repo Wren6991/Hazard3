@@ -50,14 +50,19 @@ for test in testlist:
 	if generate_vcd:
 		cmdline += ["--vcd", f"tmp/{test}.vcd"]
 
-	test_run_ret = subprocess.run(
-		cmdline,
-		stdout = subprocess.PIPE,
-		stderr = subprocess.PIPE,
-		timeout=10
-	)
-	with open(f"tmp/{test}.log", "wb") as f:
-		f.write(test_run_ret.stdout)
+	try:
+		test_run_ret = subprocess.run(
+			cmdline,
+			stdout = subprocess.PIPE,
+			stderr = subprocess.PIPE,
+			timeout=10
+		)
+		with open(f"tmp/{test}.log", "wb") as f:
+			f.write(test_run_ret.stdout)
+	except subprocess.TimeoutExpired:
+		print("\033[31m[TIMOUT]\033[39m")
+		all_passed = False
+		continue
 
 	# Testbench itself should always exit successfully.
 	if test_run_ret.returncode != 0:
