@@ -357,7 +357,7 @@ end else begin: instr_decompress
 			end else if (uop_ctr == 4'hd) begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
-				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd8); // li a0, 0				
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd10); // li a0, 0
 			end else if (uop_ctr == 4'he) begin
 				in_uop_seq = 1'b1;
 				uop_atomic = 1'b1;
