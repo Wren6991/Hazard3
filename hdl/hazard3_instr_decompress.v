@@ -427,7 +427,7 @@ if (EXTENSION_ZCMP) begin: have_uop_ctr;
 `ifdef HAZARD3_ASSERTIONS
 			assert(uop_ctr == 4'h0 || in_uop_seq);
 			if (uop_seq_end) begin
-				assert(in_uop_seq));
+				assert(in_uop_seq);
 				assert(instr_out_uop_stall || uop_ctr_nxt == 4'h0);
 			end
 `endif

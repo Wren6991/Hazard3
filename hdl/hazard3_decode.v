@@ -79,7 +79,7 @@ reg         d_invalid_32bit;
 wire        d_invalid = d_invalid_16bit || d_invalid_32bit;
 
 wire        uop_nonfinal;
-wire        uop_uninterruptible;
+wire        uop_atomic;
 wire        uop_stall;
 wire        uop_clear;
 
@@ -93,7 +93,7 @@ hazard3_instr_decompress #(
 	.instr_is_32bit                (d_instr_is_32bit),
 	.instr_out                     (d_instr),
 	.instr_out_uop_nonfinal        (uop_nonfinal),
-	.instr_out_uop_uninterruptible (uop_uninterruptible),
+	.instr_out_uop_atomic (uop_atomic),
 	.instr_out_uop_stall           (uop_stall),
 	.instr_out_uop_clear           (uop_clear),
 
@@ -102,7 +102,7 @@ hazard3_instr_decompress #(
 	.invalid                       (d_invalid_16bit)
 );
 
-assign d_uninterruptible = uop_uninterruptible && !d_invalid;
+assign d_uninterruptible = uop_atomic && !d_invalid;
 assign d_no_pc_increment = uop_nonfinal && !d_invalid;
 assign uop_stall         = x_stall || d_starved;
 assign uop_clear         = f_jump_now;
