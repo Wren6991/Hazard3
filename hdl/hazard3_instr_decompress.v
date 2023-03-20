@@ -124,16 +124,16 @@ assign df_uop_step_next = uop_ctr_nxt;
 wire [3:0] zcmp_rlist = instr_in[7:4];
 wire [3:0] zcmp_n_regs = zcmp_rlist == 4'hf ? 4'hd : zcmp_rlist - 4'h3;
 
-wire [6:0] zcmp_stack_adj_base =
-	zcmp_rlist[3]   == 1'b0 ? 7'h10 :
-	zcmp_rlist[3:2] == 2'h2 ? 7'h20 :
-	zcmp_rlist[3:0] == 4'hf ? 7'h40 : 7'h30;
+wire [11:0] zcmp_stack_adj_base =
+	zcmp_rlist[3]   == 1'b0 ? 12'h010 :
+	zcmp_rlist[3:2] == 2'h2 ? 12'h020 :
+	zcmp_rlist[3:0] == 4'hf ? 12'h040 : 12'h030;
 
-wire [6:0] zcmp_stack_adj_extra = {1'b0, instr_in[3:2], 4'h0};
+wire [11:0] zcmp_stack_adj = zcmp_stack_adj_base + {6'h00, instr_in[3:2], 4'h0};
 
 // Note we perform all load/stores before moving the stack pointer.
-wire [11:0] zcmp_stack_lw_offset = {6'h00, uop_ctr, 2'h0} + {5'h00, zcmp_stack_adj_extra};
-wire [11:0] zcmp_stack_sw_offset = {6'h00, uop_ctr, 2'h0} - {5'h00, zcmp_stack_adj_base};
+wire [11:0] zcmp_stack_lw_offset = -{6'h00, {uop_ctr + 4'h1}, 2'h0} + zcmp_stack_adj;
+wire [11:0] zcmp_stack_sw_offset = -{6'h00, {uop_ctr + 4'h1}, 2'h0};
 
 wire [4:0] zcmp_ls_reg =
 	uop_ctr == 4'h0 ? 5'd01 : // ra
@@ -149,20 +149,18 @@ wire [31:0] zcmp_pop_lw_instr = `RVOPC_NOZ_LW | rfmt_rd(zcmp_ls_reg) | rfmt_rs1(
 	zcmp_stack_lw_offset[11:0], 20'h00000
 };
 
-wire [11:0] zcmp_abs_stack_adj = {5'h00, zcmp_stack_adj_base} + {5'h00, zcmp_stack_adj_extra};
-
 wire [31:0] zcmp_push_stack_adj_instr = `RVOPC_NOZ_ADDI | rfmt_rd(5'd2) | rfmt_rs1(5'd2) | {
-	-zcmp_abs_stack_adj,
+	-zcmp_stack_adj,
 	20'h00000
 };
 
 wire [31:0] zcmp_pop_stack_adj_instr = `RVOPC_NOZ_ADDI | rfmt_rd(5'd2) | rfmt_rs1(5'd2) | {
-	zcmp_abs_stack_adj,
+	zcmp_stack_adj,
 	20'h00000
 };
 
-wire zcmp_sa01_r1s = {|instr_in[9:8], ~&instr_in[9:8], instr_in[9:7]};
-wire zcmp_sa01_r2s = {|instr_in[2:1], ~&instr_in[2:1], instr_in[2:0]};
+wire [4:0] zcmp_sa01_r1s = {|instr_in[9:8], ~|instr_in[9:8], instr_in[9:7]};
+wire [4:0] zcmp_sa01_r2s = {|instr_in[2:1], ~|instr_in[2:1], instr_in[2:0]};
 
 // ----------------------------------------------------------------------------
 

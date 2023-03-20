@@ -2,7 +2,7 @@
 [*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
 [*] Sat May 22 07:37:18 2021
 [*]
-[dumpfile] "tmp/ecall_simple_run.vcd"
+[dumpfile] "tmp/ecall_simple.vcd"
 [dumpfile_mtime] "Sat May 22 07:33:26 2021"
 [dumpfile_size] 1269546
 [timestart] 314
