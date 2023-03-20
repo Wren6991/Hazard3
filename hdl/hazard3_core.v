@@ -1063,7 +1063,7 @@ always @ (posedge clk or negedge rst_n) begin
 			xm_rs2 <= d_rs2;
 			xm_rd <= d_rd;
 			// PC increment is suppressed non-final micro-ops, only needed for Zcmp:
-			xm_no_pc_increment <= d_no_pc_increment && ~|EXTENSION_ZCMP;
+			xm_no_pc_increment <= d_no_pc_increment && |EXTENSION_ZCMP;
 			// If some X-sourced exception has squashed the address phase, need to squash the data phase too.
 			xm_memop            <= x_except != EXCEPT_NONE ? MEMOP_NONE : d_memop;
 			xm_except           <= x_except;
