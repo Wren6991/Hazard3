@@ -160,7 +160,7 @@ wire [31:0] zcmp_pop_stack_adj_instr = `RVOPC_NOZ_ADDI | rfmt_rd(5'd2) | rfmt_rs
 };
 
 wire [4:0] zcmp_sa01_r1s = {|instr_in[9:8], ~|instr_in[9:8], instr_in[9:7]};
-wire [4:0] zcmp_sa01_r2s = {|instr_in[2:1], ~|instr_in[2:1], instr_in[2:0]};
+wire [4:0] zcmp_sa01_r2s = {|instr_in[4:3], ~|instr_in[4:3], instr_in[4:2]};
 
 // ----------------------------------------------------------------------------
 
