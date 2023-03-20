@@ -129,8 +129,11 @@ wire [6:0] zcmp_stack_adj_base =
 	zcmp_rlist[3:2] == 2'h2 ? 7'h20 :
 	zcmp_rlist[3:0] == 4'hf ? 7'h40 : 7'h30;
 
-wire [11:0] zcmp_stack_lw_offset = {6'h00, uop_ctr, 2'h0};
-wire [11:0] zcmp_stack_sw_offset = zcmp_stack_lw_offset - {5'h00, zcmp_stack_adj_base};
+wire [6:0] zcmp_stack_adj_extra = {1'b0, instr_in[3:2], 4'h0};
+
+// Note we perform all load/stores before moving the stack pointer.
+wire [11:0] zcmp_stack_lw_offset = {6'h00, uop_ctr, 2'h0} + {5'h00, zcmp_stack_adj_extra};
+wire [11:0] zcmp_stack_sw_offset = {6'h00, uop_ctr, 2'h0} - {5'h00, zcmp_stack_adj_base};
 
 wire [4:0] zcmp_ls_reg =
 	uop_ctr == 4'h0 ? 5'd01 : // ra
@@ -146,7 +149,7 @@ wire [31:0] zcmp_pop_lw_instr = `RVOPC_NOZ_LW | rfmt_rd(zcmp_ls_reg) | rfmt_rs1(
 	zcmp_stack_lw_offset[11:0], 20'h00000
 };
 
-wire [11:0] zcmp_abs_stack_adj = {5'h00, zcmp_stack_adj_base} + {6'h00, instr_in[3:2], 4'h0};
+wire [11:0] zcmp_abs_stack_adj = {5'h00, zcmp_stack_adj_base} + {5'h00, zcmp_stack_adj_extra};
 
 wire [31:0] zcmp_push_stack_adj_instr = `RVOPC_NOZ_ADDI | rfmt_rd(5'd2) | rfmt_rs1(5'd2) | {
 	-zcmp_abs_stack_adj,

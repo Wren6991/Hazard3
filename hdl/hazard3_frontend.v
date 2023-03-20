@@ -565,7 +565,7 @@ wire [4:0] zcmp_pushpop_rs1 =
 wire [4:0] zcmp_sa01_r1s  = {|next_instr[9:8], ~&next_instr[9:8], next_instr[9:7]};
 wire [4:0] zcmp_sa01_r2s  = {|next_instr[2:1], ~&next_instr[2:1], next_instr[2:0]};
 
-wire [4:0] zcmp_mvsa01_rs1 = {4'h4, uop_ctr[0]};
+wire [4:0] zcmp_mvsa01_rs1 = {4'h5, uop_ctr[0]};
 wire [4:0] zcmp_mva01s_rs1 = uop_ctr[0] ? zcmp_sa01_r2s : zcmp_sa01_r1s;
 
 always @ (*) begin
