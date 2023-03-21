@@ -15,6 +15,7 @@
 // - RV32I
 // - M
 // - C (also called Zca)
+// - Zcmp
 
 // Use unsigned arithmetic everywhere, with explicit sign extension as required.
 static inline ux_t sext(ux_t bits, int sign_bit) {
@@ -95,6 +96,45 @@ static inline uint c_rs1_l(uint32_t instr) {
 
 static inline uint c_rs2_l(uint32_t instr) {
 	return GETBITS(instr, 6, 2);
+}
+
+static inline uint zcmp_n_regs(uint32_t instr) {
+	uint rlist = GETBITS(instr, 7, 4);
+	return rlist == 0xf ? 13 : rlist - 3;
+}
+
+static inline uint zcmp_stack_adj(uint32_t instr) {
+	uint nregs = zcmp_n_regs(instr);
+	uint adj_base =
+		nregs > 12 ? 0x40 :
+		nregs >  8 ? 0x30 :
+		nregs >  4 ? 0x20 : 0x10;
+	return adj_base + 16 * GETBITS(instr, 3, 2);
+
+}
+
+static inline uint32_t zcmp_reg_mask(uint32_t instr) {
+	uint32_t mask = 0;
+	switch (zcmp_n_regs(instr)) {
+		case 13: mask |= 1u << 27; // s11
+		         mask |= 1u << 26; // s10
+		case 11: mask |= 1u << 25; // s9
+		case 10: mask |= 1u << 24; // s8
+		case  9: mask |= 1u << 23; // s7
+		case  8: mask |= 1u << 22; // s6
+		case  7: mask |= 1u << 21; // s5
+		case  6: mask |= 1u << 20; // s4
+		case  5: mask |= 1u << 19; // s3
+		case  4: mask |= 1u << 18; // s2
+		case  3: mask |= 1u <<  9; // s1
+		case  2: mask |= 1u <<  8; // s0
+		case  1: mask |= 1u <<  1; // ra
+	}
+	return mask;
+}
+
+static inline uint zcmp_s_mapping(uint s_raw) {
+	return s_raw + 8 + 8 * ((s_raw & 0x6) == 0);
 }
 
 struct RVCSR {
@@ -500,6 +540,39 @@ struct RVCore {
 					+ (GETBITS(instr, 12, 9) << 2)
 					+ (GETBITS(instr, 8, 7) << 6);
 				mem.w32(addr, regs[c_rs2_l(instr)]);
+			// Zcmp:
+			} else if (RVOPC_MATCH(instr, CM_PUSH)) {
+				ux_t addr = regs[2];
+				for (uint i = 31; i > 0; --i) {
+					if (zcmp_reg_mask(instr) & (1u << i)) {
+						addr -= 4;
+						mem.w32(addr, regs[i]);
+					}
+				}
+				regnum_rd = 2;
+				rd_wdata = regs[2] - zcmp_stack_adj(instr);
+			} else if (RVOPC_MATCH(instr, CM_POP) || RVOPC_MATCH(instr, CM_POPRET) || RVOPC_MATCH(instr, CM_POPRETZ)) {
+				bool clear_a0 = RVOPC_MATCH(instr, CM_POPRETZ);
+				bool ret = clear_a0 || RVOPC_MATCH(instr, CM_POPRET);
+				ux_t addr = regs[2] + zcmp_stack_adj(instr);
+				for (uint i = 31; i > 0; --i) {
+					if (zcmp_reg_mask(instr) & (1u << i)) {
+						addr -= 4;
+						regs[i] = mem.r32(addr);
+					}
+				}
+				if (clear_a0)
+					regs[10] = 0;
+				if (ret)
+					pc_wdata = regs[1];
+				regnum_rd = 2;
+				rd_wdata = regs[2] + zcmp_stack_adj(instr);
+			} else if (RVOPC_MATCH(instr, CM_MVSA01)) {
+				regs[zcmp_s_mapping(GETBITS(instr, 9, 8))] = regs[10];
+				regs[zcmp_s_mapping(GETBITS(instr, 4, 2))] = regs[11];
+			} else if (RVOPC_MATCH(instr, CM_MVA01S)) {
+				regs[10] = regs[zcmp_s_mapping(GETBITS(instr, 9, 8))];
+				regs[11] = regs[zcmp_s_mapping(GETBITS(instr, 4, 2))];
 			} else {
 				instr_invalid = true;
 			}
