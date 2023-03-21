@@ -134,7 +134,7 @@ static inline uint32_t zcmp_reg_mask(uint32_t instr) {
 }
 
 static inline uint zcmp_s_mapping(uint s_raw) {
-	return s_raw + 8 + 8 * ((s_raw & 0x6) == 0);
+	return s_raw + 8 + 8 * ((s_raw & 0x6) != 0);
 }
 
 struct RVCSR {
@@ -568,10 +568,10 @@ struct RVCore {
 				regnum_rd = 2;
 				rd_wdata = regs[2] + zcmp_stack_adj(instr);
 			} else if (RVOPC_MATCH(instr, CM_MVSA01)) {
-				regs[zcmp_s_mapping(GETBITS(instr, 9, 8))] = regs[10];
+				regs[zcmp_s_mapping(GETBITS(instr, 9, 7))] = regs[10];
 				regs[zcmp_s_mapping(GETBITS(instr, 4, 2))] = regs[11];
 			} else if (RVOPC_MATCH(instr, CM_MVA01S)) {
-				regs[10] = regs[zcmp_s_mapping(GETBITS(instr, 9, 8))];
+				regs[10] = regs[zcmp_s_mapping(GETBITS(instr, 9, 7))];
 				regs[11] = regs[zcmp_s_mapping(GETBITS(instr, 4, 2))];
 			} else {
 				instr_invalid = true;
