@@ -216,13 +216,25 @@ assign hart_reset_done = {rst_n_cpu1, rst_n_cpu0};
 `endif
 `include `CONFIG_HEADER
 
+wire pwrup_req_cpu0;
+wire pwrup_req_cpu1;
+wire unblock_out_cpu0;
+wire unblock_out_cpu1;
+
 hazard3_cpu_1port #(
 	.MHARTID_VAL (32'h0000_0000),
 `define HAZARD3_CONFIG_INST_NO_MHARTID
 `include "hazard3_config_inst.vh"
 ) cpu0 (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n_cpu0),
+
+	.pwrup_req                  (pwrup_req_cpu0),
+	.pwrup_ack                  (pwrup_req_cpu0),
+	.clk_en                     (),
+	.unblock_out                (unblock_out_cpu0),
+	.unblock_in                 (unblock_out_cpu1),
 
 	.haddr                      (i_haddr),
 	.hexcl                      (i_hexcl),
@@ -275,7 +287,14 @@ hazard3_cpu_1port #(
 `include "hazard3_config_inst.vh"
 ) cpu1 (
 	.clk                        (clk),
+	.clk_always_on              (clk),
 	.rst_n                      (rst_n_cpu1),
+
+	.pwrup_req                  (pwrup_req_cpu1),
+	.pwrup_ack                  (pwrup_req_cpu1),
+	.clk_en                     (),
+	.unblock_out                (unblock_out_cpu1),
+	.unblock_in                 (unblock_out_cpu0),
 
 	.haddr                      (d_haddr),
 	.hexcl                      (d_hexcl),
