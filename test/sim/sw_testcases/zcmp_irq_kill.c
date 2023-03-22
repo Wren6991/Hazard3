@@ -52,9 +52,9 @@ void foreground_task() {
 		"lw s6,  40(sp)\n"
 		"lw s7,  44(sp)\n"
 		"lw s8,  48(sp)\n"
-		"lw s9, 52(sp)\n"
+		"lw s9,  52(sp)\n"
 		"lw s10, 56(sp)\n"
-		"lw s11,  60(sp)\n"
+		"lw s11, 60(sp)\n"
 		// Re-pop. Doing this a multiple of 13 times will restore the original contents.
 		".hword 0xbaf2\n" // cm.pop {ra, s0-s11},64
 		"addi a1, a1, -1\n"

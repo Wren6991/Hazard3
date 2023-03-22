@@ -116,6 +116,16 @@ Note Zca is equivalent to C, as we do not support the F extension.
 
 Default value: 0
 
+[[param-EXTENSION_ZCMP]]
+===== EXTENSION_ZCMP
+Support for Zcmp push/pop and double-move instructions.
+
+Requires: <<param-EXTENSION_C>>.
+
+Note Zca is equivalent to C, as we do not support the F extension.
+
+Default value: 0
+
 [[param-EXTENSION_ZIFENCEI]]
 ===== EXTENSION_ZIFENCEI
 
