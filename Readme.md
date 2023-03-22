@@ -12,7 +12,7 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` instruction set 
 * `Zbs`: single-bit manipulation
 * `Zbkb`: basic bit manipulation for scalar cryptography
 * `Zcb`: basic additional compressed instructions
-* `Zcmp`: push/pop instructions *(experimental)*
+* `Zcmp`: push/pop instructions
 * Debug, Machine and User privilege/execution modes
 * Privileged instructions `ECALL`, `EBREAK`, `MRET` and `WFI`
 * Physical memory protection (PMP) with up to 16 naturally aligned regions
@@ -42,6 +42,8 @@ These are links to the ratified versions of the extensions.
 | `Zbc` v1.0.0 | [Bit Manipulation ISA extensions 20210628](https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf) |
 | `Zbs` v1.0.0 | [Bit Manipulation ISA extensions 20210628](https://github.com/riscv/riscv-bitmanip/releases/download/1.0.0/bitmanip-1.0.0-38-g865e7a7.pdf) |
 | `Zbkb` v1.0.1 | [Scalar Cryptography ISA extensions 20220218](https://github.com/riscv/riscv-crypto/releases/download/v1.0.1-scalar/riscv-crypto-spec-scalar-v1.0.1.pdf) |
+| `Zcb` v1.0.3-1 | [Code Size Reduction extensions frozen v1.0.3-1](https://github.com/riscv/riscv-code-size-reduction/releases/download/v1.0.3-1/Zc-v1.0.3-1.pdf) |
+| `Zcmp` v1.0.3-1 | [Code Size Reduction extensions frozen v1.0.3-1](https://github.com/riscv/riscv-code-size-reduction/releases/download/v1.0.3-1/Zc-v1.0.3-1.pdf) |
 | Machine ISA v1.12 | [Privileged Architecture 20211203](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf) |
 | Debug v0.13.2 | [RISC-V External Debug Support 20190322](https://riscv.org/wp-content/uploads/2019/03/riscv-debug-release.pdf) |
 
