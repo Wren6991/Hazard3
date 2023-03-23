@@ -133,13 +133,13 @@ always @ (*) begin
 				1'b0                               // load = 0, this is not a watchpoint
 			};
 		end
-	end else if (cfg_rdata == TDATA2) begin
+	end else if (cfg_addr == TDATA2) begin
 		if (tselect >= BREAKPOINT_TRIGGERS) begin
 			cfg_rdata = {W_DATA{1'b0}};
 		end else begin
 			cfg_rdata = tdata2[tselect];
 		end
-	end else if (cfg_rdata == TINFO) begin
+	end else if (cfg_addr == TINFO) begin
 		if (tselect >= BREAKPOINT_TRIGGERS) begin
 			cfg_rdata = 32'h00000001; // type = 0, no trigger
 		end else begin
