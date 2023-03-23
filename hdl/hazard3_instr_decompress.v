@@ -184,6 +184,7 @@ end else begin: instr_decompress
 			uop_seq_end = 1'b0;
 			in_uop_seq = 1'b0;
 			uop_atomic = 1'b0;
+			uop_no_pc_update = 1'b0;
 			uop_ctr_nxt = uop_ctr;
 		end else begin
 			instr_is_32bit = 1'b0;
