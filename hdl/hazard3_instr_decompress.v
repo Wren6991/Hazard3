@@ -17,10 +17,11 @@ module hazard3_instr_decompress #(
 	output reg         instr_is_32bit,
 
 	output reg  [31:0] instr_out,
-	// Indicate instr_out is a uop, and more uops follow in this sequence.
-	// Should suppress PC update, and null the PC offset in the mepc address
-	// in stage 3.
-	output wire        instr_out_uop_nonfinal,
+	// If instruction is a non-final uop, need to suppress PC update, and null
+	// the PC offset in the mepc address in stage 3.
+	output wire        instr_out_is_uop,
+	output wire        instr_out_is_final_uop,
+	output wire        instr_out_uop_no_pc_update,
 	// Indicate instr_out is a uop from the noninterruptible part of a uop
 	// sequence. If one uop is noninterruptible, all following uops until the
 	// end of the sequence are also noninterruptible.
@@ -107,17 +108,20 @@ function [31:0] rfmt_rs2; input [4:0] rs2; begin rfmt_rs2 = {7'h00, rs2, 20'h000
 //
 // - 13x lw                     (counter = 0..12)
 // - 1x addi to set a0 to zero  (counter = 13   ) < atomic section
-// - 1x addi to adjust sp       (counter = 14   ) < atomic section
-// - 1x jalr to jump through ra (counter = 15   ) < atomic section
+// - 1x jalr to jump through ra (counter = 14   ) < atomic section
+// - 1x addi to adjust sp       (counter = 15   ) < atomic section
 
 reg [3:0] uop_ctr;
 reg [3:0] uop_ctr_nxt;
 reg       in_uop_seq;
 reg       uop_seq_end;
 reg       uop_atomic;
+reg       uop_no_pc_update;
 
-assign instr_out_uop_nonfinal = in_uop_seq && !uop_seq_end;
+assign instr_out_is_uop = in_uop_seq;
+assign instr_out_is_final_uop = uop_seq_end;
 assign instr_out_uop_atomic = uop_atomic;
+assign instr_out_uop_no_pc_update = uop_no_pc_update;
 assign df_uop_step_next = uop_ctr_nxt;
 
 // The offset from current sp value to the lowest-addressed saved register, +64.
@@ -188,6 +192,7 @@ end else begin: instr_decompress
 			uop_seq_end = 1'b0;
 			in_uop_seq = 1'b0;
 			uop_atomic = 1'b0;
+			uop_no_pc_update = 1'b0;
 			uop_ctr_nxt = uop_ctr;
 			casez (instr_in[15:0])
 			16'h0:         invalid = 1'b1;
@@ -295,7 +300,7 @@ end else begin: instr_decompress
 			// Optional Zcmp instructions:
 			`RVOPC_CM_PUSH: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
 				invalid = 1'b1;
-			end else if (uop_ctr == 4'he) begin
+			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
 				uop_seq_end = 1'b1;
 				uop_ctr_nxt = 4'h0;
@@ -304,14 +309,15 @@ end else begin: instr_decompress
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
 				instr_out = zcmp_push_sw_instr;
+				uop_no_pc_update = 1'b1;
 				if (uop_ctr_nxt == zcmp_n_regs) begin
-					uop_ctr_nxt = 4'he;
+					uop_ctr_nxt = 4'hf;
 				end
 			end
 
 			`RVOPC_CM_POP: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
 				invalid = 1'b1;
-			end else if (uop_ctr == 4'he) begin
+			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
 				uop_seq_end = 1'b1;
 				uop_ctr_nxt = 4'h0;
@@ -320,9 +326,10 @@ end else begin: instr_decompress
 			end else begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_no_pc_update = 1'b1;
 				instr_out = zcmp_pop_lw_instr;
 				if (uop_ctr_nxt == zcmp_n_regs) begin
-					uop_ctr_nxt = 4'he;
+					uop_ctr_nxt = 4'hf;
 				end
 			end
 
@@ -334,17 +341,19 @@ end else begin: instr_decompress
 				// executes, they all execute. Having none execute is fine.
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
-				instr_out = zcmp_pop_stack_adj_instr;
+				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
 			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
 				uop_seq_end = 1'b1;
 				uop_atomic = 1'b1;
 				uop_ctr_nxt = 4'h0;
-				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
+				uop_no_pc_update = 1'b1;
+				instr_out = zcmp_pop_stack_adj_instr;
 			end else begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
 				instr_out = zcmp_pop_lw_instr;
+				uop_no_pc_update = 1'b1;
 				if (uop_ctr_nxt == zcmp_n_regs) begin
 					uop_ctr_nxt = 4'he;
 				end
@@ -355,21 +364,24 @@ end else begin: instr_decompress
 			end else if (uop_ctr == 4'hd) begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_no_pc_update = 1'b1;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd10); // li a0, 0
 			end else if (uop_ctr == 4'he) begin
 				in_uop_seq = 1'b1;
 				uop_atomic = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
-				instr_out = zcmp_pop_stack_adj_instr;
+				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
 			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
 				uop_seq_end = 1'b1;
 				uop_atomic = 1'b1;
 				uop_ctr_nxt = 4'h0;
-				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
+				uop_no_pc_update = 1'b1;
+				instr_out = zcmp_pop_stack_adj_instr;
 			end else begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_no_pc_update = 1'b1;
 				instr_out = zcmp_pop_lw_instr;
 				if (uop_ctr_nxt == zcmp_n_regs) begin
 					uop_ctr_nxt = 4'hd;
@@ -381,6 +393,7 @@ end else begin: instr_decompress
 			end else if (uop_ctr == 4'h0) begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_no_pc_update = 1'b1;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(zcmp_sa01_r1s) | rfmt_rs1(5'd10);
 			end else begin
 				in_uop_seq = 1'b1;
@@ -395,6 +408,7 @@ end else begin: instr_decompress
 			end else if (uop_ctr == 4'h0) begin
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_no_pc_update = 1'b1;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd10) | rfmt_rs1(zcmp_sa01_r1s);
 			end else begin
 				in_uop_seq = 1'b1;

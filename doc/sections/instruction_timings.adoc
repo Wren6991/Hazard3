@@ -182,12 +182,11 @@ They perform identically to their 32-bit counterparts.
 | Instruction | Cycles | Note
 |`cm.push {rlist}, -imm` | 1 + _n_ | _n_ is number of registers in rlist
 |`cm.pop {rlist}, imm` | 1 + _n_ | _n_ is number of registers in rlist
-|`cm.popret {rlist}, imm` | 3 + _n_ footnote:unaligned_branch[] | _n_ is number of registers in rlist
-|`cm.popretz {rlist}, imm` | 4 + _n_ footnote:unaligned_branch[] | _n_ is number of registers in rlist
+|`cm.popret {rlist}, imm` | 4 (_n_ = 1)footnote:popret_stall[The single-register variants of `cm.popret` and `cm.popretz` take the same number of cycles as the two-register variants, because of an internal load-use dependency on the loaded return address.] or 2 + _n_ (_n_ >= 2)footnote:unaligned_branch[] | _n_ is number of registers in rlist
+|`cm.popretz {rlist}, imm` | 5 (_n_ = 1)footnote:popret_stall[] or 3 + _n_ (_n_ >= 2)footnote:unaligned_branch[] | _n_ is number of registers in rlist
 |`cm.mva01s r1s', r2s'` | 2 |
 |`cm.mvsa01 r1s', r2s'` | 2 |
 |===
-
 
 === Branch Predictor
 

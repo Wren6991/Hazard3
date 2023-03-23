@@ -78,7 +78,9 @@ wire        d_invalid_16bit;
 reg         d_invalid_32bit;
 wire        d_invalid = d_invalid_16bit || d_invalid_32bit;
 
-wire        uop_nonfinal;
+wire        uop_seq_raw;
+wire        uop_final;
+wire        uop_no_pc_update;
 wire        uop_atomic;
 wire        uop_stall;
 wire        uop_clear;
@@ -86,26 +88,40 @@ wire        uop_clear;
 hazard3_instr_decompress #(
 `include "hazard3_config_inst.vh"
 ) decomp (
-	.clk                           (clk),
-	.rst_n                         (rst_n),
+	.clk                        (clk),
+	.rst_n                      (rst_n),
 
-	.instr_in                      (fd_cir),
-	.instr_is_32bit                (d_instr_is_32bit),
-	.instr_out                     (d_instr),
-	.instr_out_uop_nonfinal        (uop_nonfinal),
-	.instr_out_uop_atomic (uop_atomic),
-	.instr_out_uop_stall           (uop_stall),
-	.instr_out_uop_clear           (uop_clear),
+	.instr_in                   (fd_cir),
+	.instr_is_32bit             (d_instr_is_32bit),
+	.instr_out                  (d_instr),
+	.instr_out_is_uop           (uop_seq_raw),
+	.instr_out_is_final_uop     (uop_final),
+	.instr_out_uop_no_pc_update (uop_no_pc_update),
+	.instr_out_uop_atomic       (uop_atomic),
+	.instr_out_uop_stall        (uop_stall),
+	.instr_out_uop_clear        (uop_clear),
 
-	.df_uop_step_next              (df_uop_step_next),
+	.df_uop_step_next           (df_uop_step_next),
 
-	.invalid                       (d_invalid_16bit)
+	.invalid                    (d_invalid_16bit)
 );
 
-assign d_uninterruptible = uop_atomic && !d_invalid;
-assign d_no_pc_increment = uop_nonfinal && !d_invalid;
+wire   uop_seq           = uop_seq_raw && !d_starved;
+wire   uop_nonfinal      = uop_seq && !uop_final;
 assign uop_stall         = x_stall || d_starved;
-assign uop_clear         = f_jump_now;
+
+assign d_uninterruptible = uop_atomic && !d_invalid;
+
+// Signal to null the mepc offset when taking an exception on this
+// instruction (because uops in a sequence *which can except*, so excluding
+// the final sp adjust on popret/popretz, will all have the same PC as the
+// next uop, which will be in stage 2 when they take their exception)
+assign d_no_pc_increment = uop_nonfinal;
+
+// Note !df_cir_flush_behind because the jump in cm.popret/popretz is
+// the *penultimate* instruction: we execute the stack adjustment in the
+// fetch bubble to save a cycle, still need to finish the uop sequence.
+assign uop_clear         = f_jump_now && !df_cir_flush_behind;
 
 // Decode various immmediate formats
 wire [31:0] d_imm_i = {{21{d_instr[31]}}, d_instr[30:20]};
@@ -157,8 +173,8 @@ end
 
 reg  [W_ADDR-1:0] pc;
 wire [W_ADDR-1:0] pc_seq_next = pc + (
-	|EXTENSION_ZCMP && uop_nonfinal ? 32'h0 :
-	d_instr_is_32bit                ? 32'h4 : 32'h2
+	|EXTENSION_ZCMP && uop_seq && uop_no_pc_update ? 32'h0 :
+	d_instr_is_32bit                               ? 32'h4 : 32'h2
 );
 
 assign d_pc = pc;
@@ -174,6 +190,14 @@ wire partial_predicted_branch = !d_starved &&
 
 wire predicted_branch = |BRANCH_PREDICTOR && fd_cir_predbranch[0];
 
+// Generally locking takes place on a stalled jump/branch, which may need the
+// original PC available to produce a link address when it unstalls. An
+// exception to this is jumps in micro-op sequences: in this case the jump is
+// the penultimate instruction in the sequence (ret before addi sp) and we
+// need to capture the pc mid-uop-sequence.
+wire hold_pc_on_cir_lock = assert_cir_lock && !(uop_seq && !uop_no_pc_update);
+wire update_pc_on_cir_unlock = cir_lock_prev && deassert_cir_lock && !(uop_seq && uop_no_pc_update);
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		pc <= RESET_VECTOR;
@@ -182,7 +206,7 @@ always @ (posedge clk or negedge rst_n) begin
 			pc <= debug_dpc_wdata;
 		end else if (debug_mode) begin
 			pc <= pc;
-		end else if ((f_jump_now && !assert_cir_lock) || (cir_lock_prev && deassert_cir_lock)) begin
+		end else if ((f_jump_now && !hold_pc_on_cir_lock) || update_pc_on_cir_unlock) begin
 			pc <= f_jump_target;
 		end else if (!d_stall && !cir_lock) begin
 			// If this instruction is a predicted-taken branch (and has not

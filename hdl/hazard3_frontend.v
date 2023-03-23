@@ -559,8 +559,8 @@ wire [4:0] zcmp_pushpop_rs2 =
 wire [4:0] zcmp_pushpop_rs1 =
 	uop_ctr <  4'hd ? 5'd02 :                   // sp   (addr base reg)
 	uop_ctr == 4'hd ? 5'd00 :                   // zero (clear a0)
-	uop_ctr == 4'he ? 5'd02 :                   // sp   (stack adj)
-	                  5'd01 ;                   // ra   (ret)
+	uop_ctr == 4'he ? 5'd01 :                   // ra   (ret)
+	                  5'd02 ;                   // sp   (stack adj)
 
 wire [4:0] zcmp_sa01_r1s  = {|next_instr[9:8], ~|next_instr[9:8], next_instr[9:7]};
 wire [4:0] zcmp_sa01_r2s  = {|next_instr[4:3], ~|next_instr[4:3], next_instr[4:2]};
