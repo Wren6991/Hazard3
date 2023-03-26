@@ -254,7 +254,7 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 
 const char *help_str =
 "Usage: tb [--bin x.bin] [--port n] [--vcd x.vcd] [--dump start end] \\\n"
-"          [--cycles n] [--cpuret]\n"
+"          [--cycles n] [--cpuret] [--jtagdump x] [--jtagreplay x]\n"
 "\n"
 "    --bin x.bin      : Flat binary file loaded to address 0x0 in RAM\n"
 "    --vcd x.vcd      : Path to dump waveforms to\n"
@@ -266,6 +266,9 @@ const char *help_str =
 "                       runs in lockstep with JTAG bitbang, not free-running.\n"
 "    --cpuret         : Testbench's return code is the return code written to\n"
 "                       IO_EXIT by the CPU, or -1 if timed out.\n"
+"    --jtagdump       : Dump OpenOCD JTAG bitbang commands to a file so they\n"
+"                       can be replayed. (Lower perf impact than VCD dumping)\n"
+"    --jtagreplay     : Play back some dumped OpenOCD JTAG bitbang commands\n"
 ;
 
 void exit_help(std::string errtext = "") {
@@ -301,6 +304,10 @@ int main(int argc, char **argv) {
 	int64_t max_cycles = 0;
 	bool propagate_return_code = false;
 	uint16_t port = 0;
+	bool dump_jtag = false;
+	std::string jtag_dump_path;
+	bool replay_jtag = false;
+	std::string jtag_replay_path;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string s(argv[i]);
@@ -320,6 +327,20 @@ int main(int argc, char **argv) {
 				exit_help("Option --vcd requires an argument\n");
 			dump_waves = true;
 			waves_path = argv[i + 1];
+			i += 1;
+		}
+		else if (s == "--jtagdump") {
+			if (argc - i < 2)
+				exit_help("Option --jtagdump requires an argument\n");
+			dump_jtag = true;
+			jtag_dump_path = argv[i + 1];
+			i += 1;
+		}
+		else if (s == "--jtagreplay") {
+			if (argc - i < 2)
+				exit_help("Option --jtagreplay requires an argument\n");
+			replay_jtag = true;
+			jtag_replay_path = argv[i + 1];
 			i += 1;
 		}
 		else if (s == "--dump") {
@@ -351,8 +372,12 @@ int main(int argc, char **argv) {
 			exit_help("");
 		}
 	}
-	if (!(load_bin || port != 0))
-		exit_help("At least one of --bin or --port must be specified.\n");
+	if (!(load_bin || port != 0 || replay_jtag))
+		exit_help("At least one of --bin, --port or --jtagreplay must be specified.\n");
+	if (dump_jtag && port == 0)
+		exit_help("--jtagdump specified, but there is no JTAG socket to dump from.\n");
+	if (replay_jtag && port != 0)
+		exit_help("Can't specify both --port and --jtagreplay\n");
 
 	int server_fd, sock_fd;
 	struct sockaddr_in sock_addr;
@@ -404,6 +429,24 @@ int main(int argc, char **argv) {
 		}
 		fd.seekg(0, std::ios::beg);
 		fd.read((char*)memio.mem, bin_size);
+	}
+
+	std::ofstream jtag_dump_fd;
+	if (dump_jtag) {
+		jtag_dump_fd.open(jtag_dump_path);
+		if (!jtag_dump_fd.is_open()) {
+			std::cerr << "Failed to open \"" << jtag_dump_path << "\"\n";
+			return -1;
+		}
+	}
+
+	std::ifstream jtag_replay_fd;
+	if (replay_jtag) {
+		jtag_replay_fd.open(jtag_replay_path);
+		if (!jtag_replay_fd.is_open()) {
+			std::cerr << "Failed to open \"" << jtag_replay_path << "\"\n";
+			return -1;
+		}
 	}
 
 	cxxrtl_design::p_tb top;
@@ -462,7 +505,7 @@ int main(int argc, char **argv) {
 		// writes) but reads take 0 cycles, step=false.
 		bool got_exit_cmd = false;
 		bool step = false;
-		if (port != 0) {
+		if (port != 0 or replay_jtag) {
 			while (!step) {
 				if (rx_remaining > 0) {
 					char c = rxbuf[rx_ptr++];
@@ -505,10 +548,24 @@ int main(int argc, char **argv) {
 						tx_ptr = 0;
 					}	
 					rx_ptr = 0;
-					rx_remaining = read(sock_fd, &rxbuf, TCP_BUF_SIZE);
+					if (replay_jtag) {
+						rx_remaining = jtag_replay_fd.readsome(rxbuf, TCP_BUF_SIZE);
+					}
+					else {
+						rx_remaining = read(sock_fd, &rxbuf, TCP_BUF_SIZE);
+					}
+					if (dump_jtag && rx_remaining > 0) {
+						jtag_dump_fd.write(rxbuf, rx_remaining);
+					}
 					if (rx_remaining == 0) {
-						// The socket is closed. Wait for another connection.
-						sock_fd = wait_for_connection(server_fd, port, (struct sockaddr *)&sock_addr, &sock_addr_len);
+						if (port == 0) {
+							// Presumably EOF, so quit.
+							got_exit_cmd = true;
+						}
+						else {
+							// The socket is closed. Wait for another connection.
+							sock_fd = wait_for_connection(server_fd, port, (struct sockaddr *)&sock_addr, &sock_addr_len);
+						}
 					}
 				}
 			}
@@ -609,6 +666,12 @@ int main(int argc, char **argv) {
 	}
 
 	close(sock_fd);
+	if (dump_jtag) {
+		jtag_dump_fd.close();
+	}
+	if (replay_jtag) {
+		jtag_replay_fd.close();
+	}
 
 	for (auto r : dump_ranges) {
 		printf("Dumping memory from %08x to %08x:\n", r.first, r.second);
