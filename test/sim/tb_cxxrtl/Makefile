@@ -1,7 +1,7 @@
 TOP    := tb
 DOTF   := tb.f
 CONFIG := default
-TBEXEC := $(patsubst %.f,%,DOTF)
+TBEXEC := $(patsubst %.f,%,$(DOTF))
 
 .PHONY: clean all
 

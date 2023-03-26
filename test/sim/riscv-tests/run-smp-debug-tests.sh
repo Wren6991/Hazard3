@@ -20,7 +20,7 @@ CheckMisa \
 MulticoreRegTest \
 MulticoreRtosSwitchActiveHartTest \
 SmpSimultaneousRunHalt \
-CrashLoopOpcode \ 
+CrashLoopOpcode \
 DebugBreakpoint \
 DebugChangeString \
 DebugCompareSections \

@@ -37,13 +37,15 @@ enum {
 	IO_CLR_IRQ     = 0x030,
 	IO_MTIME       = 0x100,
 	IO_MTIMEH      = 0x104,
-	IO_MTIMECMP    = 0x108,
-	IO_MTIMECMPH   = 0x10c
+	IO_MTIMECMP0   = 0x108,
+	IO_MTIMECMP0H  = 0x10c,
+	IO_MTIMECMP1   = 0x110,
+	IO_MTIMECMP1H  = 0x114
 };
 
 struct mem_io_state {
 	uint64_t mtime;
-	uint64_t mtimecmp;
+	uint64_t mtimecmp[2];
 
 	bool exit_req;
 	uint32_t exit_code;
@@ -56,7 +58,8 @@ struct mem_io_state {
 
 	mem_io_state() {
 		mtime = 0;
-		mtimecmp = 0;
+		mtimecmp[0] = 0;
+		mtimecmp[1] = 0;
 		exit_req = false;
 		exit_code = 0;
 		monitor_enabled = false;
@@ -74,7 +77,7 @@ struct mem_io_state {
 	void step(cxxrtl_design::p_tb &tb) {
 		// Default update logic for mtime, mtimecmp
 		++mtime;
-		tb.p_timer__irq.set<bool>(mtime >= mtimecmp);
+		tb.p_timer__irq.set<uint8_t>((mtime >= mtimecmp[0]) | (mtime >= mtimecmp[1]) << 1);
 	}
 };
 
@@ -188,11 +191,17 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		else if (req.addr == IO_BASE + IO_MTIMEH) {
 			memio.mtime = (memio.mtime & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
 		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP) {
-			memio.mtimecmp = (memio.mtimecmp & 0xffffffff00000000u) | req.wdata;
+		else if (req.addr == IO_BASE + IO_MTIMECMP0) {
+			memio.mtimecmp[0] = (memio.mtimecmp[0] & 0xffffffff00000000u) | req.wdata;
 		}
-		else if (req.addr == IO_BASE + IO_MTIMECMPH) {
-			memio.mtimecmp = (memio.mtimecmp & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
+		else if (req.addr == IO_BASE + IO_MTIMECMP0H) {
+			memio.mtimecmp[0] = (memio.mtimecmp[0] & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMP1) {
+			memio.mtimecmp[1] = (memio.mtimecmp[1] & 0xffffffff00000000u) | req.wdata;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMP1H) {
+			memio.mtimecmp[1] = (memio.mtimecmp[1] & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
 		}
 		else {
 			resp.err = true;
@@ -219,11 +228,17 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		else if (req.addr == IO_BASE + IO_MTIMEH) {
 			resp.rdata = memio.mtime >> 32;
 		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP) {
-			resp.rdata = memio.mtimecmp;
+		else if (req.addr == IO_BASE + IO_MTIMECMP0) {
+			resp.rdata = memio.mtimecmp[0];
 		}
-		else if (req.addr == IO_BASE + IO_MTIMECMPH) {
-			resp.rdata = memio.mtimecmp >> 32;
+		else if (req.addr == IO_BASE + IO_MTIMECMP0H) {
+			resp.rdata = memio.mtimecmp[0] >> 32;
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMP1) {
+			resp.rdata = memio.mtimecmp[1];
+		}
+		else if (req.addr == IO_BASE + IO_MTIMECMP1H) {
+			resp.rdata = memio.mtimecmp[1] >> 32;
 		}
 		else {
 			resp.err = true;

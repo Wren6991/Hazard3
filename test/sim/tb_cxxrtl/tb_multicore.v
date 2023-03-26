@@ -51,7 +51,7 @@ module tb #(
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQS-1:0] irq,       // -> mip.meip
 	input wire [1:0]          soft_irq,  // -> mip.msip
-	input wire                timer_irq  // -> mip.mtip
+	input wire [1:0]          timer_irq  // -> mip.mtip
 );
 
 // JTAG-DTM IDCODE, selected after TAP reset, would normally be a
@@ -278,7 +278,7 @@ hazard3_cpu_1port #(
 
 	.irq                        (irq),
 	.soft_irq                   (soft_irq[0]),
-	.timer_irq                  (timer_irq)
+	.timer_irq                  (timer_irq[0])
 );
 
 hazard3_cpu_1port #(
@@ -337,7 +337,7 @@ hazard3_cpu_1port #(
 
 	.irq                        (irq),
 	.soft_irq                   (soft_irq[1]),
-	.timer_irq                  (timer_irq)
+	.timer_irq                  (timer_irq[1])
 );
 
 
