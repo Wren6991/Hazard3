@@ -1,3 +1,6 @@
+# To build single-core dual-port tb: make
+# To build dual-core single-port tb: make DOTF=tb_multicore.f
+
 TOP    := tb
 DOTF   := tb.f
 CONFIG := default
@@ -16,7 +19,7 @@ build-$(DOTF)/dut.cpp: $(shell listfiles $(DOTF))
 	yosys -p '$(SYNTH_CMD)' 2>&1 > build-$(DOTF)/cxxrtl.log
 
 clean::
-	rm -f build-$(DOTF) $(TBEXEC)
+	rm -rf build-$(DOTF) $(TBEXEC)
 
 $(TBEXEC): build-$(DOTF)/dut.cpp tb.cpp
 	clang++ -O3 -std=c++14 $(addprefix -D,$(CDEFINES)) -I $(shell yosys-config --datdir)/include -I build-$(DOTF) tb.cpp -o $(TBEXEC)
