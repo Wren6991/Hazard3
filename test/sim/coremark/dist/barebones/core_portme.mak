@@ -19,14 +19,14 @@
 #	Use this flag to define how to to get an executable (e.g -o)
 OUTFLAG= -o
 
-MARCH        = rv32im_zicsr_zba_zbb_zbc_zbs_zca_zcb_zcmp
-CROSS_PREFIX = /opt/riscv/gcc-riscv32-corev/bin/riscv32-corev-elf-
+MARCH        = rv32imac_zicsr_zba_zbb_zbs
+CROSS_PREFIX = riscv32-unknown-elf-
 
 CC           =  $(CROSS_PREFIX)gcc
 LD           =  $(CROSS_PREFIX)gcc
 AS           =  $(CROSS_PREFIX)gcc
 
-PORT_CFLAGS = -O3 -g -march=$(MARCH) -fno-common -funroll-loops -finline-functions --param max-inline-insns-auto=20 -falign-functions=4 -falign-jumps=4 -falign-loops=4
+PORT_CFLAGS = -O3 -g -march=$(MARCH)
 FLAGS_STR = "$(PORT_CFLAGS) $(XCFLAGS) $(XLFLAGS) $(LFLAGS_END)"
 CFLAGS = $(PORT_CFLAGS) -I$(PORT_DIR) -I. -DFLAGS_STR=\"$(FLAGS_STR)\" 
 
@@ -38,7 +38,7 @@ SEPARATE_COMPILE=1
 # You must also define below how to create an object file, and how to link.
 
 OBJOUT 	= -o
-LFLAGS 	= -T ../../common/memmap.ld -Wl,--noinhibit-exec
+LFLAGS 	= -T ../../common/memmap.ld -Wl,--noinhibit-exec -march=$(MARCH)
 ASFLAGS = -c -march=$(MARCH)
 OFLAG 	= -o
 COUT 	= -c

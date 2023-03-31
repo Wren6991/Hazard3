@@ -1,7 +1,7 @@
 APP          := coremark
 MAX_CYCLES   := 100000000
 
-CROSS_PREFIX ?= /opt/riscv/gcc-riscv32-corev/bin/riscv32-corev-elf-
+CROSS_PREFIX ?= riscv32-unknown-elf-
 TBDIR        ?= ../tb_cxxrtl
 
 

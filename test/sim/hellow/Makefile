@@ -1,6 +1,6 @@
 SRCS := ../common/init.S main.c
 APP  := hellow
-CCFLAGS = -march=rv32ima_zicsr_zba_zbb_zbc_zbs_zca_zcb_zcmp -Os
-AFLAGS = -march=rv32ima_zicsr_zba_zbb_zbc_zbs_zca_zcb_zcmp
+CCFLAGS = -march=rv32imac_zicsr_zba_zbb_zbc_zbs -Os
+AFLAGS = -march=rv32imac_zicsr_zba_zbb_zbc_zbs
 
 include ../common/src_only_app.mk
