@@ -11,7 +11,7 @@ done
 
 # Only applicable tests are included
 ./gdbserver.py \
-	--sim_cmd "../../../tb_cxxrtl/tb_multicore --port 9824" \
+	--sim_cmd "../../../tb_cxxrtl/tb_multicore --port 9824 --jtagdump jtag_bitbang.txt" \
 	--server_cmd "riscv-openocd" \
 	--gdb riscv32-unknown-elf-gdb \
 	--gcc riscv32-unknown-elf-gcc \
