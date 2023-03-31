@@ -87,6 +87,11 @@ This build will also install an appropriate gdb as `riscv32-unknown-elf-gdb`.
 
 The `--with-multilib-generator=` flag builds multiple versions of the standard library, to match possible `-march` flags provided at link time. If there is no _exact_ match, the linker falls back to the architecture specified by the `--with-arch` flag, which in this case is the fairly conservative RV32IA. This will become worse with GCC 12, where for example the CSR instructions have moved from `I` to `Zicsr`, and the entire arch string must still be matched to get the non-fallback library.
 
+Make sure this toolchain can be found on your `PATH` (as `riscv32-unknown-elf-*`):
+
+```bash
+export PATH="$PATH:/opt/riscv/bin"
+```
 
 ## Actually Running Hello World
 
