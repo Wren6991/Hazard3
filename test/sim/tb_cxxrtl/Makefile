@@ -14,6 +14,8 @@ SYNTH_CMD += read_verilog -I ../../../hdl -DCONFIG_HEADER="config_$(CONFIG).vh" 
 SYNTH_CMD += hierarchy -top $(TOP);
 SYNTH_CMD += write_cxxrtl build-$(DOTF)/dut.cpp
 
+CDEFINES_tb_multicore.f := WIDE_TIMER_IRQ
+
 build-$(DOTF)/dut.cpp: $(shell listfiles $(DOTF))
 	mkdir -p build-$(DOTF)
 	yosys -p '$(SYNTH_CMD)' 2>&1 > build-$(DOTF)/cxxrtl.log
@@ -22,4 +24,4 @@ clean::
 	rm -rf build-$(DOTF) $(TBEXEC)
 
 $(TBEXEC): build-$(DOTF)/dut.cpp tb.cpp
-	clang++ -O3 -std=c++14 $(addprefix -D,$(CDEFINES)) -I $(shell yosys-config --datdir)/include -I build-$(DOTF) tb.cpp -o $(TBEXEC)
+	clang++ -O3 -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) -I $(shell yosys-config --datdir)/include -I build-$(DOTF) tb.cpp -o $(TBEXEC)

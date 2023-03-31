@@ -308,7 +308,7 @@ hazard3_cpu_2port #(
 
 	.irq                        (irq),
 	.soft_irq                   (soft_irq[0]),
-	.timer_irq                  (timer_irq)
+	.timer_irq                  (timer_irq[0])
 );
 
 assign i_hexcl = 1'b0;
