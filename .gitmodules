@@ -1,9 +1,6 @@
-[submodule "test/riscv-compliance/riscv-compliance"]
-	path = test/riscv-compliance/riscv-compliance
-	url = https://github.com/riscv/riscv-compliance.git
 [submodule "test/sim/riscv-compliance/riscv-arch-test"]
 	path = test/sim/riscv-compliance/riscv-arch-test
-	url = https://github.com/riscv/riscv-arch-test.git
+	url = https://github.com/wren6991/riscv-arch-test.git
 [submodule "scripts"]
 	path = scripts
 	url = https://github.com/Wren6991/fpgascripts

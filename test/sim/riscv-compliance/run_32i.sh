@@ -1,4 +1,4 @@
 #!/bin/bash
-set -e
+set -ex
 
-make
+make -C riscv-arch-test RISCV_TARGET=hazard3 RISCV_DEVICE=I

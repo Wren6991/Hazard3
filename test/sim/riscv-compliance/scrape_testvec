@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+
+model = []
+
+log_path = sys.argv[1] + ".stdout"
+elf_path = sys.argv[1] + ".elf"
+sigout_path = sys.argv[2]
+
+model_bytes = []
+in_testdata = False
+for l in open(log_path):
+	if l.startswith("Dumping memory"):
+		in_testdata = True
+		continue
+	if in_testdata:
+		try:
+			model_bytes.extend(int(x, 16) for x in l.split(" "))
+		except ValueError:
+			break
+for i in range(len(model_bytes) // 4):
+	model.append(model_bytes[i * 4] | model_bytes[i * 4 + 1] << 8 | model_bytes[i * 4 + 2] << 16 | model_bytes[i * 4 + 3] << 24)
+
+# Trim the output down to size before writing out, by scraping the symbols out
+# of the ELF. New riscv-compliance comparison script doesn't accept trailing data.
+
+# Assume that a suitable objdump is on PATH -- sorry, I couldn't figure out
+# what on earth they were trying to do with the target creation in their
+# Makefile fragments, so it's just been hacked into this script. Problem for
+# future Luke
+
+sig_start_addr = int(os.popen("riscv32-unknown-elf-objdump -t " + elf_path + " | grep begin_signature | head -c8").read(), 16)
+sig_end_addr = int(os.popen("riscv32-unknown-elf-objdump -t " + elf_path + " | grep end_signature | head -c8").read(), 16)
+sig_size_words = (sig_end_addr - sig_start_addr) // 4
+
+model = model[:sig_size_words]
+
+ofile = open(sigout_path, "w")
+for n in model:
+	ofile.write(f"{n:08x}\n")
