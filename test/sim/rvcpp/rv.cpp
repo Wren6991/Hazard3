@@ -508,7 +508,7 @@ struct RVCore {
 				}
 			// RVC Quadrant 10:
 			} else if (RVOPC_MATCH(instr, C_SLLI)) {
-				regnum_rd = c_rs1_s(instr);
+				regnum_rd = c_rs1_l(instr);
 				rd_wdata = regs[regnum_rd] << GETBITS(instr, 6, 2);
 			} else if (RVOPC_MATCH(instr, C_MV)) {
 				if (c_rs2_l(instr) == 0) {
@@ -587,7 +587,7 @@ struct RVCore {
 			} else {
 				printf("    %04x : ", instr & 0xffffu);
 			}
-			if (regnum_rd != 0) {
+			if (regnum_rd != 0 && rd_wdata) {
 				printf("%-3s <- %08x ", friendly_reg_names[regnum_rd], *rd_wdata);
 			} else {
 				printf("                ");

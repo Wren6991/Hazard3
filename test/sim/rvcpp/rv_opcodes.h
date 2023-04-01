@@ -334,7 +334,7 @@
 #define RVOPC_CM_MVA01S_BITS   0b1010110001100010
 #define RVOPC_CM_MVA01S_MASK   0b1111110001100011
 
-#define _RVOPC_MATCH(x, instr_mask, instr_bits) ((x & instr_mask) == instr_bits)
+#define _RVOPC_MATCH(x, instr_mask, instr_bits) (((x) & (instr_mask)) == (instr_bits))
 #define RVOPC_MATCH(x, instr) _RVOPC_MATCH(x, RVOPC_ ## instr ## _MASK, RVOPC_ ## instr ## _BITS)
 
 static const char *friendly_reg_names[32] = {
