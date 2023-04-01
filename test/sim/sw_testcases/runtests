@@ -66,7 +66,9 @@ for test in testlist:
 
 	# Testbench itself should always exit successfully.
 	if test_run_ret.returncode != 0:
-		sys.exit("Negative return code from testbench!")
+		print("Negative return code from testbench!")
+		all_passed = False
+		continue
 
 	# Pass if the program under test has zero exit code AND its output matches
 	# the expected output (if there is an expected_output file)

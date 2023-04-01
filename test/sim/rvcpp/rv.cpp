@@ -9,13 +9,16 @@
 
 #include "rv_opcodes.h"
 #include "rv_types.h"
+#include "rv_csr.h"
 #include "mem.h"
 
 // Minimal RISC-V interpreter, supporting:
 // - RV32I
 // - M
+// - A
 // - C (also called Zca)
 // - Zcmp
+// - M-mode traps
 
 // Use unsigned arithmetic everywhere, with explicit sign extension as required.
 static inline ux_t sext(ux_t bits, int sign_bit) {
@@ -137,57 +140,151 @@ static inline uint zcmp_s_mapping(uint s_raw) {
 	return s_raw + 8 + 8 * ((s_raw & 0x6) != 0);
 }
 
-struct RVCSR {
+class RVCSR {
+	// Current core privilege level (M/S/U)
+	uint priv;
+
+	ux_t mcycle;
+	ux_t mstatus;
+	ux_t mie;
+	ux_t mip;
+	ux_t mtvec;
+	ux_t mscratch;
+	ux_t mepc;
+	ux_t mcause;
+
+public:
+
 	enum {
 		WRITE = 0,
 		WRITE_SET = 1,
 		WRITE_CLEAR = 2
 	};
 
-	enum {
-		MSCRATCH = 0x340,
-		MCYCLE = 0xb00,
-		MTIME = 0xb01,
-		MINSTRET = 0xb02
-	};
-
-	ux_t mcycle;
-	ux_t mscratch;
-
-	RVCSR(): mcycle(0), mscratch(0) {}
+	RVCSR() {
+		priv = 3;
+		mcycle = 0;
+		mstatus = 0;
+		mie = 0;
+		mip = 0;
+		mtvec = 0;
+		mscratch = 0;
+		mepc = 0;
+		mcause = 0;
+	}
 
 	void step() {++mcycle;}
 
-	ux_t read(uint16_t addr, bool side_effect=true) {
-		if (addr == MCYCLE || addr == MTIME || addr == MINSTRET)
-			return mcycle;
-		else if (addr == MSCRATCH)
-			return mscratch;
-		else
-			return 0;
+	// Returns None on permission/decode fail
+	std::optional<ux_t> read(uint16_t addr, bool side_effect=true) {
+		if (addr >= 1u << 12 || GETBITS(addr, 9, 8) > priv)
+			return {};
+
+		switch (addr) {
+			case CSR_MISA:       return 0x40101105; // RV32IMAC + U
+			case CSR_MHARTID:    return 0;
+			case CSR_MARCHID:    return 0;
+			case CSR_MIMPID:     return 0;
+			case CSR_MVENDORID:  return 0;
+
+			case CSR_MSTATUS:    return mstatus;
+			case CSR_MIE:        return mie;
+			case CSR_MIP:        return mip;
+			case CSR_MTVEC:      return mtvec;
+			case CSR_MSCRATCH:   return mscratch;
+			case CSR_MEPC:       return mepc;
+			case CSR_MCAUSE:     return mcause;
+			case CSR_MTVAL:      return 0;
+
+			case CSR_MCYCLE:     return mcycle;
+			case CSR_MINSTRET:   return mcycle;
+
+			default:             return {};
+		}
 	}
 
-	void write(uint16_t addr, ux_t data, uint op=WRITE) {
-		if (op == WRITE_CLEAR)
-			data = read(addr, false) & ~data;
-		else if (op == WRITE_SET)
-			data = read(addr, false) | data;
-		if (addr == MCYCLE)
-			mcycle = data;
-		else if (addr == MSCRATCH)
-			mscratch = data;
+	// Returns false on permission/decode fail
+	bool write(uint16_t addr, ux_t data, uint op=WRITE) {
+		if (addr >= 1u << 12 || GETBITS(addr, 9, 8) > priv)
+			return false;
+		if (addr >= 1u << 12)
+		if (op == WRITE_CLEAR || op == WRITE_SET) {
+			std::optional<ux_t> rdata = read(addr, false);
+			if (!rdata)
+				return false;
+			if (op == WRITE_CLEAR)
+				data &= ~*rdata;
+			else
+				data |= *rdata;
+		}
+
+		switch (addr) {
+			case CSR_MISA:                                         break;
+			case CSR_MHARTID:                                      break;
+			case CSR_MARCHID:                                      break;
+			case CSR_MIMPID:                                       break;
+
+			case CSR_MSTATUS:    mstatus  = data;                  break;
+			case CSR_MIE:        mie      = data;                  break;
+			case CSR_MIP:                                          break;
+			case CSR_MTVEC:      mtvec    = data & 0xfffffffdu;    break;
+			case CSR_MSCRATCH:   mscratch = data;                  break;
+			case CSR_MEPC:       mepc     = data & 0xfffffffeu;    break;
+			case CSR_MCAUSE:     mcause   = data & 0x800000ffu;    break;
+			case CSR_MTVAL:                                        break;
+
+			case CSR_MCYCLE:     mcycle = data;                    break;
+			case CSR_MINSTRET:   mcycle = data;                    break;
+
+			default:             return false;
+		}
+		return true;
 	}
 
+	// Update trap state (including change of privilege level), return trap target PC
+	ux_t trap_enter(uint xcause, ux_t xepc) {
+		mstatus = (mstatus & ~MSTATUS_MPP) | (priv << 11);
+		priv = PRV_M;
+
+		if (mstatus & MSTATUS_MIE)
+			mstatus |= MSTATUS_MPIE;
+		mstatus &= ~MSTATUS_MIE;
+
+		mcause = xcause;
+		mepc = xepc;
+		if ((mtvec & 0x1) && (xcause & (1u << 31))) {
+			return (mtvec & -2) + 4 * (xcause & ~(1u << 31));
+		} else {
+			return mtvec & -2;
+		}
+	}
+
+	// Update trap state, return mepc:
+	ux_t trap_mret() {
+		priv = GETBITS(mstatus, 12, 11);
+
+		if (mstatus & MSTATUS_MPIE)
+			mstatus |= MSTATUS_MIE;
+		mstatus &= ~MSTATUS_MPIE;
+
+		return mepc;
+	}
+
+	uint getpriv() {
+		return priv;
+	}
 };
 
 struct RVCore {
 	std::array<ux_t, 32> regs;
 	ux_t pc;
 	RVCSR csr;
+	bool load_reserved;
 
 	RVCore(ux_t reset_vector=0x40) {
 		std::fill(std::begin(regs), std::end(regs), 0);
 		pc = reset_vector;
+		load_reserved = false;
 	}
 
 	enum {
@@ -196,6 +293,7 @@ struct RVCore {
 		OPC_OP_IMM   = 0b00'100,
 		OPC_AUIPC    = 0b00'101,
 		OPC_STORE    = 0b01'000,
+		OPC_AMO      = 0b01'011,
 		OPC_OP       = 0b01'100,
 		OPC_LUI      = 0b01'101,
 		OPC_BRANCH   = 0b11'000,
@@ -208,12 +306,8 @@ struct RVCore {
 		uint32_t instr = mem.r16(pc) | (mem.r16(pc + 2) << 16);
 		std::optional<ux_t> rd_wdata;
 		std::optional<ux_t> pc_wdata;
-		uint regnum_rs1 = instr >> 15 & 0x1f;
-		uint regnum_rs2 = instr >> 20 & 0x1f;
-		uint regnum_rd  = instr >> 7 & 0x1f;
-		ux_t rs1 = regs[regnum_rs1];
-		ux_t rs2 = regs[regnum_rs2];
-		bool instr_invalid = false;
+		uint regnum_rd = 0;
+		std::optional<uint> exception_cause;
 
 		uint opc = instr >> 2 & 0x1f;
 		uint funct3 = instr >> 12 & 0x7;
@@ -221,6 +315,11 @@ struct RVCore {
 
 		if ((instr & 0x3) == 0x3) {
 			// 32-bit instruction
+			uint regnum_rs1 = instr >> 15 & 0x1f;
+			uint regnum_rs2 = instr >> 20 & 0x1f;
+			regnum_rd       = instr >> 7 & 0x1f;
+			ux_t rs1 = regs[regnum_rs1];
+			ux_t rs2 = regs[regnum_rs2];
 			switch (opc) {
 
 			case OPC_OP: {
@@ -242,7 +341,7 @@ struct RVCore {
 					else if (funct3 == 0b111)
 						rd_wdata = rs1 & rs2;
 					else
-						instr_invalid = true;
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 				else if (funct7 == 0b01'00000) {
 					if (funct3 == 0b000)
@@ -250,7 +349,7 @@ struct RVCore {
 					else if (funct3 == 0b101)
 						rd_wdata = (sx_t)rs1 >> (rs2 & 0x1f);
 					else
-						instr_invalid = true;
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 				else if (funct7 == 0b00'00001) {
 					if (funct3 < 0b100) {
@@ -292,7 +391,7 @@ struct RVCore {
 					}
 				}
 				else {
-					instr_invalid = true;
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 				break;
 			}
@@ -323,11 +422,11 @@ struct RVCore {
 						rd_wdata = (sx_t)rs1 >> regnum_rs2;
 					}
 					else {
-						instr_invalid = true;
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
 					}
 				}
 				else {
-					instr_invalid = true;
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 				break;
 			}
@@ -342,8 +441,8 @@ struct RVCore {
 				else if ((funct3 & 0b110) == 0b110)
 					taken = rs1 < rs2;
 				else
-					instr_invalid = true;
-				if (!instr_invalid && funct3 & 0b001)
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				if (!exception_cause && funct3 & 0b001)
 					taken = !taken;
 				if (taken)
 					pc_wdata = target;
@@ -352,31 +451,109 @@ struct RVCore {
 
 			case OPC_LOAD: {
 				ux_t load_addr = rs1 + imm_i(instr);
-				if (funct3 == 0b000)
+				if (funct3 == 0b000) {
 					rd_wdata = sext(mem.r8(load_addr), 7);
-				else if (funct3 == 0b001)
-					rd_wdata = sext(mem.r16(load_addr), 15);
-				else if (funct3 == 0b010)
-					rd_wdata = mem.r32(load_addr);
-				else if (funct3 == 0b100)
+				} else if (funct3 == 0b001) {
+					if (load_addr & 0x1)
+						exception_cause = XCAUSE_LOAD_ALIGN;
+					else
+						rd_wdata = sext(mem.r16(load_addr), 15);
+				} else if (funct3 == 0b010) {
+					if (load_addr & 0x3)
+						exception_cause = XCAUSE_LOAD_ALIGN;
+					else
+						rd_wdata = mem.r32(load_addr);
+				} else if (funct3 == 0b100) {
 					rd_wdata = mem.r8(load_addr);
-				else if (funct3 == 0b101)
-					rd_wdata = mem.r16(load_addr);
-				else
-					instr_invalid = true;
+				} else if (funct3 == 0b101) {
+					if (load_addr & 0x1)
+						exception_cause = XCAUSE_LOAD_ALIGN;
+					else
+						rd_wdata = mem.r16(load_addr);
+				} else {
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				}
 				break;
 			}
 
 			case OPC_STORE: {
 				ux_t store_addr = rs1 + imm_s(instr);
-				if (funct3 == 0b000)
+				if (funct3 == 0b000) {
 					mem.w8(store_addr, rs2 & 0xffu);
-				else if (funct3 == 0b001)
-					mem.w16(store_addr, rs2 & 0xffffu);
-				else if (funct3 == 0b010)
-					mem.w32(store_addr, rs2);
-				else
-					instr_invalid = true;
+				} else if (funct3 == 0b001) {
+					if (store_addr & 0x1)
+						exception_cause = XCAUSE_STORE_ALIGN;
+					else
+						mem.w16(store_addr, rs2 & 0xffffu);
+				} else if (funct3 == 0b010) {
+					if (store_addr & 0x3)
+						exception_cause = XCAUSE_STORE_ALIGN;
+					else
+						mem.w32(store_addr, rs2);
+				} else {
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				}
+				break;
+			}
+
+			case OPC_AMO: {
+				if (RVOPC_MATCH(instr, LR_W)) {
+					if (rs1 & 0x3) {
+						exception_cause = XCAUSE_LOAD_ALIGN;
+					} else {
+						rd_wdata = mem.r32(rs1);
+						load_reserved = true;
+					}
+				} else if (RVOPC_MATCH(instr, SC_W)) {
+					if (rs1 & 0x3) {
+						exception_cause = XCAUSE_STORE_ALIGN;
+					} else {
+						if (load_reserved) {
+							load_reserved = false;
+							mem.w32(rs1, rs2);
+							rd_wdata = 0;
+						} else {
+							rd_wdata = 1;
+						}
+					}
+				} else if (RVOPC_MATCH(instr, AMOSWAP_W)) {
+					if (rs1 & 0x3) {
+						exception_cause = XCAUSE_STORE_ALIGN;
+					} else {
+						rd_wdata = mem.r32(rs1);
+						mem.w32(rs1, rs2);
+					}
+
+				} else if (
+						RVOPC_MATCH(instr, AMOSWAP_W) ||
+						RVOPC_MATCH(instr, AMOADD_W) ||
+						RVOPC_MATCH(instr, AMOXOR_W) ||
+						RVOPC_MATCH(instr, AMOAND_W) ||
+						RVOPC_MATCH(instr, AMOOR_W) ||
+						RVOPC_MATCH(instr, AMOMIN_W) ||
+						RVOPC_MATCH(instr, AMOMAX_W) ||
+						RVOPC_MATCH(instr, AMOMINU_W) ||
+						RVOPC_MATCH(instr, AMOMAXU_W)) {
+					if (rs1 & 0x3) {
+						exception_cause = XCAUSE_STORE_ALIGN;
+					} else {
+						rd_wdata = mem.r32(rs1);
+						switch (instr & RVOPC_AMOSWAP_W_MASK) {
+							case RVOPC_AMOSWAP_W_BITS: mem.w32(rs1, *rd_wdata);                                      break;
+							case RVOPC_AMOADD_W_BITS:  mem.w32(rs1, *rd_wdata + rs2);                                break;
+							case RVOPC_AMOXOR_W_BITS:  mem.w32(rs1, *rd_wdata ^ rs2);                                break;
+							case RVOPC_AMOAND_W_BITS:  mem.w32(rs1, *rd_wdata & rs2);                                break;
+							case RVOPC_AMOOR_W_BITS:   mem.w32(rs1, *rd_wdata | rs2);                                break;
+							case RVOPC_AMOMIN_W_BITS:  mem.w32(rs1, (sx_t)*rd_wdata < (sx_t)rs2 ? *rd_wdata : rs2);  break;
+							case RVOPC_AMOMAX_W_BITS:  mem.w32(rs1, (sx_t)*rd_wdata > (sx_t)rs2 ? *rd_wdata : rs2);  break;
+							case RVOPC_AMOMINU_W_BITS: mem.w32(rs1, *rd_wdata < rs2 ? *rd_wdata : rs2);              break;
+							case RVOPC_AMOMAXU_W_BITS: mem.w32(rs1, *rd_wdata > rs2 ? *rd_wdata : rs2);              break;
+							default:                   assert(false);                                                break;
+						}
+					}
+				} else {
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				}
 				break;
 			}
 
@@ -403,10 +580,17 @@ struct RVCore {
 				if (funct3 >= 0b001 && funct3 <= 0b011) {
 					// csrrw, csrrs, csrrc
 					uint write_op = funct3 - 0b001;
-					if (write_op != RVCSR::WRITE || regnum_rd != 0)
+					if (write_op != RVCSR::WRITE || regnum_rd != 0) {
 						rd_wdata = csr.read(csr_addr);
-					if (write_op == RVCSR::WRITE || regnum_rs1 != 0)
-						csr.write(csr_addr, rs1, write_op);
+						if (!rd_wdata) {
+							exception_cause = XCAUSE_INSTR_ILLEGAL;
+						}
+					}
+					else if (write_op == RVCSR::WRITE || regnum_rs1 != 0) {
+						if (!csr.write(csr_addr, rs1, write_op)) {
+							exception_cause = XCAUSE_INSTR_ILLEGAL;
+						}
+					}
 				}
 				else if (funct3 >= 0b101 && funct3 <= 0b111) {
 					// csrrwi, csrrsi, csrrci
@@ -415,22 +599,31 @@ struct RVCore {
 						rd_wdata = csr.read(csr_addr);
 					if (write_op == RVCSR::WRITE || regnum_rs1 != 0)
 						csr.write(csr_addr, regnum_rs1, write_op);
-				}
-				else {
-					instr_invalid = true;
+				} else if (RVOPC_MATCH(instr, MRET)) {
+					if (csr.getpriv() == PRV_M) {
+						pc_wdata = csr.trap_mret();
+					} else {
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
+					}
+				} else if (RVOPC_MATCH(instr, ECALL)) {
+					exception_cause = XCAUSE_ECALL_U + csr.getpriv();
+				} else if (RVOPC_MATCH(instr, EBREAK)) {
+					exception_cause = XCAUSE_EBREAK;
+				} else {
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 				break;
 			}
 
 			default:
-				instr_invalid = true;
+				exception_cause = XCAUSE_INSTR_ILLEGAL;
 				break;
 			}
-		} else {
-			regnum_rd = 0;
-			// 16-bit instructions
+		} else if ((instr & 0x3) == 0x0) {
 			// RVC Quadrant 00:
-			if (RVOPC_MATCH(instr, C_ADDI4SPN)) {
+			if (RVOPC_MATCH(instr, ILLEGAL16)) {
+				exception_cause = XCAUSE_INSTR_ILLEGAL;
+			} else if (RVOPC_MATCH(instr, C_ADDI4SPN)) {
 				regnum_rd = c_rs2_s(instr);
 				rd_wdata = regs[2]
 					+ (GETBITS(instr, 12, 11) << 4)
@@ -450,8 +643,12 @@ struct RVCore {
 					+ (GETBITS(instr, 12, 10) << 3)
 					+ (GETBIT(instr, 5) << 6);
 				mem.w32(addr, regs[c_rs2_s(instr)]);
+			} else {
+				exception_cause = XCAUSE_INSTR_ILLEGAL;
+			}
+		} else if ((instr & 0x3) == 0x1) {
 			// RVC Quadrant 01:
-			} else if (RVOPC_MATCH(instr, C_ADDI)) {
+			if (RVOPC_MATCH(instr, C_ADDI)) {
 				regnum_rd = c_rs1_l(instr);
 				rd_wdata = regs[c_rs1_l(instr)] + imm_ci(instr);
 			} else if (RVOPC_MATCH(instr, C_JAL)) {
@@ -506,8 +703,12 @@ struct RVCore {
 				if (regs[c_rs1_s(instr)] != 0) {
 					pc_wdata = pc + imm_cb(instr);
 				}
+			} else {
+				exception_cause = XCAUSE_INSTR_ILLEGAL;
+			}
+		} else {
 			// RVC Quadrant 10:
-			} else if (RVOPC_MATCH(instr, C_SLLI)) {
+			if (RVOPC_MATCH(instr, C_SLLI)) {
 				regnum_rd = c_rs1_l(instr);
 				rd_wdata = regs[regnum_rd] << GETBITS(instr, 6, 2);
 			} else if (RVOPC_MATCH(instr, C_MV)) {
@@ -520,10 +721,15 @@ struct RVCore {
 				}
 			} else if (RVOPC_MATCH(instr, C_ADD)) {
 				if (c_rs2_l(instr) == 0) {
-					// c.jalr
-					pc_wdata = regs[c_rs1_l(instr)] & -2u;
-					regnum_rd = 1;
-					rd_wdata = pc + 2;
+					if (c_rs1_l(instr) == 0) {
+						// c.ebreak
+						exception_cause = XCAUSE_EBREAK;
+					} else {
+						// c.jalr
+						pc_wdata = regs[c_rs1_l(instr)] & -2u;
+						regnum_rd = 1;
+						rd_wdata = pc + 2;
+					}
 				} else {
 					regnum_rd = c_rs1_l(instr);
 					rd_wdata = regs[c_rs1_l(instr)] + regs[c_rs2_l(instr)];
@@ -574,11 +780,10 @@ struct RVCore {
 				regs[10] = regs[zcmp_s_mapping(GETBITS(instr, 9, 7))];
 				regs[11] = regs[zcmp_s_mapping(GETBITS(instr, 4, 2))];
 			} else {
-				instr_invalid = true;
+				exception_cause = XCAUSE_INSTR_ILLEGAL;
 			}
 		}
-		if (instr_invalid)
-			printf("Invalid instr %08x at %08x\n", instr, pc);
+
 
 		if (trace) {
 			printf("%08x: ", pc);
@@ -596,6 +801,13 @@ struct RVCore {
 				printf(": pc <- %08x\n", *pc_wdata);
 			} else {
 				printf(":\n");
+			}
+		}
+
+		if (exception_cause) {
+			pc_wdata = csr.trap_enter(*exception_cause, pc);
+			if (trace) {
+				printf("Trap cause %2u: pc <- %08x\n", *exception_cause, *pc_wdata);
 			}
 		}
 
