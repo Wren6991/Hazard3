@@ -14,6 +14,9 @@ INCDIR       ?= ../common
 MAX_CYCLES   ?= 100000
 TMP_PREFIX   ?= tmp/
 
+# Useless:
+override CCFLAGS += -Wl,--no-warn-rwx-segments
+
 ###############################################################################
 
 .SUFFIXES:
