@@ -85,5 +85,14 @@ static inline void external_irq_enable(bool en) {
 	}
 }
 
+static inline void timer_irq_enable(bool en) {
+	// mie.mtie
+	if (en) {
+		set_csr(mie, 0x080);
+	}
+	else {
+		clear_csr(mie, 0x080);
+	}
+}
 
 #endif

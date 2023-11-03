@@ -337,9 +337,11 @@ end else begin: instr_decompress
 			`RVOPC_CM_POPRET: if (~|EXTENSION_ZCMP || zcmp_rlist < 4'h4) begin
 				invalid = 1'b1;
 			end else if (uop_ctr == 4'he) begin
-				// Note we don't set the uop_atomic flag on the first uop in
-				// the uninterruptible sequence -- the rule is *if* one
-				// executes, they all execute. Having none execute is fine.
+				// Note although this is only the first instruction in the uninterruptible sequence,
+				// we mark this instruction as uninterruptible: there is some special case logic to
+				// allow this jump to execute without flushing the final stack adjust uop, which can
+				// cause the wrong exception PC to be sampled if this uop is interrupted.
+				uop_atomic = 1'b1;
 				in_uop_seq = 1'b1;
 				uop_ctr_nxt = uop_ctr + 4'h1;
 				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
