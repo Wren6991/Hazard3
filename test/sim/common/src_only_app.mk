@@ -10,6 +10,7 @@ CCFLAGS      ?=
 LDSCRIPT     ?= ../common/memmap.ld
 CROSS_PREFIX ?= riscv32-unknown-elf-
 TBDIR        ?= ../tb_cxxrtl
+TBEXEC       ?= $(TBDIR)/tb
 INCDIR       ?= ../common
 MAX_CYCLES   ?= 100000
 TMP_PREFIX   ?= tmp/
@@ -25,7 +26,7 @@ override CCFLAGS += -Wl,--no-warn-rwx-segments
 all: run
 
 run: $(TMP_PREFIX)$(APP).bin
-	$(TBDIR)/tb --bin $(TMP_PREFIX)$(APP).bin --vcd $(TMP_PREFIX)$(APP)_run.vcd --cycles $(MAX_CYCLES)
+	$(TBEXEC) --bin $(TMP_PREFIX)$(APP).bin --vcd $(TMP_PREFIX)$(APP)_run.vcd --cycles $(MAX_CYCLES)
 
 view: run
 	gtkwave $(TMP_PREFIX)$(APP)_run.vcd
@@ -33,7 +34,7 @@ view: run
 bin: $(TMP_PREFIX)$(APP).bin
 
 tb:
-	$(MAKE) -C $(TBDIR) tb
+	$(MAKE) -C $(TBDIR)
 
 clean:
 	rm -rf $(TMP_PREFIX)
