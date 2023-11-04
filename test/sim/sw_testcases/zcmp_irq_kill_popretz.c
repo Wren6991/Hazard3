@@ -26,8 +26,8 @@ uint32_t __attribute__((naked)) foreground_task(uint32_t iters) {
 		"addi a2, a2, -1\n"
 		"addi a1, a1, 1\n"
 		"bgtz a2, 1b\n"
-		// Normal return -- we've been counting up in a1 as we count up in a2, so
-		// return a1 to confirm we iterated the expected number of times
+		// Normal return -- we've been counting up in a1 as we count down in a2,
+		// so return a1 to confirm we iterated the expected number of times
 		"mv a0, a1\n"
 		"lw s0, 0(sp)\n"
 		"lw ra, 4(sp)\n"
@@ -47,7 +47,7 @@ void __attribute__((noreturn)) panic_sp_changed(void) {
 }
 
 void __attribute__((interrupt)) isr_machine_timer(void) {
-	uint dwell = rand() % 301;
+	unsigned int dwell = rand() % 301;
 	mm_timer->mtimecmp = mm_timer->mtime + dwell;
 }
 
