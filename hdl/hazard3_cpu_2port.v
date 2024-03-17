@@ -190,11 +190,19 @@ assign i_htrans = core_aph_req_i ? HTRANS_NSEQ : HTRANS_IDLE;
 assign i_hsize = core_hsize_i;
 
 reg dphase_active_i;
-always @ (posedge clk or negedge rst_n)
-	if (!rst_n)
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
 		dphase_active_i <= 1'b0;
-	else if (i_hready)
+	end else if (i_hready) begin
 		dphase_active_i <= core_aph_req_i;
+	end
+end
+
+`ifdef HAZARD3_ASSERTIONS
+// Wake->sleep transition must wait for outstanding instruction fetches to
+// complete, in particular because the arbiter clock will stop
+always @ (posedge clk) if (!rst_n) assert(clk_en || !(core_aph_req_i || dphase_active_i));
+`endif
 
 assign core_aph_ready_i = i_hready && core_aph_req_i;
 assign core_dph_ready_i = i_hready && dphase_active_i;
@@ -231,7 +239,10 @@ reg [1:0] bus_gnt_ds_prev;
 reg       bus_active_dph_d;
 reg       bus_active_dph_s;
 
-always @ (posedge clk or negedge rst_n) begin
+// clk_always_on is used because SBA may access the bus through this arbiter
+// whilst the core is asleep (same is not true for I-side interface)
+
+always @ (posedge clk_always_on or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_hold_aph <= 1'b0;
 		bus_gnt_ds_prev <= 2'h0;
@@ -247,7 +258,7 @@ assign {bus_gnt_d, bus_gnt_s} =
 	dbg_sbus_vld && !bus_active_dph_s ? 2'b01 :
 	                                    2'b00 ;
 
-always @ (posedge clk or negedge rst_n) begin
+always @ (posedge clk_always_on or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_active_dph_d <= 1'b0;
 		bus_active_dph_s <= 1'b0;

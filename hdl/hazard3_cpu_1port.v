@@ -180,7 +180,10 @@ wire      bus_gnt_s;
 reg       bus_hold_aph;
 reg [2:0] bus_gnt_ids_prev;
 
-always @ (posedge clk or negedge rst_n) begin
+// Note use of clk_always_on: SBA may use this arbiter to access the bus
+// whilst the core is asleep.
+
+always @ (posedge clk_always_on or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_hold_aph <= 1'b0;
 		bus_gnt_ids_prev <= 3'h0;
@@ -214,7 +217,7 @@ assign {bus_gnt_i, bus_gnt_d, bus_gnt_s} =
 reg bus_active_dph_i;
 reg bus_active_dph_d;
 
-always @ (posedge clk or negedge rst_n) begin
+always @ (posedge clk_always_on or negedge rst_n) begin
 	if (!rst_n) begin
 		bus_active_dph_i <= 1'b0;
 		bus_active_dph_d <= 1'b0;
