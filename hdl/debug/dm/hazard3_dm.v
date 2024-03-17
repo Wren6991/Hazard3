@@ -456,7 +456,7 @@ always @ (posedge clk or negedge rst_n) begin
 					sberror <= SBERROR_BADADDR;
 				end
 			end
-		end else if (sb_want_start_read || sb_want_start_write && ~|sberror && !sbbusyerror) begin
+		end else if ((sb_want_start_read || sb_want_start_write) && ~|sberror && !sbbusyerror) begin
 			if (sb_badsize) begin
 				sberror <= SBERROR_BADSIZE;
 			end else if (sb_badalign) begin
