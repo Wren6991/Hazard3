@@ -67,6 +67,12 @@ void isr_machine_timer_c(uint32_t a0, uint32_t a1, uint32_t s0, uint32_t s1, uin
 	tb_assert((a0 & 0xffffu) == (a1 & 0xffffu), "Low-half tearing of a0,a1");
 	tb_assert((s0 & 0xffffu) == (s1 & 0xffffu), "Low-half tearing of s0,s1");
 	tb_assert((s2 & 0xffffu) == (s3 & 0xffffu), "Low-half tearing of s2,s3");
+	tb_assert((a0 >> 24) == 0xa0, "a0 value from wrong register");
+	tb_assert((a1 >> 24) == 0xa1, "a1 value from wrong register");
+	tb_assert((s0 >> 16 & 0xff) == 0x50, "s0 value from wrong register");
+	tb_assert((s1 >> 16 & 0xff) == 0x51, "s1 value from wrong register");
+	tb_assert((s2 >> 16 & 0xff) == 0x52, "s2 value from wrong register");
+	tb_assert((s3 >> 16 & 0xff) == 0x53, "s3 value from wrong register");
 	unsigned int dwell = rand() % 301;
 	mm_timer->mtimecmp = mm_timer->mtime + dwell;
 }
