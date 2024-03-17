@@ -465,7 +465,7 @@ int main(int argc, char **argv) {
 	if (dump_waves) {
 		waves_fd.open(waves_path);
 		cxxrtl::debug_items all_debug_items;
-		top.debug_info(all_debug_items);
+		top.debug_info(&all_debug_items, /*scopes=*/nullptr, "");
 		vcd.timescale(1, "us");
 		vcd.add(all_debug_items);
 	}
