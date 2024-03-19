@@ -5,6 +5,7 @@
 #include <fstream>
 #include <optional>
 #include <tuple>
+#include <array>
 #include <vector>
 
 #include "rv_opcodes.h"
@@ -145,6 +146,10 @@ class RVCSR {
 	uint priv;
 
 	ux_t mcycle;
+	ux_t mcycleh;
+	ux_t minstret;
+	ux_t minstreth;
+	ux_t mcountinhibit;
 	ux_t mstatus;
 	ux_t mie;
 	ux_t mip;
@@ -152,6 +157,8 @@ class RVCSR {
 	ux_t mscratch;
 	ux_t mepc;
 	ux_t mcause;
+
+	std::optional<ux_t> addr_written_this_step;
 
 public:
 
@@ -164,6 +171,10 @@ public:
 	RVCSR() {
 		priv = 3;
 		mcycle = 0;
+		mcycleh = 0;
+		minstret = 0;
+		minstreth = 0;
+		mcountinhibit = 0;
 		mstatus = 0;
 		mie = 0;
 		mip = 0;
@@ -171,9 +182,32 @@ public:
 		mscratch = 0;
 		mepc = 0;
 		mcause = 0;
+		addr_written_this_step = {};
 	}
 
-	void step() {++mcycle;}
+	void step() {
+		uint64_t mcycle_64 = ((uint64_t)mcycleh << 32) | mcycle;
+		uint64_t minstret_64 = ((uint64_t)minstreth << 32) | minstret;
+		if (!(mcountinhibit & 0x1u)) {
+			++mcycle_64;
+		}
+		if (!(mcountinhibit & 0x4u)) {
+			++minstret_64;
+		}
+		if (!(addr_written_this_step && *addr_written_this_step == CSR_MCYCLEH)) {
+			mcycleh = mcycle_64 >> 32;
+		}
+		if (!(addr_written_this_step && *addr_written_this_step == CSR_MCYCLE)) {
+			mcycle = mcycle_64 & 0xffffffffu;
+		}
+		if (!(addr_written_this_step && *addr_written_this_step == CSR_MINSTRETH)) {
+			minstreth = minstret_64 >> 32;
+		}
+		if (!(addr_written_this_step && *addr_written_this_step == CSR_MINSTRET)) {
+			minstret = minstret_64 & 0xffffffffu;
+		}
+		addr_written_this_step = {};
+	}
 
 	// Returns None on permission/decode fail
 	std::optional<ux_t> read(uint16_t addr, bool side_effect=true) {
@@ -181,30 +215,35 @@ public:
 			return {};
 
 		switch (addr) {
-			case CSR_MISA:       return 0x40101105; // RV32IMAC + U
-			case CSR_MHARTID:    return 0;
-			case CSR_MARCHID:    return 0;
-			case CSR_MIMPID:     return 0;
-			case CSR_MVENDORID:  return 0;
+			case CSR_MISA:          return 0x40901105;  // RV32IMACX + U
+			case CSR_MHARTID:       return 0;
+			case CSR_MARCHID:       return 0x1b;        // Hazard3
+			case CSR_MIMPID:        return 0x12345678u; // Match testbench value
+			case CSR_MVENDORID:     return 0xdeadbeefu; // Match testbench value
+			case CSR_MCONFIGPTR:    return 0x9abcdef0u; // Match testbench value
 
-			case CSR_MSTATUS:    return mstatus;
-			case CSR_MIE:        return mie;
-			case CSR_MIP:        return mip;
-			case CSR_MTVEC:      return mtvec;
-			case CSR_MSCRATCH:   return mscratch;
-			case CSR_MEPC:       return mepc;
-			case CSR_MCAUSE:     return mcause;
-			case CSR_MTVAL:      return 0;
+			case CSR_MSTATUS:       return mstatus;
+			case CSR_MIE:           return mie;
+			case CSR_MIP:           return mip;
+			case CSR_MTVEC:         return mtvec;
+			case CSR_MSCRATCH:      return mscratch;
+			case CSR_MEPC:          return mepc;
+			case CSR_MCAUSE:        return mcause;
+			case CSR_MTVAL:         return 0;
 
-			case CSR_MCYCLE:     return mcycle;
-			case CSR_MINSTRET:   return mcycle;
+			case CSR_MCOUNTINHIBIT: return mcountinhibit;
+			case CSR_MCYCLE:        return mcycle;
+			case CSR_MCYCLEH:       return mcycleh;
+			case CSR_MINSTRET:      return minstret;
+			case CSR_MINSTRETH:     return minstreth;
 
-			default:             return {};
+			default:                return {};
 		}
 	}
 
 	// Returns false on permission/decode fail
 	bool write(uint16_t addr, ux_t data, uint op=WRITE) {
+		addr_written_this_step = addr;
 		if (addr >= 1u << 12 || GETBITS(addr, 9, 8) > priv)
 			return false;
 		if (addr >= 1u << 12)
@@ -219,23 +258,25 @@ public:
 		}
 
 		switch (addr) {
-			case CSR_MISA:                                         break;
-			case CSR_MHARTID:                                      break;
-			case CSR_MARCHID:                                      break;
-			case CSR_MIMPID:                                       break;
+			case CSR_MISA:                                            break;
+			case CSR_MHARTID:                                         break;
+			case CSR_MARCHID:                                         break;
+			case CSR_MIMPID:                                          break;
 
-			case CSR_MSTATUS:    mstatus  = data;                  break;
-			case CSR_MIE:        mie      = data;                  break;
-			case CSR_MIP:                                          break;
-			case CSR_MTVEC:      mtvec    = data & 0xfffffffdu;    break;
-			case CSR_MSCRATCH:   mscratch = data;                  break;
-			case CSR_MEPC:       mepc     = data & 0xfffffffeu;    break;
-			case CSR_MCAUSE:     mcause   = data & 0x800000ffu;    break;
-			case CSR_MTVAL:                                        break;
+			case CSR_MSTATUS:       mstatus  = data;                  break;
+			case CSR_MIE:           mie      = data;                  break;
+			case CSR_MIP:                                             break;
+			case CSR_MTVEC:         mtvec    = data & 0xfffffffdu;    break;
+			case CSR_MSCRATCH:      mscratch = data;                  break;
+			case CSR_MEPC:          mepc     = data & 0xfffffffeu;    break;
+			case CSR_MCAUSE:        mcause   = data & 0x800000ffu;    break;
+			case CSR_MTVAL:                                           break;
 
-			case CSR_MCYCLE:     mcycle = data;                    break;
-			case CSR_MINSTRET:   mcycle = data;                    break;
-
+			case CSR_MCYCLE:        mcycle = data;                    break;
+			case CSR_MCYCLEH:       mcycleh = data;                   break;
+			case CSR_MINSTRET:      minstret = data;                  break;
+			case CSR_MINSTRETH:     minstreth = data;                 break;
+			case CSR_MCOUNTINHIBIT: mcountinhibit = data & 0x7u;      break;
 			default:             return false;
 		}
 		return true;
