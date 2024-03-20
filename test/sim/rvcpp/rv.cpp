@@ -269,7 +269,7 @@ public:
 			case CSR_MTVEC:         mtvec    = data & 0xfffffffdu;    break;
 			case CSR_MSCRATCH:      mscratch = data;                  break;
 			case CSR_MEPC:          mepc     = data & 0xfffffffeu;    break;
-			case CSR_MCAUSE:        mcause   = data & 0x800000ffu;    break;
+			case CSR_MCAUSE:        mcause   = data & 0x8000000fu;    break;
 			case CSR_MTVAL:                                           break;
 
 			case CSR_MCYCLE:        mcycle = data;                    break;
@@ -383,16 +383,7 @@ struct RVCore {
 						rd_wdata = rs1 & rs2;
 					else
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
-				}
-				else if (funct7 == 0b01'00000) {
-					if (funct3 == 0b000)
-						rd_wdata = rs1 - rs2;
-					else if (funct3 == 0b101)
-						rd_wdata = (sx_t)rs1 >> (rs2 & 0x1f);
-					else
-						exception_cause = XCAUSE_INSTR_ILLEGAL;
-				}
-				else if (funct7 == 0b00'00001) {
+				} else if (funct7 == 0b00'00001) {
 					if (funct3 < 0b100) {
 						sdx_t mul_op_a = rs1;
 						sdx_t mul_op_b = rs2;
@@ -430,8 +421,66 @@ struct RVCore {
 							rd_wdata = rs2 ? rs1 % rs2 : rs1;
 						}
 					}
-				}
-				else {
+				} else if (funct7 == 0b01'00000) {
+					if (funct3 == 0b000)
+						rd_wdata = rs1 - rs2;
+					else if (funct3 == 0b100)
+						rd_wdata = rs1 ^ ~rs2; // Zbb xnor
+					else if (funct3 == 0b101)
+						rd_wdata = (sx_t)rs1 >> (rs2 & 0x1f);
+					else if (funct3 == 0b110)
+						rd_wdata = rs1 | ~rs2; // Zbb orn
+					else if (funct3 == 0b111)
+						rd_wdata = rs1 & ~rs2; // Zbb andn
+					else
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
+				} else if (RVOPC_MATCH(instr, BCLR)) {
+					rd_wdata = rs1 & ~(1u << (rs2 & 0x1f));
+				} else if (RVOPC_MATCH(instr, BEXT)) {
+					rd_wdata = (rs1 >> (rs2 & 0x1f)) & 0x1u;
+				} else if (RVOPC_MATCH(instr, BINV)) {
+					rd_wdata = rs1 ^ (1u << (rs2 & 0x1f));
+				} else if (RVOPC_MATCH(instr, BSET)) {
+					rd_wdata = rs1 | (1u << (rs2 & 0x1f));
+				} else if (RVOPC_MATCH(instr, SH1ADD)) {
+					rd_wdata = (rs1 << 1) + rs2;
+				} else if (RVOPC_MATCH(instr, SH2ADD)) {
+					rd_wdata = (rs1 << 2) + rs2;
+				} else if (RVOPC_MATCH(instr, SH3ADD)) {
+					rd_wdata = (rs1 << 3) + rs2;
+				} else if (RVOPC_MATCH(instr, MAX)) {
+					rd_wdata = (sx_t)rs1 > (sx_t)rs2 ? rs1 : rs2;
+				} else if (RVOPC_MATCH(instr, MAXU)) {
+					rd_wdata = rs1 > rs2 ? rs1 : rs2;
+				} else if (RVOPC_MATCH(instr, MIN)) {
+					rd_wdata = (sx_t)rs1 < (sx_t)rs2 ? rs1 : rs2;
+				} else if (RVOPC_MATCH(instr, MINU)) {
+					rd_wdata = rs1 < rs2 ? rs1 : rs2;
+				} else if (RVOPC_MATCH(instr, ROR)) {
+					uint shamt = rs2 & 0x1f;
+					rd_wdata = shamt ? (rs1 >> shamt) | (rs1 << (32 - shamt)) : rs1;
+				} else if (RVOPC_MATCH(instr, ROL)) {
+					uint shamt = rs2 & 0x1f;
+					rd_wdata = shamt ? (rs1 << shamt) | (rs1 >> (32 - shamt)) : rs1;
+				} else if (RVOPC_MATCH(instr, PACK)) {
+					rd_wdata = (rs1 & 0xffffu) | (rs2 << 16);
+				} else if (RVOPC_MATCH(instr, PACKH)) {
+					rd_wdata = (rs1 & 0xffu) | ((rs2 & 0xffu) << 8);
+				} else if (RVOPC_MATCH(instr, CLMUL) || RVOPC_MATCH(instr, CLMULH) || RVOPC_MATCH(instr, CLMULR)) {
+					uint64_t product = 0;
+					for (int i = 0; i < 32; ++i) {
+						if (rs2 & (1u << i)) {
+							product ^= (uint64_t)rs1 << i;
+						}
+					}
+					if (RVOPC_MATCH(instr, CLMUL)) {
+						rd_wdata = product;
+					} else if (RVOPC_MATCH(instr, CLMULH)) {
+						rd_wdata = product >> 32;
+					} else {
+						rd_wdata = product >> 31;
+					}
+				} else {
 					exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 				break;
@@ -455,14 +504,61 @@ struct RVCore {
 					// shamt is regnum_rs2
 					if (funct7 == 0b00'00000 && funct3 == 0b001) {
 						rd_wdata = rs1 << regnum_rs2;
-					}
-					else if (funct7 == 0b00'00000 && funct3 == 0b101) {
+					} else if (funct7 == 0b00'00000 && funct3 == 0b101) {
 						rd_wdata = rs1 >> regnum_rs2;
-					}
-					else if (funct7 == 0b01'00000 && funct3 == 0b101) {
+					} else if (funct7 == 0b01'00000 && funct3 == 0b101) {
 						rd_wdata = (sx_t)rs1 >> regnum_rs2;
-					}
-					else {
+					} else if (RVOPC_MATCH(instr, BCLRI)) {
+						rd_wdata = rs1 & ~(1u << regnum_rs2);
+					} else if (RVOPC_MATCH(instr, BINVI)) {
+						rd_wdata = rs1 ^ (1u << regnum_rs2);
+					} else if (RVOPC_MATCH(instr, BSETI)) {
+						rd_wdata = rs1 | (1u << regnum_rs2);
+					} else if (RVOPC_MATCH(instr, CLZ)) {
+						rd_wdata = rs1 ? __builtin_clz(rs1) : 32;
+					} else if (RVOPC_MATCH(instr, CPOP)) {
+						rd_wdata = __builtin_popcount(rs1);
+					} else if (RVOPC_MATCH(instr, CTZ)) {
+						rd_wdata = rs1 ? __builtin_ctz(rs1) : 32;
+					} else if (RVOPC_MATCH(instr, SEXT_B)) {
+						rd_wdata = (rs1 & 0xffu) - ((rs1 & 0x80u) << 1);
+					} else if (RVOPC_MATCH(instr, SEXT_H)) {
+						rd_wdata = (rs1 & 0xffffu) - ((rs1 & 0x8000u) << 1);
+					} else if (RVOPC_MATCH(instr, ZIP)) {
+						ux_t accum = 0;
+						for (int i = 0; i < 32; ++i) {
+							if (rs1 & (1u << i)) {
+								accum |= 1u << ((i >> 4) | ((i & 0xf) << 1));
+							}
+						}
+						rd_wdata = accum;
+					} else if (RVOPC_MATCH(instr, UNZIP)) {
+						ux_t accum = 0;
+						for (int i = 0; i < 32; ++i) {
+							if (rs1 & (1u << i)) {
+								accum |= 1u << ((i >> 1) | ((i & 1) << 4));
+							}
+						}
+						rd_wdata = accum;
+					} else if (RVOPC_MATCH(instr, BEXTI)) {
+						rd_wdata = (rs1 >> regnum_rs2) & 0x1u;
+					} else if (RVOPC_MATCH(instr, BREV8)) {
+						rd_wdata =
+							((rs1 & 0x80808080u) >> 7) | ((rs1 & 0x01010101u) << 7) |
+							((rs1 & 0x40404040u) >> 5) | ((rs1 & 0x02020202u) << 5) |
+							((rs1 & 0x20202020u) >> 3) | ((rs1 & 0x04040404u) << 3) |
+							((rs1 & 0x10101010u) >> 1) | ((rs1 & 0x08080808u) << 1);
+					} else if (RVOPC_MATCH(instr, ORC_B)) {
+						rd_wdata =
+							(rs1 & 0xff000000u ? 0xff000000u : 0u) |
+							(rs1 & 0x00ff0000u ? 0x00ff0000u : 0u) |
+							(rs1 & 0x0000ff00u ? 0x0000ff00u : 0u) |
+							(rs1 & 0x000000ffu ? 0x000000ffu : 0u);
+					} else if (RVOPC_MATCH(instr, REV8)) {
+						rd_wdata = __builtin_bswap32(rs1);
+					} else if (RVOPC_MATCH(instr, RORI)) {
+						rd_wdata = regnum_rs2 ? ((rs1 << (32 - regnum_rs2)) | (rs1 >> regnum_rs2)) : rs1;
+					} else {
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
 					}
 				}
