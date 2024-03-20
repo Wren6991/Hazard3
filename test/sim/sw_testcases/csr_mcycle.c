@@ -45,14 +45,9 @@ int main() {
 	asm volatile (
 		".p2align 2\n"
 		"  csrw mcycle, zero\n"
-		"  j 1f\n" // 2 cycles each
-		"1:\n"
-		"  j 1f\n"
-		"1:\n"
-		"  j 1f\n"
-		"1:\n"
-		"  j 1f\n"
-		"1:\n"
+		".rept 8\n"
+		"  nop\n"
+		".endr\n"
 		"  csrr %0, mcycle\n"
 		: "=r" (tmp0)
 	);

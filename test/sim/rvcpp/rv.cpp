@@ -18,6 +18,11 @@
 // - M
 // - A
 // - C (also called Zca)
+// - Zba
+// - Zbb
+// - Zbc
+// - Zbs
+// - Zbkb
 // - Zcmp
 // - M-mode traps
 
@@ -158,7 +163,8 @@ class RVCSR {
 	ux_t mepc;
 	ux_t mcause;
 
-	std::optional<ux_t> addr_written_this_step;
+	std::optional<ux_t> pending_write_addr;
+	ux_t pending_write_data;
 
 public:
 
@@ -182,7 +188,7 @@ public:
 		mscratch = 0;
 		mepc = 0;
 		mcause = 0;
-		addr_written_this_step = {};
+		pending_write_addr = {};
 	}
 
 	void step() {
@@ -194,19 +200,36 @@ public:
 		if (!(mcountinhibit & 0x4u)) {
 			++minstret_64;
 		}
-		if (!(addr_written_this_step && *addr_written_this_step == CSR_MCYCLEH)) {
+		if (!(pending_write_addr && *pending_write_addr == CSR_MCYCLEH)) {
 			mcycleh = mcycle_64 >> 32;
 		}
-		if (!(addr_written_this_step && *addr_written_this_step == CSR_MCYCLE)) {
+		if (!(pending_write_addr && *pending_write_addr == CSR_MCYCLE)) {
 			mcycle = mcycle_64 & 0xffffffffu;
 		}
-		if (!(addr_written_this_step && *addr_written_this_step == CSR_MINSTRETH)) {
+		if (!(pending_write_addr && *pending_write_addr == CSR_MINSTRETH)) {
 			minstreth = minstret_64 >> 32;
 		}
-		if (!(addr_written_this_step && *addr_written_this_step == CSR_MINSTRET)) {
+		if (!(pending_write_addr && *pending_write_addr == CSR_MINSTRET)) {
 			minstret = minstret_64 & 0xffffffffu;
 		}
-		addr_written_this_step = {};
+		if (pending_write_addr) {
+			switch (*pending_write_addr) {
+				case CSR_MSTATUS:       mstatus       = pending_write_data;               break;
+				case CSR_MIE:           mie           = pending_write_data;               break;
+				case CSR_MTVEC:         mtvec         = pending_write_data & 0xfffffffdu; break;
+				case CSR_MSCRATCH:      mscratch      = pending_write_data;               break;
+				case CSR_MEPC:          mepc          = pending_write_data & 0xfffffffeu; break;
+				case CSR_MCAUSE:        mcause        = pending_write_data & 0x8000000fu; break;
+
+				case CSR_MCYCLE:        mcycle        = pending_write_data;               break;
+				case CSR_MCYCLEH:       mcycleh       = pending_write_data;               break;
+				case CSR_MINSTRET:      minstret      = pending_write_data;               break;
+				case CSR_MINSTRETH:     minstreth     = pending_write_data;               break;
+				case CSR_MCOUNTINHIBIT: mcountinhibit = pending_write_data & 0x7u;        break;
+				default:                                                                  break;
+			}
+			pending_write_addr = {};
+		}
 	}
 
 	// Returns None on permission/decode fail
@@ -243,41 +266,43 @@ public:
 
 	// Returns false on permission/decode fail
 	bool write(uint16_t addr, ux_t data, uint op=WRITE) {
-		addr_written_this_step = addr;
 		if (addr >= 1u << 12 || GETBITS(addr, 9, 8) > priv)
 			return false;
-		if (addr >= 1u << 12)
 		if (op == WRITE_CLEAR || op == WRITE_SET) {
 			std::optional<ux_t> rdata = read(addr, false);
 			if (!rdata)
 				return false;
 			if (op == WRITE_CLEAR)
-				data &= ~*rdata;
+				data = *rdata & ~data;
 			else
-				data |= *rdata;
+				data = *rdata | data;
 		}
-
+		pending_write_addr = addr;
+		pending_write_data = data;
+		// Actual write is applied at end of step() -- ordering is important
+		// e.g. for mcycle updates. However we validate address for
+		// writability immediately.
 		switch (addr) {
-			case CSR_MISA:                                            break;
-			case CSR_MHARTID:                                         break;
-			case CSR_MARCHID:                                         break;
-			case CSR_MIMPID:                                          break;
+			case CSR_MISA:          break;
+			case CSR_MHARTID:       break;
+			case CSR_MARCHID:       break;
+			case CSR_MIMPID:        break;
 
-			case CSR_MSTATUS:       mstatus  = data;                  break;
-			case CSR_MIE:           mie      = data;                  break;
-			case CSR_MIP:                                             break;
-			case CSR_MTVEC:         mtvec    = data & 0xfffffffdu;    break;
-			case CSR_MSCRATCH:      mscratch = data;                  break;
-			case CSR_MEPC:          mepc     = data & 0xfffffffeu;    break;
-			case CSR_MCAUSE:        mcause   = data & 0x8000000fu;    break;
-			case CSR_MTVAL:                                           break;
+			case CSR_MSTATUS:       break;
+			case CSR_MIE:           break;
+			case CSR_MIP:           break;
+			case CSR_MTVEC:         break;
+			case CSR_MSCRATCH:      break;
+			case CSR_MEPC:          break;
+			case CSR_MCAUSE:        break;
+			case CSR_MTVAL:         break;
 
-			case CSR_MCYCLE:        mcycle = data;                    break;
-			case CSR_MCYCLEH:       mcycleh = data;                   break;
-			case CSR_MINSTRET:      minstret = data;                  break;
-			case CSR_MINSTRETH:     minstreth = data;                 break;
-			case CSR_MCOUNTINHIBIT: mcountinhibit = data & 0x7u;      break;
-			default:             return false;
+			case CSR_MCYCLE:        break;
+			case CSR_MCYCLEH:       break;
+			case CSR_MINSTRET:      break;
+			case CSR_MINSTRETH:     break;
+			case CSR_MCOUNTINHIBIT: break;
+			default:                return false;
 		}
 		return true;
 	}
