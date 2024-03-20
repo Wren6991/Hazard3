@@ -365,7 +365,8 @@ struct RVCore {
 		OPC_BRANCH   = 0b11'000,
 		OPC_JALR     = 0b11'001,
 		OPC_JAL      = 0b11'011,
-		OPC_SYSTEM   = 0b11'100
+		OPC_SYSTEM   = 0b11'100,
+		OPC_CUSTOM0  = 0b00'010
 	};
 
 	void step(MemBase32 &mem, bool trace=false) {
@@ -776,6 +777,19 @@ struct RVCore {
 				}
 				break;
 			}
+
+		case OPC_CUSTOM0: {
+			if (RVOPC_MATCH(instr, H3_BEXTM)) {
+				uint size = GETBITS(instr, 28, 26) + 1;
+				rd_wdata = (rs1 >> (rs2 & 0x1f)) & ~(-1u << size);
+			} else if (RVOPC_MATCH(instr, H3_BEXTMI)) {
+				uint size = GETBITS(instr, 28, 26) + 1;
+				rd_wdata = (rs1 >> regnum_rs2) & ~(-1u << size);
+			} else {
+				exception_cause = XCAUSE_INSTR_ILLEGAL;
+			}
+			break;
+		}
 
 			default:
 				exception_cause = XCAUSE_INSTR_ILLEGAL;
