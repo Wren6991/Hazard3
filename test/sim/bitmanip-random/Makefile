@@ -19,7 +19,7 @@ define make-test-target
 	$(CROSS_PREFIX)objdump -d tmp/$1.elf >> tmp/$1.dis
 	$(CROSS_PREFIX)objdump -j .testdata -d tmp/$1.elf >> tmp/$1.dis
 	$(CROSS_PREFIX)objcopy -O binary tmp/$1.elf tmp/$1.bin
-	$(SIM_EXEC) --bin tmp/$1.bin --vcd tmp/$1.vcd --dump 0x400000 0x410000 > tmp/$1.log
+	$(SIM_EXEC) --cpuret --bin tmp/$1.bin --vcd tmp/$1.vcd --dump 0x400000 0x410000 > tmp/$1.log
 	../riscv-compliance/compare_testvec tmp/$1.log reference/$1.reference_output
 endef
 

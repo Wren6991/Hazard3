@@ -871,6 +871,8 @@ const char *help_str =
 "    --dump start end : Print out memory contents between start and end (exclusive)\n"
 "                       after execution finishes. Can be passed multiple times.\n"
 "    --cycles n       : Maximum number of cycles to run before exiting.\n"
+"    --cpuret         : Testbench's return code is the return code written to\n"
+"                       IO_EXIT by the CPU, or -1 if timed out.\n"
 "    --memsize n      : Memory size in units of 1024 bytes, default is 16 MB\n"
 "    --trace          : Print out execution tracing info\n"
 ;
@@ -890,6 +892,7 @@ int main(int argc, char **argv) {
 	bool load_bin = false;
 	std::string bin_path;
 	bool trace_execution = false;
+	bool propagate_return_code = false;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string s(argv[i]);
@@ -930,6 +933,9 @@ int main(int argc, char **argv) {
 		else if (s == "--trace") {
 			trace_execution = true;
 		}
+		else if (s == "--cpuret") {
+			propagate_return_code = true;
+		}
 		else {
 			std::cerr << "Unrecognised argument " << s << "\n";
 			exit_help("");
@@ -956,13 +962,18 @@ int main(int argc, char **argv) {
 	RVCore core;
 
 	int64_t cyc;
+	int rc = 0;
 	try {
 		for (cyc = 0; cyc < max_cycles; ++cyc)
 			core.step(mem, trace_execution);
+		if (propagate_return_code)
+			rc = -1;
 	}
 	catch (TBExitException e) {
 		printf("CPU requested halt. Exit code %d\n", e.exitcode);
 		printf("Ran for %ld cycles\n", cyc + 1);
+		if (propagate_return_code)
+			rc = e.exitcode;
 	}
 
 	for (auto [start, end] : dump_ranges) {
@@ -972,5 +983,5 @@ int main(int argc, char **argv) {
 		printf("\n");
 	}
 
-	return 0;
+	return rc;
 }

@@ -76,10 +76,20 @@ prolog = """
 #define IO_PRINT_U32  (IO_BASE + 0x4)
 #define IO_EXIT       (IO_BASE + 0x8)
 
+.section .vectors
+__initial_mtvec:
+	li a0, IO_EXIT
+	li a1, -1
+	sw a1, (a0)
+
 .section .text
 
 .global _start
 _start:
+	// Should be the initial value anyways, but just make sure:
+	la a0, __initial_mtvec
+	csrw mtvec, a0
+
 	la sp, test_signature_start
 
 """

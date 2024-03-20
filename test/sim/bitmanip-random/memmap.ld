@@ -11,6 +11,7 @@ ENTRY(_start)
 SECTIONS
 {
   .text : {
+    KEEP(*(.vectors))
     . = ORIGIN(RAM) + 0x40;
     PROVIDE (_start = .);
     *(.text*)
