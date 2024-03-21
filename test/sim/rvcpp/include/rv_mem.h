@@ -1,5 +1,4 @@
-#ifndef _RV_MEM_H
-#define _RV_MEM_H
+#pragma once
 
 #include "rv_types.h"
 #include <optional>
@@ -159,5 +158,3 @@ struct MemMap32: MemBase32 {
 			return false;
 	}
 };
-
-#endif
