@@ -1,15 +1,20 @@
-#ifndef _MEM_H
-#define _MEM_H
+#ifndef _RV_MEM_H
+#define _RV_MEM_H
 
 #include "rv_types.h"
+#include <optional>
+#include <tuple>
+#include <cassert>
+#include <vector>
+#include <cstdio>
 
 struct MemBase32 {
-	virtual uint8_t r8(ux_t addr) {return 0;}
-	virtual void w8(ux_t addr, uint8_t data) {}
-	virtual uint16_t r16(ux_t addr) {return 0;}
-	virtual void w16(ux_t addr, uint16_t data) {}
-	virtual uint32_t r32(ux_t addr) {return 0;}
-	virtual void w32(ux_t addr, uint32_t data) {}
+	virtual std::optional<uint8_t> r8(__attribute__((unused)) ux_t addr) {return std::nullopt;}
+	virtual bool w8(__attribute__((unused)) ux_t addr, __attribute__((unused)) uint8_t data) {return false;}
+	virtual std::optional<uint16_t> r16(__attribute__((unused)) ux_t addr) {return std::nullopt;}
+	virtual bool w16(__attribute__((unused)) ux_t addr, __attribute__((unused)) uint16_t data) {return false;}
+	virtual std::optional<uint32_t> r32(__attribute__((unused)) ux_t addr) {return std::nullopt;}
+	virtual bool w32(__attribute__((unused)) ux_t addr, __attribute__((unused)) uint32_t data) {return false;}
 };
 
 struct FlatMem32: MemBase32 {
@@ -28,40 +33,43 @@ struct FlatMem32: MemBase32 {
 		delete mem;
 	}
 
-	virtual uint8_t r8(ux_t addr) {
+	virtual std::optional<uint8_t> r8(ux_t addr) {
 		assert(addr < size);
 		return mem[addr >> 2] >> 8 * (addr & 0x3) & 0xffu;
 	}
 
-	virtual void w8(ux_t addr, uint8_t data) {
+	virtual bool w8(ux_t addr, uint8_t data) {
 		assert(addr < size);
 		mem[addr >> 2] &= ~(0xffu << 8 * (addr & 0x3));
 		mem[addr >> 2] |= (uint32_t)data << 8 * (addr & 0x3);
+		return true;
 	}
 
-	virtual uint16_t r16(ux_t addr) {
+	virtual std::optional<uint16_t> r16(ux_t addr) {
 		assert(addr < size && addr + 1 < size); // careful of ~0u
 		assert(addr % 2 == 0);
 		return mem[addr >> 2] >> 8 * (addr & 0x2) & 0xffffu;
 	}
 
-	virtual void w16(ux_t addr, uint16_t data) {
+	virtual bool w16(ux_t addr, uint16_t data) {
 		assert(addr < size && addr + 1 < size);
 		assert(addr % 2 == 0);
 		mem[addr >> 2] &= ~(0xffffu << 8 * (addr & 0x2));
 		mem[addr >> 2] |= (uint32_t)data << 8 * (addr & 0x2);
+		return true;
 	}
 
-	virtual uint32_t r32(ux_t addr) {
+	virtual std::optional<uint32_t> r32(ux_t addr) {
 		assert(addr < size && addr + 3 < size);
 		assert(addr % 4 == 0);
 		return mem[addr >> 2];
 	}
 
-	virtual void w32(ux_t addr, uint32_t data) {
+	virtual bool w32(ux_t addr, uint32_t data) {
 		assert(addr < size && addr + 3 < size);
 		assert(addr % 4 == 0);
 		mem[addr >> 2] = data;
+		return true;
 	}
 };
 
@@ -71,17 +79,19 @@ struct TBExitException {
 };
 
 struct TBMemIO: MemBase32 {
-	virtual void w32(ux_t addr, uint32_t data) {
+	virtual bool w32(ux_t addr, uint32_t data) {
 		switch (addr) {
 		case 0x0:
 			printf("%c", (char)data);
-			break;
+			return true;
 		case 0x4:
 			printf("%08x\n", data);
-			break;
+			return true;
 		case 0x8:
 			throw TBExitException(data);
-			break;
+			return true;
+		default:
+			return false;
 		}
 	}
 };
@@ -98,38 +108,55 @@ struct MemMap32: MemBase32 {
 			if (addr >= base && addr < base + size)
 				return std::make_tuple(addr - base, mem);
 		}
-		throw;
+		return std::make_tuple(addr, nullptr);
 	}
 
-	// perhaps some templatey-ness required
-	virtual uint8_t r8(ux_t addr) {
+	virtual std::optional<uint8_t> r8(ux_t addr) {
 		auto [offset, mem] = map_addr(addr);
-		return mem->r8(offset);
+		if (mem)
+			return mem->r8(offset);
+		else
+			return std::nullopt;
 	}
 
-	virtual void w8(ux_t addr, uint8_t data) {
+	virtual bool w8(ux_t addr, uint8_t data) {
 		auto [offset, mem] = map_addr(addr);
-		mem->w8(offset, data);
+		if (mem)
+			return mem->w8(offset, data);
+		else
+			return false;
 	}
 
-	virtual uint16_t r16(ux_t addr) {
+	virtual std::optional<uint16_t> r16(ux_t addr) {
 		auto [offset, mem] = map_addr(addr);
-		return mem->r16(offset);
+		if (mem)
+			return mem->r16(offset);
+		else
+			return std::nullopt;
 	}
 
-	virtual void w16(ux_t addr, uint16_t data) {
+	virtual bool w16(ux_t addr, uint16_t data) {
 		auto [offset, mem] = map_addr(addr);
-		mem->w16(offset, data);
+		if (mem)
+			return mem->w16(offset, data);
+		else
+			return false;
 	}
 
-	virtual uint32_t r32(ux_t addr) {
+	virtual std::optional<uint32_t> r32(ux_t addr) {
 		auto [offset, mem] = map_addr(addr);
-		return mem->r32(offset);
+		if (mem)
+			return mem->r32(offset);
+		else
+			return std::nullopt;
 	}
 
-	virtual void w32(ux_t addr, uint32_t data) {
+	virtual bool w32(ux_t addr, uint32_t data) {
 		auto [offset, mem] = map_addr(addr);
-		mem->w32(offset, data);
+		if (mem)
+			return mem->w32(offset, data);
+		else
+			return false;
 	}
 };
 

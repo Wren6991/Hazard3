@@ -26,6 +26,11 @@
 // - Zcmp
 // - M-mode traps
 
+#define RAM_SIZE_DEFAULT (16u * (1u << 20))
+#define RAM_BASE         0u
+#define IO_BASE          0x80000000u
+#define TBIO_BASE        (IO_BASE + 0x0000)
+
 // Use unsigned arithmetic everywhere, with explicit sign extension as required.
 static inline ux_t sext(ux_t bits, int sign_bit) {
 	if (sign_bit >= XLEN - 1)
@@ -346,11 +351,34 @@ struct RVCore {
 	ux_t pc;
 	RVCSR csr;
 	bool load_reserved;
+	MemBase32 &mem;
 
-	RVCore(ux_t reset_vector=0x40) {
+	// A single flat RAM is handled as a special case, in addition to whatever
+	// is in `mem`, because this avoids virtual calls for the majority of
+	// memory accesses. This RAM takes precedence over whatever is mapped at
+	// the same address in `mem`. (Note the size of this RAM may be zero, and
+	// RAM can also be added to the `mem` object.)
+	ux_t *ram;
+	ux_t ram_base;
+	ux_t ram_top;
+
+	RVCore(MemBase32 &_mem, ux_t reset_vector, ux_t ram_base_, ux_t ram_size_) : mem(_mem) {
 		std::fill(std::begin(regs), std::end(regs), 0);
 		pc = reset_vector;
 		load_reserved = false;
+		ram_base = ram_base_;
+		ram_top = ram_base_ + ram_size_;
+		ram = new ux_t[ram_size_ / sizeof(ux_t)];
+		assert(ram);
+		assert(!(ram_base_ & 0x3));
+		assert(!(ram_size_ & 0x3));
+		assert(ram_base_ + ram_size_ >= ram_base_);
+		for (ux_t i = 0; i < ram_size_ / sizeof(ux_t); ++i)
+			ram[i] = 0;
+	}
+
+	~RVCore() {
+		delete ram;
 	}
 
 	enum {
@@ -369,18 +397,78 @@ struct RVCore {
 		OPC_CUSTOM0  = 0b00'010
 	};
 
-	void step(MemBase32 &mem, bool trace=false) {
-		uint32_t instr = mem.r16(pc) | (mem.r16(pc + 2) << 16);
+	// Functions to read/write memory from this hart's point of view
+	std::optional<uint8_t> r8(ux_t addr) {
+		if (addr >= ram_base && addr < ram_top) {
+			return ram[(addr - ram_base) >> 2] >> 8 * (addr & 0x3) & 0xffu;
+		} else {
+			return mem.r8(addr);
+		}
+	}
+
+	bool w8(ux_t addr, uint8_t data) {
+		if (addr >= ram_base && addr < ram_top) {
+			ram[(addr - ram_base) >> 2] &= ~(0xffu << 8 * (addr & 0x3));
+			ram[(addr - ram_base) >> 2] |= (uint32_t)data << 8 * (addr & 0x3);
+			return true;
+		} else {
+			return mem.w8(addr, data);
+		}
+	}
+
+	std::optional<uint16_t> r16(ux_t addr) {
+		if (addr >= ram_base && addr < ram_top) {
+			return ram[(addr - ram_base) >> 2] >> 8 * (addr & 0x2) & 0xffffu;
+		} else {
+			return mem.r16(addr);
+		}
+	}
+
+	bool w16(ux_t addr, uint16_t data) {
+		if (addr >= ram_base && addr < ram_top) {
+			ram[(addr - ram_base) >> 2] &= ~(0xffffu << 8 * (addr & 0x2));
+			ram[(addr - ram_base) >> 2] |= (uint32_t)data << 8 * (addr & 0x2);
+			return true;
+		} else {
+			return mem.w16(addr, data);
+		}
+	}
+
+	std::optional<uint32_t> r32(ux_t addr) {
+		if (addr >= ram_base && addr < ram_top) {
+			return ram[(addr - ram_base) >> 2];
+		} else {
+			return mem.r32(addr);
+		}
+	}
+
+	bool w32(ux_t addr, uint32_t data) {
+		if (addr >= ram_base && addr < ram_top) {
+			ram[(addr - ram_base) >> 2] = data;
+			return true;
+		} else {
+			return mem.w32(addr, data);
+		}
+	}
+
+	// Fetch and execute one instruction from memory.
+	void step(bool trace=false) {
 		std::optional<ux_t> rd_wdata;
 		std::optional<ux_t> pc_wdata;
-		uint regnum_rd = 0;
 		std::optional<uint> exception_cause;
+		uint regnum_rd = 0;
+
+		std::optional<uint16_t> fetch0 = r16(pc);
+		std::optional<uint16_t> fetch1 = r16(pc + 2);
+		uint32_t instr = *fetch0 | ((uint32_t)*fetch1 << 16);
 
 		uint opc = instr >> 2 & 0x1f;
 		uint funct3 = instr >> 12 & 0x7;
 		uint funct7 = instr >> 25 & 0x7f;
 
-		if ((instr & 0x3) == 0x3) {
+		if (!fetch0 || ((*fetch0 & 0x3) == 0x3 && !fetch1)) {
+			exception_cause = XCAUSE_INSTR_FAULT;
+		} else if ((instr & 0x3) == 0x3) {
 			// 32-bit instruction
 			uint regnum_rs1 = instr >> 15 & 0x1f;
 			uint regnum_rs2 = instr >> 20 & 0x1f;
@@ -614,47 +702,67 @@ struct RVCore {
 
 			case OPC_LOAD: {
 				ux_t load_addr = rs1 + imm_i(instr);
-				if (funct3 == 0b000) {
-					rd_wdata = sext(mem.r8(load_addr), 7);
-				} else if (funct3 == 0b001) {
-					if (load_addr & 0x1)
-						exception_cause = XCAUSE_LOAD_ALIGN;
-					else
-						rd_wdata = sext(mem.r16(load_addr), 15);
-				} else if (funct3 == 0b010) {
-					if (load_addr & 0x3)
-						exception_cause = XCAUSE_LOAD_ALIGN;
-					else
-						rd_wdata = mem.r32(load_addr);
-				} else if (funct3 == 0b100) {
-					rd_wdata = mem.r8(load_addr);
-				} else if (funct3 == 0b101) {
-					if (load_addr & 0x1)
-						exception_cause = XCAUSE_LOAD_ALIGN;
-					else
-						rd_wdata = mem.r16(load_addr);
-				} else {
+				ux_t align_mask = ~(-1u << (funct3 & 0x3));
+				bool misalign = load_addr & align_mask;
+				if (funct3 == 0b011 || funct3 > 0b101) {
 					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				} else if (misalign) {
+					exception_cause = XCAUSE_LOAD_ALIGN;
+				} else if (funct3 == 0b000) {
+					rd_wdata = r8(load_addr);
+					if (rd_wdata) {
+						rd_wdata = sext(*rd_wdata, 7);
+					} else {
+						exception_cause = XCAUSE_LOAD_FAULT;
+					}
+				} else if (funct3 == 0b001) {
+					rd_wdata = r16(load_addr);
+					if (rd_wdata) {
+						rd_wdata = sext(*rd_wdata, 15);
+					} else {
+						exception_cause = XCAUSE_LOAD_FAULT;
+					}
+				} else if (funct3 == 0b010) {
+					rd_wdata = r32(load_addr);
+					if (!rd_wdata) {
+						exception_cause = XCAUSE_LOAD_FAULT;
+					}
+				} else if (funct3 == 0b100) {
+					rd_wdata = r8(load_addr);
+					if (!rd_wdata) {
+						exception_cause = XCAUSE_LOAD_FAULT;
+					}
+				} else if (funct3 == 0b101) {
+					rd_wdata = r16(load_addr);
+					if (!rd_wdata) {
+						exception_cause = XCAUSE_LOAD_FAULT;
+					}
 				}
 				break;
 			}
 
 			case OPC_STORE: {
 				ux_t store_addr = rs1 + imm_s(instr);
-				if (funct3 == 0b000) {
-					mem.w8(store_addr, rs2 & 0xffu);
-				} else if (funct3 == 0b001) {
-					if (store_addr & 0x1)
-						exception_cause = XCAUSE_STORE_ALIGN;
-					else
-						mem.w16(store_addr, rs2 & 0xffffu);
-				} else if (funct3 == 0b010) {
-					if (store_addr & 0x3)
-						exception_cause = XCAUSE_STORE_ALIGN;
-					else
-						mem.w32(store_addr, rs2);
-				} else {
+				ux_t align_mask = ~(-1u << (funct3 & 0x3));
+				bool misalign = store_addr & align_mask;
+				if (funct3 > 0b010) {
 					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				} else if (misalign) {
+					exception_cause = XCAUSE_STORE_ALIGN;
+				} else {
+					if (funct3 == 0b000) {
+						if (!w8(store_addr, rs2 & 0xffu)) {
+							exception_cause = XCAUSE_STORE_FAULT;
+						}
+					} else if (funct3 == 0b001) {
+						if (!w16(store_addr, rs2 & 0xffffu)) {
+							exception_cause = XCAUSE_STORE_FAULT;
+						}
+					} else if (funct3 == 0b010) {
+						if (!w32(store_addr, rs2)) {
+							exception_cause = XCAUSE_STORE_FAULT;
+						}
+					}
 				}
 				break;
 			}
@@ -664,8 +772,12 @@ struct RVCore {
 					if (rs1 & 0x3) {
 						exception_cause = XCAUSE_LOAD_ALIGN;
 					} else {
-						rd_wdata = mem.r32(rs1);
-						load_reserved = true;
+						rd_wdata = r32(rs1);
+						if (rd_wdata) {
+							load_reserved = true;
+						} else {
+							exception_cause = XCAUSE_LOAD_FAULT;
+						}
 					}
 				} else if (RVOPC_MATCH(instr, SC_W)) {
 					if (rs1 & 0x3) {
@@ -673,20 +785,15 @@ struct RVCore {
 					} else {
 						if (load_reserved) {
 							load_reserved = false;
-							mem.w32(rs1, rs2);
-							rd_wdata = 0;
+							if (w32(rs1, rs2)) {
+								rd_wdata = 0;
+							} else {
+								exception_cause = XCAUSE_STORE_FAULT;
+							}
 						} else {
 							rd_wdata = 1;
 						}
 					}
-				} else if (RVOPC_MATCH(instr, AMOSWAP_W)) {
-					if (rs1 & 0x3) {
-						exception_cause = XCAUSE_STORE_ALIGN;
-					} else {
-						rd_wdata = mem.r32(rs1);
-						mem.w32(rs1, rs2);
-					}
-
 				} else if (
 						RVOPC_MATCH(instr, AMOSWAP_W) ||
 						RVOPC_MATCH(instr, AMOADD_W) ||
@@ -700,18 +807,27 @@ struct RVCore {
 					if (rs1 & 0x3) {
 						exception_cause = XCAUSE_STORE_ALIGN;
 					} else {
-						rd_wdata = mem.r32(rs1);
-						switch (instr & RVOPC_AMOSWAP_W_MASK) {
-							case RVOPC_AMOSWAP_W_BITS: mem.w32(rs1, *rd_wdata);                                      break;
-							case RVOPC_AMOADD_W_BITS:  mem.w32(rs1, *rd_wdata + rs2);                                break;
-							case RVOPC_AMOXOR_W_BITS:  mem.w32(rs1, *rd_wdata ^ rs2);                                break;
-							case RVOPC_AMOAND_W_BITS:  mem.w32(rs1, *rd_wdata & rs2);                                break;
-							case RVOPC_AMOOR_W_BITS:   mem.w32(rs1, *rd_wdata | rs2);                                break;
-							case RVOPC_AMOMIN_W_BITS:  mem.w32(rs1, (sx_t)*rd_wdata < (sx_t)rs2 ? *rd_wdata : rs2);  break;
-							case RVOPC_AMOMAX_W_BITS:  mem.w32(rs1, (sx_t)*rd_wdata > (sx_t)rs2 ? *rd_wdata : rs2);  break;
-							case RVOPC_AMOMINU_W_BITS: mem.w32(rs1, *rd_wdata < rs2 ? *rd_wdata : rs2);              break;
-							case RVOPC_AMOMAXU_W_BITS: mem.w32(rs1, *rd_wdata > rs2 ? *rd_wdata : rs2);              break;
-							default:                   assert(false);                                                break;
+						rd_wdata = r32(rs1);
+						if (!rd_wdata) {
+							exception_cause = XCAUSE_STORE_FAULT; // Yes, AMO/Store
+						} else {
+							bool write_success = false;
+							switch (instr & RVOPC_AMOSWAP_W_MASK) {
+								case RVOPC_AMOSWAP_W_BITS: write_success = w32(rs1, rs2);                                            break;
+								case RVOPC_AMOADD_W_BITS:  write_success = w32(rs1, *rd_wdata + rs2);                                break;
+								case RVOPC_AMOXOR_W_BITS:  write_success = w32(rs1, *rd_wdata ^ rs2);                                break;
+								case RVOPC_AMOAND_W_BITS:  write_success = w32(rs1, *rd_wdata & rs2);                                break;
+								case RVOPC_AMOOR_W_BITS:   write_success = w32(rs1, *rd_wdata | rs2);                                break;
+								case RVOPC_AMOMIN_W_BITS:  write_success = w32(rs1, (sx_t)*rd_wdata < (sx_t)rs2 ? *rd_wdata : rs2);  break;
+								case RVOPC_AMOMAX_W_BITS:  write_success = w32(rs1, (sx_t)*rd_wdata > (sx_t)rs2 ? *rd_wdata : rs2);  break;
+								case RVOPC_AMOMINU_W_BITS: write_success = w32(rs1, *rd_wdata < rs2 ? *rd_wdata : rs2);              break;
+								case RVOPC_AMOMAXU_W_BITS: write_success = w32(rs1, *rd_wdata > rs2 ? *rd_wdata : rs2);              break;
+								default:                   assert(false);                                                break;
+							}
+							if (!write_success) {
+								exception_cause = XCAUSE_STORE_FAULT;
+								rd_wdata = {};
+							}
 						}
 					}
 				} else {
@@ -812,13 +928,18 @@ struct RVCore {
 					+ (GETBIT(instr, 6) << 2)
 					+ (GETBITS(instr, 12, 10) << 3)
 					+ (GETBIT(instr, 5) << 6);
-				rd_wdata = mem.r32(addr);
+				rd_wdata = r32(addr);
+				if (!rd_wdata) {
+					exception_cause = XCAUSE_LOAD_FAULT;
+				}
 			} else if (RVOPC_MATCH(instr, C_SW)) {
 				uint32_t addr = regs[c_rs1_s(instr)]
 					+ (GETBIT(instr, 6) << 2)
 					+ (GETBITS(instr, 12, 10) << 3)
 					+ (GETBIT(instr, 5) << 6);
-				mem.w32(addr, regs[c_rs2_s(instr)]);
+				if (!w32(addr, regs[c_rs2_s(instr)])) {
+					exception_cause = XCAUSE_STORE_FAULT;
+				}
 			} else {
 				exception_cause = XCAUSE_INSTR_ILLEGAL;
 			}
@@ -916,39 +1037,58 @@ struct RVCore {
 					+ (GETBIT(instr, 12) << 5)
 					+ (GETBITS(instr, 6, 4) << 2)
 					+ (GETBITS(instr, 3, 2) << 6);
-				rd_wdata = mem.r32(addr);
+				rd_wdata = r32(addr);
+				if (!rd_wdata) {
+					exception_cause = XCAUSE_LOAD_FAULT;
+				}
 			} else if (RVOPC_MATCH(instr, C_SWSP)) {
 				ux_t addr = regs[2]
 					+ (GETBITS(instr, 12, 9) << 2)
 					+ (GETBITS(instr, 8, 7) << 6);
-				mem.w32(addr, regs[c_rs2_l(instr)]);
+				if (!w32(addr, regs[c_rs2_l(instr)])) {
+					exception_cause = XCAUSE_STORE_FAULT;
+				}
 			// Zcmp:
 			} else if (RVOPC_MATCH(instr, CM_PUSH)) {
 				ux_t addr = regs[2];
-				for (uint i = 31; i > 0; --i) {
+				bool fail = false;
+				for (uint i = 31; i > 0 && !fail; --i) {
 					if (zcmp_reg_mask(instr) & (1u << i)) {
 						addr -= 4;
-						mem.w32(addr, regs[i]);
+						fail = fail || !w32(addr, regs[i]);
 					}
 				}
-				regnum_rd = 2;
-				rd_wdata = regs[2] - zcmp_stack_adj(instr);
+				if (fail) {
+					exception_cause = XCAUSE_STORE_FAULT;
+				} else {
+					regnum_rd = 2;
+					rd_wdata = regs[2] - zcmp_stack_adj(instr);
+				}
 			} else if (RVOPC_MATCH(instr, CM_POP) || RVOPC_MATCH(instr, CM_POPRET) || RVOPC_MATCH(instr, CM_POPRETZ)) {
 				bool clear_a0 = RVOPC_MATCH(instr, CM_POPRETZ);
 				bool ret = clear_a0 || RVOPC_MATCH(instr, CM_POPRET);
 				ux_t addr = regs[2] + zcmp_stack_adj(instr);
-				for (uint i = 31; i > 0; --i) {
+				bool fail = false;
+				for (uint i = 31; i > 0 && !fail; --i) {
 					if (zcmp_reg_mask(instr) & (1u << i)) {
 						addr -= 4;
-						regs[i] = mem.r32(addr);
+						std::optional<ux_t> load_result = r32(addr);
+						fail = fail || !load_result;
+						if (load_result) {
+							regs[i] = *load_result;
+						}
 					}
 				}
-				if (clear_a0)
-					regs[10] = 0;
-				if (ret)
-					pc_wdata = regs[1];
-				regnum_rd = 2;
-				rd_wdata = regs[2] + zcmp_stack_adj(instr);
+				if (fail) {
+					exception_cause = XCAUSE_LOAD_FAULT;
+				} else {
+					if (clear_a0)
+						regs[10] = 0;
+					if (ret)
+						pc_wdata = regs[1];
+					regnum_rd = 2;
+					rd_wdata = regs[2] + zcmp_stack_adj(instr);
+				}
 			} else if (RVOPC_MATCH(instr, CM_MVSA01)) {
 				regs[zcmp_s_mapping(GETBITS(instr, 9, 7))] = regs[10];
 				regs[zcmp_s_mapping(GETBITS(instr, 4, 2))] = regs[11];
@@ -1008,7 +1148,7 @@ const char *help_str =
 "    --cycles n       : Maximum number of cycles to run before exiting.\n"
 "    --cpuret         : Testbench's return code is the return code written to\n"
 "                       IO_EXIT by the CPU, or -1 if timed out.\n"
-"    --memsize n      : Memory size in units of 1024 bytes, default is 16 MB\n"
+"    --memsize n      : Memory size in units of 1024 bytes, default is 16 MiB\n"
 "    --trace          : Print out execution tracing info\n"
 ;
 
@@ -1023,7 +1163,7 @@ int main(int argc, char **argv) {
 
 	std::vector<std::tuple<uint32_t, uint32_t>> dump_ranges;
 	int64_t max_cycles = 100000;
-	uint32_t ramsize = 16 * (1 << 20);
+	uint32_t ram_size = RAM_SIZE_DEFAULT;
 	bool load_bin = false;
 	std::string bin_path;
 	bool trace_execution = false;
@@ -1062,7 +1202,7 @@ int main(int argc, char **argv) {
 		else if (s == "--memsize") {
 			if (argc - i < 2)
 				exit_help("Option --memsize requires an argument\n");
-			ramsize = 1024 * std::stol(argv[i + 1], 0, 0);
+			ram_size = 1024 * std::stol(argv[i + 1], 0, 0);
 			i += 1;
 		}
 		else if (s == "--trace") {
@@ -1077,30 +1217,28 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	FlatMem32 ram(ramsize);
 	TBMemIO io;
 	MemMap32 mem;
-	mem.add(0, ramsize, &ram);
 	mem.add(0x80000000u, 12, &io);
+
+	RVCore core(mem, RAM_BASE + 0x40, RAM_BASE, ram_size);
 
 	if (load_bin) {
 		std::ifstream fd(bin_path, std::ios::binary | std::ios::ate);
 		std::streamsize bin_size = fd.tellg();
-		if (bin_size > ramsize) {
-			std::cerr << "Binary file (" << bin_size << " bytes) is larger than memory (" << ramsize << " bytes)\n";
+		if (bin_size > ram_size) {
+			std::cerr << "Binary file (" << bin_size << " bytes) is larger than memory (" << ram_size << " bytes)\n";
 			return -1;
 		}
 		fd.seekg(0, std::ios::beg);
-		fd.read((char*)ram.mem, bin_size);
+		fd.read((char*)core.ram, bin_size);
 	}
-
-	RVCore core;
 
 	int64_t cyc;
 	int rc = 0;
 	try {
 		for (cyc = 0; cyc < max_cycles; ++cyc)
-			core.step(mem, trace_execution);
+			core.step(trace_execution);
 		if (propagate_return_code)
 			rc = -1;
 	}
@@ -1114,7 +1252,7 @@ int main(int argc, char **argv) {
 	for (auto [start, end] : dump_ranges) {
 		printf("Dumping memory from %08x to %08x:\n", start, end);
 		for (uint32_t i = 0; i < end - start; ++i)
-			printf("%02x%c", mem.r8(start + i), i % 16 == 15 ? '\n' : ' ');
+			printf("%02x%c", *core.r8(start + i), i % 16 == 15 ? '\n' : ' ');
 		printf("\n");
 	}
 
