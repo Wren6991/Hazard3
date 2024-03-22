@@ -106,9 +106,9 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	TBMemIO io;
+	TBMemIO io(trace_execution);
 	MemMap32 mem;
-	mem.add(0x80000000u, 12, &io);
+	mem.add(0x80000000u, 0x1000, &io);
 
 	RVCore core(mem, RAM_BASE + 0x40, RAM_BASE, ram_size);
 
@@ -126,8 +126,12 @@ int main(int argc, char **argv) {
 	int64_t cyc;
 	int rc = 0;
 	try {
-		for (cyc = 0; cyc < max_cycles; ++cyc)
+		for (cyc = 0; cyc < max_cycles; ++cyc) {
 			core.step(trace_execution);
+			io.step();
+			core.csr.set_irq_t(io.timer_irq_pending());
+			core.csr.set_irq_s(io.soft_irq_pending());
+		}
 		if (propagate_return_code)
 			rc = -1;
 	}

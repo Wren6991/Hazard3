@@ -9,6 +9,14 @@
 #define GETBITS(x, msb, lsb) (((x) & BITRANGE(msb, lsb)) >> (lsb))
 #define GETBIT(x, bit) (((x) >> (bit)) & 1u)
 
+
+ux_t RVCSR::get_effective_xip() {
+	return mip |
+		(irq_s ? MIP_MSIP : 0) |
+		(irq_t ? MIP_MTIP : 0) |
+		(irq_e ? MIP_MEIP : 0);
+}
+
 void RVCSR::step() {
 	uint64_t mcycle_64 = ((uint64_t)mcycleh << 32) | mcycle;
 	uint64_t minstret_64 = ((uint64_t)minstreth << 32) | minstret;
@@ -66,7 +74,7 @@ std::optional<ux_t> RVCSR::read(uint16_t addr, bool side_effect) {
 
 		case CSR_MSTATUS:       return mstatus;
 		case CSR_MIE:           return mie;
-		case CSR_MIP:           return mip;
+		case CSR_MIP:           return get_effective_xip();
 		case CSR_MTVEC:         return mtvec;
 		case CSR_MSCRATCH:      return mscratch;
 		case CSR_MEPC:          return mepc;
@@ -126,6 +134,23 @@ bool RVCSR::write(uint16_t addr, ux_t data, uint op) {
 	return true;
 }
 
+ux_t RVCSR::trap_enter_exception(uint xcause, ux_t xepc) {
+	assert(xcause < 32);
+	assert(!pending_write_addr);
+	return trap_enter(xcause, xepc);
+}
+
+std::optional<ux_t> RVCSR::trap_check_enter_irq(ux_t xepc) {
+	ux_t m_targeted_irqs = get_effective_xip() & mie;
+	bool take_m_irq = m_targeted_irqs && ((mstatus & MSTATUS_MIE) || priv < PRV_M);
+	if (take_m_irq) {
+		ux_t cause = (1u << 31) | __builtin_ctz(m_targeted_irqs);
+		return trap_enter(cause, xepc);
+	} else {
+		return std::nullopt;
+	}
+}
+
 // Update trap state (including change of privilege level), return trap target PC
 ux_t RVCSR::trap_enter(uint xcause, ux_t xepc) {
 	mstatus = (mstatus & ~MSTATUS_MPP) | (priv << 11);
@@ -147,6 +172,9 @@ ux_t RVCSR::trap_enter(uint xcause, ux_t xepc) {
 // Update trap state, return mepc:
 ux_t RVCSR::trap_mret() {
 	priv = GETBITS(mstatus, 12, 11);
+	mstatus &= ~MSTATUS_MPP;
+	if (priv != PRV_M)
+		mstatus &= ~MSTATUS_MPRV;
 
 	if (mstatus & MSTATUS_MPIE)
 		mstatus |= MSTATUS_MIE;

@@ -78,21 +78,104 @@ struct TBExitException {
 };
 
 struct TBMemIO: MemBase32 {
+
+	enum {
+		IO_PRINT_CHAR  = 0x000,
+		IO_PRINT_U32   = 0x004,
+		IO_EXIT        = 0x008,
+		IO_SET_SOFTIRQ = 0x010,
+		IO_CLR_SOFTIRQ = 0x014,
+		IO_GLOBMON_EN  = 0x018,
+		IO_SET_IRQ     = 0x020,
+		IO_CLR_IRQ     = 0x030,
+		IO_MTIME       = 0x100,
+		IO_MTIMEH      = 0x104,
+		IO_MTIMECMP    = 0x108,
+		IO_MTIMECMPH   = 0x10c,
+	};
+
+	uint64_t mtime;
+	uint64_t mtimecmp;
+	bool softirq;
+	bool trace;
+
+	TBMemIO(bool trace_) {
+		mtime = 0;
+		mtimecmp = 0; // -1 would be better, but match tb and tests
+		softirq = false;
+		trace = trace_;
+	}
+
 	virtual bool w32(ux_t addr, uint32_t data) {
 		switch (addr) {
-		case 0x0:
-			printf("%c", (char)data);
+		case IO_PRINT_CHAR:
+			if (trace)
+				printf("IO_PRINT_CHAR: %c\n", (char)data);
+			else
+				printf("%c", (char)data);
 			return true;
-		case 0x4:
-			printf("%08x\n", data);
+		case IO_PRINT_U32:
+			if (trace)
+				printf("IO_PRINT_U32: %08x\n", data);
+			else
+				printf("%08x\n", data);
 			return true;
-		case 0x8:
+		case IO_EXIT:
 			throw TBExitException(data);
+			return true;
+		case IO_SET_SOFTIRQ:
+			softirq = softirq || (data & 0x1);
+			return true;
+		case IO_CLR_SOFTIRQ:
+			softirq = softirq && !(data & 0x1);
+			return true;
+		case IO_MTIME:
+			mtime = (mtime & 0xffffffff00000000ull) | data;
+			return true;
+		case IO_MTIMEH:
+			mtime = (mtime & 0x00000000ffffffffull) | ((uint64_t)data << 32);
+			return true;
+		case IO_MTIMECMP:
+			mtimecmp = (mtimecmp & 0xffffffff00000000ull) | data;
+			return true;
+		case IO_MTIMECMPH:
+			mtimecmp = (mtimecmp & 0x00000000ffffffffull) | ((uint64_t)data << 32);
 			return true;
 		default:
 			return false;
 		}
 	}
+
+	virtual std::optional<uint32_t> r32(ux_t addr) {
+		switch(addr) {
+		case IO_MTIME:
+			return mtime & 0xffffffffull;
+		case IO_MTIMEH:
+			return mtime >> 32;
+		case IO_MTIMECMP:
+			return mtimecmp & 0xffffffffull;
+		case IO_MTIMECMPH:
+			return mtimecmp >> 32;
+		case IO_SET_SOFTIRQ:
+		case IO_CLR_SOFTIRQ:
+			return softirq;
+		default:
+			return {};
+		}
+	}
+
+	void step() {
+		mtime++;
+	}
+
+	bool timer_irq_pending() {
+		return mtime >= mtimecmp;
+	}
+
+	bool soft_irq_pending() {
+		return softirq;
+	}
+
 };
 
 struct MemMap32: MemBase32 {

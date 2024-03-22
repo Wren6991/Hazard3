@@ -131,6 +131,10 @@ void RVCore::step(bool trace) {
 	std::optional<uint> exception_cause;
 	uint regnum_rd = 0;
 
+	std::optional<ux_t> trace_csr_addr;
+	std::optional<ux_t> trace_csr_result;
+	std::optional<uint> trace_priv;
+
 	std::optional<uint16_t> fetch0 = r16(pc);
 	std::optional<uint16_t> fetch1 = r16(pc + 2);
 	uint32_t instr = *fetch0 | ((uint32_t)*fetch1 << 16);
@@ -139,7 +143,10 @@ void RVCore::step(bool trace) {
 	uint funct3 = instr >> 12 & 0x7;
 	uint funct7 = instr >> 25 & 0x7f;
 
-	if (!fetch0 || ((*fetch0 & 0x3) == 0x3 && !fetch1)) {
+	std::optional<ux_t> irq_target_pc = csr.trap_check_enter_irq(pc);
+	if (irq_target_pc) {
+		// Replace current instruction with IRQ entry
+	} else if (!fetch0 || ((*fetch0 & 0x3) == 0x3 && !fetch1)) {
 		exception_cause = XCAUSE_INSTR_FAULT;
 	} else if ((instr & 0x3) == 0x3) {
 		// 32-bit instruction
@@ -547,18 +554,33 @@ void RVCore::step(bool trace) {
 			else if (funct3 >= 0b101 && funct3 <= 0b111) {
 				// csrrwi, csrrsi, csrrci
 				uint write_op = funct3 - 0b101;
-				if (write_op != RVCSR::WRITE || regnum_rd != 0)
+				if (write_op != RVCSR::WRITE || regnum_rd != 0) {
 					rd_wdata = csr.read(csr_addr);
-				if (write_op == RVCSR::WRITE || regnum_rs1 != 0)
-					csr.write(csr_addr, regnum_rs1, write_op);
+					if (!rd_wdata) {
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
+					}
+					if (trace && !exception_cause) {
+						trace_csr_addr = csr_addr;
+					}
+				}
+				if (write_op == RVCSR::WRITE || regnum_rs1 != 0) {
+					if (!csr.write(csr_addr, regnum_rs1, write_op)) {
+						exception_cause = XCAUSE_INSTR_ILLEGAL;
+					}
+					if (trace && !exception_cause) {
+						trace_csr_addr = csr_addr;
+						trace_csr_result = csr.read(csr_addr, false);
+					}
+				}
 			} else if (RVOPC_MATCH(instr, MRET)) {
-				if (csr.getpriv() == PRV_M) {
+				if (csr.get_true_priv() == PRV_M) {
 					pc_wdata = csr.trap_mret();
+					trace_priv = csr.get_true_priv();
 				} else {
 					exception_cause = XCAUSE_INSTR_ILLEGAL;
 				}
 			} else if (RVOPC_MATCH(instr, ECALL)) {
-				exception_cause = XCAUSE_ECALL_U + csr.getpriv();
+				exception_cause = XCAUSE_ECALL_U + csr.get_true_priv();
 			} else if (RVOPC_MATCH(instr, EBREAK)) {
 				exception_cause = XCAUSE_EBREAK;
 			} else {
@@ -774,30 +796,49 @@ void RVCore::step(bool trace) {
 	}
 
 
-	if (trace) {
+	if (trace && !irq_target_pc) {
 		printf("%08x: ", pc);
 		if ((instr & 0x3) == 0x3) {
 			printf("%08x : ", instr);
 		} else {
 			printf("    %04x : ", instr & 0xffffu);
 		}
-		if (regnum_rd != 0 && rd_wdata) {
-			printf("%-3s <- %08x ", friendly_reg_names[regnum_rd], *rd_wdata);
+		bool gpr_writeback = regnum_rd != 0 && rd_wdata;
+		if (gpr_writeback) {
+			printf("%-3s   <- %08x :\n", friendly_reg_names[regnum_rd], *rd_wdata);
+		} else if (pc_wdata) {
+			printf("pc    <- %08x <\n", *pc_wdata);
 		} else {
-			printf("                ");
+			printf("                  :\n");
 		}
-		if (pc_wdata) {
-			printf(": pc <- %08x\n", *pc_wdata);
-		} else {
-			printf(":\n");
+		if (pc_wdata && gpr_writeback) {
+			printf("                   : pc    <- %08x <\n", *pc_wdata);
+		}
+		if (trace_csr_result) {
+			printf("                   : #%03x  <- %08x :\n", *trace_csr_addr, *trace_csr_result);
 		}
 	}
 
+	// Ensure pending CSR writes are applied before checking IRQ conditions
+	csr.step();
+
 	if (exception_cause) {
-		pc_wdata = csr.trap_enter(*exception_cause, pc);
+		pc_wdata = csr.trap_enter_exception(*exception_cause, pc);
 		if (trace) {
-			printf("Trap cause %2u: pc <- %08x\n", *exception_cause, *pc_wdata);
+			printf("^^^ Trap           : cause <- %-2u       :\n", *exception_cause);
+			printf("|||                : pc    <- %08x <\n", *pc_wdata);
+			trace_priv = csr.get_true_priv();
 		}
+	} else if (irq_target_pc) {
+		pc_wdata = irq_target_pc;
+		if (trace) {
+			printf("^^^ IRQ            : cause <- IRQ + %-2u :\n", csr.get_xcause() & ((1u << 31) - 1));
+			printf("|||                : pc    <- %08x <\n", *pc_wdata);
+			trace_priv = csr.get_true_priv();
+		}
+	}
+	if (trace && trace_priv) {
+		printf("|||                : priv  <- %c        :\n", "US.M"[*trace_priv & 0x3]);
 	}
 
 	if (pc_wdata)
@@ -806,5 +847,4 @@ void RVCore::step(bool trace) {
 		pc = pc + ((instr & 0x3) == 0x3 ? 4 : 2);
 	if (rd_wdata && regnum_rd != 0)
 		regs[regnum_rd] = *rd_wdata;
-	csr.step();
 }
