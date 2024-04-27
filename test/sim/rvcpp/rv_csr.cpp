@@ -52,6 +52,29 @@ void RVCSR::step() {
 			case CSR_MINSTRET:      minstret      = pending_write_data;               break;
 			case CSR_MINSTRETH:     minstreth     = pending_write_data;               break;
 			case CSR_MCOUNTINHIBIT: mcountinhibit = pending_write_data & 0x7u;        break;
+
+			case CSR_PMPCFG0:       pmpcfg[0]      = pending_write_data & 0x9f9f9f9f; break;
+			case CSR_PMPCFG1:       pmpcfg[1]      = pending_write_data & 0x9f9f9f9f; break;
+			case CSR_PMPCFG2:       pmpcfg[2]      = pending_write_data & 0x9f9f9f9f; break;
+			case CSR_PMPCFG3:       pmpcfg[3]      = pending_write_data & 0x9f9f9f9f; break;
+
+			case CSR_PMPADDR0:      pmpaddr[0]     = pending_write_data;              break;
+			case CSR_PMPADDR1:      pmpaddr[1]     = pending_write_data;              break;
+			case CSR_PMPADDR2:      pmpaddr[2]     = pending_write_data;              break;
+			case CSR_PMPADDR3:      pmpaddr[3]     = pending_write_data;              break;
+			case CSR_PMPADDR4:      pmpaddr[4]     = pending_write_data;              break;
+			case CSR_PMPADDR5:      pmpaddr[5]     = pending_write_data;              break;
+			case CSR_PMPADDR6:      pmpaddr[6]     = pending_write_data;              break;
+			case CSR_PMPADDR7:      pmpaddr[7]     = pending_write_data;              break;
+			case CSR_PMPADDR8:      pmpaddr[8]     = pending_write_data;              break;
+			case CSR_PMPADDR9:      pmpaddr[9]     = pending_write_data;              break;
+			case CSR_PMPADDR10:     pmpaddr[10]    = pending_write_data;              break;
+			case CSR_PMPADDR11:     pmpaddr[11]    = pending_write_data;              break;
+			case CSR_PMPADDR12:     pmpaddr[12]    = pending_write_data;              break;
+			case CSR_PMPADDR13:     pmpaddr[13]    = pending_write_data;              break;
+			case CSR_PMPADDR14:     pmpaddr[14]    = pending_write_data;              break;
+			case CSR_PMPADDR15:     pmpaddr[15]    = pending_write_data;              break;
+
 			default:                                                                  break;
 		}
 		pending_write_addr = {};
@@ -86,6 +109,28 @@ std::optional<ux_t> RVCSR::read(uint16_t addr, bool side_effect) {
 		case CSR_MCYCLEH:       return mcycleh;
 		case CSR_MINSTRET:      return minstret;
 		case CSR_MINSTRETH:     return minstreth;
+
+		case CSR_PMPCFG0:       return pmpcfg[0];
+		case CSR_PMPCFG1:       return pmpcfg[1];
+		case CSR_PMPCFG2:       return pmpcfg[2];
+		case CSR_PMPCFG3:       return pmpcfg[3];
+
+		case CSR_PMPADDR0:      return pmpaddr[0];
+		case CSR_PMPADDR1:      return pmpaddr[1];
+		case CSR_PMPADDR2:      return pmpaddr[2];
+		case CSR_PMPADDR3:      return pmpaddr[3];
+		case CSR_PMPADDR4:      return pmpaddr[4];
+		case CSR_PMPADDR5:      return pmpaddr[5];
+		case CSR_PMPADDR6:      return pmpaddr[6];
+		case CSR_PMPADDR7:      return pmpaddr[7];
+		case CSR_PMPADDR8:      return pmpaddr[8];
+		case CSR_PMPADDR9:      return pmpaddr[9];
+		case CSR_PMPADDR10:     return pmpaddr[10];
+		case CSR_PMPADDR11:     return pmpaddr[11];
+		case CSR_PMPADDR12:     return pmpaddr[12];
+		case CSR_PMPADDR13:     return pmpaddr[13];
+		case CSR_PMPADDR14:     return pmpaddr[14];
+		case CSR_PMPADDR15:     return pmpaddr[15];
 
 		default:                return {};
 	}
@@ -129,6 +174,29 @@ bool RVCSR::write(uint16_t addr, ux_t data, uint op) {
 		case CSR_MINSTRET:      break;
 		case CSR_MINSTRETH:     break;
 		case CSR_MCOUNTINHIBIT: break;
+
+		case CSR_PMPCFG0:       break;
+		case CSR_PMPCFG1:       break;
+		case CSR_PMPCFG2:       break;
+		case CSR_PMPCFG3:       break;
+
+		case CSR_PMPADDR0:      break;
+		case CSR_PMPADDR1:      break;
+		case CSR_PMPADDR2:      break;
+		case CSR_PMPADDR3:      break;
+		case CSR_PMPADDR4:      break;
+		case CSR_PMPADDR5:      break;
+		case CSR_PMPADDR6:      break;
+		case CSR_PMPADDR7:      break;
+		case CSR_PMPADDR8:      break;
+		case CSR_PMPADDR9:      break;
+		case CSR_PMPADDR10:     break;
+		case CSR_PMPADDR11:     break;
+		case CSR_PMPADDR12:     break;
+		case CSR_PMPADDR13:     break;
+		case CSR_PMPADDR14:     break;
+		case CSR_PMPADDR15:     break;
+
 		default:                return false;
 	}
 	return true;
@@ -181,4 +249,37 @@ ux_t RVCSR::trap_mret() {
 	mstatus &= ~MSTATUS_MPIE;
 
 	return mepc;
+}
+
+uint RVCSR::get_pmp_xwr(ux_t addr) {
+	bool match = false;
+	uint matching_xwr = 0;
+	uint matching_l = 0;
+	bool trace_pmp = get_true_priv() == PRV_U && true;
+	for (int i = 0; i < PMP_REGIONS; ++i) {
+		if (pmpcfg_a(i) == 0u) {
+			continue;
+		}
+		uint32_t mask = 0xffffffffu;
+		if (pmpcfg_a(i) == 2) {
+			mask = 0xfffffffeu << __builtin_ctz(~pmpaddr[i]);
+		}
+		match = ((addr >> 2) & mask) == (pmpaddr[i] & mask);
+		if (match) {
+			matching_xwr = pmpcfg_xwr(i);
+			matching_l = pmpcfg_l(i);
+			// Lowest-numbered match determines success/failure:
+			break;
+		}
+	}
+	if (match) {
+		// TODO MPRV
+		if (get_true_priv() == PRV_M && !matching_l) {
+			return 0x7u;
+		} else {
+			return matching_xwr;
+		}
+	} else {
+		return get_true_priv() == PRV_M ? 0x7u : 0x0u;
+	}
 }

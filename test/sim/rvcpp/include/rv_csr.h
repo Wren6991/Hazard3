@@ -4,6 +4,8 @@
 
 class RVCSR {
 
+	static const int PMP_REGIONS = 16;
+
 	// Latched IRQ signals into core
 	bool irq_t;
 	bool irq_s;
@@ -25,6 +27,9 @@ class RVCSR {
 	ux_t mepc;
 	ux_t mcause;
 
+	ux_t pmpaddr[PMP_REGIONS];
+	ux_t pmpcfg[PMP_REGIONS / 4];
+
 	std::optional<ux_t> pending_write_addr;
 	ux_t pending_write_data;
 
@@ -32,6 +37,21 @@ class RVCSR {
 
 	// Internal interface for updating trap state. Returns trap target pc.
 	ux_t trap_enter(uint xcause, ux_t xepc);
+
+	ux_t pmpcfg_a(int i) {
+		uint8_t cfg_bits = pmpcfg[i / 4] >> 8 * (i % 4);
+		return (cfg_bits >> 3) & 0x3u;
+	}
+
+	ux_t pmpcfg_xwr(int i) {
+		uint8_t cfg_bits = pmpcfg[i / 4] >> 8 * (i % 4);
+		return cfg_bits & 0x7u;
+	}
+
+	ux_t pmpcfg_l(int i) {
+		uint8_t cfg_bits = pmpcfg[i / 4] >> 8 * (i % 4);
+		return (cfg_bits >> 7) & 0x1u;
+	}
 
 public:
 
@@ -59,6 +79,12 @@ public:
 		mepc = 0;
 		mcause = 0;
 		pending_write_addr = {};
+		for (int i = 0; i < PMP_REGIONS; ++i) {
+			pmpaddr[i] = 0;
+		}
+		for (int i = 0; i < PMP_REGIONS / 4; ++i) {
+			pmpcfg[i] = 0;
+		}
 	}
 
 	void step();
@@ -101,4 +127,5 @@ public:
 		return mcause;
 	}
 
+	uint get_pmp_xwr(ux_t addr);
 };

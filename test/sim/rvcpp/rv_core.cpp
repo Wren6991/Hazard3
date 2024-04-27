@@ -135,8 +135,8 @@ void RVCore::step(bool trace) {
 	std::optional<ux_t> trace_csr_result;
 	std::optional<uint> trace_priv;
 
-	std::optional<uint16_t> fetch0 = r16(pc);
-	std::optional<uint16_t> fetch1 = r16(pc + 2);
+	std::optional<uint16_t> fetch0 = r16(pc, 0x4u);
+	std::optional<uint16_t> fetch1 = r16(pc + 2, 0x4u);
 	uint32_t instr = *fetch0 | ((uint32_t)*fetch1 << 16);
 
 	uint opc = instr >> 2 & 0x1f;

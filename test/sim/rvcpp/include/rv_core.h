@@ -59,8 +59,10 @@ struct RVCore {
 	};
 
 	// Functions to read/write memory from this hart's point of view
-	std::optional<uint8_t> r8(ux_t addr) {
-		if (addr >= ram_base && addr < ram_top) {
+	std::optional<uint8_t> r8(ux_t addr, uint permissions=0x1u) {
+		if (!(csr.get_pmp_xwr(addr) & permissions)) {
+			return {};
+		} else if (addr >= ram_base && addr < ram_top) {
 			return ram[(addr - ram_base) >> 2] >> 8 * (addr & 0x3) & 0xffu;
 		} else {
 			return mem.r8(addr);
@@ -68,7 +70,9 @@ struct RVCore {
 	}
 
 	bool w8(ux_t addr, uint8_t data) {
-		if (addr >= ram_base && addr < ram_top) {
+		if (!(csr.get_pmp_xwr(addr) & 0x2u)) {
+			return false;
+		} else if (addr >= ram_base && addr < ram_top) {
 			ram[(addr - ram_base) >> 2] &= ~(0xffu << 8 * (addr & 0x3));
 			ram[(addr - ram_base) >> 2] |= (uint32_t)data << 8 * (addr & 0x3);
 			return true;
@@ -77,8 +81,10 @@ struct RVCore {
 		}
 	}
 
-	std::optional<uint16_t> r16(ux_t addr) {
-		if (addr >= ram_base && addr < ram_top) {
+	std::optional<uint16_t> r16(ux_t addr, uint permissions=0x1u) {
+		if (!(csr.get_pmp_xwr(addr) & permissions)) {
+			return {};
+		} else if (addr >= ram_base && addr < ram_top) {
 			return ram[(addr - ram_base) >> 2] >> 8 * (addr & 0x2) & 0xffffu;
 		} else {
 			return mem.r16(addr);
@@ -86,7 +92,9 @@ struct RVCore {
 	}
 
 	bool w16(ux_t addr, uint16_t data) {
-		if (addr >= ram_base && addr < ram_top) {
+		if (!(csr.get_pmp_xwr(addr) & 0x2u)) {
+			return false;
+		} else if (addr >= ram_base && addr < ram_top) {
 			ram[(addr - ram_base) >> 2] &= ~(0xffffu << 8 * (addr & 0x2));
 			ram[(addr - ram_base) >> 2] |= (uint32_t)data << 8 * (addr & 0x2);
 			return true;
@@ -95,8 +103,10 @@ struct RVCore {
 		}
 	}
 
-	std::optional<uint32_t> r32(ux_t addr) {
-		if (addr >= ram_base && addr < ram_top) {
+	std::optional<uint32_t> r32(ux_t addr, uint permissions=0x1u) {
+		if (!(csr.get_pmp_xwr(addr) & permissions)) {
+			return {};
+		} else if (addr >= ram_base && addr < ram_top) {
 			return ram[(addr - ram_base) >> 2];
 		} else {
 			return mem.r32(addr);
@@ -104,7 +114,9 @@ struct RVCore {
 	}
 
 	bool w32(ux_t addr, uint32_t data) {
-		if (addr >= ram_base && addr < ram_top) {
+		if (!(csr.get_pmp_xwr(addr) & 0x2u)) {
+			return false;
+		} else if (addr >= ram_base && addr < ram_top) {
 			ram[(addr - ram_base) >> 2] = data;
 			return true;
 		} else {
