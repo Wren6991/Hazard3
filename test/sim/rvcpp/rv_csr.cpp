@@ -54,30 +54,22 @@ void RVCSR::step() {
 			case CSR_MINSTRETH:     minstreth     = pending_write_data;               break;
 			case CSR_MCOUNTINHIBIT: mcountinhibit = pending_write_data & 0x7u;        break;
 
-			case CSR_PMPCFG0:       pmpcfg[0]      = pending_write_data & 0x9f9f9f9f; break;
-			case CSR_PMPCFG1:       pmpcfg[1]      = pending_write_data & 0x9f9f9f9f; break;
-			case CSR_PMPCFG2:       pmpcfg[2]      = pending_write_data & 0x9f9f9f9f; break;
-			case CSR_PMPCFG3:       pmpcfg[3]      = pending_write_data & 0x9f9f9f9f; break;
-
-			case CSR_PMPADDR0:      pmpaddr[0]     = pending_write_data;              break;
-			case CSR_PMPADDR1:      pmpaddr[1]     = pending_write_data;              break;
-			case CSR_PMPADDR2:      pmpaddr[2]     = pending_write_data;              break;
-			case CSR_PMPADDR3:      pmpaddr[3]     = pending_write_data;              break;
-			case CSR_PMPADDR4:      pmpaddr[4]     = pending_write_data;              break;
-			case CSR_PMPADDR5:      pmpaddr[5]     = pending_write_data;              break;
-			case CSR_PMPADDR6:      pmpaddr[6]     = pending_write_data;              break;
-			case CSR_PMPADDR7:      pmpaddr[7]     = pending_write_data;              break;
-			case CSR_PMPADDR8:      pmpaddr[8]     = pending_write_data;              break;
-			case CSR_PMPADDR9:      pmpaddr[9]     = pending_write_data;              break;
-			case CSR_PMPADDR10:     pmpaddr[10]    = pending_write_data;              break;
-			case CSR_PMPADDR11:     pmpaddr[11]    = pending_write_data;              break;
-			case CSR_PMPADDR12:     pmpaddr[12]    = pending_write_data;              break;
-			case CSR_PMPADDR13:     pmpaddr[13]    = pending_write_data;              break;
-			case CSR_PMPADDR14:     pmpaddr[14]    = pending_write_data;              break;
-			case CSR_PMPADDR15:     pmpaddr[15]    = pending_write_data;              break;
-
 			default:                                                                  break;
 		}
+
+		for (uint i = 0; i < IMPLEMENTED_PMP_REGIONS; ++i) {
+			if (pmpcfg_l(i)) {
+				continue;
+			}
+			if (*pending_write_addr == CSR_PMPADDR0 + i) {
+				pmpaddr[i] = pending_write_data & 0x3fffffffu;
+			} else if (*pending_write_addr == CSR_PMPCFG0 + i / 4) {
+				uint field_lsb = 8 * (i % 4);
+				pmpcfg[i / 4] = (pmpcfg[i / 4] & ~(0xffu << field_lsb))
+					| (pending_write_data & (0x9fu << field_lsb));
+			}
+		}
+
 		pending_write_addr = {};
 	}
 }

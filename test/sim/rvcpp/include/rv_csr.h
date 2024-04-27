@@ -5,6 +5,7 @@
 class RVCSR {
 
 	static const int PMP_REGIONS = 16;
+	static const int IMPLEMENTED_PMP_REGIONS = 4;
 
 	// Latched IRQ signals into core
 	bool irq_t;
