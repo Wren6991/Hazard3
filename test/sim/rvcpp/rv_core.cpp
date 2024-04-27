@@ -545,7 +545,7 @@ void RVCore::step(bool trace) {
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
 					}
 				}
-				else if (write_op == RVCSR::WRITE || regnum_rs1 != 0) {
+				if (write_op == RVCSR::WRITE || regnum_rs1 != 0) {
 					if (!csr.write(csr_addr, rs1, write_op)) {
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
 					}
