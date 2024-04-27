@@ -57,9 +57,9 @@ end else begin: have_pmp
 
 reg              pmpcfg_l [0:PMP_REGIONS-1];
 reg [1:0]        pmpcfg_a [0:PMP_REGIONS-1];
-reg              pmpcfg_r [0:PMP_REGIONS-1];
-reg              pmpcfg_w [0:PMP_REGIONS-1];
 reg              pmpcfg_x [0:PMP_REGIONS-1];
+reg              pmpcfg_w [0:PMP_REGIONS-1];
+reg              pmpcfg_r [0:PMP_REGIONS-1];
 
 // Address register contains bits 33:2 of the address (to support 16 GiB
 // physical address space). We don't implement bits 33 or 32.
@@ -77,9 +77,9 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
 			pmpcfg_l[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 7]      : 1'b0;
 			pmpcfg_a[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 3 +: 2] : 2'h0;
-			pmpcfg_r[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 2]      : 1'b0;
+			pmpcfg_x[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 2]      : 1'b0;
 			pmpcfg_w[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 1]      : 1'b0;
-			pmpcfg_x[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 0]      : 1'b0;
+			pmpcfg_r[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 0]      : 1'b0;
 
 			pmpaddr[i]  <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_ADDR[32 * i +: 30]  :
 			               PMP_GRAIN > 1    ? ~(~30'h0 << (PMP_GRAIN - 1))      : 30'h0;
@@ -92,15 +92,15 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 					// Keep tied to hardwired value (but still make the "register" sensitive to clk)
 					pmpcfg_l[i] <= PMP_HARDWIRED_CFG[8 * i + 7];
 					pmpcfg_a[i] <= PMP_HARDWIRED_CFG[8 * i + 3 +: 2];
-					pmpcfg_r[i] <= PMP_HARDWIRED_CFG[8 * i + 2];
+					pmpcfg_x[i] <= PMP_HARDWIRED_CFG[8 * i + 2];
 					pmpcfg_w[i] <= PMP_HARDWIRED_CFG[8 * i + 1];
-					pmpcfg_x[i] <= PMP_HARDWIRED_CFG[8 * i + 0];
+					pmpcfg_r[i] <= PMP_HARDWIRED_CFG[8 * i + 0];
 					pmpaddr[i]  <= PMP_HARDWIRED_ADDR[32 * i +: 30];
 				end else begin
 					pmpcfg_l[i] <= cfg_wdata[i % 4 * 8 + 7];
-					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 2];
+					pmpcfg_x[i] <= cfg_wdata[i % 4 * 8 + 2];
 					pmpcfg_w[i] <= cfg_wdata[i % 4 * 8 + 1];
-					pmpcfg_x[i] <= cfg_wdata[i % 4 * 8 + 0];
+					pmpcfg_r[i] <= cfg_wdata[i % 4 * 8 + 0];
 					// Unsupported A values are mapped to OFF (it's a WARL field).
 					pmpcfg_a[i] <=
 						cfg_wdata[i % 4 * 8 + 3 +: 2] == PMP_A_TOR ? PMP_A_OFF :
@@ -132,9 +132,9 @@ always @ (*) begin: cfg_read
 				pmpcfg_l[i],
 				2'b00,
 				pmpcfg_a[i],
-				pmpcfg_r[i],
+				pmpcfg_x[i],
 				pmpcfg_w[i],
-				pmpcfg_x[i]
+				pmpcfg_r[i]
 			};
 		end else if (cfg_addr == PMPADDR0 + i) begin
 			// If G > 1, the G-1 LSBs of pmpaddr_i are read-only-zero when

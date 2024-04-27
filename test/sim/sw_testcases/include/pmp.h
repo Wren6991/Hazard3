@@ -7,9 +7,9 @@
 #define PMPCFG_L_BITS 0x80
 #define PMPCFG_A_LSB 3
 #define PMPCFG_A_BITS 0x18
-#define PMPCFG_R_BITS 0x04
+#define PMPCFG_R_BITS 0x01
 #define PMPCFG_W_BITS 0x02
-#define PMPCFG_X_BITS 0x01
+#define PMPCFG_X_BITS 0x04
 
 #define PMPCFG_A_OFF 0x0
 #define PMPCFG_A_TOR 0x1
