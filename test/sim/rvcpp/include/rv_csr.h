@@ -112,6 +112,10 @@ public:
 		return priv;
 	}
 
+	bool get_mstatus_tw() {
+		return mstatus & 0x00200000u;
+	}
+
 	void set_irq_t(bool irq) {
 		irq_t = irq;
 	}

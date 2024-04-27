@@ -151,6 +151,10 @@ void RVCore::step(bool trace) {
 	std::optional<ux_t> irq_target_pc = csr.trap_check_enter_irq(pc);
 	if (irq_target_pc) {
 		// Replace current instruction with IRQ entry
+		stalled_on_wfi = false;
+	} else if (stalled_on_wfi) {
+		// Replace current instruction with jump-to-self
+		pc_wdata = pc;
 	} else if (!fetch0 || ((*fetch0 & 0x3) == 0x3 && (!fetch1 || pmp_straddle))) {
 		exception_cause = XCAUSE_INSTR_FAULT;
 	} else if ((instr & 0x3) == 0x3) {
@@ -588,6 +592,12 @@ void RVCore::step(bool trace) {
 				exception_cause = XCAUSE_ECALL_U + csr.get_true_priv();
 			} else if (RVOPC_MATCH(instr, EBREAK)) {
 				exception_cause = XCAUSE_EBREAK;
+			} else if (RVOPC_MATCH(instr, WFI)) {
+				if (csr.get_true_priv() == PRV_U && csr.get_mstatus_tw()) {
+					exception_cause = XCAUSE_INSTR_ILLEGAL;
+				} else {
+					stalled_on_wfi = true;
+				}
 			} else {
 				exception_cause = XCAUSE_INSTR_ILLEGAL;
 			}

@@ -13,6 +13,7 @@ struct RVCore {
 	RVCSR csr;
 	bool load_reserved;
 	MemBase32 &mem;
+	bool stalled_on_wfi;
 
 	// A single flat RAM is handled as a special case, in addition to whatever
 	// is in `mem`, because this avoids virtual calls for the majority of
@@ -27,6 +28,7 @@ struct RVCore {
 		std::fill(std::begin(regs), std::end(regs), 0);
 		pc = reset_vector;
 		load_reserved = false;
+		stalled_on_wfi = false;
 		ram_base = ram_base_;
 		ram_top = ram_base_ + ram_size_;
 		ram = new ux_t[ram_size_ / sizeof(ux_t)];
