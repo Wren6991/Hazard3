@@ -2,6 +2,7 @@
 #include "encoding/rv_csr.h"
 
 #include <cassert>
+#include <cstdio>
 
 // Inclusive msb:lsb style, like Verilog (and like the ISA manual)
 #define BITS_UPTO(msb) (~((-1u << (msb)) << 1))
@@ -251,26 +252,37 @@ ux_t RVCSR::trap_mret() {
 	return mepc;
 }
 
-uint RVCSR::get_pmp_xwr(ux_t addr) {
-	bool match = false;
-	uint matching_xwr = 0;
-	uint matching_l = 0;
-	bool trace_pmp = get_true_priv() == PRV_U && true;
+int RVCSR::get_pmp_match(ux_t addr) {
 	for (int i = 0; i < PMP_REGIONS; ++i) {
 		if (pmpcfg_a(i) == 0u) {
 			continue;
 		}
-		uint32_t mask = 0xffffffffu;
-		if (pmpcfg_a(i) == 2) {
-			mask = 0xfffffffeu << __builtin_ctz(~pmpaddr[i]);
+		ux_t mask = 0xffffffffu;
+		if (pmpcfg_a(i) == 3) {
+			if (pmpaddr[i] == 0xffffffffu) {
+				mask = 0u;
+			} else {
+				mask = 0xfffffffeu << __builtin_ctz(~pmpaddr[i]);
+			}
 		}
-		match = ((addr >> 2) & mask) == (pmpaddr[i] & mask);
+		bool match = ((addr >> 2) & mask) == (pmpaddr[i] & mask);
 		if (match) {
-			matching_xwr = pmpcfg_xwr(i);
-			matching_l = pmpcfg_l(i);
 			// Lowest-numbered match determines success/failure:
-			break;
+			return i;
 		}
+	}
+	return -1;
+}
+
+uint RVCSR::get_pmp_xwr(ux_t addr) {
+	int region = get_pmp_match(addr);
+	bool match = false;
+	uint matching_xwr = 0;
+	uint matching_l = 0;
+	if (region >= 0) {
+		match = true;
+		matching_xwr = pmpcfg_xwr(region);
+		matching_l = pmpcfg_l(region);
 	}
 	if (match) {
 		// TODO MPRV

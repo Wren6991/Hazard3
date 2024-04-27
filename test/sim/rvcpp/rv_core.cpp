@@ -143,10 +143,15 @@ void RVCore::step(bool trace) {
 	uint funct3 = instr >> 12 & 0x7;
 	uint funct7 = instr >> 25 & 0x7f;
 
+	bool pmp_straddle = false;
+	if (fetch0 && (*fetch0 & 0x3) == 0x3) {
+		pmp_straddle = csr.get_pmp_match(pc) != csr.get_pmp_match(pc + 2);
+	}
+
 	std::optional<ux_t> irq_target_pc = csr.trap_check_enter_irq(pc);
 	if (irq_target_pc) {
 		// Replace current instruction with IRQ entry
-	} else if (!fetch0 || ((*fetch0 & 0x3) == 0x3 && !fetch1)) {
+	} else if (!fetch0 || ((*fetch0 & 0x3) == 0x3 && (!fetch1 || pmp_straddle))) {
 		exception_cause = XCAUSE_INSTR_FAULT;
 	} else if ((instr & 0x3) == 0x3) {
 		// 32-bit instruction

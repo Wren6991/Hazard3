@@ -127,5 +127,8 @@ public:
 		return mcause;
 	}
 
+	// Return region, or -1 for no match
+	int get_pmp_match(ux_t addr);
+
 	uint get_pmp_xwr(ux_t addr);
 };
