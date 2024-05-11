@@ -18,6 +18,8 @@ Do WFI with TW=1, IRQs disabled:
 mcause = 2                            // = illegal instruction
 Do PMP-failed WFI, IRQs disabled:
 mcause = 1                            // = instruction access fault.
+Do PMP-failed WFI, IRQs enabled:
+mcause = 1                            // = instruction access fault.
 
 *******************************************************************************/
 
@@ -37,25 +39,42 @@ void __attribute__((naked)) do_ecall() {
 
 // Call function in U mode, from M mode. Catch exception, or break back to M
 // mode if the function returned normally (via dummy ecall), and then return.
-static inline void umode_call_and_catch(void (*f)(void)) {
-	clear_csr(mstatus, 0x1800u);
-	write_csr(mepc, f);
-	uint32_t mtvec_save = read_csr(mtvec);
-	asm (
-		" la ra, 1f\n"
-		" csrw mtvec, ra\n"
+static void __attribute__((naked)) umode_call_and_catch(void (*f)(void)) {
+	(void)f;
+	asm volatile (
+		// Set up return-from-M-mode to U-mode at *f
+		" csrw mepc, a0\n"
+		" li a0, 0x1800\n"
+		" csrc mstatus, a0\n"
+		// Save ra, we will pick it up in handle_exception()
+		" addi sp, sp, -16\n"
+		" sw ra, (sp)\n"
+		// Set up return to ecall if there is no other exception
 		" la ra, do_ecall\n"
+		// Enter function pointer
 		" mret\n"
-		// Note mtvec requires 4-byte alignment.
-		".p2align 2\n"
-		"1:\n"
-	: : : "ra"
 	);
-	write_csr(mtvec, mtvec_save);
+}
+
+void __attribute__((naked)) handle_exception(void) {
+	asm volatile (
+		// Pick up saved ra and return through it -- from the caller's pov we
+		// have returned from umode_call_and_catch()
+		" lw ra, (sp)\n"
+		" addi sp, sp, 16\n"
+		" ret\n"
+	);
+}
+
+volatile bool timer_has_fired = false;
+void __attribute__((interrupt)) isr_machine_timer(void) {
+	timer_has_fired = true;
+	mm_timer->mtimecmp = mm_timer->mtime + 100;
 }
 
 int main() {
 	// Ensure WFI doesn't block by enabling timer IRQ but leaving IRQs globally disabled.
+	// (They will still fire in U-mode, as mstatus.mie is treated as set when priv < M)
 	set_csr(mie, -1u);
 
 	// Give U mode RWX permission on all of memory.
@@ -63,7 +82,9 @@ int main() {
 	write_csr(pmpaddr0, -1u);
 
 	tb_puts("Do WFI with TW=0:\n");
+	tb_assert(!timer_has_fired, "Timer should not have fired whilst still in M-mode\n");
 	umode_call_and_catch(&do_wfi);
+	tb_assert(timer_has_fired, "Timer should have fired upon entering U-mode\n");
 	tb_printf("mcause = %u\n", read_csr(mcause));
 	if (read_csr(mepc) != (uint32_t)&do_ecall) {
 		tb_puts("Non-normal return detected\n");
@@ -82,7 +103,9 @@ int main() {
 	write_csr(mie, 0);
 	// This checks that setting TW stops the WFI state from being entered, as
 	// well as just raising an exception.
+	timer_has_fired = false;
 	umode_call_and_catch(&do_wfi);
+	tb_assert(!timer_has_fired, "Even in U-mode, timer should not fire when disabled.\n");
 	tb_printf("mcause = %u\n", read_csr(mcause));
 	tb_assert(read_csr(mepc) == (uint32_t)&do_wfi, "mepc doesn't point to wfi\n");
 
@@ -94,6 +117,16 @@ int main() {
 	// Revoke all U-mode PMP permissions
 	write_csr(pmpcfg0, 0);
 	umode_call_and_catch(&do_wfi);
+	tb_printf("mcause = %u\n", read_csr(mcause));
+	tb_assert(read_csr(mepc) == (uint32_t)&do_wfi, "mepc doesn't point to wfi\n");
+
+	tb_puts("Do PMP-failed WFI, IRQs enabled:\n");
+	// The expected sequence here is: return to U-mode, enter timer IRQ in
+	// M-mode, return to U-mode again, take PMP fault back to M-mode.
+	set_csr(mie, -1u);
+	timer_has_fired = false;
+	umode_call_and_catch(&do_wfi);
+	tb_assert(timer_has_fired, "Timer should fire immediately on U-mode entry\n");
 	tb_printf("mcause = %u\n", read_csr(mcause));
 	tb_assert(read_csr(mepc) == (uint32_t)&do_wfi, "mepc doesn't point to wfi\n");
 

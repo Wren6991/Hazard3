@@ -1268,7 +1268,7 @@ assign mip = {
 	3'h0                  // Reserved
 };
 
-wire irq_active = |(mip & mie) && mstatus_mie && !dcsr_step;
+wire irq_active = |(mip & mie) && (mstatus_mie || !m_mode) && !dcsr_step;
 
 // WFI clear respects individual interrupt enables but ignores mstatus.mie.
 // Additionally, wfi is treated as a nop during single-stepping and D-mode.
