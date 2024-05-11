@@ -27,6 +27,7 @@ class RVCSR {
 	ux_t mscratch;
 	ux_t mepc;
 	ux_t mcause;
+	ux_t hazard3_msleep;
 
 	ux_t pmpaddr[PMP_REGIONS];
 	ux_t pmpcfg[PMP_REGIONS / 4];
@@ -79,6 +80,7 @@ public:
 		mscratch = 0;
 		mepc = 0;
 		mcause = 0;
+		hazard3_msleep = 0;
 		pending_write_addr = {};
 		for (int i = 0; i < PMP_REGIONS; ++i) {
 			pmpaddr[i] = 0;

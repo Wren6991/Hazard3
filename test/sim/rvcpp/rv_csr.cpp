@@ -41,20 +41,22 @@ void RVCSR::step() {
 	}
 	if (pending_write_addr) {
 		switch (*pending_write_addr) {
-			case CSR_MSTATUS:       mstatus       = pending_write_data;               break;
-			case CSR_MIE:           mie           = pending_write_data;               break;
-			case CSR_MTVEC:         mtvec         = pending_write_data & 0xfffffffdu; break;
-			case CSR_MSCRATCH:      mscratch      = pending_write_data;               break;
-			case CSR_MEPC:          mepc          = pending_write_data & 0xfffffffeu; break;
-			case CSR_MCAUSE:        mcause        = pending_write_data & 0x8000000fu; break;
+			case CSR_MSTATUS:        mstatus        = pending_write_data;               break;
+			case CSR_MIE:            mie            = pending_write_data;               break;
+			case CSR_MTVEC:          mtvec          = pending_write_data & 0xfffffffdu; break;
+			case CSR_MSCRATCH:       mscratch       = pending_write_data;               break;
+			case CSR_MEPC:           mepc           = pending_write_data & 0xfffffffeu; break;
+			case CSR_MCAUSE:         mcause         = pending_write_data & 0x8000000fu; break;
 
-			case CSR_MCYCLE:        mcycle        = pending_write_data;               break;
-			case CSR_MCYCLEH:       mcycleh       = pending_write_data;               break;
-			case CSR_MINSTRET:      minstret      = pending_write_data;               break;
-			case CSR_MINSTRETH:     minstreth     = pending_write_data;               break;
-			case CSR_MCOUNTINHIBIT: mcountinhibit = pending_write_data & 0x7u;        break;
+			case CSR_MCYCLE:         mcycle         = pending_write_data;               break;
+			case CSR_MCYCLEH:        mcycleh        = pending_write_data;               break;
+			case CSR_MINSTRET:       minstret       = pending_write_data;               break;
+			case CSR_MINSTRETH:      minstreth      = pending_write_data;               break;
+			case CSR_MCOUNTINHIBIT:  mcountinhibit  = pending_write_data & 0x7u;        break;
 
-			default:                                                                  break;
+			case CSR_HAZARD3_MSLEEP: hazard3_msleep = pending_write_data & 0x7u;        break;
+
+			default:                                                                    break;
 		}
 
 		for (uint i = 0; i < IMPLEMENTED_PMP_REGIONS; ++i) {
@@ -81,51 +83,53 @@ std::optional<ux_t> RVCSR::read(uint16_t addr, bool side_effect) {
 		return {};
 
 	switch (addr) {
-		case CSR_MISA:          return 0x40901105;  // RV32IMACX + U
-		case CSR_MHARTID:       return 0;
-		case CSR_MARCHID:       return 0x1b;        // Hazard3
-		case CSR_MIMPID:        return 0x12345678u; // Match testbench value
-		case CSR_MVENDORID:     return 0xdeadbeefu; // Match testbench value
-		case CSR_MCONFIGPTR:    return 0x9abcdef0u; // Match testbench value
+		case CSR_MISA:           return 0x40901105;  // RV32IMACX + U
+		case CSR_MHARTID:        return 0;
+		case CSR_MARCHID:        return 0x1b;        // Hazard3
+		case CSR_MIMPID:         return 0x12345678u; // Match testbench value
+		case CSR_MVENDORID:      return 0xdeadbeefu; // Match testbench value
+		case CSR_MCONFIGPTR:     return 0x9abcdef0u; // Match testbench value
 
-		case CSR_MSTATUS:       return mstatus;
-		case CSR_MIE:           return mie;
-		case CSR_MIP:           return get_effective_xip();
-		case CSR_MTVEC:         return mtvec;
-		case CSR_MSCRATCH:      return mscratch;
-		case CSR_MEPC:          return mepc;
-		case CSR_MCAUSE:        return mcause;
-		case CSR_MTVAL:         return 0;
+		case CSR_MSTATUS:        return mstatus;
+		case CSR_MIE:            return mie;
+		case CSR_MIP:            return get_effective_xip();
+		case CSR_MTVEC:          return mtvec;
+		case CSR_MSCRATCH:       return mscratch;
+		case CSR_MEPC:           return mepc;
+		case CSR_MCAUSE:         return mcause;
+		case CSR_MTVAL:          return 0;
 
-		case CSR_MCOUNTINHIBIT: return mcountinhibit;
-		case CSR_MCYCLE:        return mcycle;
-		case CSR_MCYCLEH:       return mcycleh;
-		case CSR_MINSTRET:      return minstret;
-		case CSR_MINSTRETH:     return minstreth;
+		case CSR_MCOUNTINHIBIT:  return mcountinhibit;
+		case CSR_MCYCLE:         return mcycle;
+		case CSR_MCYCLEH:        return mcycleh;
+		case CSR_MINSTRET:       return minstret;
+		case CSR_MINSTRETH:      return minstreth;
 
-		case CSR_PMPCFG0:       return pmpcfg[0];
-		case CSR_PMPCFG1:       return pmpcfg[1];
-		case CSR_PMPCFG2:       return pmpcfg[2];
-		case CSR_PMPCFG3:       return pmpcfg[3];
+		case CSR_PMPCFG0:        return pmpcfg[0];
+		case CSR_PMPCFG1:        return pmpcfg[1];
+		case CSR_PMPCFG2:        return pmpcfg[2];
+		case CSR_PMPCFG3:        return pmpcfg[3];
 
-		case CSR_PMPADDR0:      return pmpaddr[0];
-		case CSR_PMPADDR1:      return pmpaddr[1];
-		case CSR_PMPADDR2:      return pmpaddr[2];
-		case CSR_PMPADDR3:      return pmpaddr[3];
-		case CSR_PMPADDR4:      return pmpaddr[4];
-		case CSR_PMPADDR5:      return pmpaddr[5];
-		case CSR_PMPADDR6:      return pmpaddr[6];
-		case CSR_PMPADDR7:      return pmpaddr[7];
-		case CSR_PMPADDR8:      return pmpaddr[8];
-		case CSR_PMPADDR9:      return pmpaddr[9];
-		case CSR_PMPADDR10:     return pmpaddr[10];
-		case CSR_PMPADDR11:     return pmpaddr[11];
-		case CSR_PMPADDR12:     return pmpaddr[12];
-		case CSR_PMPADDR13:     return pmpaddr[13];
-		case CSR_PMPADDR14:     return pmpaddr[14];
-		case CSR_PMPADDR15:     return pmpaddr[15];
+		case CSR_PMPADDR0:       return pmpaddr[0];
+		case CSR_PMPADDR1:       return pmpaddr[1];
+		case CSR_PMPADDR2:       return pmpaddr[2];
+		case CSR_PMPADDR3:       return pmpaddr[3];
+		case CSR_PMPADDR4:       return pmpaddr[4];
+		case CSR_PMPADDR5:       return pmpaddr[5];
+		case CSR_PMPADDR6:       return pmpaddr[6];
+		case CSR_PMPADDR7:       return pmpaddr[7];
+		case CSR_PMPADDR8:       return pmpaddr[8];
+		case CSR_PMPADDR9:       return pmpaddr[9];
+		case CSR_PMPADDR10:      return pmpaddr[10];
+		case CSR_PMPADDR11:      return pmpaddr[11];
+		case CSR_PMPADDR12:      return pmpaddr[12];
+		case CSR_PMPADDR13:      return pmpaddr[13];
+		case CSR_PMPADDR14:      return pmpaddr[14];
+		case CSR_PMPADDR15:      return pmpaddr[15];
 
-		default:                return {};
+		case CSR_HAZARD3_MSLEEP: return hazard3_msleep;
+
+		default:                 return {};
 	}
 }
 
@@ -148,49 +152,51 @@ bool RVCSR::write(uint16_t addr, ux_t data, uint op) {
 	// e.g. for mcycle updates. However we validate address for
 	// writability immediately.
 	switch (addr) {
-		case CSR_MISA:          break;
-		case CSR_MHARTID:       break;
-		case CSR_MARCHID:       break;
-		case CSR_MIMPID:        break;
+		case CSR_MISA:           break;
+		case CSR_MHARTID:        break;
+		case CSR_MARCHID:        break;
+		case CSR_MIMPID:         break;
 
-		case CSR_MSTATUS:       break;
-		case CSR_MIE:           break;
-		case CSR_MIP:           break;
-		case CSR_MTVEC:         break;
-		case CSR_MSCRATCH:      break;
-		case CSR_MEPC:          break;
-		case CSR_MCAUSE:        break;
-		case CSR_MTVAL:         break;
+		case CSR_MSTATUS:        break;
+		case CSR_MIE:            break;
+		case CSR_MIP:            break;
+		case CSR_MTVEC:          break;
+		case CSR_MSCRATCH:       break;
+		case CSR_MEPC:           break;
+		case CSR_MCAUSE:         break;
+		case CSR_MTVAL:          break;
 
-		case CSR_MCYCLE:        break;
-		case CSR_MCYCLEH:       break;
-		case CSR_MINSTRET:      break;
-		case CSR_MINSTRETH:     break;
-		case CSR_MCOUNTINHIBIT: break;
+		case CSR_MCYCLE:         break;
+		case CSR_MCYCLEH:        break;
+		case CSR_MINSTRET:       break;
+		case CSR_MINSTRETH:      break;
+		case CSR_MCOUNTINHIBIT:  break;
 
-		case CSR_PMPCFG0:       break;
-		case CSR_PMPCFG1:       break;
-		case CSR_PMPCFG2:       break;
-		case CSR_PMPCFG3:       break;
+		case CSR_PMPCFG0:        break;
+		case CSR_PMPCFG1:        break;
+		case CSR_PMPCFG2:        break;
+		case CSR_PMPCFG3:        break;
 
-		case CSR_PMPADDR0:      break;
-		case CSR_PMPADDR1:      break;
-		case CSR_PMPADDR2:      break;
-		case CSR_PMPADDR3:      break;
-		case CSR_PMPADDR4:      break;
-		case CSR_PMPADDR5:      break;
-		case CSR_PMPADDR6:      break;
-		case CSR_PMPADDR7:      break;
-		case CSR_PMPADDR8:      break;
-		case CSR_PMPADDR9:      break;
-		case CSR_PMPADDR10:     break;
-		case CSR_PMPADDR11:     break;
-		case CSR_PMPADDR12:     break;
-		case CSR_PMPADDR13:     break;
-		case CSR_PMPADDR14:     break;
-		case CSR_PMPADDR15:     break;
+		case CSR_PMPADDR0:       break;
+		case CSR_PMPADDR1:       break;
+		case CSR_PMPADDR2:       break;
+		case CSR_PMPADDR3:       break;
+		case CSR_PMPADDR4:       break;
+		case CSR_PMPADDR5:       break;
+		case CSR_PMPADDR6:       break;
+		case CSR_PMPADDR7:       break;
+		case CSR_PMPADDR8:       break;
+		case CSR_PMPADDR9:       break;
+		case CSR_PMPADDR10:      break;
+		case CSR_PMPADDR11:      break;
+		case CSR_PMPADDR12:      break;
+		case CSR_PMPADDR13:      break;
+		case CSR_PMPADDR14:      break;
+		case CSR_PMPADDR15:      break;
 
-		default:                return false;
+		case CSR_HAZARD3_MSLEEP: break;
+
+		default:                 return false;
 	}
 	return true;
 }

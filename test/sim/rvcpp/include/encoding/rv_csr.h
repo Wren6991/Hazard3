@@ -425,4 +425,12 @@
 #define CSR_MENTROPY 0xF15
 #define CSR_MNOISE 0x7A9
 
+#define CSR_HAZARD3_MEIEA      0xbe0
+#define CSR_HAZARD3_MEIPA      0xbe1
+#define CSR_HAZARD3_MEIFA      0xbe2
+#define CSR_HAZARD3_MEIPRA     0xbe3
+#define CSR_HAZARD3_MEINEXT    0xbe4
+#define CSR_HAZARD3_MEICONTEXT 0xbe5
+#define CSR_HAZARD3_MSLEEP     0xbf0
+
 #endif
