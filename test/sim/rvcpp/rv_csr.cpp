@@ -83,7 +83,7 @@ std::optional<ux_t> RVCSR::read(uint16_t addr, bool side_effect) {
 		return {};
 
 	switch (addr) {
-		case CSR_MISA:           return 0x40901105;  // RV32IMACX + U
+		case CSR_MISA:           return 0x40901107u; // RV32IMABCX + U
 		case CSR_MHARTID:        return 0;
 		case CSR_MARCHID:        return 0x1b;        // Hazard3
 		case CSR_MIMPID:         return 0x12345678u; // Match testbench value

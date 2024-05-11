@@ -588,7 +588,11 @@ always @ (*) begin
 			1'b1,              // Integer ISA
 			5'd0,              // H...D, no
 			|EXTENSION_C,
-			1'b0,
+			&{                 // B is now defined as ZbaZbbZbs
+				|EXTENSION_ZBA,
+				|EXTENSION_ZBB,
+				|EXTENSION_ZBS
+			},
 			|EXTENSION_A
 		};
 	end
