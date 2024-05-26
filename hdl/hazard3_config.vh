@@ -127,15 +127,15 @@ parameter PMP_GRAIN           = 0,
 // pmpcfg registers are read-only. PMP_GRAIN is ignored on hardwired regions.
 // It's recommended to make hardwired regions the highest-numbered, so they
 // can be overridden by lower-numbered regions.
-parameter PMP_HARDWIRED       = PMP_REGIONS > 0 ? {PMP_REGIONS{1'b0}} : 1'b0,
+parameter PMP_HARDWIRED       = {(PMP_REGIONS > 0 ? PMP_REGIONS : 1){1'b0}},
 
 // PMPADDR_HARDWIRED_ADDR: Values of pmpaddr registers whose PMP_HARDWIRED
 // bits are set to 1. Non-hardwired regions reset to all-zeroes.
-parameter PMP_HARDWIRED_ADDR  = PMP_REGIONS > 0 ? {PMP_REGIONS{32'h0}} : 1'b0,
+parameter PMP_HARDWIRED_ADDR  = {(PMP_REGIONS > 0 ? PMP_REGIONS : 1){32'h0}},
 
 // PMPCFG_RESET_VAL: Values of pmpcfg registers whose PMP_HARDWIRED bits are
 // set to 1. Non-hardwired regions reset to all zeroes.
-parameter PMP_HARDWIRED_CFG   = PMP_REGIONS > 0 ? {PMP_REGIONS{8'h00}} : 1'b0,
+parameter PMP_HARDWIRED_CFG   = {(PMP_REGIONS > 0 ? PMP_REGIONS : 1){8'h00}},
 
 // DEBUG_SUPPORT: Support for run/halt and instruction injection from an
 // external Debug Module, support for Debug Mode, and Debug Mode CSRs.
@@ -163,7 +163,7 @@ parameter IRQ_PRIORITY_BITS   = 0,
 // IRQ_INPUT_BYPASS: disable the input registers on the external interrupts,
 // to reduce latency by one cycle. Can be applied on an IRQ-by-IRQ basis.
 // Ignored if EXTENSION_XH3IRQ is disabled.
-parameter IRQ_INPUT_BYPASS    = {NUM_IRQS{1'b0}},
+parameter IRQ_INPUT_BYPASS    = {(NUM_IRQS > 0 ? NUM_IRQS : 1){1'b0}},
 
 // ----------------------------------------------------------------------------
 // ID registers
