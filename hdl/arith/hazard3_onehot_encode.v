@@ -20,7 +20,7 @@ always @ (*) begin: encode
 	reg [W_GNT:0] i;
 	gnt = {W_GNT{1'b0}};
 	for (i = 0; i < W_REQ; i = i + 1) begin
-		gnt = gnt | ({W_GNT{req[i]}} & i[W_GNT-1:0]);
+		gnt = gnt | ({W_GNT{req[i[W_GNT-1:0]]}} & i[W_GNT-1:0]);
 	end
 end
 

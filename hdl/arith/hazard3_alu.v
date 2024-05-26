@@ -38,7 +38,7 @@ wire [W_DATA-1:0] op_a_shifted =
 
 wire [W_DATA-1:0] op_b_inv = op_b ^ {W_DATA{inv_op_b}};
 
-wire [W_DATA-1:0] sum  = op_a_shifted + op_b_inv + sub;
+wire [W_DATA-1:0] sum  = op_a_shifted + op_b_inv + {{W_DATA-1{1'b0}}, sub};
 wire [W_DATA-1:0] op_xor = op_a ^ op_b;
 
 wire cmp_is_unsigned = aluop == ALUOP_LTU ||
@@ -200,7 +200,7 @@ always @ (*) begin
 		{7'bzzzzz1z, ALUOP_BREV8  }: result = {op_a_rev[7:0], op_a_rev[15:8], op_a_rev[23:16], op_a_rev[31:24]};
 		{7'bzzzzz1z, ALUOP_UNZIP  }: result = unzip;
 		{7'bzzzzz1z, ALUOP_ZIP    }: result = zip;
-		// Xh3b
+		// Xh3bextm
 		{7'bzzzzzz1, ALUOP_BEXTM  }: result = shift_dout & {24'h0, {~(8'hfe << funct7_32b[3:1])}};
 
 		default:                    result = bitwise;

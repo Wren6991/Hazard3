@@ -120,7 +120,7 @@ always @ (*) begin: alu
 		{neg_l_borrow, accum_next[XLEN-1:0]} = {~accum[XLEN-1:0]} + 1'b1;
 	if (accum_incr_h || accum_inv_h)
 		accum_next[XLEN +: XLEN] = (accum[XLEN +: XLEN] ^ {XLEN{accum_inv_h}})
-			+ accum_incr_h;
+			+ {{XLEN-1{1'b0}}, accum_incr_h};
 end
 
 // ----------------------------------------------------------------------------

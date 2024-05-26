@@ -840,7 +840,7 @@ if (PMP_REGIONS > 0) begin: have_pmp
 
 end else begin: no_pmp
 
-	assign x_pmp_cfg_rdata = 1'b0;
+	assign x_pmp_cfg_rdata = 32'd0;
 	assign x_loadstore_pmp_fail = 1'b0;
 	assign x_exec_pmp_fail = 1'b0;
 

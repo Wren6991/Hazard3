@@ -119,6 +119,7 @@ reg                  fifo_err        [0:FIFO_DEPTH];
 reg  [1:0]           fifo_predbranch [0:FIFO_DEPTH];
 reg  [1:0]           fifo_valid_hw   [0:FIFO_DEPTH];
 reg                  fifo_valid      [0:FIFO_DEPTH];
+reg                  fifo_valid_m1   [0:FIFO_DEPTH];
 
 wire [W_DATA-1:0] fifo_rdata       = fifo_mem[0];
 wire              fifo_full        = fifo_valid[FIFO_DEPTH - 1];
@@ -135,9 +136,16 @@ always @ (*) begin: boundary_conditions
 	fifo_predbranch[FIFO_DEPTH] = 2'b00;
 	fifo_err[FIFO_DEPTH] = 1'b0;
 	fifo_valid_hw[FIFO_DEPTH] = 2'b00;
-	fifo_valid[FIFO_DEPTH] = 1'b0;
 	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 		fifo_valid[i] = |EXTENSION_C ? |fifo_valid_hw[i] : fifo_valid_hw[i][0];
+		// valid-to-right condition: i == 0 || fifo_valid[i - 1], but without
+		// using negative array bound (seems broken in Yosys?) or OOB in the
+		// short circuit case (gives lint although result is well-defined)
+		if (i == 0) begin
+			fifo_valid_m1[i] = 1'b1;
+		end else begin
+			fifo_valid_m1[i] = fifo_valid[i - 1];
+		end
 	end
 end
 
@@ -158,11 +166,11 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 				fifo_predbranch[i] <= fifo_valid[i + 1] ? fifo_predbranch[i + 1] : mem_data_predbranch;
 			end
 			fifo_valid_hw[i] <=
-				jump_now                                                 ? 2'h0                            :
-				fifo_valid[i + 1] && fifo_pop                            ? fifo_valid_hw[i + 1]            :
-				fifo_valid[i]     && fifo_pop                            ? mem_data_hwvld & {2{fifo_push}} :
-				fifo_valid[i]                                            ? fifo_valid_hw[i]                :
-				fifo_push && !fifo_pop && (i == 0 || fifo_valid[i - |i]) ? mem_data_hwvld                  : 2'h0;
+				jump_now                                   ? 2'h0                            :
+				fifo_valid[i + 1] && fifo_pop              ? fifo_valid_hw[i + 1]            :
+				fifo_valid[i]     && fifo_pop              ? mem_data_hwvld & {2{fifo_push}} :
+				fifo_valid[i]                              ? fifo_valid_hw[i]                :
+				fifo_push && !fifo_pop && fifo_valid_m1[i] ? mem_data_hwvld                  : 2'h0;
 		end
 		// Allow DM to inject instructions directly into the lowest-numbered
 		// queue entry. This mux should not extend critical path since it is
@@ -259,6 +267,11 @@ wire btb_match_next_addr    = btb_match_word && btb_src_overhanging;
 
 wire btb_match_now = btb_match_current_addr || btb_prev_start_of_overhanging;
 
+// Post-increment if jump request is going straight through
+wire [W_ADDR-1:0] jump_target_post_increment =
+	{jump_target[W_ADDR-1:2],                          2'b00} +
+	{{W_ADDR-3{1'b0}}, mem_addr_rdy && !mem_addr_hold, 2'b00};
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		fetch_addr <= RESET_VECTOR;
@@ -267,8 +280,7 @@ always @ (posedge clk or negedge rst_n) begin
 		btb_prev_start_of_overhanging <= 1'b0;
 	end else begin
 		if (jump_now) begin
-			// Post-increment if jump request is going straight through
-			fetch_addr <= {jump_target[W_ADDR-1:2] + (mem_addr_rdy && !mem_addr_hold), 2'b00};
+			fetch_addr <= jump_target_post_increment;
 			fetch_priv <= jump_priv || !U_MODE;
 			btb_prev_start_of_overhanging <= 1'b0;
 		end else if (mem_addr_vld && mem_addr_rdy) begin
@@ -506,7 +518,7 @@ always @ (posedge clk or negedge rst_n) begin
 		buf_level <= 2'h0;
 		cir_vld <= 2'h0;
 		hwbuf <= 16'h0;
-		cir <= 16'h0;
+		cir <= 32'h0;
 		cir_bus_err <= 3'h0;
 		cir_predbranch_reg <= 3'h0;
 	end else begin
