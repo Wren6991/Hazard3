@@ -99,9 +99,6 @@ Make sure you have done a _recursive_ clone of the Hazard3 repository. Build the
 
 ```bash
 cd hazard3
-# Set up some paths, add RISC-V toolchain to PATH
-. sourceme
-
 cd test/sim/tb_cxxrtl
 make
 ```
@@ -270,7 +267,6 @@ Note there is no software tree for this SoC. For now you'll have to read the sou
 
 ```bash
 cd hazard3
-. sourceme
 cd example_soc/synth
 make -f Icebreaker.mk prog
 # Should be able to attach to the processor
@@ -281,7 +277,6 @@ riscv-openocd -f ../icebreaker-openocd.cfg
 
 ```bash
 cd hazard3
-. sourceme
 cd example_soc/synth
 make -f ULX3S.mk flash
 # Should be able to attach to the processor

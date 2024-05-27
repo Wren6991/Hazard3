@@ -1,3 +1,5 @@
+include ../project_paths.mk
+
 CHIPNAME=fpga_ulx3s
 TOP=fpga_ulx3s
 DOTF=../fpga/fpga_ulx3s.f

@@ -1,6 +1,0 @@
-export PROJ_ROOT=$PWD
-export HDL=$PROJ_ROOT/hdl
-export SCRIPTS=$PROJ_ROOT/scripts
-
-export PATH="$PATH:$PWD/scripts"
-export PATH="$PATH:/opt/riscv/bin"
