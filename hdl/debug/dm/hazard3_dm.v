@@ -718,6 +718,11 @@ always @ (*) begin
 				acmd_state_nxt = S_IDLE;
 			end
 		end
+
+		default: begin
+			// Unreachable
+		end
+
 	endcase
 end
 

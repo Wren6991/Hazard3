@@ -134,8 +134,6 @@ wire [W_DR_SHIFT-1:0] core_dr_rdata;
 always @ (posedge tck or negedge trst_n) begin
 	if (!trst_n) begin
 		dr_shift <= {W_DR_SHIFT{1'b0}};
-	end else if (tap_state == S_RESET) begin
-		dr_shift <= {W_DR_SHIFT{1'b0}};
 	end else if (tap_state == S_SHIFT_DR) begin
 		dr_shift <= {tdi, dr_shift} >> 1;
 		// Shorten DR shift chain according to IR
@@ -146,12 +144,13 @@ always @ (posedge tck or negedge trst_n) begin
 		else // BYPASS
 			dr_shift[0] <= tdi;
 	end else if (tap_state == S_CAPTURE_DR) begin
-		if (ir == IR_DMI || ir == IR_DTMCS)
+		if (ir == IR_DMI || ir == IR_DTMCS) begin
 			dr_shift <= core_dr_rdata;
-		else if (ir == IR_IDCODE)
-			dr_shift <= {10'h0, IDCODE};
-		else // BYPASS
-			dr_shift <= 42'h0;
+		end else if (ir == IR_IDCODE) begin
+			dr_shift <= {{W_DR_SHIFT-32{1'b0}}, IDCODE};
+		end else begin // BYPASS
+			dr_shift <= {W_DR_SHIFT{1'b0}};
+		end
 	end
 end
 
