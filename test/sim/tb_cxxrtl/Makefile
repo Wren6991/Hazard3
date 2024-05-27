@@ -1,10 +1,14 @@
 # To build single-core dual-port tb: make
 # To build dual-core single-port tb: make DOTF=tb_multicore.f
 
-TOP    := tb
-DOTF   := tb.f
-CONFIG := default
-TBEXEC := $(patsubst %.f,%,$(DOTF))
+TOP     := tb
+DOTF    := tb.f
+CONFIG  := default
+TBEXEC  := $(patsubst %.f,%,$(DOTF))
+
+# Note: clang++-18 has a >20x compile time regression, even at low
+# optimisation levels. I have tried clang++-16 and clang++-17, both fine.
+CLANGXX := clang++-16
 
 .PHONY: clean all
 
@@ -24,4 +28,4 @@ clean::
 	rm -rf build-$(DOTF) $(TBEXEC)
 
 $(TBEXEC): build-$(DOTF)/dut.cpp tb.cpp
-	clang++ -O3 -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) -I $(shell yosys-config --datdir)/include/backends/cxxrtl/runtime -I build-$(DOTF) tb.cpp -o $(TBEXEC)
+	$(CLANGXX) -O3 -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) -I $(shell yosys-config --datdir)/include/backends/cxxrtl/runtime -I build-$(DOTF) tb.cpp -o $(TBEXEC)
