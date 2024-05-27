@@ -62,8 +62,8 @@ module hazard3_dm #(
 	input  wire [N_HARTS-1:0]        hart_data0_wen,
 
 	// Hart instruction injection
-	output wire [N_HARTS*XLEN-1:0]   hart_instr_data,
-	output wire [N_HARTS-1:0]        hart_instr_data_vld,
+	output wire [N_HARTS*32-1:0]     hart_instr_data,
+	output reg  [N_HARTS-1:0]        hart_instr_data_vld,
 	input  wire [N_HARTS-1:0]        hart_instr_data_rdy,
 	input  wire [N_HARTS-1:0]        hart_instr_caught_exception,
 	input  wire [N_HARTS-1:0]        hart_instr_caught_ebreak,
@@ -569,7 +569,9 @@ localparam CMDERR_EXCEPTION = 3'h3;
 localparam CMDERR_HALTRESUME = 3'h4;
 
 reg [2:0]         abstractcs_cmderr;
+reg [2:0]         abstractcs_cmderr_nxt;
 reg [W_STATE-1:0] acmd_state;
+reg [W_STATE-1:0] acmd_state_nxt;
 
 assign abstractcs_busy = acmd_state != S_IDLE;
 
@@ -621,19 +623,16 @@ always @ (posedge clk or negedge rst_n) begin
 		acmd_prev_postexec <= 1'b0;
 		acmd_prev_transfer <= 1'b0;
 		acmd_prev_write <= 1'b0;
-		acmd_prev_regno <= 5'h0;
 		acmd_prev_unsupported <= 1'b1;
 	end else if (!dmactive) begin
 		acmd_prev_postexec <= 1'b0;
 		acmd_prev_transfer <= 1'b0;
 		acmd_prev_write <= 1'b0;
-		acmd_prev_regno <= 5'h0;
 		acmd_prev_unsupported <= 1'b1;
 	end else if (start_abstract_cmd && acmd_new) begin
 		acmd_prev_postexec <= acmd_new_postexec;
 		acmd_prev_transfer <= acmd_new_transfer;
 		acmd_prev_write <= acmd_new_write;
-		acmd_prev_regno <= acmd_new_regno;
 		acmd_prev_unsupported <= acmd_new_unsupported;
 	end
 end
@@ -641,8 +640,86 @@ end
 wire       acmd_postexec    = acmd_new ? acmd_new_postexec    : acmd_prev_postexec   ;
 wire       acmd_transfer    = acmd_new ? acmd_new_transfer    : acmd_prev_transfer   ;
 wire       acmd_write       = acmd_new ? acmd_new_write       : acmd_prev_write      ;
-wire [4:0] acmd_regno       = acmd_new ? acmd_new_regno       : acmd_prev_regno      ;
 wire       acmd_unsupported = acmd_new ? acmd_new_unsupported : acmd_prev_unsupported;
+
+always @ (*) begin
+	// Default: no state change
+	acmd_state_nxt = acmd_state;
+	abstractcs_cmderr_nxt = abstractcs_cmderr;
+
+	if (dmi_write && dmi_regaddr == ADDR_ABSTRACTCS && !abstractcs_busy)
+		abstractcs_cmderr_nxt = abstractcs_cmderr & ~dmi_pwdata[10:8];
+	if (abstractcs_cmderr == CMDERR_OK && abstractcs_busy && dmi_access_illegal_when_busy)
+		abstractcs_cmderr_nxt = CMDERR_BUSY;
+	if (acmd_state != S_IDLE && hart_instr_caught_exception[hartsel])
+		abstractcs_cmderr_nxt = CMDERR_EXCEPTION;
+
+	case (acmd_state)
+		S_IDLE: begin
+			if (start_abstract_cmd) begin
+				if (!hart_halted[hartsel] || !hart_available[hartsel]) begin
+					abstractcs_cmderr_nxt = CMDERR_HALTRESUME;
+				end else if (acmd_unsupported) begin
+					abstractcs_cmderr_nxt = CMDERR_UNSUPPORTED;
+				end else begin
+					if (acmd_transfer && acmd_write)
+						acmd_state_nxt = S_ISSUE_REGWRITE;
+					else if (acmd_transfer && !acmd_write)
+						acmd_state_nxt = S_ISSUE_REGREAD;
+					else if (acmd_postexec)
+						acmd_state_nxt = S_ISSUE_PROGBUF0;
+					else
+						acmd_state_nxt = S_IDLE;
+				end
+			end
+		end
+
+		S_ISSUE_REGREAD: begin
+			if (hart_instr_data_rdy[hartsel])
+				acmd_state_nxt = S_ISSUE_REGEBREAK;
+		end
+		S_ISSUE_REGWRITE: begin
+			if (hart_instr_data_rdy[hartsel])
+				acmd_state_nxt = S_ISSUE_REGEBREAK;
+		end
+		S_ISSUE_REGEBREAK: begin
+			if (hart_instr_data_rdy[hartsel])
+				acmd_state_nxt = S_WAIT_REGEBREAK;
+		end
+		S_WAIT_REGEBREAK: begin
+			if (hart_instr_caught_ebreak[hartsel]) begin
+				if (acmd_prev_postexec)
+					acmd_state_nxt = S_ISSUE_PROGBUF0;
+				else
+					acmd_state_nxt = S_IDLE;
+			end
+		end
+
+		S_ISSUE_PROGBUF0: begin
+			if (hart_instr_data_rdy[hartsel])
+				acmd_state_nxt = S_ISSUE_PROGBUF1;
+		end
+		S_ISSUE_PROGBUF1: begin
+			if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
+				acmd_state_nxt = S_IDLE;
+			end else if (hart_instr_data_rdy[hartsel]) begin
+				acmd_state_nxt = S_ISSUE_IMPEBREAK;
+			end
+		end
+		S_ISSUE_IMPEBREAK: begin
+			if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
+				acmd_state_nxt = S_IDLE;
+			end else if (hart_instr_data_rdy[hartsel]) begin
+				acmd_state_nxt = S_WAIT_IMPEBREAK;
+			end
+		end
+		S_WAIT_IMPEBREAK: begin
+			if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
+				acmd_state_nxt = S_IDLE;
+			end
+		end
+	endcase
+end
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -652,92 +729,37 @@ always @ (posedge clk or negedge rst_n) begin
 		abstractcs_cmderr <= CMDERR_OK;
 		acmd_state <= S_IDLE;
 	end else begin
-		if (dmi_write && dmi_regaddr == ADDR_ABSTRACTCS && !abstractcs_busy)
-			abstractcs_cmderr <= abstractcs_cmderr & ~dmi_pwdata[10:8];
-		if (abstractcs_cmderr == CMDERR_OK && abstractcs_busy && dmi_access_illegal_when_busy)
-			abstractcs_cmderr <= CMDERR_BUSY;
-		if (acmd_state != S_IDLE && hart_instr_caught_exception[hartsel])
-			abstractcs_cmderr <= CMDERR_EXCEPTION;
-		case (acmd_state)
-			S_IDLE: begin
-				if (start_abstract_cmd) begin
-					if (!hart_halted[hartsel] || !hart_available[hartsel]) begin
-						abstractcs_cmderr <= CMDERR_HALTRESUME;
-					end else if (acmd_unsupported) begin
-						abstractcs_cmderr <= CMDERR_UNSUPPORTED;
-					end else begin
-						if (acmd_transfer && acmd_write)
-							acmd_state <= S_ISSUE_REGWRITE;
-						else if (acmd_transfer && !acmd_write)
-							acmd_state <= S_ISSUE_REGREAD;
-						else if (acmd_postexec)
-							acmd_state <= S_ISSUE_PROGBUF0;
-						else
-							acmd_state <= S_IDLE;
-					end
-				end
-			end
-
-			S_ISSUE_REGREAD: begin
-				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_ISSUE_REGEBREAK;
-			end
-			S_ISSUE_REGWRITE: begin
-				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_ISSUE_REGEBREAK;
-			end
-			S_ISSUE_REGEBREAK: begin
-				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_WAIT_REGEBREAK;
-			end
-			S_WAIT_REGEBREAK: begin
-				if (hart_instr_caught_ebreak[hartsel]) begin
-					if (acmd_prev_postexec)
-						acmd_state <= S_ISSUE_PROGBUF0;
-					else
-						acmd_state <= S_IDLE;
-				end
-			end
-
-			S_ISSUE_PROGBUF0: begin
-				if (hart_instr_data_rdy[hartsel])
-					acmd_state <= S_ISSUE_PROGBUF1;
-			end
-			S_ISSUE_PROGBUF1: begin
-				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
-					acmd_state <= S_IDLE;
-				end else if (hart_instr_data_rdy[hartsel]) begin
-					acmd_state <= S_ISSUE_IMPEBREAK;
-				end
-			end
-			S_ISSUE_IMPEBREAK: begin
-				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
-					acmd_state <= S_IDLE;
-				end else if (hart_instr_data_rdy[hartsel]) begin
-					acmd_state <= S_WAIT_IMPEBREAK;
-				end
-			end
-			S_WAIT_IMPEBREAK: begin
-				if (hart_instr_caught_exception[hartsel] || hart_instr_caught_ebreak[hartsel]) begin
-					acmd_state <= S_IDLE;
-				end
-			end
-		endcase
+		abstractcs_cmderr <= abstractcs_cmderr_nxt;
+		acmd_state <= acmd_state_nxt;
 	end
 end
 
-assign hart_instr_data_vld = {{N_HARTS{1'b0}},
-	acmd_state == S_ISSUE_REGREAD || acmd_state == S_ISSUE_REGWRITE || acmd_state == S_ISSUE_REGEBREAK ||
-	acmd_state == S_ISSUE_PROGBUF0 || acmd_state == S_ISSUE_PROGBUF1 || acmd_state == S_ISSUE_IMPEBREAK
+wire hart_instr_data_vld_nxt = {{N_HARTS{1'b0}},
+	acmd_state_nxt == S_ISSUE_REGREAD || acmd_state_nxt == S_ISSUE_REGWRITE || acmd_state_nxt == S_ISSUE_REGEBREAK ||
+	acmd_state_nxt == S_ISSUE_PROGBUF0 || acmd_state_nxt == S_ISSUE_PROGBUF1 || acmd_state_nxt == S_ISSUE_IMPEBREAK
 } << hartsel;
 
-assign hart_instr_data = {N_HARTS{
-	acmd_state == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_prev_regno,  7'd0} : // csrr xx, dmdata0
-	acmd_state == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_prev_regno, 15'd0} : // csrw dmdata0, xx
-	acmd_state == S_ISSUE_PROGBUF0  ? progbuf0                                       :
-	acmd_state == S_ISSUE_PROGBUF1  ? progbuf1                                       :
-	                                  32'h00100073                                     // ebreak
-}};
+wire [31:0] hart_instr_data_nxt =
+	acmd_state_nxt == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_new_regno,  7'd0} : // csrr xx, dmdata0
+	acmd_state_nxt == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_new_regno, 15'd0} : // csrw dmdata0, xx
+	acmd_state_nxt == S_ISSUE_PROGBUF0  ? progbuf0                                      :
+	acmd_state_nxt == S_ISSUE_PROGBUF1  ? progbuf1                                      :
+	                                      32'h00100073;                                   // ebreak
+
+reg [31:0] hart_instr_data_reg;
+assign hart_instr_data = {N_HARTS{hart_instr_data_reg}};
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		hart_instr_data_vld <= 1'b0;
+		hart_instr_data_reg <= 32'h00000000;
+	end else begin
+		hart_instr_data_vld <= hart_instr_data_vld_nxt;
+		if (hart_instr_data_vld_nxt) begin
+			hart_instr_data_reg <= hart_instr_data_nxt;
+		end
+	end
+end
 
 // ----------------------------------------------------------------------------
 // Status helper functions
