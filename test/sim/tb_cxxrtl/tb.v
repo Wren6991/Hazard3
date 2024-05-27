@@ -27,6 +27,7 @@ module tb #(
 	output wire [2:0]         i_hburst,
 	output wire [3:0]         i_hprot,
 	output wire               i_hmastlock,
+	output wire [7:0]         i_hmaster,
 	input  wire               i_hready,
 	input  wire               i_hresp,
 	input  wire               i_hexokay,
@@ -42,6 +43,7 @@ module tb #(
 	output wire [2:0]         d_hburst,
 	output wire [3:0]         d_hprot,
 	output wire               d_hmastlock,
+	output wire [7:0]         d_hmaster,
 	input  wire               d_hready,
 	input  wire               d_hresp,
 	input  wire               d_hexokay,
@@ -51,7 +53,7 @@ module tb #(
 	// Level-sensitive interrupt sources
 	input wire [NUM_IRQS-1:0] irq,       // -> mip.meip
 	input wire [1:0]          soft_irq,  // -> mip.msip
-	input wire                timer_irq  // -> mip.mtip
+	input wire [1:0]          timer_irq  // -> mip.mtip
 );
 
 // JTAG-DTM IDCODE, selected after TAP reset, would normally be a
@@ -262,6 +264,7 @@ hazard3_cpu_2port #(
 	.i_hburst                   (i_hburst),
 	.i_hprot                    (i_hprot),
 	.i_hmastlock                (i_hmastlock),
+	.i_hmaster                  (i_hmaster),
 	.i_hready                   (i_hready),
 	.i_hresp                    (i_hresp),
 	.i_hwdata                   (i_hwdata),
@@ -275,6 +278,7 @@ hazard3_cpu_2port #(
 	.d_hburst                   (d_hburst),
 	.d_hprot                    (d_hprot),
 	.d_hmastlock                (d_hmastlock),
+	.d_hmaster                  (d_hmaster),
 	.d_hready                   (d_hready),
 	.d_hresp                    (d_hresp),
 	.d_hexokay                  (d_hexokay),

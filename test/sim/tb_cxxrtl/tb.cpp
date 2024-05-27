@@ -77,16 +77,7 @@ struct mem_io_state {
 	void step(cxxrtl_design::p_tb &tb) {
 		// Default update logic for mtime, mtimecmp
 		++mtime;
-		// This wire is 1-bit wide on single-core tb, and two bits wide on
-		// multicore tb. Using a set<uint8_t> on the single-core tb results
-		// in bit 8 of mip impossibly being set (bit 7 is the timer IRQ, bit
-		// 8 is hardwired to 0). Seems like a CXXRTL bug but no smaller repro
-		// yet, so use an ifdef for now.
-#ifdef WIDE_TIMER_IRQ
 		tb.p_timer__irq.set<uint8_t>((mtime >= mtimecmp[0]) | (mtime >= mtimecmp[1]) << 1);
-#else
-		tb.p_timer__irq.set<bool>(mtime >= mtimecmp[0]);
-#endif
 	}
 };
 
