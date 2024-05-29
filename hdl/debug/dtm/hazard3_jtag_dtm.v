@@ -109,7 +109,7 @@ always @ (posedge tck or negedge trst_n) begin
 	end else if (tap_state == S_CAPTURE_IR) begin
 		ir_shift <= ir;
 	end else if (tap_state == S_SHIFT_IR) begin
-		ir_shift <= {tdi, ir_shift} >> 1;
+		ir_shift <= {tdi, ir_shift[W_IR-1:1]};
 	end else if (tap_state == S_UPDATE_IR) begin
 		ir <= ir_shift;
 	end
@@ -135,7 +135,7 @@ always @ (posedge tck or negedge trst_n) begin
 	if (!trst_n) begin
 		dr_shift <= {W_DR_SHIFT{1'b0}};
 	end else if (tap_state == S_SHIFT_DR) begin
-		dr_shift <= {tdi, dr_shift} >> 1;
+		dr_shift <= {tdi, dr_shift[W_DR_SHIFT-1:1]};
 		// Shorten DR shift chain according to IR
 		if (ir == IR_DMI)
 			dr_shift[W_DR_SHIFT - 1] <= tdi;
