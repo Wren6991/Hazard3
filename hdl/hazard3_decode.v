@@ -249,170 +249,228 @@ end
 
 localparam X0 = {W_REGADDR{1'b0}};
 
+// First decode the instruction bits, based on available extensions and
+// privilege state, without gating in any stall/exception signals.
+reg  [W_REGADDR-1:0] raw_rs1;
+reg  [W_REGADDR-1:0] raw_rs2;
+reg  [W_REGADDR-1:0] raw_rd;
+reg  [W_DATA-1:0]    raw_imm;
+reg  [W_ALUSRC-1:0]  raw_alusrc_a;
+reg  [W_ALUSRC-1:0]  raw_alusrc_b;
+reg  [W_ALUOP-1:0]   raw_aluop;
+reg  [W_MEMOP-1:0]   raw_memop;
+reg  [W_MULOP-1:0]   raw_mulop;
+reg                  raw_csr_ren;
+reg                  raw_csr_wen;
+reg  [1:0]           raw_csr_wtype;
+reg                  raw_csr_w_imm;
+reg  [W_BCOND-1:0]   raw_branchcond;
+reg  [W_ADDR-1:0]    raw_addr_offs;
+reg                  raw_addr_is_regoffs;
+reg  [W_EXCEPT-1:0]  raw_except;
+reg                  raw_sleep_wfi;
+reg                  raw_sleep_block;
+reg                  raw_sleep_unblock;
+reg                  raw_fence_i;
+
 always @ (*) begin
 	// Assign some defaults
-	d_rs1 = d_instr[19:15];
-	d_rs2 = d_instr[24:20];
-	d_rd  = d_instr[11: 7];
-	d_imm = d_imm_i;
-	d_alusrc_a = ALUSRCA_RS1;
-	d_alusrc_b = ALUSRCB_RS2;
-	d_aluop = ALUOP_ADD;
-	d_memop = MEMOP_NONE;
-	d_mulop = M_OP_MUL;
-	d_csr_ren = 1'b0;
-	d_csr_wen = 1'b0;
-	d_csr_wtype = CSR_WTYPE_W;
-	d_csr_w_imm = 1'b0;
-	d_branchcond = BCOND_NEVER;
-	d_addr_is_regoffs = 1'b0;
-	d_invalid_32bit = 1'b0;
-	d_except = EXCEPT_NONE;
-	d_sleep_wfi = 1'b0;
-	d_sleep_block = 1'b0;
-	d_sleep_unblock = 1'b0;
-	d_fence_i = 1'b0;
+	raw_rs1 = d_instr[19:15];
+	raw_rs2 = d_instr[24:20];
+	raw_rd  = d_instr[11: 7];
+	raw_imm = d_imm_i;
+	raw_alusrc_a = ALUSRCA_RS1;
+	raw_alusrc_b = ALUSRCB_RS2;
+	raw_aluop = ALUOP_ADD;
+	raw_memop = MEMOP_NONE;
+	raw_mulop = M_OP_MUL;
+	raw_csr_ren = 1'b0;
+	raw_csr_wen = 1'b0;
+	raw_csr_wtype = CSR_WTYPE_W;
+	raw_csr_w_imm = 1'b0;
+	raw_branchcond = BCOND_NEVER;
+	raw_addr_is_regoffs = 1'b0;
+	raw_except = EXCEPT_NONE;
+	raw_sleep_wfi = 1'b0;
+	raw_sleep_block = 1'b0;
+	raw_sleep_unblock = 1'b0;
+	raw_fence_i = 1'b0;
 	// Note this funct3/funct7 are valid only for 32-bit instructions. They
 	// are useful for clusters of related ALU ops, such as sh*add, clmul.
 	d_funct3_32b = fd_cir[14:12];
 	d_funct7_32b = fd_cir[31:25];
 
+	d_invalid_32bit = 1'b0;
+
 	casez (d_instr)
-	`RVOPC_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_ZERO;  end
-	`RVOPC_BNE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_SUB; d_branchcond = BCOND_NZERO; end
-	`RVOPC_BLT:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_NZERO; end
-	`RVOPC_BGE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LT;  d_branchcond = BCOND_ZERO; end
-	`RVOPC_BLTU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_NZERO; end
-	`RVOPC_BGEU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_rd = X0; d_aluop = ALUOP_LTU; d_branchcond = BCOND_ZERO; end
-	`RVOPC_JALR:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
-	`RVOPC_JAL:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_rs1 = X0;               d_rs2 = X0; d_aluop = ALUOP_ADD; d_alusrc_a = ALUSRCA_PC; d_alusrc_b = ALUSRCB_IMM; d_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
-	`RVOPC_LUI:       begin d_aluop = ALUOP_RS2; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_rs1 = X0; end
-	`RVOPC_AUIPC:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_aluop = ALUOP_ADD; d_imm = d_imm_u; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; d_alusrc_a = ALUSRCA_PC;  d_rs1 = X0; end
-	`RVOPC_ADDI:      begin d_aluop = ALUOP_ADD; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SLLI:      begin d_aluop = ALUOP_SLL; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SLTI:      begin d_aluop = ALUOP_LT;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SLTIU:     begin d_aluop = ALUOP_LTU; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_XORI:      begin d_aluop = ALUOP_XOR; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SRLI:      begin d_aluop = ALUOP_SRL; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_SRAI:      begin d_aluop = ALUOP_SRA; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_ORI:       begin d_aluop = ALUOP_OR;  d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_ANDI:      begin d_aluop = ALUOP_AND; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; d_rs2 = X0; end
-	`RVOPC_ADD:       begin d_aluop = ALUOP_ADD; end
-	`RVOPC_SUB:       begin d_aluop = ALUOP_SUB; end
-	`RVOPC_SLL:       begin d_aluop = ALUOP_SLL; end
-	`RVOPC_SLTU:      begin d_aluop = ALUOP_LTU; end
-	`RVOPC_XOR:       begin d_aluop = ALUOP_XOR; end
-	`RVOPC_SRL:       begin d_aluop = ALUOP_SRL; end
-	`RVOPC_SRA:       begin d_aluop = ALUOP_SRA; end
-	`RVOPC_OR:        begin d_aluop = ALUOP_OR;  end
-	`RVOPC_AND:       begin d_aluop = ALUOP_AND; end
-	`RVOPC_LB:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LB;  end
-	`RVOPC_LH:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LH;  end
-	`RVOPC_LW:        begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LW;  end
-	`RVOPC_LBU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LBU; end
-	`RVOPC_LHU:       begin d_addr_is_regoffs = 1'b1; d_rs2 = X0; d_memop = MEMOP_LHU; end
-	`RVOPC_SB:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SB;  d_rd = X0; end
-	`RVOPC_SH:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SH;  d_rd = X0; end
-	`RVOPC_SW:        begin d_addr_is_regoffs = 1'b1; d_aluop = ALUOP_RS2; d_memop = MEMOP_SW;  d_rd = X0; end
+	`RVOPC_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_SUB; raw_branchcond = BCOND_ZERO;  end
+	`RVOPC_BNE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_SUB; raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BLT:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LT;  raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BGE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LT;  raw_branchcond = BCOND_ZERO;  end
+	`RVOPC_BLTU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LTU; raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BGEU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LTU; raw_branchcond = BCOND_ZERO;  end
+	`RVOPC_JALR:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_branchcond = BCOND_ALWAYS; raw_addr_is_regoffs = 1'b1;
+	                        raw_rs2 = X0; raw_aluop = ALUOP_ADD; raw_alusrc_a = ALUSRCA_PC; raw_alusrc_b = ALUSRCB_IMM; raw_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
+	`RVOPC_JAL:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_branchcond = BCOND_ALWAYS; raw_rs1 = X0;
+	                        raw_rs2 = X0; raw_aluop = ALUOP_ADD; raw_alusrc_a = ALUSRCA_PC; raw_alusrc_b = ALUSRCB_IMM; raw_imm = d_instr_is_32bit ? 32'h4 : 32'h2; end
+	`RVOPC_LUI:       begin raw_aluop = ALUOP_RS2; raw_imm = d_imm_u; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; raw_rs1 = X0; end
+	`RVOPC_AUIPC:     begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_aluop = ALUOP_ADD; raw_imm = d_imm_u; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; raw_alusrc_a = ALUSRCA_PC;  raw_rs1 = X0; end
+	`RVOPC_ADDI:      begin raw_aluop = ALUOP_ADD; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_SLLI:      begin raw_aluop = ALUOP_SLL; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_SLTI:      begin raw_aluop = ALUOP_LT;  raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_SLTIU:     begin raw_aluop = ALUOP_LTU; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_XORI:      begin raw_aluop = ALUOP_XOR; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_SRLI:      begin raw_aluop = ALUOP_SRL; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_SRAI:      begin raw_aluop = ALUOP_SRA; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_ORI:       begin raw_aluop = ALUOP_OR;  raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_ANDI:      begin raw_aluop = ALUOP_AND; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; raw_rs2 = X0; end
+	`RVOPC_ADD:       begin raw_aluop = ALUOP_ADD; end
+	`RVOPC_SUB:       begin raw_aluop = ALUOP_SUB; end
+	`RVOPC_SLL:       begin raw_aluop = ALUOP_SLL; end
+	`RVOPC_SLTU:      begin raw_aluop = ALUOP_LTU; end
+	`RVOPC_XOR:       begin raw_aluop = ALUOP_XOR; end
+	`RVOPC_SRL:       begin raw_aluop = ALUOP_SRL; end
+	`RVOPC_SRA:       begin raw_aluop = ALUOP_SRA; end
+	`RVOPC_OR:        begin raw_aluop = ALUOP_OR;  end
+	`RVOPC_AND:       begin raw_aluop = ALUOP_AND; end
+	`RVOPC_LB:        begin raw_addr_is_regoffs = 1'b1; raw_rs2 = X0; raw_memop = MEMOP_LB;  end
+	`RVOPC_LH:        begin raw_addr_is_regoffs = 1'b1; raw_rs2 = X0; raw_memop = MEMOP_LH;  end
+	`RVOPC_LW:        begin raw_addr_is_regoffs = 1'b1; raw_rs2 = X0; raw_memop = MEMOP_LW;  end
+	`RVOPC_LBU:       begin raw_addr_is_regoffs = 1'b1; raw_rs2 = X0; raw_memop = MEMOP_LBU; end
+	`RVOPC_LHU:       begin raw_addr_is_regoffs = 1'b1; raw_rs2 = X0; raw_memop = MEMOP_LHU; end
+	`RVOPC_SB:        begin raw_addr_is_regoffs = 1'b1; raw_aluop = ALUOP_RS2; raw_memop = MEMOP_SB;  raw_rd = X0; end
+	`RVOPC_SH:        begin raw_addr_is_regoffs = 1'b1; raw_aluop = ALUOP_RS2; raw_memop = MEMOP_SH;  raw_rd = X0; end
+	`RVOPC_SW:        begin raw_addr_is_regoffs = 1'b1; raw_aluop = ALUOP_RS2; raw_memop = MEMOP_SW;  raw_rd = X0; end
 
 	`RVOPC_SLT:       begin
-		d_aluop = ALUOP_LT;
-		if (|EXTENSION_XH3POWER && ~|d_rd && ~|d_rs1) begin
-			if (d_rs2 == 5'h00) begin
+		raw_aluop = ALUOP_LT;
+		if (|EXTENSION_XH3POWER && ~|raw_rd && ~|raw_rs1) begin
+			if (raw_rs2 == 5'h00) begin
 				// h3.block (power management hint)
 				d_invalid_32bit = trap_wfi;
-				d_sleep_block = !trap_wfi;
-			end else if (d_rs2 == 5'h01) begin
+				raw_sleep_block = !trap_wfi;
+			end else if (raw_rs2 == 5'h01) begin
 				// h3.unblock (power management hint)
 				d_invalid_32bit = trap_wfi;
-				d_sleep_unblock = !trap_wfi;
+				raw_sleep_unblock = !trap_wfi;
 			end
 		end
 	end
 
-	`RVOPC_MUL:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MUL;    end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MULH:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULH;   end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MULHSU:    if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULHSU; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MULHU:     if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_MULHU;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_DIV:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_DIV;    end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_DIVU:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_DIVU;   end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_REM:       if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_REMU:      if (EXTENSION_M) begin d_aluop = ALUOP_MULDIV; d_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MUL:       if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_MUL;    end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MULH:      if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_MULH;   end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MULHSU:    if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_MULHSU; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MULHU:     if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_MULHU;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_DIV:       if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_DIV;    end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_DIVU:      if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_DIVU;   end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_REM:       if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_REM;    end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_REMU:      if (EXTENSION_M) begin raw_aluop = ALUOP_MULDIV; raw_mulop = M_OP_REMU;   end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_LR_W:      if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_LR_W; d_rs2 = X0;           end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_SC_W:      if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_SC_W; d_aluop = ALUOP_RS2;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOSWAP_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_RS2;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOADD_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_ADD;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOXOR_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_XOR;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOAND_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_AND;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOOR_W:   if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_OR;   end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOMIN_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_MIN;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOMAX_W:  if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_MAX;  end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOMINU_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_MINU; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_AMOMAXU_W: if (EXTENSION_A) begin d_addr_is_regoffs = 1'b1; d_memop = MEMOP_AMO;  d_aluop = ALUOP_MAXU; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_LR_W:      if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_LR_W; raw_rs2 = X0;           end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_SC_W:      if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_SC_W; raw_aluop = ALUOP_RS2;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOSWAP_W: if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_RS2;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOADD_W:  if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_ADD;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOXOR_W:  if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_XOR;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOAND_W:  if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_AND;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOOR_W:   if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_OR;   end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOMIN_W:  if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MIN;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOMAX_W:  if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MAX;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOMINU_W: if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MINU; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_AMOMAXU_W: if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MAXU; end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_SH1ADD:    if (EXTENSION_ZBA)  begin d_aluop = ALUOP_SHXADD;                                                        end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_SH2ADD:    if (EXTENSION_ZBA)  begin d_aluop = ALUOP_SHXADD;                                                        end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_SH3ADD:    if (EXTENSION_ZBA)  begin d_aluop = ALUOP_SHXADD;                                                        end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_SH1ADD:    if (EXTENSION_ZBA)  begin raw_aluop = ALUOP_SHXADD;                                                              end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_SH2ADD:    if (EXTENSION_ZBA)  begin raw_aluop = ALUOP_SHXADD;                                                              end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_SH3ADD:    if (EXTENSION_ZBA)  begin raw_aluop = ALUOP_SHXADD;                                                              end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_ANDN:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ANDN;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CLZ:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_CLZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CPOP:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_CPOP;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CTZ:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_CTZ;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MAX:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MAX;                                                           end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MAXU:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MAXU;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MIN:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MIN;                                                           end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MINU:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_MINU;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ORC_B:     if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ORC_B;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ORN:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ORN;                                                           end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_REV8:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_REV8;   d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ROL:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ROL;                                                           end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ROR:       if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ROR;                                                           end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_RORI:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ROR;    d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_SEXT_B:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_SEXT_B; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_SEXT_H:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_SEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_XNOR:      if (EXTENSION_ZBB)  begin d_aluop = ALUOP_XNOR;                                                          end else begin d_invalid_32bit = 1'b1; end
-	// Note: ZEXT_H is a subset of PACK from Zbkb. This is fine as long as
-	// this case appears first, since Zbkb implies Zbb on Hazard3.
-	`RVOPC_ZEXT_H:    if (EXTENSION_ZBB)  begin d_aluop = ALUOP_ZEXT_H; d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ANDN:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ANDN;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CLZ:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_CLZ;    raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CPOP:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_CPOP;   raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CTZ:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_CTZ;    raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MAX:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_MAX;                                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MAXU:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_MAXU;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MIN:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_MIN;                                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MINU:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_MINU;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ORC_B:     if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ORC_B;  raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ORN:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ORN;                                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_REV8:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_REV8;   raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ROL:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ROL;                                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ROR:       if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ROR;                                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_RORI:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ROR;    raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_SEXT_B:    if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_SEXT_B; raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_SEXT_H:    if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_SEXT_H; raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_XNOR:      if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_XNOR;                                                                end else begin d_invalid_32bit = 1'b1; end
+	// Note: ZEXT_H is a subset of PACK from Zbkb. This is fine as long
+	// as this case appears first, since Zbkb implies Zbb on Hazard3.
+	`RVOPC_ZEXT_H:    if (EXTENSION_ZBB)  begin raw_aluop = ALUOP_ZEXT_H; raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_CLMUL:     if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CLMULH:    if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CLMULR:    if (EXTENSION_ZBC)  begin d_aluop = ALUOP_CLMUL;                                                         end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CLMUL:     if (EXTENSION_ZBC)  begin raw_aluop = ALUOP_CLMUL;                                                               end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CLMULH:    if (EXTENSION_ZBC)  begin raw_aluop = ALUOP_CLMUL;                                                               end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CLMULR:    if (EXTENSION_ZBC)  begin raw_aluop = ALUOP_CLMUL;                                                               end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_BCLR:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BCLR;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BCLRI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BCLR;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BEXT:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BEXT;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BEXTI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BEXT;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BINV:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BINV;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BINVI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BINV;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BSET:      if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BSET;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BSETI:     if (EXTENSION_ZBS)  begin d_aluop = ALUOP_BSET;   d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BCLR:      if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BCLR;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BCLRI:     if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BCLR;   raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BEXT:      if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BEXT;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BEXTI:     if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BEXT;   raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BINV:      if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BINV;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BINVI:     if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BINV;   raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BSET:      if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BSET;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BSETI:     if (EXTENSION_ZBS)  begin raw_aluop = ALUOP_BSET;   raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_PACK:      if (EXTENSION_ZBKB) begin d_aluop = ALUOP_PACK;                                                          end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_PACKH:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_PACKH;                                                         end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_BREV8:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_BREV8;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_UNZIP:     if (EXTENSION_ZBKB) begin d_aluop = ALUOP_UNZIP;  d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ZIP:       if (EXTENSION_ZBKB) begin d_aluop = ALUOP_ZIP;    d_rs2 = X0;                                            end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_PACK:      if (EXTENSION_ZBKB) begin raw_aluop = ALUOP_PACK;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_PACKH:     if (EXTENSION_ZBKB) begin raw_aluop = ALUOP_PACKH;                                                               end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BREV8:     if (EXTENSION_ZBKB) begin raw_aluop = ALUOP_BREV8;  raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_UNZIP:     if (EXTENSION_ZBKB) begin raw_aluop = ALUOP_UNZIP;  raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_ZIP:       if (EXTENSION_ZBKB) begin raw_aluop = ALUOP_ZIP;    raw_rs2 = X0;                                                end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_H3_BEXTM:  if (EXTENSION_XH3BEXTM) begin d_aluop = ALUOP_BEXTM;                                                         end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_H3_BEXTMI: if (EXTENSION_XH3BEXTM) begin d_aluop = ALUOP_BEXTM;  d_rs2 = X0; d_imm = d_imm_i; d_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_BEXTM:  if (EXTENSION_XH3BEXTM) begin
+	                                           raw_aluop = ALUOP_BEXTM;                                                                end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_BEXTMI: if (EXTENSION_XH3BEXTM) begin
+	                                           raw_aluop = ALUOP_BEXTM;   raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
 
-	`RVOPC_FENCE:     begin d_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
-	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; d_branchcond = BCOND_ALWAYS; d_fence_i = 1'b1; end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
-	`RVOPC_CSRRW:     if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRS:     if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRC:     if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRWI:    if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = 1'b1  ; d_csr_ren = |d_rd; d_csr_wtype = CSR_WTYPE_W; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRSI:    if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_S; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_CSRRCI:    if (HAVE_CSR)              begin d_imm = d_imm_i; d_csr_wen = |d_rs1; d_csr_ren = 1'b1 ; d_csr_wtype = CSR_WTYPE_C; d_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_ECALL:     if (HAVE_CSR)              begin d_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_EBREAK:    if (HAVE_CSR)              begin d_except = EXCEPT_EBREAK; d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_MRET:      if (HAVE_CSR && m_mode)    begin d_except = EXCEPT_MRET;   d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
-	`RVOPC_WFI:       if (HAVE_CSR && !trap_wfi) begin d_sleep_wfi = 1'b1;       d_rs2 = X0; d_rs1 = X0; d_rd = X0; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRW:     if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = 1'b1  ;   raw_csr_ren = |raw_rd; raw_csr_wtype = CSR_WTYPE_W;                       end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRS:     if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_S;                       end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRC:     if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_C;                       end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRWI:    if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = 1'b1  ;   raw_csr_ren = |raw_rd; raw_csr_wtype = CSR_WTYPE_W; raw_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRSI:    if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_S; raw_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_CSRRCI:    if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_C; raw_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
 
-	default:      begin d_invalid_32bit = 1'b1; end
+	`RVOPC_FENCE:     begin raw_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
+	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_branchcond = BCOND_ALWAYS; raw_fence_i = 1'b1;                    end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
+	`RVOPC_ECALL:     if (HAVE_CSR)              begin raw_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;          end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_EBREAK:    if (HAVE_CSR)              begin raw_except = EXCEPT_EBREAK; raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_MRET:      if (HAVE_CSR && m_mode)    begin raw_except = EXCEPT_MRET;   raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;                                                 end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_WFI:       if (HAVE_CSR && !trap_wfi) begin raw_sleep_wfi = 1'b1;       raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;                                                 end else begin d_invalid_32bit = 1'b1; end
+
+	default:          begin d_invalid_32bit = 1'b1; end
 	endcase
+end
+
+// Then gate key signals based on CIR fullness, fetch faults etc. The split
+// helps to avoid an event scheduling feedback loop that makes simulators
+// unhappy and slow, particularly verilator
+
+always @ (*) begin
+	// Pass through by default
+	d_rs1             = raw_rs1;
+	d_rs2             = raw_rs2;
+	d_rd              = raw_rd;
+	d_imm             = raw_imm;
+	d_alusrc_a        = raw_alusrc_a;
+	d_alusrc_b        = raw_alusrc_b;
+	d_aluop           = raw_aluop;
+	d_memop           = raw_memop;
+	d_mulop           = raw_mulop;
+	d_csr_ren         = raw_csr_ren;
+	d_csr_wen         = raw_csr_wen;
+	d_csr_wtype       = raw_csr_wtype;
+	d_csr_w_imm       = raw_csr_w_imm;
+	d_branchcond      = raw_branchcond;
+	d_addr_is_regoffs = raw_addr_is_regoffs;
+	d_except          = raw_except;
+	d_sleep_wfi       = raw_sleep_wfi;
+	d_sleep_block     = raw_sleep_block;
+	d_sleep_unblock   = raw_sleep_unblock;
+	d_fence_i         = raw_fence_i;
 
 	if (d_invalid || d_starved || d_except_instr_bus_fault || partial_predicted_branch) begin
 		d_rs1             = {W_REGADDR{1'b0}};

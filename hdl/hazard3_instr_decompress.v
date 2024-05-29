@@ -112,13 +112,17 @@ function [31:0] rfmt_rs2; input [4:0] rs2; begin rfmt_rs2 = {7'h00, rs2, 20'h000
 // - 1x addi to adjust sp       (counter = 15   ) < atomic section
 
 reg [3:0] uop_ctr;
-reg [3:0] uop_ctr_nxt;
+reg [3:0] uop_ctr_nxt_in_seq;
 reg       in_uop_seq;
 reg       uop_no_pc_update;
 
 wire zcmp_is_pushpop = instr_in[12];
 wire uop_seq_end      = |EXTENSION_ZCMP && (zcmp_is_pushpop ? uop_ctr == 4'hf : uop_ctr[0]);
 wire uop_atomic       = |EXTENSION_ZCMP && (zcmp_is_pushpop ? uop_ctr >= 4'he : uop_ctr[0]);
+
+wire [3:0] uop_ctr_nxt =
+	instr_out_uop_clear ? 4'h0    :
+	instr_out_uop_stall ? uop_ctr : uop_ctr_nxt_in_seq;
 
 assign instr_out_is_uop = in_uop_seq;
 assign instr_out_is_final_uop = uop_seq_end;
@@ -185,14 +189,14 @@ end else begin: instr_decompress
 			invalid = 1'b0;
 			in_uop_seq = 1'b0;
 			uop_no_pc_update = 1'b0;
-			uop_ctr_nxt = uop_ctr;
+			uop_ctr_nxt_in_seq = uop_ctr;
 		end else begin
 			instr_is_32bit = 1'b0;
 			instr_out = 32'h0;
 			invalid = 1'b0;
 			in_uop_seq = 1'b0;
 			uop_no_pc_update = 1'b0;
-			uop_ctr_nxt = uop_ctr;
+			uop_ctr_nxt_in_seq = uop_ctr;
 			casez (instr_in[15:0])
 			16'h0:         invalid = 1'b1;
 			`RVOPC_C_ADDI4SPN: instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_s) | rfmt_rs1(5'h2)
@@ -301,15 +305,15 @@ end else begin: instr_decompress
 				invalid = 1'b1;
 			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = 4'h0;
+				uop_ctr_nxt_in_seq = 4'h0;
 				instr_out = zcmp_push_stack_adj_instr;
 			end else begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				instr_out = zcmp_push_sw_instr;
 				uop_no_pc_update = 1'b1;
-				if (uop_ctr_nxt == zcmp_n_regs) begin
-					uop_ctr_nxt = 4'hf;
+				if (uop_ctr_nxt_in_seq == zcmp_n_regs) begin
+					uop_ctr_nxt_in_seq = 4'hf;
 				end
 			end
 
@@ -317,15 +321,15 @@ end else begin: instr_decompress
 				invalid = 1'b1;
 			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = 4'h0;
+				uop_ctr_nxt_in_seq = 4'h0;
 				instr_out = zcmp_pop_stack_adj_instr;
 			end else begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				uop_no_pc_update = 1'b1;
 				instr_out = zcmp_pop_lw_instr;
-				if (uop_ctr_nxt == zcmp_n_regs) begin
-					uop_ctr_nxt = 4'hf;
+				if (uop_ctr_nxt_in_seq == zcmp_n_regs) begin
+					uop_ctr_nxt_in_seq = 4'hf;
 				end
 			end
 
@@ -337,20 +341,20 @@ end else begin: instr_decompress
 				// allow this jump to execute without flushing the final stack adjust uop, which can
 				// cause the wrong exception PC to be sampled if this uop is interrupted.
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
 			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = 4'h0;
+				uop_ctr_nxt_in_seq = 4'h0;
 				uop_no_pc_update = 1'b1;
 				instr_out = zcmp_pop_stack_adj_instr;
 			end else begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				instr_out = zcmp_pop_lw_instr;
 				uop_no_pc_update = 1'b1;
-				if (uop_ctr_nxt == zcmp_n_regs) begin
-					uop_ctr_nxt = 4'he;
+				if (uop_ctr_nxt_in_seq == zcmp_n_regs) begin
+					uop_ctr_nxt_in_seq = 4'he;
 				end
 			end
 
@@ -358,25 +362,25 @@ end else begin: instr_decompress
 				invalid = 1'b1;
 			end else if (uop_ctr == 4'hd) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				uop_no_pc_update = 1'b1;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd10); // li a0, 0
 			end else if (uop_ctr == 4'he) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				instr_out = `RVOPC_NOZ_JALR | rfmt_rs1(5'h1);
 			end else if (uop_ctr == 4'hf) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = 4'h0;
+				uop_ctr_nxt_in_seq = 4'h0;
 				uop_no_pc_update = 1'b1;
 				instr_out = zcmp_pop_stack_adj_instr;
 			end else begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				uop_no_pc_update = 1'b1;
 				instr_out = zcmp_pop_lw_instr;
-				if (uop_ctr_nxt == zcmp_n_regs) begin
-					uop_ctr_nxt = 4'hd;
+				if (uop_ctr_nxt_in_seq == zcmp_n_regs) begin
+					uop_ctr_nxt_in_seq = 4'hd;
 				end
 			end
 
@@ -384,12 +388,12 @@ end else begin: instr_decompress
 				invalid = 1'b1;
 			end else if (uop_ctr == 4'h0) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				uop_no_pc_update = 1'b1;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(zcmp_sa01_r1s) | rfmt_rs1(5'd10);
 			end else begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = 4'h0;
+				uop_ctr_nxt_in_seq = 4'h0;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(zcmp_sa01_r2s) | rfmt_rs1(5'd11);
 			end
 
@@ -397,23 +401,17 @@ end else begin: instr_decompress
 				invalid = 1'b1;
 			end else if (uop_ctr == 4'h0) begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = uop_ctr + 4'h1;
+				uop_ctr_nxt_in_seq = uop_ctr + 4'h1;
 				uop_no_pc_update = 1'b1;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd10) | rfmt_rs1(zcmp_sa01_r1s);
 			end else begin
 				in_uop_seq = 1'b1;
-				uop_ctr_nxt = 4'h0;
+				uop_ctr_nxt_in_seq = 4'h0;
 				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(5'd11) | rfmt_rs1(zcmp_sa01_r2s);
 			end
 
 			default: invalid = 1'b1;
 			endcase
-
-			if (instr_out_uop_clear) begin
-				uop_ctr_nxt = 4'h0;
-			end else if (instr_out_uop_stall) begin
-				uop_ctr_nxt = uop_ctr;
-			end
 		end
 	end
 end
