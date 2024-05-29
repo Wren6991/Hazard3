@@ -46,6 +46,7 @@ module hazard3_irq_ctrl #(
 
 localparam MAX_IRQS = 512;
 localparam [3:0] IRQ_PRIORITY_MASK = ~(4'hf >> IRQ_PRIORITY_BITS);
+localparam W_IRQ_INDEX = $clog2(MAX_IRQS);
 
 // ----------------------------------------------------------------------------
 // IRQ input flops
@@ -80,9 +81,9 @@ endgenerate
 // CSR write
 
 // Assigned later:
-wire [8:0]            meinext_irq;
-wire                  meinext_noirq;
-reg  [3:0]            eirq_highest_priority;
+wire [W_IRQ_INDEX-1:0] meinext_irq;
+wire                   meinext_noirq;
+reg  [3:0]             eirq_highest_priority;
 
 // Interrupt array registers:
 reg  [NUM_IRQS-1:0]   meiea;
@@ -95,7 +96,7 @@ wire [MAX_IRQS-1:0]   meifa_rdata  = {{MAX_IRQS-NUM_IRQS{1'b0}}, meifa};
 wire [4*MAX_IRQS-1:0] meipra_rdata = {{4*(MAX_IRQS-NUM_IRQS){1'b0}}, meipra};
 
 always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
-	integer i;
+	reg signed [31:0] i;
 	if (!rst_n) begin
 		meiea <= {NUM_IRQS{1'b0}};
 		meifa <= {NUM_IRQS{1'b0}};
@@ -104,30 +105,30 @@ always @ (posedge clk or negedge rst_n) begin: update_irq_reg_arrays
 		for (i = 0; i < NUM_IRQS; i = i + 1) begin
 			// CSR write update. Note raw wdata is used for array indexing --
 			// necessary for correctness, and also avoid a loop with rdata.
-			if (wen_m_mode && addr == MEIEA && wdata_raw[4:0] == i / 16) begin
+			if (wen_m_mode && addr == MEIEA  && $signed(wdata_raw[4:0]) == i[W_IRQ_INDEX-1:4]) begin
 				meiea[i]  <= wdata[16 + (i % 16)];
 			end
-			if (wen_m_mode && addr == MEIFA && wdata_raw[4:0] == i / 16) begin
+			if (wen_m_mode && addr == MEIFA  && $signed(wdata_raw[4:0]) == i[W_IRQ_INDEX-1:4]) begin
 				meifa[i]  <= wdata[16 + (i % 16)];
 			end
-			if (wen_m_mode && addr == MEIPRA && wdata_raw[6:0] == i / 4) begin
+			if (wen_m_mode && addr == MEIPRA && $signed(wdata_raw[6:0]) == i[W_IRQ_INDEX-1:2]) begin
 				meipra[4 * i +: 4] <= wdata[16 + 4 * (i % 4) +: 4] & IRQ_PRIORITY_MASK;
 			end
 			// Clear IRQ force when the corresponding IRQ is sampled from meinext
 			// (so that an IRQ can be posted *once* without modifying the ISR source)
-			if (meinext_irq == i && ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
-				meifa[meinext_irq] <= 1'b0;
+			if (meinext_irq == i[W_IRQ_INDEX-1:0] && ren_m_mode && addr == MEINEXT && !meinext_noirq) begin
+				meifa[i[$clog2(NUM_IRQS)-1:0]] <= 1'b0;
 			end
 		end
 	end
 end
 
-reg [3:0] meicontext_pppreempt;
-reg [3:0] meicontext_ppreempt;
-reg [4:0] meicontext_preempt;
-reg       meicontext_noirq;
-reg [8:0] meicontext_irq;
-reg       meicontext_mreteirq;
+reg [3:0]             meicontext_pppreempt;
+reg [3:0]             meicontext_ppreempt;
+reg [4:0]             meicontext_preempt;
+reg                   meicontext_noirq;
+reg [W_IRQ_INDEX-1:0] meicontext_irq;
+reg                   meicontext_mreteirq;
 
 wire [4:0] preempt_level_next = meinext_noirq ? 5'h10 : (
 	(5'd1 << (4 - IRQ_PRIORITY_BITS)) + {1'b0, eirq_highest_priority}
@@ -139,7 +140,7 @@ always @ (posedge clk or negedge rst_n) begin
 		meicontext_ppreempt <= 4'h0;
 		meicontext_preempt <= 5'h0;
 		meicontext_noirq <= 1'b1;
-		meicontext_irq <= 9'h0;
+		meicontext_irq <= {W_IRQ_INDEX{1'b0}};
 		meicontext_mreteirq <= 1'b0;
 	end else if (trapreg_update_enter) begin
 		if (trap_entry_is_eirq) begin
@@ -217,8 +218,8 @@ assign meinext_noirq        = ~|eirq_active_above_ppreempt;
 // the same priority selector (possibly longer critpath while saving area), but
 // we could use a second priority selector that ignores ppreempt masking.
 
-wire [NUM_IRQS-1:0] highest_eirq_onehot;
-wire [8:0]          meinext_irq_unmasked;
+wire [NUM_IRQS-1:0]    highest_eirq_onehot;
+wire [W_IRQ_INDEX-1:0] meinext_irq_unmasked;
 
 hazard3_onehot_priority_dynamic #(
 	.W_REQ                 (NUM_IRQS),
@@ -241,15 +242,27 @@ always @ (*) begin: get_highest_eirq_priority
 	end
 end
 
+wire [$clog2(NUM_IRQS)-1:0] meinext_irq_unmasked_nopad;
+
 hazard3_onehot_encode #(
-	.W_REQ (NUM_IRQS),
-	.W_GNT (9)
+	.W_REQ (NUM_IRQS)
 ) eirq_encode_u (
 	.req (highest_eirq_onehot),
-	.gnt (meinext_irq_unmasked)
+	.gnt (meinext_irq_unmasked_nopad)
 );
 
-assign meinext_irq = meinext_irq_unmasked & {9{!meinext_noirq}};
+generate
+if ($clog2(NUM_IRQS) == $clog2(MAX_IRQS)) begin: encode_eirq_no_padding
+	assign meinext_irq_unmasked = meinext_irq_unmasked_nopad;
+end else begin: encode_eirq_padded
+	assign meinext_irq_unmasked = {
+		{$clog2(MAX_IRQS) - $clog2(NUM_IRQS){1'b0}},
+		meinext_irq_unmasked_nopad
+	};
+end
+endgenerate
+
+assign meinext_irq = meinext_irq_unmasked & {W_IRQ_INDEX{!meinext_noirq}};
 
 // ----------------------------------------------------------------------------
 // CSR read

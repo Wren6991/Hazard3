@@ -29,10 +29,11 @@ reg [W_REQ-1:0]        req_stratified [0:N_PRIORITIES-1];
 reg [N_PRIORITIES-1:0] level_has_req;
 
 always @ (*) begin: stratify
-	integer i, j;
+	reg signed [31:0] i, j;
 	for (i = 0; i < N_PRIORITIES; i = i + 1) begin
 		for (j = 0; j < W_REQ; j = j + 1) begin
-			req_stratified[i][j] = req[j] && pri[W_PRIORITY * j +: W_PRIORITY] == i;
+			req_stratified[i][j] = req[j] &&
+				pri[W_PRIORITY * j +: W_PRIORITY] == i[W_PRIORITY-1:0];
 		end
 		level_has_req[i] = |req_stratified[i];
 	end

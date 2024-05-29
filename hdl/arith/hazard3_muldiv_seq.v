@@ -39,7 +39,7 @@ module hazard3_muldiv_seq #(
 `include "hazard3_ops.vh"
 
 //synthesis translate_off
-generate if (MULDIV_UNROLL & (MULDIV_UNROLL - 1) || ~|MULDIV_UNROLL)
+generate if (|(MULDIV_UNROLL & (MULDIV_UNROLL - 1)) || ~|MULDIV_UNROLL)
 	initial $fatal("%m: MULDIV_UNROLL must be a positive power of 2");
 endgenerate
 //synthesis translate_on
