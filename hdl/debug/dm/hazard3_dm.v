@@ -357,8 +357,8 @@ always @ (posedge clk or negedge rst_n) begin
 			// a sbdata0 read with sbautoincrement=1 and sbreadondata=0, but
 			// this seems to be a typo, fixed in later versions.
 			sbaddress <= sbaddress + (
-				sbaccess[1:0] == 2'b00 ? 3'h1 :
-				sbaccess[1:0] == 2'b01 ? 3'h2 : 3'h4
+				sbaccess[1:0] == 2'b00 ? 32'd1 :
+				sbaccess[1:0] == 2'b01 ? 32'd2 : 32'd4
 			);
 		end
 	end
@@ -496,7 +496,7 @@ reg [XLEN-1:0] abstract_data0;
 assign hart_data0_rdata = {N_HARTS{abstract_data0}};
 
 always @ (posedge clk or negedge rst_n) begin: update_hart_data0
-	integer i;
+	reg signed [31:0] i;
 	if (!rst_n) begin
 		abstract_data0 <= {XLEN{1'b0}};
 	end else if (!dmactive) begin
@@ -505,7 +505,7 @@ always @ (posedge clk or negedge rst_n) begin: update_hart_data0
 		abstract_data0 <= dmi_pwdata;
 	end else begin
 		for (i = 0; i < N_HARTS; i = i + 1) begin
-			if (hartsel == i && hart_data0_wen[i] && hart_halted[i] && abstractcs_busy)
+			if (hartsel == i[W_HARTSEL-1:0] && hart_data0_wen[i] && hart_halted[i] && abstractcs_busy)
 				abstract_data0 <= hart_data0_wdata[i * XLEN +: XLEN];
 		end
 	end
@@ -739,7 +739,7 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-wire hart_instr_data_vld_nxt = {{N_HARTS{1'b0}},
+wire [N_HARTS-1:0] hart_instr_data_vld_nxt = {{N_HARTS-1{1'b0}},
 	acmd_state_nxt == S_ISSUE_REGREAD || acmd_state_nxt == S_ISSUE_REGWRITE || acmd_state_nxt == S_ISSUE_REGEBREAK ||
 	acmd_state_nxt == S_ISSUE_PROGBUF0 || acmd_state_nxt == S_ISSUE_PROGBUF1 || acmd_state_nxt == S_ISSUE_IMPEBREAK
 } << hartsel;

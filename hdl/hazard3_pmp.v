@@ -72,7 +72,7 @@ reg [W_ADDR-3:0] pmpaddr  [0:PMP_REGIONS-1];
 reg [PMP_REGIONS-1:0] pmpcfg_m;
 
 always @ (posedge clk or negedge rst_n) begin: cfg_update
-	integer i;
+	reg signed [31:0] i;
 	if (!rst_n) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
 			pmpcfg_l[i] <= PMP_HARDWIRED[i] ? PMP_HARDWIRED_CFG[8 * i + 7]      : 1'b0;
@@ -87,7 +87,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		pmpcfg_m <= {PMP_REGIONS{1'b0}};
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			if (cfg_addr == PMPCFG0 + i / 4 && !pmpcfg_l[i]) begin
+			if (cfg_addr == PMPCFG0 + i[13:2] && !pmpcfg_l[i]) begin
 				if (PMP_HARDWIRED[i]) begin
 					// Keep tied to hardwired value (but still make the "register" sensitive to clk)
 					pmpcfg_l[i] <= PMP_HARDWIRED_CFG[8 * i + 7];
@@ -108,7 +108,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 						cfg_wdata[i % 4 * 8 + 3 +: 2];
 				end
 			end
-			if (cfg_addr == PMPADDR0 + i && !pmpcfg_l[i]) begin
+			if (cfg_addr == PMPADDR0 + i[11:0] && !pmpcfg_l[i]) begin
 				if (PMP_GRAIN > 1) begin
 					pmpaddr[i] <= cfg_wdata[W_ADDR-3:0] | ~(~30'h0 << (PMP_GRAIN - 1));
 				end else begin
@@ -124,10 +124,10 @@ end
 
 
 always @ (*) begin: cfg_read
-	integer i;
+	reg signed [31:0] i;
 	cfg_rdata = {W_DATA{1'b0}};
 	for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-		if (cfg_addr == PMPCFG0 + i / 4) begin
+		if (cfg_addr == PMPCFG0 + i[13:2]) begin
 			cfg_rdata[i % 4 * 8 +: 8] = {
 				pmpcfg_l[i],
 				2'b00,
@@ -136,7 +136,7 @@ always @ (*) begin: cfg_read
 				pmpcfg_w[i],
 				pmpcfg_r[i]
 			};
-		end else if (cfg_addr == PMPADDR0 + i) begin
+		end else if (cfg_addr == PMPADDR0 + i[11:0]) begin
 			// If G > 1, the G-1 LSBs of pmpaddr_i are read-only-zero when
 			// region is OFF, and read-only-one when region is NAPOT.
 			if (PMP_GRAIN > 1 && !PMP_HARDWIRED[i]) begin
@@ -255,7 +255,7 @@ reg i_m; // Hazard3 extension (M-mode without locking)
 reg i_l;
 reg i_x;
 
-wire [W_ADDR-1:0] i_addr_hw1 = i_addr + 2'h2;
+wire [W_ADDR-1:0] i_addr_hw1 = i_addr + 32'd2;
 
 always @ (*) begin: check_i_match
 	integer i;

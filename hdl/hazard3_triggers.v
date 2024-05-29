@@ -55,6 +55,7 @@ end else begin: have_triggers
 parameter W_TSELECT = $clog2(BREAKPOINT_TRIGGERS);
 
 reg [W_TSELECT-1:0] tselect;
+wire tselect_in_range = {{32-W_TSELECT{1'sb0}}, $signed(tselect)} < BREAKPOINT_TRIGGERS;
 
 // Note tdata1 and mcontrol are the same CSR. tdata1 refers to the universal
 // fields (type/dmode) and mcontrol refers to those fields specific to
@@ -84,7 +85,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		end
 	end else if (cfg_wen && cfg_addr == TSELECT) begin
 		tselect <= cfg_wdata[W_TSELECT-1:0];
-	end else if (cfg_wen && tselect < BREAKPOINT_TRIGGERS && !(tdata1_dmode[tselect] && !d_mode)) begin
+	end else if (cfg_wen && tselect_in_range && !(tdata1_dmode[tselect] && !d_mode)) begin
 		// Handle writes to tselect-indexed registers (note writes to D-mode
 		// triggers in non-D-mode are ignored rather than raising an exception)
 		if (cfg_addr == TDATA1) begin
@@ -109,7 +110,7 @@ always @ (*) begin
 	if (cfg_addr == TSELECT) begin
 		cfg_rdata = {{W_DATA-W_TSELECT{1'b0}}, tselect};
 	end else if (cfg_addr == TDATA1) begin
-		if (tselect >= BREAKPOINT_TRIGGERS) begin
+		if (!tselect_in_range) begin
 			// Nonexistent -> type=0
 			cfg_rdata = {W_DATA{1'b0}};
 		end else begin
@@ -134,13 +135,13 @@ always @ (*) begin
 			};
 		end
 	end else if (cfg_addr == TDATA2) begin
-		if (tselect >= BREAKPOINT_TRIGGERS) begin
+		if (!tselect_in_range) begin
 			cfg_rdata = {W_DATA{1'b0}};
 		end else begin
 			cfg_rdata = tdata2[tselect];
 		end
 	end else if (cfg_addr == TINFO) begin
-		if (tselect >= BREAKPOINT_TRIGGERS) begin
+		if (!tselect_in_range) begin
 			cfg_rdata = 32'h00000001; // type = 0, no trigger
 		end else begin
 			cfg_rdata = 32'h00000004; // type = 2, address/data match
