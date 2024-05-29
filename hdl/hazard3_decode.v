@@ -110,7 +110,14 @@ wire   uop_seq           = uop_seq_raw && !d_starved;
 wire   uop_nonfinal      = uop_seq && !uop_final;
 assign uop_stall         = x_stall || d_starved;
 
-assign d_uninterruptible = uop_atomic && !d_invalid;
+assign d_uninterruptible = uop_atomic;
+
+`ifdef HAZARD3_ASSERTIONS
+always @ (posedge clk) if (rst_n) begin
+	assert(!(d_invalid && uop_seq_raw));
+	assert(!(d_invalid && uop_atomic));
+end
+`endif
 
 // Signal to null the mepc offset when taking an exception on this
 // instruction (because uops in a sequence *which can except*, so excluding
