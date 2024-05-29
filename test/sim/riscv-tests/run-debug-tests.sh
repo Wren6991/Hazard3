@@ -66,3 +66,36 @@ TriggerExecuteInstant \
 UserInterrupt \
 WriteCsrs \
 WriteGprs
+
+# List of excluded tests, as seen by removing the test list from the above
+# invocation and allowing all tests to run:
+#
+# "fail":
+#  * EtriggerTest ....................... Relies on exception trigger, not implemented
+#  * IcountTest ......................... Relies on interrupt count trigger, not implemented
+#  * TriggerDmode ....................... Relies on load/store triggers, not implemented
+# "exception":
+#  * ItriggerTest ....................... Relies on interrupt trigger, not implemented
+#  * ProgramHwWatchpoint ................ Relies on load/store trigger, not implemented
+#  * Sv32Test ........................... Relies on S-mode + vm, not implemented
+#  * TriggerLoadAddressInstant .......... Relies on load address trigger, not implemented
+#  * TriggerStoreAddressInstant ......... Relies on store address trigger, not implemented
+# "not_applicable":
+#  * CeaseStepiTest ..................... Relies on the `cease` instruction, not implemented
+#  * CustomRegisterTest ................. Only applicable if target has custom debug registers like spike
+#  * FreeRtosTest ....................... Requires freertos binary build, possibly should be ported in future
+#  * MemTestBlockReadInvalid ............ Requires invalid_memory_returns_zero flag which is false for hazard3 tb
+#  * MulticoreRegTest ................... SMP-only
+#  * MulticoreRtosSwitchActiveHartTest .. SMP-only
+#  * MulticoreRunAllHaltOne ............. SMP-only
+#  * SmpSimultaneousRunHalt ............. SMP-only
+#  * StepThread2Test .................... SMP-only
+#  * Sv39Test ........................... (RV64 + S)-only
+#  * Sv48Test ........................... (RV64 + S)-only
+#  * UnavailableCycleTest ............... Requires unavailability control through DMCUSTOM, perhaps could be supported in future
+#  * UnavailableHaltedTest .............. Requires unavailability control through DMCUSTOM, perhaps could be supported in future
+#  * UnavailableMultiTest ............... Requires unavailability control through DMCUSTOM, perhaps could be supported in future
+#  * UnavailableRunTest ................. Requires unavailability control through DMCUSTOM, perhaps could be supported in future
+#  * VectorTest ......................... Relies on V extension, not implemented
+#
+# When this list was last updated, there were: 74 tests
