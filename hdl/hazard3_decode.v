@@ -435,7 +435,7 @@ always @ (*) begin
 	`RVOPC_CSRRCI:    if (HAVE_CSR)              begin raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_C; raw_csr_w_imm = 1'b1; end else begin d_invalid_32bit = 1'b1; end
 
 	`RVOPC_FENCE:     begin raw_rs2 = X0; end  // NOP, note rs1/rd are zero in instruction
-	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)    begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_branchcond = BCOND_ALWAYS; raw_fence_i = 1'b1;                    end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
+	`RVOPC_FENCE_I:   if (EXTENSION_ZIFENCEI)    begin raw_branchcond = debug_mode ? BCOND_NEVER : BCOND_ALWAYS; raw_fence_i = 1'b1;                                        end else begin d_invalid_32bit = 1'b1; end // note rs1/rs2/rd are zero in instruction
 	`RVOPC_ECALL:     if (HAVE_CSR)              begin raw_except = m_mode || !U_MODE ? EXCEPT_ECALL_M : EXCEPT_ECALL_U;  raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;          end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_EBREAK:    if (HAVE_CSR)              begin raw_except = EXCEPT_EBREAK; raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;                                                 end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_MRET:      if (HAVE_CSR && m_mode)    begin raw_except = EXCEPT_MRET;   raw_rs2 = X0; raw_rs1 = X0; raw_rd = X0;                                                 end else begin d_invalid_32bit = 1'b1; end
