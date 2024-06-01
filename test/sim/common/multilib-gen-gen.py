@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-# Generate a multilib configure line for riscv-gnu-toolchain with all useful
+# Generate a multilib configure line for riscv-gnu-toolchain with useful
 # combinations of extensions supported by both Hazard3 and mainline GCC
-# (currently GCC 13.2). Use as:
+# (currently GCC 14). Use as:
 # ./configure ... --with-multilib-generator="$(path/to/multilib-gen-gen.py)"
 
 base = "rv32i"
 abi = "-ilp32--"
 options = [
+	# GCC13+:
 	"m",
 	"a",
 	"c",
@@ -17,19 +18,29 @@ options = [
 	"zbb",
 	"zbc",
 	"zbs",
-	"zbkb"
+	"zbkb",
+	# GCC14 only:
+	"zicond",
+	"zca",
+	"zcb",
+	"zcmp"
 ]
 
-# The relationship here is: do not build for LHS except when *all of* RHS is
-# also present. This cuts down on the number of configurations whilst
-# hopefully preserving ones that are useful for Hazard3 development.
+# Do not build for LHS except when *all of* RHS is also present. This cuts
+# down on the number of configurations. A leading "!" means antidependency,
+# i.e. an incompatibility.
 depends_on = {
-	"zbb":      ["m"                ],
-	"zba":      ["m"                ],
-	"zbkb":     ["zbb"              ],
-	"zbs":      ["zbb",             ],
-	"zbc":      ["zba", "zbb", "zbs"],
-	"zifencei": ["zicsr"            ],
+	"zbb":      ["m", "zba", "zbs"          ],
+	"zba":      ["m", "zbb", "zbs"          ],
+	"zbs":      ["m", "zba", "zbb"          ],
+	"zbkb":     ["zbb"                      ],
+	"zbc":      ["zba", "zbb", "zbs", "zbkb"],
+	"zicond":   ["zba", "zbb", "zbs"        ],
+	"zifencei": ["zicsr"                    ],
+	"c":        ["!zca"                     ],
+	"zca":      ["!c"                       ],
+	"zcb":      ["zca"                      ],
+	"zcmp":     ["zca", "zcb",              ],
 }
 
 l = []
@@ -40,7 +51,9 @@ for i in range(2 ** len(options)):
 		opt = options[j]
 		if opt in depends_on:
 			for dep in depends_on[opt]:
-				if not (i & (1 << options.index(dep))):
+				inverted_dep = dep.startswith("!")
+				if inverted_dep: dep = dep[1:]
+				if inverted_dep == bool(i & (1 << options.index(dep))):
 					violates_dependencies = True
 					break
 		if violates_dependencies:
