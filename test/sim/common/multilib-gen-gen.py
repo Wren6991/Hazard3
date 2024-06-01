@@ -23,7 +23,7 @@ options = [
 	"zicond",
 	"zca",
 	"zcb",
-	"zcmp"
+	# "zcmp" (waiting on binutils 2.43)
 ]
 
 # Do not build for LHS except when *all of* RHS is also present. This cuts
@@ -40,7 +40,7 @@ depends_on = {
 	"c":        ["!zca"                     ],
 	"zca":      ["!c"                       ],
 	"zcb":      ["zca"                      ],
-	"zcmp":     ["zca", "zcb",              ],
+	# "zcmp":     ["zca", "zcb",              ],
 }
 
 l = []
