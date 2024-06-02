@@ -9,8 +9,8 @@ endif
 CCFLAGS      ?=
 LDSCRIPT     ?= ../common/memmap.ld
 CROSS_PREFIX ?= riscv32-unknown-elf-
-TBDIR        ?= ../tb_cxxrtl
 TBEXEC       ?= $(TBDIR)/tb
+TBDIR        := $(dir $(abspath $(TBEXEC)))
 INCDIR       ?= ../common
 MAX_CYCLES   ?= 100000
 TMP_PREFIX   ?= tmp/

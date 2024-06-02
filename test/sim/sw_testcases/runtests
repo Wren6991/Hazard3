@@ -3,16 +3,19 @@
 import os
 import subprocess
 import sys
+import argparse
 
 args = sys.argv[1:]
 
-generate_vcd = False
-if "--vcd" in args:
-	generate_vcd = True
-	del args[args.index("--vcd")]
+parser = argparse.ArgumentParser()
+parser.add_argument("tests", nargs="*", help="List of tests to run. Empty to run all tests. Each test corresponds to one C file.")
+parser.add_argument("--vcd", action="store_true", help="Pass --vcd flag to simulator, to generate waveform dumps.")
+parser.add_argument("--tb", default="../tb_cxxrtl/tb", help="Pass tb executable to run tests.")
+args = parser.parse_args()
 
-if len(args) > 0:
-	testlist = args
+testlist = args.tests
+
+if len(testlist) > 0:
 	# This happens a lot when autocomplete is used:
 	for i, n in enumerate(testlist):
 		if n.endswith(".c"):
@@ -25,8 +28,9 @@ else:
 
 testlist = sorted(testlist)
 
+tb_dir = os.path.join(*os.path.split(os.path.abspath(args.tb))[:-1])
 tb_build_ret = subprocess.run(
-	["make", "-C", "../tb_cxxrtl", "tb"],
+	["make", "-C", tb_dir, "all"],
 	timeout=300
 )
 if tb_build_ret.returncode != 0:
@@ -46,8 +50,8 @@ for test in testlist:
 		all_passed = False
 		continue
 
-	cmdline = ["../tb_cxxrtl/tb", "--bin", f"tmp/{test}.bin", "--cycles", "1000000"]
-	if generate_vcd:
+	cmdline = [args.tb, "--bin", f"tmp/{test}.bin", "--cycles", "1000000"]
+	if args.vcd:
 		cmdline += ["--vcd", f"tmp/{test}.vcd"]
 
 	try:
