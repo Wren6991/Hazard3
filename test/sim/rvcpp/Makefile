@@ -2,10 +2,13 @@ SRCS=$(wildcard *.cpp)
 EXECUTABLE:=rvcpp
 
 .SUFFIXES:
-.PHONY: all clean
+.PHONY: all clean tb
 
 all:
-	g++ -std=c++17 -O3 -Wall -Wno-parentheses -I include $(SRCS) -o $(EXECUTABLE)
+	g++ -std=c++17 -O3 -Wall -I include $(SRCS) -o $(EXECUTABLE)
+
+# To match tb_cxxrtl/Makefile:
+tb: all
 
 clean:
 	rm -f $(EXECUTABLE)

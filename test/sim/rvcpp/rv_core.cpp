@@ -6,10 +6,13 @@
 
 // Use unsigned arithmetic everywhere, with explicit sign extension as required.
 static inline ux_t sext(ux_t bits, int sign_bit) {
-	if (sign_bit >= XLEN - 1)
+	if (sign_bit >= XLEN - 1) {
 		return bits;
-	else
-		return (bits & (1u << sign_bit + 1) - 1) - ((bits & 1u << sign_bit) << 1);
+	} else {
+		ux_t mask_sign = 1u << sign_bit;
+		ux_t mask_below_sign = mask_sign - 1;
+		return (bits & mask_below_sign) - (bits & mask_sign);
+	}
 }
 
 // Inclusive msb:lsb style, like Verilog (and like the ISA manual)
@@ -191,9 +194,9 @@ void RVCore::step(bool trace) {
 					sdx_t mul_op_a = rs1;
 					sdx_t mul_op_b = rs2;
 					if (funct3 != 0b011)
-						mul_op_a -= (mul_op_a & (1 << XLEN - 1)) << 1;
+						mul_op_a -= (mul_op_a & (1 << (XLEN - 1))) << 1;
 					if (funct3 < 0b010)
-						mul_op_b -= (mul_op_b & (1 << XLEN - 1)) << 1;
+						mul_op_b -= (mul_op_b & (1 << (XLEN - 1))) << 1;
 					sdx_t mul_result = mul_op_a * mul_op_b;
 					if (funct3 == 0b000)
 						rd_wdata = mul_result;
@@ -650,6 +653,54 @@ void RVCore::step(bool trace) {
 			if (!w32(addr, regs[c_rs2_s(instr)])) {
 				exception_cause = XCAUSE_STORE_FAULT;
 			}
+		} else if (RVOPC_MATCH(instr, C_LBU)) {
+			// Zcb:
+			regnum_rd = c_rs2_s(instr);
+			uint32_t addr = regs[c_rs1_s(instr)]
+				+ (GETBIT(instr, 6) << 0)
+				+ (GETBIT(instr, 5) << 1);
+			rd_wdata = r8(addr);
+			if (!rd_wdata) {
+				exception_cause = XCAUSE_LOAD_FAULT;
+			}
+		} else if (RVOPC_MATCH(instr, C_LHU)) {
+			regnum_rd = c_rs2_s(instr);
+			uint32_t addr = regs[c_rs1_s(instr)] + (GETBIT(instr, 5) << 1);
+			if (addr & 0x1u) {
+				exception_cause = XCAUSE_LOAD_ALIGN;
+			} else {
+				rd_wdata = r16(addr);
+				if (!rd_wdata) {
+					exception_cause = XCAUSE_LOAD_FAULT;
+				}
+			}
+		} else if (RVOPC_MATCH(instr, C_LH)) {
+			regnum_rd = c_rs2_s(instr);
+			uint32_t addr = regs[c_rs1_s(instr)] + (GETBIT(instr, 5) << 1);
+			if (addr & 0x1u) {
+				exception_cause = XCAUSE_LOAD_ALIGN;
+			} else {
+				rd_wdata = r16(addr);
+				if (rd_wdata) {
+					rd_wdata = sext(*rd_wdata, 15);
+				} else {
+					exception_cause = XCAUSE_LOAD_FAULT;
+				}
+			}
+		} else if (RVOPC_MATCH(instr, C_SB)) {
+			uint32_t addr = regs[c_rs1_s(instr)]
+				+ (GETBIT(instr, 6) << 0)
+				+ (GETBIT(instr, 5) << 1);
+			if (!w8(addr, regs[c_rs2_s(instr)])) {
+				exception_cause = XCAUSE_STORE_FAULT;
+			}
+		} else if (RVOPC_MATCH(instr, C_SH)) {
+			uint32_t addr = regs[c_rs1_s(instr)] + (GETBIT(instr, 5) << 1);
+			if (addr & 0x1u) {
+				exception_cause = XCAUSE_LOAD_ALIGN;
+			} else if (!w16(addr, regs[c_rs2_s(instr)])) {
+				exception_cause = XCAUSE_STORE_FAULT;
+			}
 		} else {
 			exception_cause = XCAUSE_INSTR_ILLEGAL;
 		}
@@ -710,6 +761,25 @@ void RVCore::step(bool trace) {
 			if (regs[c_rs1_s(instr)] != 0) {
 				pc_wdata = pc + imm_cb(instr);
 			}
+		} else if (RVOPC_MATCH(instr, C_ZEXT_B)) {
+			// Zcb:
+			regnum_rd = c_rs1_s(instr);
+			rd_wdata = regs[regnum_rd] & 0xffu;
+		} else if (RVOPC_MATCH(instr, C_SEXT_B)) {
+			regnum_rd = c_rs1_s(instr);
+			rd_wdata = sext(regs[regnum_rd], 7);
+		} else if (RVOPC_MATCH(instr, C_ZEXT_H)) {
+			regnum_rd = c_rs1_s(instr);
+			rd_wdata = regs[regnum_rd] & 0xffffu;
+		} else if (RVOPC_MATCH(instr, C_SEXT_H)) {
+			regnum_rd = c_rs1_s(instr);
+			rd_wdata = sext(regs[regnum_rd], 15);
+		} else if (RVOPC_MATCH(instr, C_NOT)) {
+			regnum_rd = c_rs1_s(instr);
+			rd_wdata = ~regs[regnum_rd];
+		} else if (RVOPC_MATCH(instr, C_MUL)) {
+			regnum_rd = c_rs1_s(instr);
+			rd_wdata = regs[c_rs1_s(instr)] * regs[c_rs2_s(instr)];
 		} else {
 			exception_cause = XCAUSE_INSTR_ILLEGAL;
 		}
