@@ -2,7 +2,8 @@ APP          := coremark
 MAX_CYCLES   := 100000000
 
 CROSS_PREFIX ?= riscv32-unknown-elf-
-TBDIR        ?= ../tb_cxxrtl
+TBEXEC       ?= ../tb_cxxrtl/tb
+TBDIR        := $(dir $(abspath $(TBEXEC)))
 
 
 ###############################################################################
@@ -13,10 +14,10 @@ TBDIR        ?= ../tb_cxxrtl
 all: run
 
 run: $(APP).bin
-	$(TBDIR)/tb --bin $(APP).bin --cycles $(MAX_CYCLES)
+	$(TBEXEC) --bin $(APP).bin --cycles $(MAX_CYCLES)
 
 waves: $(APP).bin
-	$(TBDIR)/tb $(APP).bin $(APPNAME)_run.vcd --cycles $(MAX_CYCLES)
+	$(TBEXEC) $(APP).bin $(APPNAME)_run.vcd --cycles $(MAX_CYCLES)
 
 view: run
 	gtkwave $(APP)_run.vcd
