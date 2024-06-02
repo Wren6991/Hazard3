@@ -79,6 +79,7 @@ void RVCSR::step() {
 
 // Returns None on permission/decode fail
 std::optional<ux_t> RVCSR::read(uint16_t addr, bool side_effect) {
+	(void)side_effect;
 	if (addr >= 1u << 12 || GETBITS(addr, 9, 8) > priv)
 		return {};
 

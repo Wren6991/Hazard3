@@ -108,16 +108,27 @@ static inline uint32_t zcmp_reg_mask(uint32_t instr) {
 	switch (zcmp_n_regs(instr)) {
 		case 13: mask |= 1u << 27; // s11
 		         mask |= 1u << 26; // s10
+		         // fall through
 		case 11: mask |= 1u << 25; // s9
+		         // fall through
 		case 10: mask |= 1u << 24; // s8
+		         // fall through
 		case  9: mask |= 1u << 23; // s7
+		         // fall through
 		case  8: mask |= 1u << 22; // s6
+		         // fall through
 		case  7: mask |= 1u << 21; // s5
+		         // fall through
 		case  6: mask |= 1u << 20; // s4
+		         // fall through
 		case  5: mask |= 1u << 19; // s3
+		         // fall through
 		case  4: mask |= 1u << 18; // s2
+		         // fall through
 		case  3: mask |= 1u <<  9; // s1
+		         // fall through
 		case  2: mask |= 1u <<  8; // s0
+		         // fall through
 		case  1: mask |= 1u <<  1; // ra
 	}
 	return mask;
