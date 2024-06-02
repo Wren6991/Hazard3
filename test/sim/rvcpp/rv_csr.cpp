@@ -224,8 +224,11 @@ ux_t RVCSR::trap_enter(uint xcause, ux_t xepc) {
 	mstatus = (mstatus & ~MSTATUS_MPP) | (priv << 11);
 	priv = PRV_M;
 
-	if (mstatus & MSTATUS_MIE)
+	if (mstatus & MSTATUS_MIE) {
 		mstatus |= MSTATUS_MPIE;
+	} else {
+		mstatus &= ~MSTATUS_MPIE;
+	}
 	mstatus &= ~MSTATUS_MIE;
 
 	mcause = xcause;
@@ -241,14 +244,26 @@ ux_t RVCSR::trap_enter(uint xcause, ux_t xepc) {
 ux_t RVCSR::trap_mret() {
 	priv = GETBITS(mstatus, 12, 11);
 	mstatus &= ~MSTATUS_MPP;
-	if (priv != PRV_M)
+	if (priv != PRV_M) {
 		mstatus &= ~MSTATUS_MPRV;
+	}
 
-	if (mstatus & MSTATUS_MPIE)
+	if (mstatus & MSTATUS_MPIE) {
 		mstatus |= MSTATUS_MIE;
-	mstatus &= ~MSTATUS_MPIE;
+	} else {
+		mstatus &= ~MSTATUS_MIE;
+	}
+	mstatus |= MSTATUS_MPIE;
 
 	return mepc;
+}
+
+uint RVCSR::get_effective_priv() {
+	if (mstatus & MSTATUS_MPRV) {
+		return (mstatus & MSTATUS_MPP) >> __builtin_ctz(MSTATUS_MPP);
+	} else {
+		return priv;
+	}
 }
 
 int RVCSR::get_pmp_match(ux_t addr) {
@@ -284,13 +299,15 @@ uint RVCSR::get_pmp_xwr(ux_t addr) {
 		matching_l = pmpcfg_l(region);
 	}
 	if (match) {
-		// TODO MPRV
-		if (get_true_priv() == PRV_M && !matching_l) {
+		if (get_effective_priv() == PRV_M && !matching_l) {
 			return 0x7u;
+		} else if (get_true_priv() == PRV_M && !matching_l) {
+			return matching_xwr | PMP_X;
 		} else {
 			return matching_xwr;
 		}
 	} else {
-		return get_true_priv() == PRV_M ? 0x7u : 0x0u;
+		return get_effective_priv() == PRV_M ? 0x7u  :
+		       get_true_priv()      == PRV_M ? PMP_X : 0x0u;
 	}
 }

@@ -114,6 +114,8 @@ public:
 		return priv;
 	}
 
+	uint get_effective_priv();
+
 	bool get_mstatus_tw() {
 		return mstatus & 0x00200000u;
 	}

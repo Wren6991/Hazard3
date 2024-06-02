@@ -146,7 +146,6 @@ void RVCore::step(bool trace) {
 	uint regnum_rd = 0;
 
 	std::optional<ux_t> trace_csr_addr;
-	std::optional<ux_t> trace_csr_result;
 	std::optional<uint> trace_priv;
 
 	std::optional<uint16_t> fetch0 = r16(pc, 0x4u);
@@ -571,6 +570,8 @@ void RVCore::step(bool trace) {
 				if (write_op == RVCSR::WRITE || regnum_rs1 != 0) {
 					if (!csr.write(csr_addr, rs1, write_op)) {
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
+					} else if (trace) {
+						trace_csr_addr = csr_addr;
 					}
 				}
 			}
@@ -582,17 +583,12 @@ void RVCore::step(bool trace) {
 					if (!rd_wdata) {
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
 					}
-					if (trace && !exception_cause) {
-						trace_csr_addr = csr_addr;
-					}
 				}
 				if (write_op == RVCSR::WRITE || regnum_rs1 != 0) {
 					if (!csr.write(csr_addr, regnum_rs1, write_op)) {
 						exception_cause = XCAUSE_INSTR_ILLEGAL;
-					}
-					if (trace && !exception_cause) {
+					} else if (trace) {
 						trace_csr_addr = csr_addr;
-						trace_csr_result = csr.read(csr_addr, false);
 					}
 				}
 			} else if (RVOPC_MATCH(instr, MRET)) {
@@ -891,6 +887,9 @@ void RVCore::step(bool trace) {
 		}
 	}
 
+	// Ensure pending CSR writes are applied before checking IRQ conditions,
+	// and before reading back the CSR value for tracing
+	csr.step();
 
 	if (trace && !irq_target_pc) {
 		printf("%08x: ", pc);
@@ -910,13 +909,10 @@ void RVCore::step(bool trace) {
 		if (pc_wdata && gpr_writeback) {
 			printf("                   : pc    <- %08x <\n", *pc_wdata);
 		}
-		if (trace_csr_result) {
-			printf("                   : #%03x  <- %08x :\n", *trace_csr_addr, *trace_csr_result);
+		if (trace_csr_addr) {
+			printf("                   : #%03x  <- %08x :\n", *trace_csr_addr, *csr.read(*trace_csr_addr, false));
 		}
 	}
-
-	// Ensure pending CSR writes are applied before checking IRQ conditions
-	csr.step();
 
 	if (exception_cause) {
 		pc_wdata = csr.trap_enter_exception(*exception_cause, pc);
