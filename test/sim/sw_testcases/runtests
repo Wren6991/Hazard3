@@ -1,16 +1,31 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
+import shlex
 import subprocess
 import sys
-import argparse
 
 args = sys.argv[1:]
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("tests", nargs="*", help="List of tests to run. Empty to run all tests. Each test corresponds to one C file.")
 parser.add_argument("--vcd", action="store_true", help="Pass --vcd flag to simulator, to generate waveform dumps.")
 parser.add_argument("--tb", default="../tb_cxxrtl/tb", help="Pass tb executable to run tests.")
+parser.add_argument("--tbarg", action="append", default=[], help="Extra argument to pass to tb executable. Can pass --tbarg=xxx multiple times to pass multiple arguments.")
+parser.add_argument("--postcmd", action="append", default=[], help="Add a command to run post-simulation, e.g. log file processing. The string TEST is expanded to the test result file name, minus any file extensions.")
+parser.epilog = """
+Example command lines:
+
+Run all tests:
+./runtests
+
+Just run hello world, and generate waves:
+./runtests hello_world --vcd
+
+Run under rvcpp, enable instruction tracing, and post-process log using disassembly:
+./runtests --tb ../rvcpp/rvcpp --tbarg=--trace --postcmd="../rvcpp/scripts/annotate_trace.py TEST.log TEST_annotated.log -d TEST.dis"
+"""
 args = parser.parse_args()
 
 testlist = args.tests
@@ -38,95 +53,106 @@ if tb_build_ret.returncode != 0:
 
 all_passed = True
 
+passed_test_count = 0
 for test in testlist:
 	sys.stdout.write(f"{test:<30}")
-
+	failed = False
 	test_build_ret = subprocess.run(
 		["make", f"APP={test}", f"tmp/{test}.bin"],
 		stdout=subprocess.DEVNULL
 	)
 	if test_build_ret.returncode != 0:
 		print("\033[33m[MK ERR]\033[39m")
-		all_passed = False
-		continue
+		failed = True
 
-	cmdline = [args.tb, "--bin", f"tmp/{test}.bin", "--cycles", "1000000"]
-	if args.vcd:
-		cmdline += ["--vcd", f"tmp/{test}.vcd"]
+	if not failed:
+		cmdline = [args.tb, "--bin", f"tmp/{test}.bin", "--cycles", "1000000"]
+		if args.vcd:
+			cmdline += ["--vcd", f"tmp/{test}.vcd"]
+		cmdline += args.tbarg
 
-	try:
-		test_run_ret = subprocess.run(
-			cmdline,
-			stdout = subprocess.PIPE,
-			stderr = subprocess.PIPE,
-			timeout=10
-		)
-		with open(f"tmp/{test}.log", "wb") as f:
-			f.write(test_run_ret.stdout)
-	except subprocess.TimeoutExpired:
-		print("\033[31m[TIMOUT]\033[39m")
-		all_passed = False
-		continue
+		try:
+			test_run_ret = subprocess.run(
+				cmdline,
+				stdout = subprocess.PIPE,
+				stderr = subprocess.PIPE,
+				timeout=10
+			)
+			with open(f"tmp/{test}.log", "wb") as f:
+				f.write(test_run_ret.stdout)
+		except subprocess.TimeoutExpired:
+			print("\033[31m[TIMOUT]\033[39m")
+			failed = True
 
 	# Testbench itself should always exit successfully.
-	if test_run_ret.returncode != 0:
-		print("Negative return code from testbench!")
-		all_passed = False
-		continue
+	if not failed:
+		if test_run_ret.returncode != 0:
+			print("Negative return code from testbench!")
+			failed = True
 
 	# Pass if the program under test has zero exit code AND its output matches
 	# the expected output (if there is an expected_output file)
 
-	output_lines = test_run_ret.stdout.decode("utf-8").strip().splitlines()
-	returncode = -1
-	if len(output_lines) >= 2:
-		exit_line = output_lines[-2]
-		if exit_line.startswith("CPU requested halt"):
+	if not failed:
+		output_lines = test_run_ret.stdout.decode("utf-8").strip().splitlines()
+		returncode = -1
+		if len(output_lines) >= 2:
+			exit_line = output_lines[-2]
+			if exit_line.startswith("CPU requested halt"):
+				try:
+					returncode = int(exit_line.split(" ")[-1])
+				except:
+					pass
+		if returncode != 0:
+			print("\033[31m[BADRET]\033[39m")
+			failed = True
+
+	if not failed:
+		test_src = open(f"{test}.c").read()
+		if "/*EXPECTED-OUTPUT" in test_src:
+			good_output = True
 			try:
-				returncode = int(exit_line.split(" ")[-1])
+				expected_start = test_src.find("/*EXPECTED-OUTPUT")
+				expected_end = test_src.find("*/", expected_start)
+				expected_lines = test_src[expected_start:expected_end + 1].splitlines()[1:-1]
+				while expected_lines[0].strip() == "":
+					del expected_lines[0]
+				while expected_lines[-1].strip() == "":
+					del expected_lines[-1]
+
+				# Allow single-line comments within the expected output, in case some of
+				# the output needs explanation inline in the test source. If the line is
+				# empty after stripping comments, still don't remove the line.
+				for i, l in enumerate(expected_lines):
+					if "//" in l:
+						expected_lines[i] = l.split("//")[0].rstrip()
+
+				# Drop last two lines, which should just be tb output (checked in BADRET)
+				output_lines = output_lines[:-2]
+				while output_lines[0].strip() == "":
+					del output_lines[0]
+				while output_lines[-1].strip() == "":
+					del output_lines[-1]
+
+				if expected_lines != output_lines:
+					good_output = False
 			except:
-				pass
-	if returncode != 0:
-		print("\033[31m[BADRET]\033[39m")
-		all_passed = False
-		continue
-
-	test_src = open(f"{test}.c").read()
-	if "/*EXPECTED-OUTPUT" in test_src:
-		good_output = True
-		try:
-			expected_start = test_src.find("/*EXPECTED-OUTPUT")
-			expected_end = test_src.find("*/", expected_start)
-			expected_lines = test_src[expected_start:expected_end + 1].splitlines()[1:-1]
-			while expected_lines[0].strip() == "":
-				del expected_lines[0]
-			while expected_lines[-1].strip() == "":
-				del expected_lines[-1]
-
-			# Allow single-line comments within the expected output, in case some of
-			# the output needs explanation inline in the test source. If the line is
-			# empty after stripping comments, still don't remove the line.
-			for i, l in enumerate(expected_lines):
-				if "//" in l:
-					expected_lines[i] = l.split("//")[0].rstrip()
-
-			# Drop last two lines, which should just be tb output (checked in BADRET)
-			output_lines = output_lines[:-2]
-			while output_lines[0].strip() == "":
-				del output_lines[0]
-			while output_lines[-1].strip() == "":
-				del output_lines[-1]
-
-			if expected_lines != output_lines:
 				good_output = False
-		except:
-			good_output = False
-		if not good_output:
-			print("\033[31m[BADOUT]\033[39m")
-			all_passed = False
-			continue
+			if not good_output:
+				print("\033[31m[BADOUT]\033[39m")
+				failed = True
 
-	print("\033[32m[PASSED]\033[39m")
+	if not failed:
+		print("\033[32m[PASSED]\033[39m")
+		passed_test_count += 1
+
+	# Post-processing commands are run regardless of success. Their return
+	# codes are ignored.
+	for postcmd in args.postcmd:
+		postcmd = postcmd.replace("TEST", f"tmp/{test}")
+		subprocess.run(shlex.split(postcmd))
+
+print(f"\nPassed: {passed_test_count} out of {len(testlist)}")
 
 sys.exit(not all_passed)
 
