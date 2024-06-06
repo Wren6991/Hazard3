@@ -441,6 +441,33 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
+wire [W_REGADDR-1:0] d_rs1_predecoded_nxt =
+	d_starved || !x_stall ? f_rs1_fine : d_rs1_predecoded;
+wire [W_REGADDR-1:0] d_rs2_predecoded_nxt =
+	d_starved || !x_stall ? f_rs2_fine : d_rs2_predecoded;
+
+wire [W_REGADDR-1:0] xm_rd_nxt;
+wire [W_REGADDR-1:0] mw_rd_nxt;
+
+reg [2:0] x_rs1_select_regs_xm_mw;
+reg [2:0] x_rs2_select_regs_xm_mw;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		x_rs1_select_regs_xm_mw <= 3'b000;
+		x_rs2_select_regs_xm_mw <= 3'b000;
+	end else begin
+		x_rs1_select_regs_xm_mw <=
+			5'h00     == d_rs1_predecoded_nxt ? 3'b000 :
+			xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 :
+			mw_rd_nxt == d_rs1_predecoded_nxt ? 3'b001 : 3'b100;
+		x_rs2_select_regs_xm_mw <=
+			5'h00     == d_rs2_predecoded_nxt ? 3'b000 :
+			xm_rd_nxt == d_rs2_predecoded_nxt ? 3'b010 :
+			mw_rd_nxt == d_rs2_predecoded_nxt ? 3'b001 : 3'b100;
+	end
+end
+
 `ifdef HAZARD3_ASSERTIONS
 always @ (posedge clk) if (rst_n && !x_stall) begin
 	// If stage 2 sees a reg operand, it must have been correctly predecoded too.
@@ -453,28 +480,30 @@ always @ (posedge clk) if (rst_n && !x_stall) begin
 		assert(~|d_rs1);
 	if (~|d_rs2_predecoded)
 		assert(~|d_rs2);
+	// Make sure bypass mask updates to track older in-flight instructions
+	if      (|d_rs1 && d_rs1 == xm_rd) assert(x_rs1_select_regs_xm_mw[1]);
+	else if (|d_rs1 && d_rs1 == mw_rd) assert(x_rs1_select_regs_xm_mw[0]);
+	else if (|d_rs1                  ) assert(x_rs1_select_regs_xm_mw[2]);
+	else if (~|d_rs1_predecoded      ) assert(~|x_rs1_select_regs_xm_mw);
+	if      (|d_rs2 && d_rs2 == xm_rd) assert(x_rs2_select_regs_xm_mw[1]);
+	else if (|d_rs2 && d_rs2 == mw_rd) assert(x_rs2_select_regs_xm_mw[0]);
+	else if (|d_rs2                  ) assert(x_rs2_select_regs_xm_mw[2]);
+	else if (~|d_rs2_predecoded      ) assert(~|x_rs2_select_regs_xm_mw);
 end
 `endif
 
+
 always @ (*) begin
-	if (~|d_rs1_predecoded) begin
-		x_rs1_bypass = {W_DATA{1'b0}};
-	end else if (xm_rd == d_rs1_predecoded) begin
-		x_rs1_bypass = xm_result;
-	end else if (mw_rd == d_rs1_predecoded && !REDUCED_BYPASS) begin
-		x_rs1_bypass = mw_result;
-	end else begin
-		x_rs1_bypass = x_rdata1;
-	end
-	if (~|d_rs2_predecoded) begin
-		x_rs2_bypass = {W_DATA{1'b0}};
-	end else if (xm_rd == d_rs2_predecoded) begin
-		x_rs2_bypass = xm_result;
-	end else if (mw_rd == d_rs2_predecoded && !REDUCED_BYPASS) begin
-		x_rs2_bypass = mw_result;
-	end else begin
-		x_rs2_bypass = x_rdata2;
-	end
+
+	x_rs1_bypass =
+		(x_rdata1  & {W_DATA{x_rs1_select_regs_xm_mw[2]}}) |
+		(xm_result & {W_DATA{x_rs1_select_regs_xm_mw[1]}}) |
+		(mw_result & {W_DATA{x_rs1_select_regs_xm_mw[0]}});
+
+	x_rs2_bypass =
+		(x_rdata2  & {W_DATA{x_rs2_select_regs_xm_mw[2]}}) |
+		(xm_result & {W_DATA{x_rs2_select_regs_xm_mw[1]}}) |
+		(mw_result & {W_DATA{x_rs2_select_regs_xm_mw[0]}});
 
 	// AMO captures rdata into mw_result at end of read data phase, so we can
 	// feed back through the ALU.
@@ -1044,6 +1073,10 @@ hazard3_csr #(
 
 // Pipe register
 
+assign xm_rd_nxt =
+	m_stall                                   ? xm_rd :
+	x_stall || d_starved || m_trap_enter_soon ? 5'h0  : d_rd;
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		xm_memop <= MEMOP_NONE;
@@ -1137,6 +1170,7 @@ always @ (posedge clk) if (rst_n) begin
 	// M-generated exception, i.e. a dataphase bus fault. Also AMOs are different.
 	if (xm_except != EXCEPT_NONE && !(bus_dph_err_d || $past(!m_trap_enter_rdy)))
 		assert(xm_memop == MEMOP_NONE || xm_memop == MEMOP_AMO);
+	assert(xm_rd == $past(xm_rd_nxt));
 end
 `endif
 
@@ -1334,6 +1368,8 @@ always @ (posedge clk or negedge rst_n) begin
 		mw_result <= m_result;
 	end
 end
+
+assign mw_rd_nxt = m_reg_wen_if_nonzero ? xm_rd : mw_rd;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
