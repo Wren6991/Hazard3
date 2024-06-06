@@ -162,11 +162,15 @@ always @ (*) begin
 		{7'bzzzzzzz, ALUOP_SRL    }: result = shift_dout;
 		{7'bzzzzzzz, ALUOP_SRA    }: result = shift_dout;
 		{7'bzzzzzzz, ALUOP_SLL    }: result = shift_dout;
-		// A (duplicates of Zbb)
-		{7'b1zzzzzz, ALUOP_MAX    }: result = lt ? op_b : op_a;
-		{7'b1zzzzzz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
-		{7'b1zzzzzz, ALUOP_MIN    }: result = lt ? op_a : op_b;
-		{7'b1zzzzzz, ALUOP_MINU   }: result = lt ? op_a : op_b;
+		// A or Zbb (written this way to avoid case overlap)
+		{7'b1zzzzzz, ALUOP_MAX    },
+		{7'b0z1zzzz, ALUOP_MAX    }: result = lt ? op_b : op_a;
+		{7'b1zzzzzz, ALUOP_MIN    },
+		{7'b0z1zzzz, ALUOP_MIN    }: result = lt ? op_a : op_b;
+		{7'b1zzzzzz, ALUOP_MAXU   },
+		{7'b0z1zzzz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
+		{7'b1zzzzzz, ALUOP_MINU   },
+		{7'b0z1zzzz, ALUOP_MINU   }: result = lt ? op_a : op_b;
 		// Zba
 		{7'bz1zzzzz, ALUOP_SHXADD }: result = sum;
 		// Zbb
@@ -176,10 +180,6 @@ always @ (*) begin
 		{7'bzz1zzzz, ALUOP_CLZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
 		{7'bzz1zzzz, ALUOP_CTZ    }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
 		{7'bzz1zzzz, ALUOP_CPOP   }: result = {{W_DATA-W_SHAMT-1{1'b0}}, cpop};
-		{7'bzz1zzzz, ALUOP_MAX    }: result = lt ? op_b : op_a;
-		{7'bzz1zzzz, ALUOP_MAXU   }: result = lt ? op_b : op_a;
-		{7'bzz1zzzz, ALUOP_MIN    }: result = lt ? op_a : op_b;
-		{7'bzz1zzzz, ALUOP_MINU   }: result = lt ? op_a : op_b;
 		{7'bzz1zzzz, ALUOP_SEXT_B }: result = {{W_DATA-8{op_a[7]}}, op_a[7:0]};
 		{7'bzz1zzzz, ALUOP_SEXT_H }: result = {{W_DATA-16{op_a[15]}}, op_a[15:0]};
 		{7'bzz1zzzz, ALUOP_ZEXT_H }: result = {{W_DATA-16{1'b0}}, op_a[15:0]};
