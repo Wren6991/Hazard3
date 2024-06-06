@@ -198,17 +198,19 @@ end else begin: instr_decompress
 			uop_no_pc_update = 1'b0;
 			uop_ctr_nxt_in_seq = uop_ctr;
 			casez (instr_in[15:0])
-			16'h0:         invalid = 1'b1;
-			`RVOPC_C_ADDI4SPN: instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_s) | rfmt_rs1(5'h2)
-				| {2'h0, instr_in[10:7], instr_in[12:11], instr_in[5], instr_in[6], 2'b00, 20'h00000};
-			`RVOPC_C_LW:       instr_out = `RVOPC_NOZ_LW | rfmt_rd(rd_s) | rfmt_rs1(rs1_s)
+			`RVOPC_C_ADDI4SPN: begin
+				instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_s) | rfmt_rs1(5'h2)
+					| {2'h0, instr_in[10:7], instr_in[12:11], instr_in[5], instr_in[6], 2'b00, 20'h00000};
+				invalid   = ~|instr_in[12:2]; // Always-invalid all-zeroes instruction
+			end
+			`RVOPC_C_LW:   instr_out = `RVOPC_NOZ_LW | rfmt_rd(rd_s) | rfmt_rs1(rs1_s)
 				| {5'h00, instr_in[5], instr_in[12:10], instr_in[6], 2'b00, 20'h00000};
-			`RVOPC_C_SW:       instr_out = `RVOPC_NOZ_SW | rfmt_rs2(rs2_s) | rfmt_rs1(rs1_s)
+			`RVOPC_C_SW:   instr_out = `RVOPC_NOZ_SW | rfmt_rs2(rs2_s) | rfmt_rs1(rs1_s)
 				| {5'h00, instr_in[5], instr_in[12], 13'h000, instr_in[11:10], instr_in[6], 2'b00, 7'h00};
-			`RVOPC_C_ADDI:     instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_l) | rfmt_rs1(rs1_l) | imm_ci;
-			`RVOPC_C_JAL:      instr_out = `RVOPC_NOZ_JAL  | rfmt_rd(5'h1) | imm_cj;
-			`RVOPC_C_J:        instr_out = `RVOPC_NOZ_JAL  | rfmt_rd(5'h0) | imm_cj;
-			`RVOPC_C_LI:       instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_l) | imm_ci;
+			`RVOPC_C_ADDI: instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_l) | rfmt_rs1(rs1_l) | imm_ci;
+			`RVOPC_C_JAL:  instr_out = `RVOPC_NOZ_JAL  | rfmt_rd(5'h1) | imm_cj;
+			`RVOPC_C_J:    instr_out = `RVOPC_NOZ_JAL  | rfmt_rd(5'h0) | imm_cj;
+			`RVOPC_C_LI:   instr_out = `RVOPC_NOZ_ADDI | rfmt_rd(rd_l) | imm_ci;
 			`RVOPC_C_LUI: begin
 				if (rd_l == 5'h2) begin
 					// addi16sp
@@ -219,14 +221,14 @@ end else begin: instr_decompress
 				end
 				invalid = ~|{instr_in[12], instr_in[6:2]}; // RESERVED if imm == 0
 			end
-			`RVOPC_C_SLLI:     instr_out = `RVOPC_NOZ_SLLI | rfmt_rd(rs1_l) | rfmt_rs1(rs1_l) | imm_ci;
-			`RVOPC_C_SRAI:     instr_out = `RVOPC_NOZ_SRAI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
-			`RVOPC_C_SRLI:     instr_out = `RVOPC_NOZ_SRLI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
-			`RVOPC_C_ANDI:     instr_out = `RVOPC_NOZ_ANDI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
-			`RVOPC_C_AND:      instr_out = `RVOPC_NOZ_AND  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
-			`RVOPC_C_OR:       instr_out = `RVOPC_NOZ_OR   | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
-			`RVOPC_C_XOR:      instr_out = `RVOPC_NOZ_XOR  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
-			`RVOPC_C_SUB:      instr_out = `RVOPC_NOZ_SUB  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
+			`RVOPC_C_SLLI: instr_out = `RVOPC_NOZ_SLLI | rfmt_rd(rs1_l) | rfmt_rs1(rs1_l) | imm_ci;
+			`RVOPC_C_SRAI: instr_out = `RVOPC_NOZ_SRAI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
+			`RVOPC_C_SRLI: instr_out = `RVOPC_NOZ_SRLI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
+			`RVOPC_C_ANDI: instr_out = `RVOPC_NOZ_ANDI | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | imm_ci;
+			`RVOPC_C_AND:  instr_out = `RVOPC_NOZ_AND  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
+			`RVOPC_C_OR:   instr_out = `RVOPC_NOZ_OR   | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
+			`RVOPC_C_XOR:  instr_out = `RVOPC_NOZ_XOR  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
+			`RVOPC_C_SUB:  instr_out = `RVOPC_NOZ_SUB  | rfmt_rd(rs1_s) | rfmt_rs1(rs1_s) | rfmt_rs2(rs2_s);
 			`RVOPC_C_ADD: begin
 				if (|rs2_l) begin
 					instr_out = `RVOPC_NOZ_ADD | rfmt_rd(rd_l) | rfmt_rs1(rs1_l) | rfmt_rs2(rs2_l);
