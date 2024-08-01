@@ -262,7 +262,11 @@ end else begin: encode_eirq_padded
 end
 endgenerate
 
-assign meinext_irq = meinext_irq_unmasked & {W_IRQ_INDEX{!meinext_noirq}};
+// It is unnecessary to mask meinext_irq based on meinext_noirq because:
+// - The value of the CSR field is unimportant when noirq is set
+// - There are no IRQ inputs to the priority selector when there
+//   are no IRQs, so result is already 0.
+assign meinext_irq = meinext_irq_unmasked;
 
 // ----------------------------------------------------------------------------
 // CSR read
