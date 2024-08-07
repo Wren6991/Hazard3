@@ -19,15 +19,21 @@
 #	Use this flag to define how to to get an executable (e.g -o)
 OUTFLAG= -o
 
-MARCH        = rv32ima_zicsr_zba_zbb_zbs_zbkb
+# Note removing C (compressed) support tends to slightly improve performance
+# by eliminating alignment nops. This is really a toolchain issue because
+# most 2-byte alignment nops could also be eliminated by selectively
+# expanding 16-bit instructions to 32-bit.
+MARCH        = rv32imac_zicsr_zifencei_zba_zbb_zbkb_zbs
 CROSS_PREFIX = riscv32-unknown-elf-
 
 CC           =  $(CROSS_PREFIX)gcc
 LD           =  $(CROSS_PREFIX)gcc
 AS           =  $(CROSS_PREFIX)gcc
 
-# If compressed instructions are enabled, you also want: -falign-functions=4 -falign-jumps=4 -falign-loops=4
-PORT_CFLAGS = -O3 -g -march=$(MARCH) -mbranch-cost=1 -funroll-all-loops --param max-inline-insns-auto=200 -finline-limit=10000 -fno-code-hoisting -fno-if-conversion2
+# Slightly shorter alternative when compressed instructions are not used:
+# PORT_CFLAGS = -O3 -g -march=$(MARCH) -mbranch-cost=1 -funroll-all-loops --param max-inline-insns-auto=200 -finline-limit=10000 -fno-code-hoisting -fno-if-conversion2
+PORT_CFLAGS = -O3 -g -march=$(MARCH) -mbranch-cost=1 -funroll-all-loops --param max-inline-insns-auto=200 -finline-limit=10000 -fno-code-hoisting -fno-if-conversion2 -falign-functions=4 -falign-jumps=4 -falign-loops=4
+
 FLAGS_STR = "$(PORT_CFLAGS) $(XCFLAGS) $(XLFLAGS) $(LFLAGS_END)"
 CFLAGS = $(PORT_CFLAGS) -I$(PORT_DIR) -I. -DFLAGS_STR=\"$(FLAGS_STR)\" 
 

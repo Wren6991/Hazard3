@@ -130,7 +130,7 @@ export PATH="$PATH:/opt/riscv/gcc14-no-zcmp/bin"
 For a faster build and a smaller install size, use this `./configure` line instead:
 
 ```bash
-./configure --with-gcc-src=$(pwd)/gcc-14 --prefix=/opt/riscv/gcc14-no-zcmp --with-arch=rv32imac_zicsr --with-abi=ilp32
+./configure --with-gcc-src=$(pwd)/gcc-14 --prefix=/opt/riscv/gcc14-no-zcmp --with-arch=rv32imac_zicsr_zifencei_zba_zbb_zbkb_zbs --with-abi=ilp32
 ```
 
 Adjust the `--with-arch` line as necessary for your Hazard3 configuration. You may need to adjust architectures used in software Makefiles in this repository to fit your chosen architecture variant.
@@ -159,14 +159,14 @@ All going well you should see something like:
 ```
 $ make
 mkdir -p tmp/
-riscv32-unknown-elf-gcc -march=rv32imc -Os ../common/init.S main.c -T ../common/memmap.ld -I../common -o tmp/hellow.elf
+riscv32-unknown-elf-gcc -march=rv32imac_zicsr_zifencei_zba_zbb_zbkb_zbs -Os -Wl,--no-warn-rwx-segments ../common/init.S main.c -T ../common/memmap.ld -I../common -o tmp/hellow.elf
 riscv32-unknown-elf-objcopy -O binary tmp/hellow.elf tmp/hellow.bin
 riscv32-unknown-elf-objdump -h tmp/hellow.elf > tmp/hellow.dis
 riscv32-unknown-elf-objdump -d tmp/hellow.elf >> tmp/hellow.dis
 ../tb_cxxrtl/tb --bin tmp/hellow.bin --vcd tmp/hellow_run.vcd --cycles 100000
 Hello world from Hazard3 + CXXRTL!
 CPU requested halt. Exit code 123
-Ran for 601 cycles
+Ran for 897 cycles
 ```
 
 This will have created a waveform dump called `tmp/hellow_run.vcd` which you can view with GTKWave:
@@ -174,6 +174,8 @@ This will have created a waveform dump called `tmp/hellow_run.vcd` which you can
 ```bash
 gtkwave tmp/hellow_run.vcd
 ```
+
+Installing GTKWave on Ubuntu 24.04 is just `sudo apt install gtkwave`.
 
 # Loading Hello World with the Debugger
 

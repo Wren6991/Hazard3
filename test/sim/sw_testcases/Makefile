@@ -1,6 +1,6 @@
 APP        := hellow
 SRCS        = ../common/init.S $(APP).c $(EXTRA_SRCS_$(APP))
-CCFLAGS    := -march=rv32imac_zicsr_zifencei_zba_zbb_zbc_zbkb -Os
+CCFLAGS    := -march=rv32imac_zicsr_zifencei_zba_zbb_zbkb_zbs -Os
 MAX_CYCLES := 1000000
 INCDIR     := include ../common
 
