@@ -25,6 +25,8 @@ The [example SoC integration](example_soc/soc/example_soc.v) shows how these com
 
 Hazard3 is still under development.
 
+Please read [Contributing.md](Contributing.md) before raising an issue or pull request.
+
 # Links to Specifications
 
 These are links to the ratified versions of the extensions.
