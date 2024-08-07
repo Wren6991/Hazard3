@@ -14,14 +14,14 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` instruction set 
 * `Zcb`: basic additional compressed instructions
 * `Zcmp`: push/pop instructions
 * Debug, Machine and User privilege/execution modes
-* Privileged instructions `ECALL`, `EBREAK`, `MRET` and `WFI`
+* Privileged instructions `ecall`, `ebreak`, `mret` and `wfi`
 * Physical memory protection (PMP) with up to 16 naturally aligned regions
 
 You can [read the documentation here](doc/hazard3.pdf). (PDF link)
 
 This repository also contains a compliant RISC-V Debug Module for Hazard3, which can be accessed over an AMBA 3 APB port or using the optional JTAG Debug Transport Module.
 
-There is an [example SoC integration](example_soc/soc/example_soc.v), showing how these components can be assembled to create a minimal system with a JTAG-enabled RISC-V processor, some RAM and a serial port.
+The [example SoC integration](example_soc/soc/example_soc.v) shows how these components can be assembled to create a minimal system with a JTAG-enabled RISC-V processor, some RAM and a serial port.
 
 Hazard3 is still under development.
 
@@ -51,47 +51,89 @@ These specifications are abstract descriptions of the architectural features tha
 
 # Cloning This Repository
 
-For the purpose of using Hazard3 in your design, this repository is self-contained. You will need to pull in the submodules for simulation scripts, compliance tests and for components for the example SoC:
+For the purpose of using Hazard3 in your design, this repository is self-contained. You need the submodules for simulation scripts, compliance tests and example SoC components:
 
 ```bash
 git clone --recursive https://github.com/Wren6991/Hazard3.git hazard3
 ```
+
+To initialise submodules in an already-cloned repository:
+
+```bash
+git submodule update --init --recursive
+```
+
 # Running Hello World
 
-These instructions are for Ubuntu 20.04. You will need:
+These instructions walk through:
 
-- A recent Yosys build to process the Verilog. At least version `c2afcbe7`, which includes a workaround for a gtkwave string parsing issue. Latest master should be fine.
-- A `riscv32-unknown-elf-` toolchain to build software for the core
-- A native `clang` to build the simulator
+* Setting up the tools for building the Hazard3 simulator from Verilog source
+* Setting up the tools for building RISC-V binaries to run on the simulator
+* Building a "Hello, world!" binary and running it on the simulator
+
+These instructions are for Ubuntu 24.04. If you are running on Windows you may have some success with Ubuntu under WSL.
+
+You will need:
+
+* A recent Yosys build to process the Verilog (these instructions were last tested with `b1569de5`)
+* A `riscv32-unknown-elf-` toolchain to build software for the core
+* A native `clang` to build the simulator
 
 ## Yosys
 
-The [Yosys GitHub repo](https://github.com/YosysHQ/yosys) has instructions for building Yosys from source. I don't recommend right now (July '21) to use the version from your package manager.
+The [Yosys GitHub repo](https://github.com/YosysHQ/yosys) has instructions for building Yosys from source.
+
+The following steps work for me on Ubuntu 24.04 using version `b1569de5` mentioned above.
+
+```bash
+sudo apt install build-essential clang lld bison flex libreadline-dev gawk tcl-dev libffi-dev git graphviz xdot pkg-config python3 libboost-system-dev libboost-python-dev libboost-filesystem-dev zlib1g-dev
+
+git clone https://github.com/YosysHQ/yosys.git
+cd yosys
+git submodule update --init
+make -j$(nproc)
+sudo make install
+```
 
 ## RISC-V Toolchain
 
-The instructions below are for building a version of the 32-bit [RISC-V GNU toolchain](https://github.com/riscv/riscv-gnu-toolchain) with multilib support for the various combinations of RV32I/M/A/C ISAs:
+I recommend building a toolchain to get libraries with the correct ISA support. Follow the below instructions to build a 32-bit GCC 14 version of the [RISC-V GNU toolchain](https://github.com/riscv/riscv-gnu-toolchain) with a multilib setup suitable for Hazard3 development.
 
 ```bash
-# Prerequisites for Ubuntu 20.04
-sudo apt install -y autoconf automake autotools-dev curl python3 libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev
+# Prerequisites for Ubuntu 24.04
+sudo apt install autoconf automake autotools-dev curl python3 python3-pip libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev ninja-build git cmake libglib2.0-dev libslirp-dev
+
 cd /tmp
 git clone --recursive https://github.com/riscv/riscv-gnu-toolchain
 cd riscv-gnu-toolchain
-./configure --prefix=/opt/riscv --with-arch=rv32ia --with-abi=ilp32 --with-multilib-generator="rv32i-ilp32--;rv32ia-ilp32--;rv32iac-ilp32--;rv32ic-ilp32--;rv32im-ilp32--;rv32ima-ilp32--;rv32imac-ilp32--;rv32imc-ilp32--"
-sudo mkdir /opt/riscv
-sudo chown $(whoami) /opt/riscv
+git clone https://github.com/gcc-mirror/gcc gcc-14 -b releases/gcc-14
+./configure --with-gcc-src=$(pwd)/gcc-14 --prefix=/opt/riscv/gcc14-no-zcmp --with-arch=rv32ia_zicsr --with-abi=ilp32 --with-multilib-generator="rv32i-ilp32--;rv32im-ilp32--;rv32ia-ilp32--;rv32ima-ilp32--;rv32ic-ilp32--;rv32imc-ilp32--;rv32iac-ilp32--;rv32imac-ilp32--;rv32i_zicsr-ilp32--;rv32im_zicsr-ilp32--;rv32ia_zicsr-ilp32--;rv32ima_zicsr-ilp32--;rv32ic_zicsr-ilp32--;rv32imc_zicsr-ilp32--;rv32iac_zicsr-ilp32--;rv32imac_zicsr-ilp32--;rv32i_zicsr_zifencei-ilp32--;rv32im_zicsr_zifencei-ilp32--;rv32ia_zicsr_zifencei-ilp32--;rv32ima_zicsr_zifencei-ilp32--;rv32ic_zicsr_zifencei-ilp32--;rv32imc_zicsr_zifencei-ilp32--;rv32iac_zicsr_zifencei-ilp32--;rv32imac_zicsr_zifencei-ilp32--;rv32im_zba_zbb_zbs-ilp32--;rv32ima_zba_zbb_zbs-ilp32--;rv32imc_zba_zbb_zbs-ilp32--;rv32imac_zba_zbb_zbs-ilp32--;rv32im_zicsr_zba_zbb_zbs-ilp32--;rv32ima_zicsr_zba_zbb_zbs-ilp32--;rv32imc_zicsr_zba_zbb_zbs-ilp32--;rv32imac_zicsr_zba_zbb_zbs-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbs-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbs-ilp32--;rv32imc_zicsr_zifencei_zba_zbb_zbs-ilp32--;rv32imac_zicsr_zifencei_zba_zbb_zbs-ilp32--;rv32im_zba_zbb_zbs_zbkb-ilp32--;rv32ima_zba_zbb_zbs_zbkb-ilp32--;rv32imc_zba_zbb_zbs_zbkb-ilp32--;rv32imac_zba_zbb_zbs_zbkb-ilp32--;rv32im_zicsr_zba_zbb_zbs_zbkb-ilp32--;rv32ima_zicsr_zba_zbb_zbs_zbkb-ilp32--;rv32imc_zicsr_zba_zbb_zbs_zbkb-ilp32--;rv32imac_zicsr_zba_zbb_zbs_zbkb-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbs_zbkb-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbs_zbkb-ilp32--;rv32imc_zicsr_zifencei_zba_zbb_zbs_zbkb-ilp32--;rv32imac_zicsr_zifencei_zba_zbb_zbs_zbkb-ilp32--;rv32im_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32ima_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32imc_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32imac_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32im_zicsr_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32ima_zicsr_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32imc_zicsr_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32imac_zicsr_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32imc_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32imac_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb-ilp32--;rv32i_zca-ilp32--;rv32im_zca-ilp32--;rv32ia_zca-ilp32--;rv32ima_zca-ilp32--;rv32i_zicsr_zca-ilp32--;rv32im_zicsr_zca-ilp32--;rv32ia_zicsr_zca-ilp32--;rv32ima_zicsr_zca-ilp32--;rv32i_zicsr_zifencei_zca-ilp32--;rv32im_zicsr_zifencei_zca-ilp32--;rv32ia_zicsr_zifencei_zca-ilp32--;rv32ima_zicsr_zifencei_zca-ilp32--;rv32im_zba_zbb_zbs_zca-ilp32--;rv32ima_zba_zbb_zbs_zca-ilp32--;rv32im_zicsr_zba_zbb_zbs_zca-ilp32--;rv32ima_zicsr_zba_zbb_zbs_zca-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbs_zca-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbs_zca-ilp32--;rv32im_zba_zbb_zbs_zbkb_zca-ilp32--;rv32ima_zba_zbb_zbs_zbkb_zca-ilp32--;rv32im_zicsr_zba_zbb_zbs_zbkb_zca-ilp32--;rv32ima_zicsr_zba_zbb_zbs_zbkb_zca-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbs_zbkb_zca-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbs_zbkb_zca-ilp32--;rv32im_zba_zbb_zbc_zbs_zbkb_zca-ilp32--;rv32ima_zba_zbb_zbc_zbs_zbkb_zca-ilp32--;rv32im_zicsr_zba_zbb_zbc_zbs_zbkb_zca-ilp32--;rv32ima_zicsr_zba_zbb_zbc_zbs_zbkb_zca-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb_zca-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb_zca-ilp32--;rv32i_zca_zcb-ilp32--;rv32im_zca_zcb-ilp32--;rv32ia_zca_zcb-ilp32--;rv32ima_zca_zcb-ilp32--;rv32i_zicsr_zca_zcb-ilp32--;rv32im_zicsr_zca_zcb-ilp32--;rv32ia_zicsr_zca_zcb-ilp32--;rv32ima_zicsr_zca_zcb-ilp32--;rv32i_zicsr_zifencei_zca_zcb-ilp32--;rv32im_zicsr_zifencei_zca_zcb-ilp32--;rv32ia_zicsr_zifencei_zca_zcb-ilp32--;rv32ima_zicsr_zifencei_zca_zcb-ilp32--;rv32im_zba_zbb_zbs_zca_zcb-ilp32--;rv32ima_zba_zbb_zbs_zca_zcb-ilp32--;rv32im_zicsr_zba_zbb_zbs_zca_zcb-ilp32--;rv32ima_zicsr_zba_zbb_zbs_zca_zcb-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbs_zca_zcb-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbs_zca_zcb-ilp32--;rv32im_zba_zbb_zbs_zbkb_zca_zcb-ilp32--;rv32ima_zba_zbb_zbs_zbkb_zca_zcb-ilp32--;rv32im_zicsr_zba_zbb_zbs_zbkb_zca_zcb-ilp32--;rv32ima_zicsr_zba_zbb_zbs_zbkb_zca_zcb-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbs_zbkb_zca_zcb-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbs_zbkb_zca_zcb-ilp32--;rv32im_zba_zbb_zbc_zbs_zbkb_zca_zcb-ilp32--;rv32ima_zba_zbb_zbc_zbs_zbkb_zca_zcb-ilp32--;rv32im_zicsr_zba_zbb_zbc_zbs_zbkb_zca_zcb-ilp32--;rv32ima_zicsr_zba_zbb_zbc_zbs_zbkb_zca_zcb-ilp32--;rv32im_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb_zca_zcb-ilp32--;rv32ima_zicsr_zifencei_zba_zbb_zbc_zbs_zbkb_zca_zcb-ilp32--"
+sudo mkdir -p /opt/riscv/gcc14-no-zcmp
+sudo chown $(whoami) /opt/riscv/gcc14-no-zcmp
 make -j $(nproc)
 ```
-This build will also install an appropriate gdb as `riscv32-unknown-elf-gdb`.
 
-The `--with-multilib-generator=` flag builds multiple versions of the standard library, to match possible `-march` flags provided at link time. If there is no _exact_ match, the linker falls back to the architecture specified by the `--with-arch` flag, which in this case is the fairly conservative RV32IA. This will become worse with GCC 12, where for example the CSR instructions have moved from `I` to `Zicsr`, and the entire arch string must still be matched to get the non-fallback library.
+The `--with-multilib-generator=` flag builds multiple versions of the standard library, to match possible `-march` flags provided at link time. Recent versions of GCC seem to remove the fallback to the `--with-arch` architecture when there is no exact match, so if you are developing for multiple ISA variants then you need a fairly expansive multilib setup. The multilib-generator command line above was generated using [multilib-gen-gen.py](test/sim/common/multilib-gen-gen.py)
+
+As of writing (August 2024) there are issues with Zcmp support on `riscv-gnu-toolchain`. The above multilib command line excludes Zcmp from the library setup for this reason.
 
 Make sure this toolchain can be found on your `PATH` (as `riscv32-unknown-elf-*`):
 
 ```bash
-export PATH="$PATH:/opt/riscv/bin"
+export PATH="$PATH:/opt/riscv/gcc14-no-zcmp/bin"
 ```
+
+### Non-multilib (Smaller Install Size)
+
+For a faster build and a smaller install size, use this `./configure` line instead:
+
+```bash
+./configure --with-gcc-src=$(pwd)/gcc-14 --prefix=/opt/riscv/gcc14-no-zcmp --with-arch=rv32imac_zicsr --with-abi=ilp32
+```
+
+Adjust the `--with-arch` line as necessary for your Hazard3 configuration. You may need to adjust architectures used in software Makefiles in this repository to fit your chosen architecture variant.
+
+You can also remove the `--with-gcc-src` flag if you would prefer to use the GCC version pinned by the toolchain repository.
 
 ## Actually Running Hello World
 

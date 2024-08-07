@@ -20,7 +20,6 @@ options = [
 	"zbs",
 	"zbkb",
 	# GCC14 only:
-	"zicond",
 	"zca",
 	"zcb",
 	# "zcmp" (waiting on binutils 2.43)
@@ -35,7 +34,6 @@ depends_on = {
 	"zbs":      ["m", "zba", "zbb"          ],
 	"zbkb":     ["zbb"                      ],
 	"zbc":      ["zba", "zbb", "zbs", "zbkb"],
-	"zicond":   ["zba", "zbb", "zbs"        ],
 	"zifencei": ["zicsr"                    ],
 	"c":        ["!zca"                     ],
 	"zca":      ["!c"                       ],
@@ -67,3 +65,5 @@ for i in range(2 ** len(options)):
 assert((base + abi) in l)
 
 print(";".join(l))
+
+print(len(l))
