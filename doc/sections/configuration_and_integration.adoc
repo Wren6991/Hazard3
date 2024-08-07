@@ -449,4 +449,62 @@ Default: All writable except for bit 1.
 
 === Interfaces (Top-level Ports)
 
-TODO lol
+Most ports are common to the two top-level wrappers, `hazard3_cpu_1port.v` and `hazard3_cpu_2port.v`. The only difference is the number of AHB5 manager ports used to access the bus: `hazard3_cpu_1port.v` has a single port used for all accesses, whereas `hazard3_cpu_2port.v` adds a separate, dedicated port for instruction fetch.
+
+==== Interfaces Common to All Wrappers
+
+Global signals
+
+[options="header",cols="1,1,4,4"]
+|===
+| Width | I/O | Name | Description
+4+| Global signals
+| 1          | I | `clk`                        | Clock for all processor logic not driven by `clk_always_on`. Must be the same as the AHB5 bus clock. You should an external clock gate controlled by `clk_en` if the Xh3power extension is configured.
+| 1          | I | `clk_always_on`              | Clock for logic required to wake from a low-power state. Connect to the same clock as `clk`, but do not insert an external clock gate.
+| 1          | I | `rst_n`                      | Active-low asynchronous reset for all processor logic. There is no internal synchroniser, so you must arrange externally for reset assertion/removal times to be met. For example, add an external reset synchroniser.
+4+| Power control signals
+| 1          | O | `pwrup_req`                  | Power-up request. Disconnect if Xh3power is not configured. Part of a four-phase (Gray code) req/ack handshake for negotiating power or clocks with your system power controller. The processor releases `pwrup_req` on entering a sufficiently deep `wfi` or `h3.block` state, as configured by the `msleep` CSR. It then waits for deassertion of `pwrup_ack`, before reasserting `pwrup_req` when the processor intends to wake from the low-power state.
+| 1          | I | `pwrup_ack`                  | Power-up acknowledged. Tie to 1 if Xh3power is not configured, or if there is no external system power controller. The processor does not access the bus when either `pwrup_req` or `pwrup_ack` is low.
+| 1          | O | `clk_en`                     | Control output for an external top-level clock gate on `clk`. Active-high enable.
+| 1          | O | `unblock_out`                | Pulses high when an `h3.unblock` instruction executes. Disconnect if Xh3power is not configured.
+| 1          | I | `unblock_in`                 | A high input pulse will release a blocked `h3.block` instruction, or cause the next `h3.block` instruction to immediately fall through.
+4+| Debug Module controls
+| 1          | I | `dbg_req_halt`               | Debugger halt request. Connect to the matching signal on the Debug Module. Tie low if debug support is not configured.
+| 1          | I | `dbg_req_halt_on_reset`      | Debugger halt-on-reset request. Connect to the matching signal on the Debug Module. Tie low if debug support is not configured.
+| 1          | I | `dbg_req_resume`             | Debugger resume request. Connect to the matching signal on the Debug Module. Tie low if debug support is not configured.
+| 1          | O | `dbg_halted`                 | Debug halted status. Asserts when the processor is halted in Debug mode. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+| 1          | O | `dbg_running`                | Debug halted status. Asserts when the processor is halted in Debug mode. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+| 32         | I | `dbg_data0_rdata`            | Read data bus for mapping Debug Module `dmdata0` register as a CSR. Connect to the matching signal on the Debug Module. Tie to zeroes if debug support is not configured.
+| 32         | O | `dbg_data0_wdata`            | Write data bus for mapping Debug Module `dmdata0` register as a CSR. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+| 1          | O | `dbg_data0_wen`              | Write data strobe for mapping Debug Module `dmdata0` register as a CSR. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+| 32         | I | `dbg_instr_data`             | Instruction injection interface. Connect to the matching signal on the Debug Module. Tie to zeroes if debug support is not configured.
+| 1          | I | `dbg_instr_data_vld`         | Instruction injection interface. Connect to the matching signal on the Debug Module. Tie low if debug support is not configured.
+| 1          | O | `dbg_instr_data_rdy`         | Instruction injection interface. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+| 1          | O | `dbg_instr_caught_exception` | Exception caught during Program Buffer excecution. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+| 1          | O | `dbg_instr_caught_ebreak`    | Breakpoint instruction caught during Program Buffer execution. Connect to the matching signal on the Debug Module. Disconnect if debug support is not configured.
+4+| Shared System Bus Access
+| 32         | I | `dbg_sbus_addr`              | Address for System Bus Access arbitrated with this core's load/store access. Tie to zeroes if this feature is not used.
+| 1          | I | `dbg_sbus_write`             | Write/not-Read flag for System Bus Access arbitrated with this core's load/store access. Tie low if this feature is not used.
+| 2          | I | `dbg_sbus_size`              | Transfer size (0/1/2 = byte/halfword/word) for System Bus Access arbitrated with this core's load/store access. Tie low if this feature is not used.
+| 1          | I | `dbg_sbus_vld`               | Transfer enable signal for System Bus Access arbitrated with this core's load/store access. Tie low if this feature is not used.
+| 1          | O | `dbg_sbus_rdy`               | Transfer stall signal for System Bus Access arbitrated with this core's load/store access. Disconnect if this feature is not used.
+| 1          | O | `dbg_sbus_err`               | Bus fault signal for System Bus Access arbitrated with this core's load/store access. Disconnect if this feature is not used.
+| 32         | I | `dbg_sbus_wdata`             | Write data bus for System Bus Access arbitrated with this core's load/store access. Tie to zeroes if this feature is not used.
+| 32         | O | `dbg_sbus_rdata`             | Read data bus for System Bus Access arbitrated with this core's load/store access. Disconnect if this feature is not used.
+4+| Interrupt requests
+| `NUM_IRQS` | I | `irq`                        | If Xh3irq is not configured, this is the RISC-V external interrupt line (`mip.meip`) which you should connect to an external interrupt controller such as a standard RISC-V PLIC. If Xh3irq is configured, this is a vector of level-sensitive active-high interrupt signals which the core's internal interrupt controller can route through the `mip.meip` vector. Tie low if unused.
+| 1          | I | `soft_irq`                   | This is the standard RISC-V software interrupt signal, `mip.msip`. Tie low if unused.
+| 1          | I | `timer_irq`                  | This is the standard RISC-V timer interrupt signal, `mip.mtip`. It should be connected to a standard RISC-V platform timer peripheral (`mtime`/`mtimecmp`) accessible to M-mode software on your system bus. Tie low if unused.
+|===
+
+==== Interfaces for 1-port CPU
+
+This wrapper adds a single standard AHB5 manager port, with signals prefixed `ahblm_`. See the AMBA 5 AHB specification from Arm for definitions of these signals.
+
+==== Interfaces for 2-port CPU
+
+This wrapper adds two standard AHB5 manager ports, with signals prefixed `i_` for instruction and `d_` for data. See the AMBA 5 AHB specification from Arm for definitions of these signals.
+
+The I port only generates word-aligned word-sized read accesses. It does not use AHB5 exclusives.
+
+When shared System Bus Access (SBA) is used, the SBA bus accesses are routed through the D port.
