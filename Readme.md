@@ -259,14 +259,18 @@ If you see something like:
 Info : Initializing remote_bitbang driver
 Info : Connecting to localhost:9824
 Info : remote_bitbang driver initialized
-Info : This adapter doesn't support configurable speed
-Info : JTAG tap: hazard3.cpu tap/device found: 0xdeadbeef (mfg: 0x777 (<unknown>), part: 0xeadb, ver: 0xd)
-Info : datacount=1 progbufsize=2
-Info : Disabling abstract command reads from CSRs.
-Info : Examined RISC-V core; found 1 harts
-Info :  hart 0: XLEN=32, misa=0x40801105
-Info : starting gdb server for hazard3.cpu on 3333
+Info : Note: The adapter "remote_bitbang" doesn't support configurable speed
+Info : JTAG tap: hazard3.cpu tap/device found: 0xdeadbeef (mfg: 0x777 (Fabric of Truth Inc), part: 0xeadb, ver: 0xd)
+Info : [hazard3.cpu] datacount=1 progbufsize=2
+Info : [hazard3.cpu] Disabling abstract command reads from CSRs.
+Info : [hazard3.cpu] Disabling abstract command writes to CSRs.
+Info : [hazard3.cpu] Examined RISC-V core
+Info : [hazard3.cpu]  XLEN=32, misa=0x40901107
+[hazard3.cpu] Target successfully examined.
+Info : [hazard3.cpu] Examination succeed
+Info : [hazard3.cpu] starting gdb server on 3333
 Info : Listening on port 3333 for gdb connections
+hazard3.cpu halted due to debug-request.
 Info : Listening on port 6666 for tcl connections
 Info : Listening on port 4444 for telnet connections
 ```
