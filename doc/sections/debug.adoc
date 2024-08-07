@@ -6,30 +6,32 @@ Hazard3, along with its external debug components, implements version 0.13.2 of 
 * Abstract GPR access as required
 * Program Buffer, 2 words plus `impebreak`
 * Automatic trigger of abstract command (`abstractauto`) on `data0` or Program Buffer access for efficient memory block transfers from the host
-* (Optional) System Bus Access, either through a dedicated AHB-Lite master, or multiplexed with a processor load/store port
+* Support for multiple harts (multiple Hazard3 cores) connected to a single Debug Module (DM)
+* The hart array mask registers, for applying run/halt/reset controls to multiple cores simultaneously
+* (Optional) System Bus Access, either through a dedicated AHB5 manager interface, or multiplexed with a processor load/store port
 * (Optional) An instruction address trigger unit (hardware breakpoints)
 
 === Debug Topologies
 
-Hazard3's Debug Module has the following interfaces:
+Hazard3's Debug Module (DM) has the following interfaces:
 
 * An upstream AMBA 3 APB port -- the "Debug Module Interface" -- for host access to the Debug Module
-* A downstream Hazard3-specific interface to one or more cores _(multicore support is experimental)_
+* A downstream Hazard3-specific interface to one or more cores
 * Some reset request/acknowledge signals which require careful handshaking with system-level reset logic
 
 This is shown in the example topology below.
 
 image::diagrams/debug_topology.png[pdfwidth=50%]
 
-The Debug Module _must_ be connected directly to the processors without intervening registers. This implies the Debug Module is in the same clock domain as the processors, so multiple processors on the same Debug Module must share a common clock.
+The DM _must_ be connected directly to the processors without intervening registers. This implies the DM is in the same clock domain as the processors, so multiple processors on the same DM must share a common clock.
 
-Upstream of the Debug Module is at least one Debug Transport Module, which bridges some host-facing interface such as JTAG to the APB Debug Module Interface. Hazard3 provides an implementation of a standard RISC-V JTAG-DTM, but any APB master could be used. The Debug Module requires at least 7 bits of word addressing, i.e. 9 bits of byte address space.
+Upstream of the DM is at least one Debug Transport Module, which bridges some host-facing interface such as JTAG to the APB DM Interface. Hazard3 provides an implementation of a standard RISC-V JTAG-DTM, but any APB master could be used. The DM requires at least 7 bits of word addressing, i.e. 9 bits of byte address space.
 
-An APB arbiter could be inserted here, to allow multiple transports to be used, provided the host(s) avoid using multiple transports concurrently. This also admits simple implementation of self-hosted debug, by mapping the Debug Module to a system-level peripheral address space.
+An APB arbiter could be inserted here, to allow multiple transports to be used, provided the host(s) avoid using multiple transports concurrently. This also admits simple implementation of self-hosted debug, by mapping the DM to a system-level peripheral address space.
 
 The clock domain crossing (if any) occurs on the downstream port of the Debug Transport Module. Hazard3's JTAG-DTM implementation runs entirely in the TCK domain, and instantiates a bus clock-crossing module internally to bridge a TCK-domain internal APB bus to an external bus in the processor clock domain.
 
-It is possible to instantiate multiple Debug Modules, one per core, and attach them to a single Debug Transport Module. This is not the preferred topology, but it does allow multiple cores to be independently clocked.
+It is possible to instantiate multiple DMs, one per core, and attach them to a single Debug Transport Module. This is not the preferred topology, but it does allow multiple cores to be independently clocked. In this case, the first DM must be located at address `0x0` in the DMI address space, and you must set the `NEXT_DM_ADDR` parameter on each DM so that the debugger can walk the (null-terminated) linked list and discover all the DMs.
 
 === Implementation-defined behaviour
 
@@ -69,7 +71,7 @@ The debug host must use the Program Buffer to access CSRs and memory. This carri
 
 Abstract memory access is not implemented because, for bulk transfers, it offers no better throughput than Program Buffer execution with `abstractauto`. Non-bulk transfers, while slower, are still instantaneous from the perspective of the human at the other end of the wire.
 
-The Hazard3 Debug Module has experimental support for multi-core debug. Each core possesses exactly one hardware thread (hart) which is exposed to the debugger. The RISC-V specification does not mandate what mapping is used between the Debug Module hart index `hartsel` and each core's `mhartid` CSR, but a 1:1 match of these values is the least likely to cause issues. Each core's `mhartid` can be configured using the `MHARTID_VAL` parameter during instantiation.
+The Hazard3 DM has experimental support for multi-core debug. Each core possesses exactly one hardware thread (hart) which is exposed to the debugger. The RISC-V specification does not mandate what mapping is used between the DM hart index `hartsel` and each core's `mhartid` CSR, but a 1:1 match of these values is the least likely to cause issues. Each core's `mhartid` can be configured using the `MHARTID_VAL` parameter during instantiation.
 
 === Debug Module to Core Interface
 
@@ -77,4 +79,3 @@ The DM can inject instructions directly into the core's instruction prefetch buf
 
 The DM's `data0` register is exposed to the core as a debug mode CSR. By issuing instructions to make the core read or write this dummy CSR, the DM can exchange data with the core. To read from a GPR `x` into `data0`, the DM issues a `csrw data0, x` instruction. Similarly `csrr x, data0` will write `data0` to that GPR. The DM always follows the CSR instruction with an `ebreak`, just like the implicit `ebreak` at the end of the Program Buffer, so that it is notified by the core when the GPR read instruction sequence completes.
 
-TODO reset interface description

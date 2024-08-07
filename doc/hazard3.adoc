@@ -22,5 +22,6 @@ include::sections/debug.adoc[]
 [appendix]
 include::sections/instruction_timings.adoc[]
 
-[appendix]
-include::sections/instruction_pseudocode.adoc[]
+// removed for now as it's fairly low-value
+// [appendix]
+// include::sections/instruction_pseudocode.adoc[]
