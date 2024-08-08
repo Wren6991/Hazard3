@@ -334,3 +334,32 @@ make -f ULX3S.mk flash
 # Should be able to attach to the processor
 riscv-openocd -f ../ulx3s-openocd.cfg
 ```
+
+# Performance
+
+The RP2350 configuration of Hazard3 achieves 3.81 CoreMark/MHz.
+
+```
+2K performance run parameters for coremark.
+CoreMark Size    : 666
+Total ticks      : 15758494
+Total time (secs): 15.758494
+Iterations/Sec   : 3.807470
+Iterations       : 60
+Compiler version : GCC14.2.1 20240807
+Compiler flags   : -O3 -g -march=rv32ima_zicsr_zifencei_zba_zbb_zbkb_zbs -mbranch-cost=1 -funroll-all-loops --param max-inline-insns-auto=200 -finline-limit=10000 -fno-code-hoisting -fno-if-conversion2 -DPERFORMANCE_RUN=1  
+Memory location  : STACK
+seedcrc          : 0xe9f5
+[0]crclist       : 0xe714
+[0]crcmatrix     : 0x1fd7
+[0]crcstate      : 0x8e3a
+[0]crcfinal      : 0xa14c
+Correct operation validated. See README.md for run and reporting rules.
+CoreMark 1.0 : 3.807470 / GCC14.2.1 20240807 -O3 -g -march=rv32ima_zicsr_zifencei_zba_zbb_zbkb_zbs -mbranch-cost=1 -funroll-all-loops --param max-inline-insns-auto=200 -finline-limit=10000 -fno-code-hoisting -fno-if-conversion2 -DPERFORMANCE_RUN=1   / STACK
+```
+
+To reproduce this in the RTL simulator, use the top-level Makefile in [test/sim/coremark](test/sim/coremark) after you have followed all the steps to get set up for running a "Hello, world!" binary above.
+
+The default flags are appropriate for the non-multilib toolchain build, and achieve 3.74 CoreMark/MHz. To achieve the full 3.81 CoreMark/MHz, change the ISA variant in `core_portme.mak` to `rv32ima_zicsr_zifencei_zba_zbb_zbkb_zbs`. See the comments in that file for an explanation of why this makes a difference.
+
+See the RP2350 datasheet for details of the Hazard3 configuration used by that chip. The default `tb_cxxrtl` build uses the same configuration as RP2350, except that it also enables the Zbc extension (which is not emitted by GCC 14 as it is not useful for general-purpose code).
