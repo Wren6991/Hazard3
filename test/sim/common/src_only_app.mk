@@ -6,6 +6,7 @@ ifndef APP
 $(error Must define application name as APP)
 endif
 
+DOTF         ?= tb.f
 CCFLAGS      ?=
 LDSCRIPT     ?= ../common/memmap.ld
 CROSS_PREFIX ?= riscv32-unknown-elf-
@@ -34,7 +35,7 @@ view: run
 bin: $(TMP_PREFIX)$(APP).bin
 
 tb:
-	$(MAKE) -C $(TBDIR)
+	$(MAKE) -C $(TBDIR) DOTF=$(DOTF)
 
 clean:
 	rm -rf $(TMP_PREFIX)
