@@ -23,9 +23,9 @@ This repository also contains a compliant RISC-V Debug Module for Hazard3, which
 
 The [example SoC integration](example_soc/soc/example_soc.v) shows how these components can be assembled to create a minimal system with a JTAG-enabled RISC-V processor, some RAM and a serial port.
 
-Hazard3 is still under development.
-
 Please read [Contributing.md](Contributing.md) before raising an issue or pull request.
+
+For the latest stable release, check out the [stable](https://github.com/Wren6991/Hazard3/tree/stable) branch. For the latest work-in-progress code including new experimental features, check out the [develop](https://github.com/Wren6991/Hazard3/tree/develop) branch.
 
 # Links to Specifications
 
