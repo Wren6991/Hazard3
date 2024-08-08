@@ -273,7 +273,7 @@ Each `pmpcfg` register divides into four identical 8-bit chunks, each correspond
 |Bits | Name | Description
 | 7   | `L` | Lock region, and additionally enforce its permissions on M-mode as well as U-mode.
 | 6:5 | -   | RES0
-| 4:3 | `A` | Address-matching mode. Values supported are 0 (OFF), 2 (NA4, naturally aligned 4-byte) and 3 (NAPOT, naturally aligned power-of-two). Attempting to write an unsupported value will set the region to OFF.
+| 4:3 | `A` | Address-matching mode. Values supported are 0 (OFF), 2 (NA4, naturally aligned 4-byte) and 3 (NAPOT, naturally aligned power-of-two). 1 (TOR, top of range) is not supported. Attempting to write an unsupported value will set the region to OFF.
 | 2    | `X` | Execute permission
 | 1    | `W` | Write permission
 | 0    | `R` | Read permission
