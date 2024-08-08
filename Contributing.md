@@ -12,20 +12,23 @@ I am grateful for any of the following pull requests:
 * Improvements and expansion to the example SoC
 * Bug fixes for the example SoC
 * Porting the example SoC to new FPGA platforms
-	* Preferably ones supported by Yosys + nextpnr, with a fairly inexpensive commercially-available development board that I can order for testing
+	* Preferably ones supported by Yosys + nextpnr, with an inexpensive commercially-available development board that I can order for testing
 * Improvements to automation and scripting
 * Improvements to RTL in project dependencies like `example_soc/libfpga/`
-* General project maintenance such as accidental use of SSH URLs for submodules
+* General project maintenance (such as fixing accidental use of SSH URLs for submodules)
 
 Please do not raise pull requests for the following:
 
 * Changes to RTL sources in the top-level `hdl/` directory
 * Cosmetic changes (except for comment-only changes)
-	* The cosmetic value does not outweigh the cost of review, nor the possibility of introducing a regression
 
-### Core RTL
+### Changes to Core RTL
 
-I will not merge pull requests which modify hardware sources in the `hdl/` directory. I will close such a pull request without reading the patch. The contents of the `hdl/` directory have a **single author**; I refuse to expose anybody taping out Hazard3 to the possibility of your employer chasing you for your contribution by harassing them legally. A contribution agreement does not solve this, because you may sign it without the legal capability to do so, and **what is taped out cannot be taped back in.** If you are reading this as a software engineer, please understand that the ASIC industry is more hostile to open-source projects than the software industry is, and I am trying my hardest to build a core that other people can safely use.
+I do not merge pull requests which modify hardware sources in the `hdl/` directory. I close these pull requests without reading the patch.
+
+The contents of the `hdl/` directory have a single author. I will not expose people taping out Hazard3 to the possibility of your employer chasing you for your contribution by harassing them legally. A contribution agreement does not solve this, because you may sign it without the legal capability to do so, and **what is taped out cannot be taped back in.**
+
+If you are reading this as a software engineer, please understand that the ASIC industry is more hostile to open-source projects than the software industry is, and I am trying my hardest to build a core that other people can safely use.
 
 (I am not trying to be obstructive; if a community fork of Hazard3 gets traction I am happy to contribute and help out with issues and questions. However, the core RTL in this repository will remain single-author.)
 
@@ -43,12 +46,12 @@ If you find a bug in the Hazard3 repository, please report it. This includes:
 2. A compatibility issue with your tools
 	* Please do not raise cosmetic lint issues: the intersection of clean Verilog across all lint tools is the empty set. Hazard3 is lint-clean with Verilator lint.
 	* A lint issue relating to simulation/synthesis mismatch is important though, and falls under point **1** above.
-3. An incorect or incomplete statement in documentation
+3. An incorrect or incomplete statement in documentation
 4. A test which fails when it should pass, or vice versa
 
 #### Reproducibility
 
-Before I fix a bug I must reproduce it on my own machine. I will not fix issues on faith as this is unlikely to result in a reliable or complete fix. Please include the following in a bug report:
+Before I fix a bug I must reproduce it on my own machine. I cannot fix issues on faith as this is unlikely to result in a reliable or complete fix. Please include the following in a bug report to ensure I can reproduce the issue:
 
 * A description of expected behaviour
 * A description of actual, observed behaviour (which differs from expected)
@@ -56,9 +59,9 @@ Before I fix a bug I must reproduce it on my own machine. I will not fix issues 
 	* Preferred platforms are the CXXRTL simulator, and the iCEBreaker and ULX3S FPGA SoCs
 	* You can attach a patch for a preferred platform if it is necessary to reproduce the issue
 * All files necessary to reproduce the issue
-	* For software the minimum is an ELF and DIS file for your binary
+	* For software the minimum is an ELF and disassembly file for your binary
 	* Do not strip symbols from ELF files
-	* Please attach source code if possible
+	* Please attach source code if possible (but the ELF is more important as I may not be able to reproduce your build exactly)
 * A sequence of bash commands which can be invoked on the above files to reproduce the faulty behaviour
 
 I develop Hazard3 on the latest Ubuntu LTS release (currently 24.04) and testing your reproduction on this platform is much appreciated.
@@ -72,7 +75,7 @@ I am happy to field feature requests. Please be aware the answer may be "no" for
 * I don't like the feature, for reasons of aesthetics or toolchain compatibility
 * I don't expect to have time to implement the feature in a reasonable timeframe
 
-Please describe **why** this feature is necessary. This helps me prioritise the request, and I might realise I also want this feature!
+Please describe **why** the requested feature is useful. This helps me prioritise the request, and I might realise I also want this feature!
 
 I am overwhelmingly more likely to implement requests for standard RISC-V ISA features than custom ones. As a rule, I don't implement standard RISC-V features that are not at least in the Frozen state. Please also consider the availability of toolchain support and upstream tests.
 
