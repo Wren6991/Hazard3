@@ -22,6 +22,8 @@ Please do not raise pull requests for the following:
 * Changes to RTL sources in the top-level `hdl/` directory
 * Cosmetic changes (except for comment-only changes)
 
+Raise pull requests against the [develop](https://github.com/Wren6991/Hazard3/tree/develop) branch. Do not raise pull requests directly against [stable](https://github.com/Wren6991/Hazard3/tree/stable).
+
 ### Changes to Core RTL
 
 I do not merge pull requests which modify hardware sources in the `hdl/` directory. I close these pull requests without reading the patch.
