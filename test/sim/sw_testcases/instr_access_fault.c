@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+// Test intent: check a jump into a faulting memory region generates the
+// correct trap cause and exception address.
+
 /*EXPECTED-OUTPUT***************************************************************
 
 mcause = 1

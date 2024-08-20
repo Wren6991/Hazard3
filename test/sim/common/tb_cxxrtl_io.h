@@ -19,7 +19,7 @@ typedef struct {
 	volatile uint32_t set_softirq;
 	volatile uint32_t clr_softirq;
 	volatile uint32_t globmon_en;
-	uint32_t _pad1[1];
+	volatile uint32_t poison_addr;
 	volatile uint32_t set_irq;
 	uint32_t _pad2[3];
 	volatile uint32_t clr_irq;
@@ -86,6 +86,11 @@ static inline bool tb_get_softirq(int idx) {
 
 static inline void tb_enable_global_monitor(bool en) {
 	mm_io->globmon_en = en;
+}
+
+// Set an address to generate faults on any access
+static inline void tb_set_poison_addr(uint32_t addr) {
+	mm_io->poison_addr = addr;
 }
 
 static inline void tb_set_irq_masked(uint32_t mask) {

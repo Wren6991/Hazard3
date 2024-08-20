@@ -33,6 +33,7 @@ enum {
 	IO_SET_SOFTIRQ = 0x010,
 	IO_CLR_SOFTIRQ = 0x014,
 	IO_GLOBMON_EN  = 0x018,
+	IO_POISON_ADDR = 0x01c,
 	IO_SET_IRQ     = 0x020,
 	IO_CLR_IRQ     = 0x030,
 	IO_MTIME       = 0x100,
@@ -55,6 +56,7 @@ struct mem_io_state {
 	bool monitor_enabled;
 	bool reservation_valid[2];
 	uint32_t reservation_addr[2];
+	uint32_t poison_addr;
 
 	mem_io_state() {
 		mtime = 0;
@@ -67,6 +69,7 @@ struct mem_io_state {
 			reservation_valid[i] = false;
 			reservation_addr[i] = 0;
 		}
+		poison_addr = -4u;
 		mem = new uint8_t[MEM_SIZE];
 		for (size_t i = 0; i < MEM_SIZE; ++i)
 			mem[i] = 0;
@@ -151,6 +154,9 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		if (memio.monitor_enabled && req.excl && !resp.exokay) {
 			// Failed exclusive write; do nothing
 		}
+		else if ((req.addr & -4u) == memio.poison_addr) {
+			resp.err = true;
+		}
 		else if (req.addr <= MEM_SIZE - 4u) {
 			unsigned int n_bytes = 1u << (int)req.size;
 			// Note we are relying on hazard3's byte lane replication
@@ -178,6 +184,9 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		}
 		else if (req.addr == IO_BASE + IO_GLOBMON_EN) {
 			memio.monitor_enabled = req.wdata;
+		}
+		else if (req.addr == IO_BASE + IO_POISON_ADDR) {
+			memio.poison_addr = req.wdata & -4u;
 		}
 		else if (req.addr == IO_BASE + IO_SET_IRQ) {
 			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() | req.wdata);
@@ -208,7 +217,10 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 		}
 	}
 	else {
-		if (req.addr <= MEM_SIZE - (1u << (int)req.size)) {
+		if (req.addr == (memio.poison_addr & -4u)) {
+			resp.err = true;
+		}
+		else if (req.addr <= MEM_SIZE - (1u << (int)req.size)) {
 			req.addr &= ~0x3u;
 			resp.rdata =
 				(uint32_t)memio.mem[req.addr] |

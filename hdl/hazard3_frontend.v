@@ -50,7 +50,7 @@ module hazard3_frontend #(
 	// Note reg/wire distinction
 	// => decode is providing live feedback on the CIR it is decoding,
 	//    which we fetched previously
-	output reg  [31:0]       cir,
+	output wire [31:0]       cir,
 	output reg  [1:0]        cir_vld,        // number of valid halfwords in CIR
 	input  wire [1:0]        cir_use,        // number of halfwords D intends to consume
 	                                         // *may* be a function of hready
@@ -430,97 +430,89 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // ----------------------------------------------------------------------------
-// Instruction assembly yard
+// Instruction buffer
 
-// buf_level is the number of valid halfwords in {hwbuf, cir}.
-reg [1:0] buf_level;
-reg [W_BUNDLE-1:0] hwbuf;
+// The instruction buffer is a 3 x ~16-bit shift register:
+//
+// * 2 x 16-bit entries form the 32-bit current instruction register (CIR)
+//   which is the processor's decode window
+//
+// * 1 x 16-bit entry allows the decode window to be non-32-bit-aligned with
+//   respect to the 2 x 32-bit prefetch queue entries, which are always
+//   naturally aligned in memory (if fully populated).
+//
+// The third entry should be trimmed for non-RVC configurations due to
+// constant-folding on EXTENSION_C; it is unnecessary here because the
+// instructions are always 32-bit-aligned.
 
-wire [W_DATA-1:0] fetch_data = fifo_empty ? mem_data : fifo_rdata;
-wire [1:0] fetch_data_hwvld = fifo_empty ? mem_data_hwvld : fifo_valid_hw[0];
-wire fetch_data_vld = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
+// The entries ("slots") are slightly larger than 16 bits because they also
+// contain metadata like bus errors:
+localparam W_SLOT              = 2 + W_BUNDLE;
+localparam SLOT_ERR_BIT        = 1 + W_BUNDLE;
+localparam SLOT_PREDBRANCH_BIT = 0 + W_BUNDLE;
 
-wire [2*W_BUNDLE-1:0] fetch_data_aligned = {
-	fetch_data[W_BUNDLE +: W_BUNDLE],
-	fetch_data_hwvld[0] || ~|EXTENSION_C ?
-		fetch_data[0 +: W_BUNDLE] : fetch_data[W_BUNDLE +: W_BUNDLE]
+reg  [3*W_SLOT-1:0] buf_contents;
+reg  [1:0]          buf_level;
+
+wire                fetch_data_vld   = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
+
+wire [W_DATA-1:0]   fetch_data       = fifo_empty ? mem_data            : fifo_rdata;
+wire [1:0]          fetch_data_hwvld = fifo_empty ? mem_data_hwvld      : fifo_valid_hw[0];
+wire                fetch_bus_err    = fifo_empty ? mem_data_err        : fifo_err[0];
+wire [1:0]          fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
+
+wire [W_SLOT-1:0] fetch_contents_hw1 = {
+	fetch_bus_err,
+	fetch_predbranch[1],
+	fetch_data[W_BUNDLE +: W_BUNDLE]
 };
 
-// Shift any recycled instruction data down to backfill D's consumption
-// We don't care about anything which is invalid or will be overlaid with fresh data,
-// so choose these values in a way that minimises muxes
-wire [3*W_BUNDLE-1:0] instr_data_shifted =
-	cir_use[1]                ? {hwbuf, cir[W_BUNDLE +: W_BUNDLE], hwbuf} :
-	cir_use[0] && EXTENSION_C ? {hwbuf, hwbuf, cir[W_BUNDLE +: W_BUNDLE]} :
-	                            {hwbuf, cir};
+wire [W_SLOT-1:0] fetch_contents_hw0 = {
+	fetch_bus_err,
+	fetch_predbranch[0],
+	fetch_data[0 +: W_BUNDLE]
+};
+
+wire [2*W_SLOT-1:0] fetch_contents_aligned = {
+	fetch_contents_hw1,
+	fetch_data_hwvld[0] || ~|EXTENSION_C ? fetch_contents_hw0 : fetch_contents_hw1
+};
+
+// Shift not-yet-used contents down to backfill D's consumption. We don't care
+// about anything which is invalid or will be overlaid with fresh data, so
+// choose these values in a way that minimises muxes.
+wire [3*W_SLOT-1:0] buf_shifted =
+	cir_use[1]                ? {buf_contents[W_SLOT +: 2 * W_SLOT], buf_contents[2 * W_SLOT +: W_SLOT]} :
+	cir_use[0] && EXTENSION_C ? {buf_contents[2 * W_SLOT +: W_SLOT], buf_contents[W_SLOT +: 2 * W_SLOT]} :
+	                            buf_contents;
 
 wire [1:0] level_next_no_fetch = buf_level - cir_use;
 
-// Overlay fresh fetch data onto the shifted/recycled instruction data
-// Again, if something won't be looked at, generate cheapest possible garbage.
+// Overlay fresh fetch data onto the shifted/recycled buffer contents. Again,
+// if something won't be looked at, generate the cheapest possible garbage.
 assign cir_room_for_fetch = level_next_no_fetch <= (|EXTENSION_C && ~&fetch_data_hwvld ? 2'h2 : 2'h1);
 assign fifo_pop = cir_room_for_fetch && !fifo_empty;
 
-wire [3*W_BUNDLE-1:0] instr_data_plus_fetch =
-	!cir_room_for_fetch                    ? instr_data_shifted :
-	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_data_aligned[0 +: W_BUNDLE], instr_data_shifted[0 +: 2 * W_BUNDLE]} :
-	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_data_aligned, instr_data_shifted[0 +: W_BUNDLE]} :
-	                                         {instr_data_shifted[2 * W_BUNDLE +: W_BUNDLE], fetch_data_aligned};
-
-// Also keep track of bus errors associated with CIR contents, shifted in the
-// same way as instruction data. Errors may come straight from the bus, or
-// may be buffered in the prefetch queue.
-
-wire fetch_bus_err = fifo_empty ? mem_data_err : fifo_err[0];
-
-reg  [2:0] cir_bus_err;
-wire [2:0] cir_bus_err_shifted =
-	cir_use[1]                ? cir_bus_err >> 2 :
-	cir_use[0] && EXTENSION_C ? cir_bus_err >> 1 : cir_bus_err;
-
-wire [2:0] cir_bus_err_plus_fetch =
-	!cir_room_for_fetch                    ? cir_bus_err_shifted :
-	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_bus_err, cir_bus_err_shifted[1:0]} :
-	level_next_no_fetch[0] && |EXTENSION_C ? {{2{fetch_bus_err}}, cir_bus_err_shifted[0]} :
-	                                         {cir_bus_err_shifted[2], {2{fetch_bus_err}}};
-
-// And the same thing again for whether CIR contains a predicted-taken branch.
-// One day I should clean up this copy/paste.
-
-wire [1:0] fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
-wire [1:0] fetch_predbranch_aligned = {
-	fetch_predbranch[1],
-	fetch_data_hwvld[0] || ~|EXTENSION_C ? fetch_predbranch[0] : fetch_predbranch[1]
-};
-
-
-reg  [2:0] cir_predbranch_reg;
-wire [2:0] cir_predbranch_shifted =
-	cir_use[1]                ? cir_predbranch_reg >> 2 :
-	cir_use[0] && EXTENSION_C ? cir_predbranch_reg >> 1 : cir_predbranch_reg;
-
-wire [2:0] cir_predbranch_plus_fetch =
-	!cir_room_for_fetch                    ? cir_predbranch_shifted :
-	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_predbranch_aligned[0], cir_predbranch_shifted[1:0]} :
-	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_predbranch_aligned, cir_predbranch_shifted[0]} :
-	                                         {cir_predbranch_shifted[2], fetch_predbranch_aligned};
+wire [3*W_SLOT-1:0] buf_shifted_plus_fetch =
+	!cir_room_for_fetch                    ? buf_shifted :
+	level_next_no_fetch[1] && |EXTENSION_C ? {fetch_contents_aligned[0 +: W_SLOT], buf_shifted[0 +: 2 * W_SLOT]} :
+	level_next_no_fetch[0] && |EXTENSION_C ? {fetch_contents_aligned, buf_shifted[0 +: W_SLOT]} :
+	                                         {buf_shifted[2 * W_SLOT +: W_SLOT], fetch_contents_aligned};
 
 wire [1:0] fetch_fill_amount = cir_room_for_fetch && fetch_data_vld ? (
-	&fetch_data_hwvld ? 2'h2 : 2'h1
+	&fetch_data_hwvld || ~|EXTENSION_C ? 2'h2 : 2'h1
 ) : 2'h0;
 
-wire [1:0] buf_level_next =
-	jump_now && cir_flush_behind   ? (cir[1:0] == 2'b11 || ~|EXTENSION_C ? 2'h2 : 2'h1) :
-	jump_now                       ? 2'h0 : level_next_no_fetch + fetch_fill_amount;
+wire [1:0] buf_level_next = {1'b1, |EXTENSION_C} & (
+	jump_now && cir_flush_behind ? (cir[1:0] == 2'b11 || ~|EXTENSION_C ? 2'h2 : 2'h1) :
+	jump_now                     ? 2'h0 : level_next_no_fetch + fetch_fill_amount
+);
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		buf_level <= 2'h0;
 		cir_vld <= 2'h0;
-		hwbuf <= 16'h0;
-		cir <= 32'h0;
-		cir_bus_err <= 3'h0;
-		cir_predbranch_reg <= 3'h0;
+		buf_contents <= {3 * W_SLOT{1'b0}};
 	end else begin
 `ifdef HAZARD3_ASSERTIONS
 		assert(cir_vld <= 2);
@@ -530,9 +522,7 @@ always @ (posedge clk or negedge rst_n) begin
 `endif
 		buf_level <= buf_level_next;
 		cir_vld <= buf_level_next & ~(buf_level_next >> 1'b1);
-		cir_bus_err <= cir_bus_err_plus_fetch;
-		cir_predbranch_reg <= cir_predbranch_plus_fetch;
-		{hwbuf, cir} <= instr_data_plus_fetch;
+		buf_contents <= buf_shifted_plus_fetch;
 	end
 end
 
@@ -550,15 +540,30 @@ always @ (posedge clk or negedge rst_n) begin
 end
 `endif
 
-assign cir_err = cir_bus_err[1:0];
-assign cir_predbranch = cir_predbranch_reg[1:0];
+assign cir = {
+	buf_contents[1 * W_SLOT +: W_BUNDLE],
+	buf_contents[0 * W_SLOT +: W_BUNDLE]
+};
+
+assign cir_err = {
+	buf_contents[1 * W_SLOT + SLOT_ERR_BIT],
+	buf_contents[0 * W_SLOT + SLOT_ERR_BIT]
+};
+
+assign cir_predbranch = {
+	buf_contents[1 * W_SLOT + SLOT_PREDBRANCH_BIT],
+	buf_contents[0 * W_SLOT + SLOT_PREDBRANCH_BIT]
+};
 
 // ----------------------------------------------------------------------------
 // Register number predecode
 
-wire [31:0] next_instr = instr_data_plus_fetch[31:0];
-wire next_instr_is_32bit = next_instr[1:0] == 2'b11 || ~|EXTENSION_C;
+wire [31:0] next_instr = {
+	buf_shifted_plus_fetch[1 * W_SLOT +: W_BUNDLE],
+	buf_shifted_plus_fetch[0 * W_SLOT +: W_BUNDLE]
+};
 
+wire next_instr_is_32bit = next_instr[1:0] == 2'b11 || ~|EXTENSION_C;
 
 wire [3:0] uop_ctr = df_uop_step_next & {4{|EXTENSION_ZCMP}};
 
