@@ -644,6 +644,9 @@ always @ (posedge clk) if (rst_n) begin
 	// Make sure M is unstalled for passing store data through in phase 2
 	if (x_amo_phase == 3'h2)
 		assert(!m_stall);
+	// Make sure we don't pipeline AMO aphases with other exclusive dphases
+	if (x_amo_phase == 3'h0 || x_amo_phase == 3'h2)
+		assert(!bus_dph_exokay_d);
 end
 `endif
 
@@ -946,7 +949,7 @@ always @ (posedge clk or negedge rst_n) begin
 			d_memop_is_amo && !(
 				x_amo_phase == 3'h3 && bus_dph_ready_d && !bus_dph_err_d ||
 				// Read reservation failure failure also generates error
-				x_amo_phase == 3'h1 & bus_dph_ready_d && !bus_dph_err_d && bus_dph_exokay_d
+				x_amo_phase == 3'h1 && bus_dph_ready_d && !bus_dph_err_d && bus_dph_exokay_d
 			);
 
 		if (!x_stall)
