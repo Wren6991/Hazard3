@@ -265,7 +265,6 @@ reg                  raw_csr_wen;
 reg  [1:0]           raw_csr_wtype;
 reg                  raw_csr_w_imm;
 reg  [W_BCOND-1:0]   raw_branchcond;
-reg  [W_ADDR-1:0]    raw_addr_offs;
 reg                  raw_addr_is_regoffs;
 reg  [W_EXCEPT-1:0]  raw_except;
 reg                  raw_sleep_wfi;

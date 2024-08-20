@@ -48,7 +48,6 @@ module hazard3_jtag_dtm_core #(
 wire write_dmi   = dr_wen &&  dr_sel_dmi_ndtmcs;
 wire write_dtmcs = dr_wen && !dr_sel_dmi_ndtmcs;
 wire read_dmi    = dr_ren &&  dr_sel_dmi_ndtmcs;
-wire read_dtmcs  = dr_ren && !dr_sel_dmi_ndtmcs;
 
 // ----------------------------------------------------------------------------
 // DMI bus adapter

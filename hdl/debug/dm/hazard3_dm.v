@@ -615,7 +615,6 @@ wire       acmd_new_unsupported =
 reg        acmd_prev_postexec;
 reg        acmd_prev_transfer;
 reg        acmd_prev_write;
-reg  [4:0] acmd_prev_regno;
 reg        acmd_prev_unsupported;
 
 always @ (posedge clk or negedge rst_n) begin
