@@ -281,7 +281,7 @@ always @ (*) begin
 	};
 
 	MEIPA: rdata = {
-		meipa[wdata_raw[4:0] * 16 +: 16],
+		meipa_rdata[wdata_raw[4:0] * 16 +: 16],
 		16'h0
 	};
 
