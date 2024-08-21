@@ -616,7 +616,11 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 `ifdef HAZARD3_ASSERTIONS
+reg prop_dph_is_excl = 1'b0;
 always @ (posedge clk) if (rst_n) begin
+	if (bus_aph_ready_d && bus_aph_req_d) begin
+		prop_dph_is_excl <= bus_aph_excl_d;
+	end
 	// Other states should be unreachable
 	assert(x_amo_phase <= 3'h4);
 	// First state should be 0 -- don't want anything carried from one AMO to the next.
@@ -646,7 +650,7 @@ always @ (posedge clk) if (rst_n) begin
 		assert(!m_stall);
 	// Make sure we don't pipeline AMO aphases with other exclusive dphases
 	if (x_amo_phase == 3'h0 || x_amo_phase == 3'h2)
-		assert(!bus_dph_exokay_d);
+		assert(!prop_dph_is_excl);
 end
 `endif
 
