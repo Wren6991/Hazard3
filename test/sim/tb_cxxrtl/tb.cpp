@@ -128,14 +128,12 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 							memio.reservation_valid[i] = false;
 					}
 				}
-			}
-			else {
+			} else {
 				resp.exokay = true;
 				memio.reservation_valid[req.reservation_id] = true;
 				memio.reservation_addr[req.reservation_id] = req.addr & RESERVATION_ADDR_MASK;
 			}
-		}
-		else {
+		} else {
 			resp.exokay = false;
 			// Non-exclusive write still clears others' reservations
 			if (req.write) {
@@ -153,106 +151,77 @@ bus_response mem_access(cxxrtl_design::p_tb &tb, mem_io_state &memio, bus_reques
 	if (req.write) {
 		if (memio.monitor_enabled && req.excl && !resp.exokay) {
 			// Failed exclusive write; do nothing
-		}
-		else if ((req.addr & -4u) == memio.poison_addr) {
+		} else if ((req.addr & -4u) == memio.poison_addr) {
 			resp.err = true;
-		}
-		else if (req.addr <= MEM_SIZE - 4u) {
+		} else if (req.addr <= MEM_SIZE - 4u) {
 			unsigned int n_bytes = 1u << (int)req.size;
 			// Note we are relying on hazard3's byte lane replication
 			for (unsigned int i = 0; i < n_bytes; ++i) {
 				memio.mem[req.addr + i] = req.wdata >> (8 * i) & 0xffu;
 			}
-		}
-		else if (req.addr == IO_BASE + IO_PRINT_CHAR) {
+		} else if (req.addr == IO_BASE + IO_PRINT_CHAR) {
 			putchar(req.wdata);
-		}
-		else if (req.addr == IO_BASE + IO_PRINT_U32) {
+		} else if (req.addr == IO_BASE + IO_PRINT_U32) {
 			printf("%08x\n", req.wdata);
-		}
-		else if (req.addr == IO_BASE + IO_EXIT) {
+		} else if (req.addr == IO_BASE + IO_EXIT) {
 			if (!memio.exit_req) {
 				memio.exit_req = true;
 				memio.exit_code = req.wdata;
 			}
-		}
-		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ) {
+		} else if (req.addr == IO_BASE + IO_SET_SOFTIRQ) {
 			tb.p_soft__irq.set<uint8_t>(tb.p_soft__irq.get<uint8_t>() | req.wdata);
-		}
-		else if (req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
+		} else if (req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
 			tb.p_soft__irq.set<uint8_t>(tb.p_soft__irq.get<uint8_t>() & ~req.wdata);
-		}
-		else if (req.addr == IO_BASE + IO_GLOBMON_EN) {
+		} else if (req.addr == IO_BASE + IO_GLOBMON_EN) {
 			memio.monitor_enabled = req.wdata;
-		}
-		else if (req.addr == IO_BASE + IO_POISON_ADDR) {
+		} else if (req.addr == IO_BASE + IO_POISON_ADDR) {
 			memio.poison_addr = req.wdata & -4u;
-		}
-		else if (req.addr == IO_BASE + IO_SET_IRQ) {
+		} else if (req.addr == IO_BASE + IO_SET_IRQ) {
 			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() | req.wdata);
-		}
-		else if (req.addr == IO_BASE + IO_CLR_IRQ) {
+		} else if (req.addr == IO_BASE + IO_CLR_IRQ) {
 			tb.p_irq.set<uint32_t>(tb.p_irq.get<uint32_t>() & ~req.wdata);
-		}
-		else if (req.addr == IO_BASE + IO_MTIME) {
+		} else if (req.addr == IO_BASE + IO_MTIME) {
 			memio.mtime = (memio.mtime & 0xffffffff00000000u) | req.wdata;
-		}
-		else if (req.addr == IO_BASE + IO_MTIMEH) {
+		} else if (req.addr == IO_BASE + IO_MTIMEH) {
 			memio.mtime = (memio.mtime & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP0) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP0) {
 			memio.mtimecmp[0] = (memio.mtimecmp[0] & 0xffffffff00000000u) | req.wdata;
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP0H) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP0H) {
 			memio.mtimecmp[0] = (memio.mtimecmp[0] & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP1) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP1) {
 			memio.mtimecmp[1] = (memio.mtimecmp[1] & 0xffffffff00000000u) | req.wdata;
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP1H) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP1H) {
 			memio.mtimecmp[1] = (memio.mtimecmp[1] & 0x00000000ffffffffu) | ((uint64_t)req.wdata << 32);
-		}
-		else {
+		} else {
 			resp.err = true;
 		}
-	}
-	else {
+	} else {
 		if (req.addr == (memio.poison_addr & -4u)) {
 			resp.err = true;
-		}
-		else if (req.addr <= MEM_SIZE - (1u << (int)req.size)) {
+		} else if (req.addr <= MEM_SIZE - (1u << (int)req.size)) {
 			req.addr &= ~0x3u;
 			resp.rdata =
 				(uint32_t)memio.mem[req.addr] |
 				memio.mem[req.addr + 1] << 8 |
 				memio.mem[req.addr + 2] << 16 |
 				memio.mem[req.addr + 3] << 24;
-		}
-		else if (req.addr == IO_BASE + IO_SET_SOFTIRQ || req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
+		} else if (req.addr == IO_BASE + IO_SET_SOFTIRQ || req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
 			resp.rdata = tb.p_soft__irq.get<uint8_t>();
-		}
-		else if (req.addr == IO_BASE + IO_SET_IRQ || req.addr == IO_BASE + IO_CLR_IRQ) {
+		} else if (req.addr == IO_BASE + IO_SET_IRQ || req.addr == IO_BASE + IO_CLR_IRQ) {
 			resp.rdata = tb.p_irq.get<uint32_t>();
-		}
-		else if (req.addr == IO_BASE + IO_MTIME) {
+		} else if (req.addr == IO_BASE + IO_MTIME) {
 			resp.rdata = memio.mtime;
-		}
-		else if (req.addr == IO_BASE + IO_MTIMEH) {
+		} else if (req.addr == IO_BASE + IO_MTIMEH) {
 			resp.rdata = memio.mtime >> 32;
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP0) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP0) {
 			resp.rdata = memio.mtimecmp[0];
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP0H) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP0H) {
 			resp.rdata = memio.mtimecmp[0] >> 32;
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP1) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP1) {
 			resp.rdata = memio.mtimecmp[1];
-		}
-		else if (req.addr == IO_BASE + IO_MTIMECMP1H) {
+		} else if (req.addr == IO_BASE + IO_MTIMECMP1H) {
 			resp.rdata = memio.mtimecmp[1] >> 32;
-		}
-		else {
+		} else {
 			resp.err = true;
 		}
 	}
@@ -326,36 +295,31 @@ int main(int argc, char **argv) {
 		if (s.rfind("--", 0) != 0) {
 			std::cerr << "Unexpected positional argument " << s << "\n";
 			exit_help("");
-		}
-		else if (s == "--bin") {
+		} else if (s == "--bin") {
 			if (argc - i < 2)
 				exit_help("Option --bin requires an argument\n");
 			load_bin = true;
 			bin_path = argv[i + 1];
 			i += 1;
-		}
-		else if (s == "--vcd") {
+		} else if (s == "--vcd") {
 			if (argc - i < 2)
 				exit_help("Option --vcd requires an argument\n");
 			dump_waves = true;
 			waves_path = argv[i + 1];
 			i += 1;
-		}
-		else if (s == "--jtagdump") {
+		} else if (s == "--jtagdump") {
 			if (argc - i < 2)
 				exit_help("Option --jtagdump requires an argument\n");
 			dump_jtag = true;
 			jtag_dump_path = argv[i + 1];
 			i += 1;
-		}
-		else if (s == "--jtagreplay") {
+		} else if (s == "--jtagreplay") {
 			if (argc - i < 2)
 				exit_help("Option --jtagreplay requires an argument\n");
 			replay_jtag = true;
 			jtag_replay_path = argv[i + 1];
 			i += 1;
-		}
-		else if (s == "--dump") {
+		} else if (s == "--dump") {
 			if (argc - i < 3)
 				exit_help("Option --dump requires 2 arguments\n");
 			dump_ranges.push_back(std::pair<uint32_t, uint32_t>(
@@ -363,23 +327,19 @@ int main(int argc, char **argv) {
 				std::stoul(argv[i + 2], 0, 0)
 			));;
 			i += 2;
-		}
-		else if (s == "--cycles") {
+		} else if (s == "--cycles") {
 			if (argc - i < 2)
 				exit_help("Option --cycles requires an argument\n");
 			max_cycles = std::stol(argv[i + 1], 0, 0);
 			i += 1;
-		}
-		else if (s == "--port") {
+		} else if (s == "--port") {
 			if (argc - i < 2)
 				exit_help("Option --port requires an argument\n");
 			port = std::stol(argv[i + 1], 0, 0);
 			i += 1;
-		}
-		else if (s == "--cpuret") {
+		} else if (s == "--cpuret") {
 			propagate_return_code = true;
-		}
-		else {
+		} else {
 			std::cerr << "Unrecognised argument " << s << "\n";
 			exit_help("");
 		}
@@ -526,31 +486,26 @@ int main(int argc, char **argv) {
 					if (c == 'r' || c == 's') {
 						top.p_trst__n.set<bool>(true);
 						step = true;
-					}
-					else if (c == 't' || c == 'u') {
+					} else if (c == 't' || c == 'u') {
 						top.p_trst__n.set<bool>(false);
-					}
-					else if (c >= '0' && c <= '7') {
+					} else if (c >= '0' && c <= '7') {
 						int mask = c - '0';
 						top.p_tck.set<bool>(mask & 0x4);
 						top.p_tms.set<bool>(mask & 0x2);
 						top.p_tdi.set<bool>(mask & 0x1);
 						step = true;
-					}
-					else if (c == 'R') {
+					} else if (c == 'R') {
 						txbuf[tx_ptr++] = top.p_tdo.get<bool>() ? '1' : '0';
 						if (tx_ptr >= TCP_BUF_SIZE || rx_remaining == 0) {
 							send(sock_fd, txbuf, tx_ptr, 0);
 							tx_ptr = 0;
 						}
-					}
-					else if (c == 'Q') {
+					} else if (c == 'Q') {
 						printf("OpenOCD sent quit command\n");
 						got_exit_cmd = true;
 						step = true;
 					}
-				}
-				else {
+				} else {
 					// Potentially the last command was not a read command, but
 					// OpenOCD is still waiting for a last response from its
 					// last command packet before it sends us any more, so now is
@@ -562,8 +517,7 @@ int main(int argc, char **argv) {
 					rx_ptr = 0;
 					if (replay_jtag) {
 						rx_remaining = jtag_replay_fd.readsome(rxbuf, TCP_BUF_SIZE);
-					}
-					else {
+					} else {
 						rx_remaining = read(sock_fd, &rxbuf, TCP_BUF_SIZE);
 					}
 					if (dump_jtag && rx_remaining > 0) {
@@ -573,8 +527,7 @@ int main(int argc, char **argv) {
 						if (port == 0) {
 							// Presumably EOF, so quit.
 							got_exit_cmd = true;
-						}
-						else {
+						} else {
 							// The socket is closed. Wait for another connection.
 							sock_fd = wait_for_connection(server_fd, port, (struct sockaddr *)&sock_addr, &sock_addr_len);
 						}
@@ -694,11 +647,9 @@ int main(int argc, char **argv) {
 
 	if (propagate_return_code && timed_out) {
 		return -1;
-	}
-	else if (propagate_return_code && memio.exit_req) {
+	} else if (propagate_return_code && memio.exit_req) {
 		return memio.exit_code;
-	}
-	else {
+	} else {
 		return 0;
 	}
 }
