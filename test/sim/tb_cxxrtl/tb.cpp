@@ -563,7 +563,14 @@ int main(int argc, char **argv) {
 			}
 			top.p_d__hrdata.set<uint32_t>(resp.rdata);
 			top.p_d__hexokay.set<bool>(resp.exokay);
+		} else {
+			// hready=0. Currently this only happens when we're in the first
+			// phase of an error response, so go to phase 2.
+			top.p_d__hready.set<bool>(true);
+		}
 
+		req_d_vld = false;
+		if (top.p_d__hready.get<bool>()) {
 			// Progress current address phase to data phase
 			req_d_vld = top.p_d__htrans.get<uint8_t>() >> 1;
 			req_d.write = top.p_d__hwrite.get<bool>();
@@ -571,12 +578,6 @@ int main(int argc, char **argv) {
 			req_d.addr = top.p_d__haddr.get<uint32_t>();
 			req_d.excl = top.p_d__hexcl.get<bool>();
 		}
-		else {
-			// hready=0. Currently this only happens when we're in the first
-			// phase of an error response, so go to phase 2.
-			top.p_d__hready.set<bool>(true);
-		}
-
 
 		if (top.p_i__hready.get<bool>()) {
 			top.p_i__hresp.set<bool>(false);
@@ -594,18 +595,20 @@ int main(int argc, char **argv) {
 			}
 			top.p_i__hrdata.set<uint32_t>(resp.rdata);
 			top.p_i__hexokay.set<bool>(resp.exokay);
+		} else {
+			// hready=0. Currently this only happens when we're in the first
+			// phase of an error response, so go to phase 2.
+			top.p_i__hready.set<bool>(true);
+		}
 
+		req_i_vld = false;
+		if (top.p_i__hready.get<bool>()) {
 			// Progress current address phase to data phase
 			req_i_vld = top.p_i__htrans.get<uint8_t>() >> 1;
 			req_i.write = top.p_i__hwrite.get<bool>();
 			req_i.size = (bus_size_t)top.p_i__hsize.get<uint8_t>();
 			req_i.addr = top.p_i__haddr.get<uint32_t>();
 			req_i.excl = top.p_i__hexcl.get<bool>();
-		}
-		else {
-			// hready=0. Currently this only happens when we're in the first
-			// phase of an error response, so go to phase 2.
-			top.p_i__hready.set<bool>(true);
 		}
 
 		if (dump_waves) {
