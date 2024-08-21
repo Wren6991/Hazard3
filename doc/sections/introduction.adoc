@@ -48,7 +48,7 @@ This document often refers to `F`, `X` and `M` as stages 1, 2 and 3 respectively
 
 ==== Bus Interfaces
 
-Hazard3 implements either one or two AHB5 bus manager ports. Use the single-port configuration when ease of integration is a priority, since it supports simpler bus topologies. The dual-port configuration adds a dedicated port for instruction fetch. Use the dual-port configuration for maximum frequency and the best clock-for-clock performance.
+Hazard3 implements either one or two AHB5 bus manager ports. The dual-port configuration adds a dedicated port for instruction fetch. Use the single-port configuration when ease of integration is a priority, since it supports simpler bus topologies. Use the dual-port configuration for higher maximum frequency and greater clock-for-clock performance provided you either have a split (Harvard) bus architecture, or can handle multiple AHB5 managers on the same bus.
 
 Hazard3 uses AHB5 specifically, rather than older versions of the AHB standard, because of its support for global exclusives. This is a bus feature that allows a processor to perform an ordered read-modify-write sequence with a guarantee that no other processor has written to the same address range in between. Hazard3 uses this to implement multiprocessor support for the A (atomics) extension. Single-processor support for the A extension does not require these additional signals.
 

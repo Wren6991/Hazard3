@@ -62,7 +62,9 @@ Most ports are common to the two top-level wrappers, `hazard3_cpu_1port` and `ha
 When <<param-RESET_REGFILE>> is one, this input also resets the register file. You should avoid resetting the register file on FPGA, as this can prevent the register file being implemented with block RAM or LUT RAM primitives.
 4+| **Power control signals**
 4+| These signals are used in the implementation of internal sleep states as configured by the <<reg-msleep>> csr. They are used only when the Xh3power extension is enabled.
-| 1          | Out | `pwrup_req`                  | Power-up request. Disconnect if Xh3power is not configured. Part of a four-phase (Gray code) req/ack handshake for negotiating power or clocks with your system power controller. The processor releases `pwrup_req` on entering a sufficiently deep `wfi` or `h3.block` state, as configured by the `msleep` CSR. It then waits for deassertion of `pwrup_ack`, before taking further action. The processor asserts `pwrup_req` when the processor intends to wake from the low-power state, and then waits for `pwrup_ack` before fetching the first instruction from the bus.
+| 1          | Out | `pwrup_req`                  | Power-up request. Disconnect if Xh3power is not configured. Part of a four-phase (Gray code) req/ack handshake for negotiating power or clocks with your system power controller. The processor releases `pwrup_req` on entering a sufficiently deep `wfi` or `h3.block` state, as configured by the `msleep` CSR. It then waits for deassertion of `pwrup_ack` before taking further action.
+
+The processor asserts `pwrup_req` when it intends to wake from its low-power state. It then waits for `pwrup_ack` before fetching the first instruction from the bus.
 | 1          | In  | `pwrup_ack`                  | Power-up acknowledged. Tie back to `pwrup_req` if Xh3power is not configured, or if there is no external system power controller. The processor does not access the bus when either `pwrup_req` or `pwrup_ack` is low.
 | 1          | Out | `clk_en`                     | Control output for an external top-level clock gate on `clk`. Active-high enable. Hazard3 tolerates up to one cycle of delay between the assertion of `clk_en` and the resulting clock pulse on `clk`.
 | 1          | Out | `unblock_out`                | Pulses high when an `h3.unblock` instruction executes. Disconnect if Xh3power is not configured.
@@ -84,16 +86,18 @@ When <<param-RESET_REGFILE>> is one, this input also resets the register file. Y
 | 1          | Out | `dbg_instr_caught_ebreak`    | Breakpoint instruction caught during Program Buffer execution. Disconnect if debug support is not configured.
 4+| **Shared System Bus Access**
 4+| This subordinate bus port allows the standard System Bus Access (SBA) feature of the Debug Module to share bus access with the core. Alternatively, use the standalone `hazard3_sbus_to_ahb` adapter to provide dedicated SBA access to the system bus.
-| 32         | In  | `dbg_sbus_addr`              | Address for System Bus Access arbitrated with this core's load/store access. Tie to zeroes if this feature is not used.
-| 1          | In  | `dbg_sbus_write`             | Write/not-Read flag for System Bus Access arbitrated with this core's load/store access. Tie low if this feature is not used.
-| 2          | In  | `dbg_sbus_size`              | Transfer size (0/1/2 = byte/halfword/word) for System Bus Access arbitrated with this core's load/store access. Tie low if this feature is not used.
-| 1          | In  | `dbg_sbus_vld`               | Transfer enable signal for System Bus Access arbitrated with this core's load/store access. Tie low if this feature is not used.
-| 1          | Out | `dbg_sbus_rdy`               | Transfer stall signal for System Bus Access arbitrated with this core's load/store access. Disconnect if this feature is not used.
-| 1          | Out | `dbg_sbus_err`               | Bus fault signal for System Bus Access arbitrated with this core's load/store access. Disconnect if this feature is not used.
-| 32         | In  | `dbg_sbus_wdata`             | Write data bus for System Bus Access arbitrated with this core's load/store access. Tie to zeroes if this feature is not used.
-| 32         | Out | `dbg_sbus_rdata`             | Read data bus for System Bus Access arbitrated with this core's load/store access. Disconnect if this feature is not used.
+| 32         | In  | `dbg_sbus_addr`              | Address for SBA arbitrated with this core's load/store access. Tie to zeroes if this feature is not used.
+| 1          | In  | `dbg_sbus_write`             | Write/not-Read flag for SBA arbitrated with this core's load/store access. Tie low if this feature is not used.
+| 2          | In  | `dbg_sbus_size`              | Transfer size (`0`/`1`/`2` = byte/halfword/word) for SBA arbitrated with this core's load/store access. Tie low if this feature is not used.
+| 1          | In  | `dbg_sbus_vld`               | Transfer enable signal for SBA arbitrated with this core's load/store access. Tie low if this feature is not used.
+| 1          | Out | `dbg_sbus_rdy`               | Transfer stall signal for SBA arbitrated with this core's load/store access. Disconnect if this feature is not used.
+| 1          | Out | `dbg_sbus_err`               | Bus fault signal for SBA arbitrated with this core's load/store access. Disconnect if this feature is not used.
+| 32         | In  | `dbg_sbus_wdata`             | Write data bus for SBA arbitrated with this core's load/store access. Tie to zeroes if this feature is not used.
+| 32         | Out | `dbg_sbus_rdata`             | Read data bus for SBA arbitrated with this core's load/store access. Disconnect if this feature is not used.
 4+| **Interrupt requests**
-| `NUM_IRQS` | In  | `irq`                        | If Xh3irq is not configured, this is the RISC-V external interrupt line (`mip.meip`) which you should connect to an external interrupt controller such as a standard RISC-V PLIC. If Xh3irq is configured, this is a vector of level-sensitive active-high system interrupt requests, which the core's internal interrupt controller can route through the `mip.meip` vector. Tie low if unused.
+| `NUM_IRQS` | In  | `irq`                        | If Xh3irq is not configured, this is the RISC-V external interrupt line (`mip.meip`) which you should connect to an external interrupt controller such as a standard RISC-V PLIC.
+
+If Xh3irq is configured, this is a vector of level-sensitive active-high system interrupt requests, which the core's internal interrupt controller can route through the `mip.meip` vector. Tie low if unused.
 | 1          | In  | `soft_irq`                   | This is the standard RISC-V software interrupt signal, `mip.msip`. It should be connected to a register accessible to M-mode software on your system bus. Tie low if unused.
 | 1          | In  | `timer_irq`                  | This is the standard RISC-V timer interrupt signal, `mip.mtip`. It should be connected to a standard RISC-V platform timer peripheral (`mtime`/`mtimecmp`) accessible to M-mode software on your system bus. Tie low if unused.
 |===
@@ -107,7 +111,7 @@ This wrapper (`hazard3_cpu_1port`) adds a single standard AHB5 manager port. See
 | Width | In/Out | Name | Description
 | 32 | Out | `haddr`      | Address output. AHB is always byte-addressed. Hazard3 always issues naturally-aligned accesses.
 | 1  | Out | `hwrite`     | Driven high for a write transfer, low for a read transfer.
-| 2  | Out | `htrans`     | Driven to `0` (`IDLE`) to indicate no transfer in the current address phase, and `2` (NSEQ) to indicate there is a transfer. Other types are not used.
+| 2  | Out | `htrans`     | Driven to `0` (`IDLE`) to indicate no transfer in the current address phase, and `2` (`NSEQ`) to indicate there is a transfer. Other types are not used.
 | 3  | Out | `hsize`      | Driven to `0`, `1` or `2` to indicate byte, halfword or word sized transfers respectively. Other sizes are not used.
 | 3  | Out | `hburst`     | Tied off to `0` (`SINGLE`). Hazard3 does not issue bursts.
 | 4  | Out | `hprot`      | Bits `3:2` are always `0` to indicate nonbufferable and noncacheable access.
@@ -139,7 +143,7 @@ When shared System Bus Access (SBA) is used, the SBA bus accesses are routed thr
 | Width | In/Out | Name | Description
 | 32 | Out | `i_haddr`      | Address output. AHB is always byte-addressed. This port always issues word-aligned accesses (address bits `1:0` are zero).
 | 1  | Out | `i_hwrite`     | Always driven low for to indicate a read transfer.
-| 2  | Out | `i_htrans`     | Driven to `0` (`IDLE`) to indicate no transfer in the current address phase, and `2` (NSEQ) to indicate there is a transfer. Other types are not used.
+| 2  | Out | `i_htrans`     | Driven to `0` (`IDLE`) to indicate no transfer in the current address phase, and `2` (`NSEQ`) to indicate there is a transfer. Other types are not used.
 | 3  | Out | `i_hsize`      | Always driven to `2` to indicate a word-sized transfer. Other sizes are not used.
 | 3  | Out | `i_hburst`     | Tied off to `0` (`SINGLE`). Hazard3 does not issue bursts.
 | 4  | Out | `i_hprot`      | Bits `3:2` are always `0` to indicate nonbufferable and noncacheable access.
@@ -156,7 +160,7 @@ Bit `0` is tied to `0` to indicate instruction fetch.
 4+| **Port D (Data)**
 | 32 | Out | `d_haddr`      | Address output. AHB is always byte-addressed. Hazard3 always issues naturally-aligned accesses.
 | 1  | Out | `d_hwrite`     | Driven high for a write transfer, low for a read transfer.
-| 2  | Out | `d_htrans`     | Driven to `0` (`IDLE`) to indicate no transfer in the current address phase, and `2` (NSEQ) to indicate there is a transfer. Other types are not used.
+| 2  | Out | `d_htrans`     | Driven to `0` (`IDLE`) to indicate no transfer in the current address phase, and `2` (`NSEQ`) to indicate there is a transfer. Other types are not used.
 | 3  | Out | `d_hsize`      | Driven to `0`, `1` or `2` to indicate byte, halfword or word sized transfers respectively. Other sizes are not used.
 | 3  | Out | `d_hburst`     | Tied off to `0` (`SINGLE`). Hazard3 does not issue bursts.
 | 4  | Out | `d_hprot`      | Bits `3:2` are always `0` to indicate nonbufferable and noncacheable access.
