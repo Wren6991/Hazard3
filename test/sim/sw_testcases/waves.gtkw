@@ -1,0 +1,78 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Wed Aug 21 08:28:19 2024
+[*]
+[dumpfile] "./waves.vcd"
+[dumpfile_mtime] "Wed Aug 21 08:17:24 2024"
+[dumpfile_size] 14226534
+[timestart] 0
+[size] 1833 1349
+[pos] 724 49
+*-11.400000 436 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] cpu.
+[treeopen] cpu.core.
+[sst_width] 278
+[signals_width] 254
+[sst_expanded] 1
+[sst_vpaned_height] 418
+@200
+-I Bus
+@22
+cpu.i_haddr[31:0]
+cpu.i_htrans[1:0]
+cpu.i_hready
+cpu.i_hresp
+cpu.i_hrdata[31:0]
+@202
+-
+-D Bus
+@22
+cpu.d_haddr[31:0]
+cpu.d_htrans[1:0]
+cpu.d_hsize[2:0]
+cpu.d_hwrite
+cpu.d_hready
+cpu.d_hresp
+cpu.d_hwdata[31:0]
+cpu.d_hrdata[31:0]
+@200
+-
+-Current Instr
+@22
+cpu.core.d_pc[31:0]
+cpu.core.fd_cir[31:0]
+cpu.core.d_rs1[4:0]
+cpu.core.d_rs2[4:0]
+cpu.core.d_rd[4:0]
+cpu.core.x_op_a[31:0]
+cpu.core.x_op_b[31:0]
+cpu.core.x_alu_result[31:0]
+@200
+-
+-Stage M
+@22
+cpu.core.xm_result[31:0]
+cpu.core.xm_except[3:0]
+cpu.core.m_trap_addr[31:0]
+@28
+cpu.core.m_trap_enter_rdy
+cpu.core.m_trap_enter_soon
+cpu.core.m_trap_enter_vld
+cpu.core.m_trap_is_debug_entry
+cpu.core.m_trap_is_irq
+@200
+-
+-Stalls
+@28
+cpu.core.decode_u.d_starved
+cpu.core.decode_u.d_stall
+cpu.core.decode_u.uop_stall
+cpu.core.decode_u.x_stall
+cpu.core.x_stall_muldiv
+cpu.core.x_stall_on_amo
+cpu.core.x_stall_on_exclusive_overlap
+cpu.core.x_stall_on_raw
+cpu.core.x_stall_on_trap
+cpu.core.m_stall
+[pattern_trace] 1
+[pattern_trace] 0

@@ -23,6 +23,9 @@ Run all tests:
 Just run hello world, and generate waves:
 ./runtests hello_world --vcd
 
+(The last run test is always softlinked as "waves.vcd". You can view it in
+gtkwave using the default wave config, "waves.gtkw".)
+
 Run under rvcpp, enable instruction tracing, and post-process log using disassembly:
 ./runtests --tb ../rvcpp/rvcpp --tbarg=--trace --postcmd="../rvcpp/scripts/annotate_trace.py TEST.log TEST_annotated.log -d TEST.dis"
 """
@@ -89,6 +92,14 @@ for test in testlist:
 		if test_run_ret.returncode != 0:
 			print("Negative return code from testbench!")
 			failed = True
+
+	# Link last-run test as "waves.vcd" for use with generic .gtkw wave config
+	if args.vcd:
+		try:
+			os.system(f"ln -sf tmp/{test}.vcd waves.vcd")
+		except:
+			# Don't care, not a critical part of the test run
+			pass
 
 	# Pass if the program under test has zero exit code AND its output matches
 	# the expected output (if there is an expected_output file)
