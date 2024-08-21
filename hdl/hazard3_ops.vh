@@ -87,9 +87,8 @@ localparam CSR_WTYPE_S    = 2'h1;
 localparam CSR_WTYPE_C    = 2'h2;
 
 // Exceptional condition signals which travel alongside (or instead of)
-// instructions in the pipeline. These are speculative and can be flushed
-// on e.g. branch mispredict
-// These mostly align with mcause values.
+// instructions in the pipeline. These are speculative and can be flushed on
+// e.g. branch mispredict. These mostly align with mcause values.
 
 localparam EXCEPT_NONE           = 4'hf;
 
@@ -102,8 +101,14 @@ localparam EXCEPT_LOAD_FAULT     = 4'h5;
 localparam EXCEPT_STORE_ALIGN    = 4'h6;
 localparam EXCEPT_STORE_FAULT    = 4'h7;
 localparam EXCEPT_ECALL_U        = 4'h8;
-localparam EXCEPT_MRET           = 4'ha; // Not really an exception, but handled like one
+// MRET, Return from M-mode: not really an exception, but handled like one
+localparam EXCEPT_MRET           = 4'ha;
 localparam EXCEPT_ECALL_M        = 4'hb;
+// spare: c
+// spare: d
+// REFETCH: flush and refetch sequentially-following instructions, e.g. on
+// executing fence.i. Jumps from stage 3 to get ordering against L/S dphase.
+localparam EXCEPT_REFETCH        = 4'he;
 
 // Operations for M extension (these are just instr[14:12])
 

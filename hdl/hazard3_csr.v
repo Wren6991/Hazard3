@@ -170,7 +170,7 @@ wire ren_m_mode = ren && (m_mode || debug_mode);
 wire debug_suppresses_trap_update = DEBUG_SUPPORT && (debug_mode || enter_debug_mode);
 
 wire trapreg_update = trap_enter_vld && trap_enter_rdy && !debug_suppresses_trap_update;
-wire trapreg_update_enter = trapreg_update && except != EXCEPT_MRET;
+wire trapreg_update_enter = trapreg_update && except != EXCEPT_MRET && except != EXCEPT_REFETCH;
 wire trapreg_update_exit = trapreg_update && except == EXCEPT_MRET;
 
 reg mstatus_mpie;
@@ -1299,9 +1299,13 @@ wire [3:0] mcause_irq_num =	irq_active ? standard_irq_num : 4'd0;
 
 wire [3:0] vector_sel =	!exception_req_any && irq_vector_enable ? mcause_irq_num : 4'd0;
 
+// Note in the refetch case we're relying on the aliasing of dpc and pc
+// (The intent is to fetch the sequentially-next instruction again)
 assign trap_addr =
-	except == EXCEPT_MRET ? mepc             :
-	pending_dbg_resume    ? debug_dpc_rdata  : mtvec | {26'h0, vector_sel, 2'h0};
+	except == EXCEPT_MRET    ? mepc            :
+	except == EXCEPT_REFETCH ? debug_dpc_rdata :
+	pending_dbg_resume       ? debug_dpc_rdata :
+	                           mtvec | {26'h0, vector_sel, 2'h0};
 
 // Check for exception-like or IRQ-like trap entry; any debug mode entry takes
 // priority over any regular trap.

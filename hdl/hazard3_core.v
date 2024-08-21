@@ -979,6 +979,7 @@ wire [W_EXCEPT-1:0] x_except =
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire =
 	x_except == EXCEPT_EBREAK  ||
+	x_except == EXCEPT_REFETCH ||
 	x_except == EXCEPT_MRET    ||
 	x_except == EXCEPT_ECALL_M ||
 	x_except == EXCEPT_ECALL_U;
