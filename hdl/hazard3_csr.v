@@ -55,6 +55,7 @@ module hazard3_csr #(
 	input  wire               ren,
 	input  wire               ren_soon, // ren will be asserted once some stall condition clears
 	output wire               illegal,
+	output wire               write_is_fetch_ordered,
 
 	// Trap signalling
 	// *We* tell the core that we are taking a trap, and where to, based on:
@@ -1121,6 +1122,12 @@ always @ (*) begin
 end
 
 assign illegal = (wen_soon || ren_soon) && !decode_match;
+
+// Trigger refetch of sequentially-next instructions on certain CSR updates:
+assign write_is_fetch_ordered = wen_raw && (
+	(PMP_REGIONS > 0 && addr >= PMPADDR0 && addr <= PMPADDR15) ||
+	(PMP_REGIONS > 0 && addr >= PMPCFG0  && addr <= PMPCFG3)
+);
 
 // ----------------------------------------------------------------------------
 // Debug run/halt

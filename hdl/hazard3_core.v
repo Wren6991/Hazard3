@@ -122,6 +122,10 @@ wire                 x_btb_clear;
 
 wire [W_ADDR-1:0]    d_btb_target_addr;
 
+wire [W_ADDR-1:0]    f_pmp_i_addr;
+wire                 f_pmp_i_m_mode;
+wire                 f_pmp_i_kill;
+
 assign bus_aph_panic_i = 1'b0;
 
 wire f_mem_size;
@@ -174,7 +178,11 @@ hazard3_frontend #(
 	.debug_mode           (debug_mode),
 	.dbg_instr_data       (dbg_instr_data),
 	.dbg_instr_data_vld   (dbg_instr_data_vld),
-	.dbg_instr_data_rdy   (dbg_instr_data_rdy)
+	.dbg_instr_data_rdy   (dbg_instr_data_rdy),
+
+	.pmp_i_addr           (f_pmp_i_addr),
+	.pmp_i_m_mode         (f_pmp_i_m_mode),
+	.pmp_i_kill           (f_pmp_i_kill)
 );
 
 // ----------------------------------------------------------------------------
@@ -413,7 +421,6 @@ assign x_stall =
 wire m_sleep_stall_release;
 
 wire x_loadstore_pmp_fail;
-wire x_exec_pmp_fail;
 wire x_trig_break;
 wire x_trig_break_d_mode;
 
@@ -680,7 +687,6 @@ always @ (*) begin
 		x_stall_on_raw ||
 		x_stall_on_exclusive_overlap ||
 		x_loadstore_pmp_fail ||
-		x_exec_pmp_fail ||
 		x_trig_break ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
@@ -824,7 +830,7 @@ wire x_jump_req_unchecked = !x_stall_on_raw && (
 	d_branchcond == BCOND_NZERO && x_branch_cmp
 );
 
-assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_exec_pmp_fail && !x_trig_break;
+assign x_jump_req = x_jump_req_unchecked && !x_jump_misaligned && !x_trig_break;
 
 assign x_btb_set = |BRANCH_PREDICTOR && (
 	x_jump_req_unchecked && d_addr_offs[W_ADDR - 1] && !x_branch_was_predicted &&
@@ -852,6 +858,11 @@ if (PMP_REGIONS > 0) begin: have_pmp
 	wire x_loadstore_pmp_badperm;
 	assign x_loadstore_pmp_fail = x_loadstore_pmp_badperm && x_memop_vld;
 
+	// R and W are enforced at the point the load/store address is generated,
+	// in time to mask the address-phase request. X is enforced by checking
+	// fetch addresses during fetch data phase (stage F) and promoting PMP
+	// fails to bus faults.
+
 	hazard3_pmp #(
 	`include "hazard3_config_inst.vh"
 	) pmp (
@@ -863,10 +874,9 @@ if (PMP_REGIONS > 0) begin: have_pmp
 		.cfg_wdata        (x_pmp_cfg_wdata),
 		.cfg_rdata        (x_pmp_cfg_rdata),
 
-		.i_addr           (d_pc),
-		.i_instr_is_32bit (&fd_cir[1:0]),
-		.i_m_mode         (x_mmode_execution),
-		.i_kill           (x_exec_pmp_fail),
+		.i_addr           (f_pmp_i_addr),
+		.i_m_mode         (f_pmp_i_m_mode),
+		.i_kill           (f_pmp_i_kill),
 
 		.d_addr           (bus_haddr_d),
 		.d_m_mode         (x_mmode_loadstore),
@@ -878,7 +888,6 @@ end else begin: no_pmp
 
 	assign x_pmp_cfg_rdata = 32'd0;
 	assign x_loadstore_pmp_fail = 1'b0;
-	assign x_exec_pmp_fail = 1'b0;
 
 end
 endgenerate
@@ -930,6 +939,7 @@ wire [W_DATA-1:0] x_csr_wdata = d_csr_w_imm ?
 
 wire [W_DATA-1:0] x_csr_rdata;
 wire              x_csr_illegal_access;
+wire              x_csr_write_is_fetch_ordered;
 
 // "Previous" refers to next-most-recent instruction to be in D/X, i.e. the
 // most recent instruction to reach stage M (which may or may not still be in M).
@@ -965,7 +975,6 @@ wire [W_ADDR-1:0] m_exception_return_addr;
 
 wire [W_EXCEPT-1:0] x_except =
 	x_trig_break                                             ? EXCEPT_EBREAK         :
-	x_exec_pmp_fail                                          ? EXCEPT_INSTR_FAULT    :
 	x_jump_req_unchecked && x_jump_misaligned                ? EXCEPT_INSTR_MISALIGN :
 	x_csr_illegal_access                                     ? EXCEPT_INSTR_ILLEGAL  :
 	|EXTENSION_A && x_unaligned_addr &&  d_memop_is_amo      ? EXCEPT_STORE_ALIGN    :
@@ -974,7 +983,8 @@ wire [W_EXCEPT-1:0] x_except =
 	x_unaligned_addr &&  x_memop_write                       ? EXCEPT_STORE_ALIGN    :
 	x_unaligned_addr && !x_memop_write                       ? EXCEPT_LOAD_ALIGN     :
 	x_loadstore_pmp_fail && (d_memop_is_amo || bus_hwrite_d) ? EXCEPT_STORE_FAULT    :
-	x_loadstore_pmp_fail                                     ? EXCEPT_LOAD_FAULT     : d_except;
+	x_loadstore_pmp_fail                                     ? EXCEPT_LOAD_FAULT     :
+	x_csr_write_is_fetch_ordered                             ? EXCEPT_REFETCH        : d_except;
 
 // If an instruction causes an exceptional condition we do not consider it to have retired.
 wire x_except_counts_as_retire =
@@ -1035,6 +1045,7 @@ hazard3_csr #(
 	.ren_soon                   (d_csr_ren && !m_trap_enter_soon),
 	.ren                        (d_csr_ren && !m_trap_enter_soon && !x_stall),
 	.illegal                    (x_csr_illegal_access),
+	.write_is_fetch_ordered     (x_csr_write_is_fetch_ordered),
 
 	// Trap signalling
 	.trap_addr                  (m_trap_addr),

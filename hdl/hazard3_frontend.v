@@ -90,7 +90,12 @@ module hazard3_frontend #(
 	input  wire              debug_mode,
 	input  wire [W_DATA-1:0] dbg_instr_data,
 	input  wire              dbg_instr_data_vld,
-	output wire              dbg_instr_data_rdy
+	output wire              dbg_instr_data_rdy,
+
+	// PMP query->kill interface for X permission checks
+	output wire [W_ADDR-1:0] pmp_i_addr,
+	output wire              pmp_i_m_mode,
+	input  wire              pmp_i_kill
 );
 
 `include "rv_opcodes.vh"
@@ -105,6 +110,11 @@ localparam FIFO_DEPTH = 2;
 
 wire jump_now = jump_target_vld && jump_target_rdy;
 reg [1:0] mem_data_hwvld;
+
+// PMP X faults are checked in parallel with the fetch (fine if executable
+// memory is read-idempotent) and failures are promoted to bus errors:
+wire pmp_kill_fetch_dph;
+wire mem_or_pmp_err = mem_data_err || pmp_kill_fetch_dph;
 
 // Mark data as containing a predicted-taken branch instruction so that
 // mispredicts can be recovered -- need to track both halfwords so that we
@@ -162,7 +172,7 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 			if (fifo_pop || (fifo_push && !fifo_valid[i])) begin
 				fifo_mem[i]        <= fifo_valid[i + 1] ? fifo_mem[i + 1]        : mem_data;
-				fifo_err[i]        <= fifo_valid[i + 1] ? fifo_err[i + 1]        : mem_data_err;
+				fifo_err[i]        <= fifo_valid[i + 1] ? fifo_err[i + 1]        : mem_or_pmp_err;
 				fifo_predbranch[i] <= fifo_valid[i + 1] ? fifo_predbranch[i + 1] : mem_data_predbranch;
 			end
 			fifo_valid_hw[i] <=
@@ -430,6 +440,41 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // ----------------------------------------------------------------------------
+// PMP check/kill interface
+
+generate
+if (PMP_REGIONS == 0) begin: no_pmp
+
+	assign pmp_i_addr = {W_ADDR{1'b0}};
+	assign pmp_i_m_mode = 1'b0;
+	assign pmp_kill_fetch_dph = 1'b0;
+
+end else begin: have_pmp
+
+	// Register the fetch address into stage F so that the PMP can check it in
+	// parallel with the bus data phase. Feels wasteful to have a separate
+	// register, but using the fetch_addr counter is fraught due to the way
+	// that new addresses go into it or past it (depending on aphase hold).
+	reg [W_ADDR-1:0] pmp_check_addr_dph;
+	reg              pmp_check_m_mode_dph;
+	always @ (posedge clk or negedge rst_n) begin
+		if (!rst_n) begin
+			pmp_check_addr_dph <= {W_ADDR{1'b0}};
+			pmp_check_m_mode_dph <= 1'b0;
+		end else if (mem_addr_vld && mem_addr_rdy) begin
+			pmp_check_addr_dph <= mem_addr;
+			pmp_check_m_mode_dph <= mem_priv;
+		end
+	end
+
+	assign pmp_i_addr = pmp_check_addr_dph;
+	assign pmp_i_m_mode = pmp_check_m_mode_dph;
+	assign pmp_kill_fetch_dph = pmp_i_kill;
+
+end
+endgenerate
+
+// ----------------------------------------------------------------------------
 // Instruction buffer
 
 // The instruction buffer is a 3 x ~16-bit shift register:
@@ -458,7 +503,7 @@ wire                fetch_data_vld   = !fifo_empty || (mem_data_vld && ~|ctr_flu
 
 wire [W_DATA-1:0]   fetch_data       = fifo_empty ? mem_data            : fifo_rdata;
 wire [1:0]          fetch_data_hwvld = fifo_empty ? mem_data_hwvld      : fifo_valid_hw[0];
-wire                fetch_bus_err    = fifo_empty ? mem_data_err        : fifo_err[0];
+wire                fetch_bus_err    = fifo_empty ? mem_or_pmp_err      : fifo_err[0];
 wire [1:0]          fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
 
 wire [W_SLOT-1:0] fetch_contents_hw1 = {

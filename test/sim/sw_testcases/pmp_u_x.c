@@ -25,11 +25,11 @@ mcause = 1
 Full match under partial match, positive overhang
 mcause = 8
 Partial match under full match, positive overhang
-mcause = 1
+mcause = 8
 Full match under partial match, negative overhang
 mcause = 8
 Partial match under full match, negative overhang
-mcause = 1
+mcause = 8
 Jump to bad jump
 OK
 
@@ -173,8 +173,8 @@ int main() {
 
 	enter_umode(&do_nops);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_INSTR_FAULT, "Should get instruction fault on partial match\n");
-	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 2, "Bad mepc\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should not get instruction fault on partial match\n");
+	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 6, "Bad mepc\n");
 
 	// Now do the same two tests, but with the partial match on the second
 	// half of the instruction rather than the first half
@@ -197,8 +197,8 @@ int main() {
 
 	enter_umode(&do_nops);
 	tb_printf("mcause = %u\n", read_csr(mcause));
-	tb_assert(read_csr(mcause) == MCAUSE_INSTR_FAULT, "Should get instruction fault on partial match\n");
-	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 2, "Bad mepc\n");
+	tb_assert(read_csr(mcause) == MCAUSE_ECALL_UMODE, "Should not get instruction fault on partial match\n");
+	tb_assert(read_csr(mepc) == (uint32_t)&do_nops + 6, "Bad mepc\n");
 
 	tb_puts("Jump to bad jump\n");
 	write_pmpcfg(0, 0);

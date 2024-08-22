@@ -21,7 +21,6 @@ module hazard3_pmp #(
 
 	// Fetch address query
 	input  wire [W_ADDR-1:0] i_addr,
-	input  wire              i_instr_is_32bit,
 	input  wire              i_m_mode,
 	output wire              i_kill,
 
@@ -219,56 +218,30 @@ always @ (*) begin: check_d_match
 	end
 end
 
-// Instruction fetches are more complex. For IALIGN=4 (i.e. non-RVC)
-// implementations, we can assume that instruction fetches are naturally
-// aligned, because any control flow transfer which would cause a
-// non-naturally-aligned fetch will have trapped. Therefore we never have to
-// worry about priority of instruction alignment fault vs instruction access
-// fault exceptions. However, when IALIGN=2, there are some cases to
-// consider:
+// Instructions work similarly because we check *fetches*, not instructions.
+// Fetch is always word-sized word-aligned. The spec permits this:
 //
-// - An instruction which straddles a protection boundary must fail the PMP
-//   check as it has a partial match
+// "On some implementations, misaligned loads, stores, and instruction fetches
+//  may also be decomposed into multiple accesses, some of which may succeed
+//  before an access-fault exception occurs."
 //
-// - A jump to an illegal instruction starting at the last halfword of a PMP
-//   region: in this case the size of the instruction is unknown, so it is
-//   ambiguous whether this should be an access fault (if we treat the
-//   illegal instruction as 32-bit) or an illegal instruction fault (if we
-//   treat the instruction as 16-bit). To disambiguate, we decode the two
-//   LSBs of the instruction to determine its size, as though it were valid.
-//
-// To detect partial matches of instruction fetches, we take the simple but
-// possibly suboptimal choice of querying both PC and PC + 2. On the topic of
-// partial matches, note the spec wording, as it's tricky:
-//
-// "The lowest-numbered PMP entry that matches any byte of an access
-//  determines whether that access succeeds or fails. The matching PMP entry
-//  must match all bytes of an access, or the access fails, irrespective of
-//  the L, R, W, and X bits."
-//
-// This means that a partial match *is* permitted, if and only if you also
-// completely match a lower-numbered region. We don't accumulate the partial
-// match across all regions.
+// Hazard3 separately checks the naturally-aligned fetches that occur in the
+// course of fetching a non-naturally-aligned instruction. This means
+// instruction fetch spanning two different regions which both grant X
+// permission *is* permitted, unlike the RP2350 version of Hazard3.
 
 reg i_partial_match;
 reg i_m; // Hazard3 extension (M-mode without locking)
 reg i_l;
 reg i_x;
 
-wire [W_ADDR-1:0] i_addr_hw1 = i_addr + 32'd2;
-
 always @ (*) begin: check_i_match
 	integer i;
-	reg match_hw0, match_hw1;
-	i_partial_match = 1'b0;
 	i_m = 1'b0;
 	i_l = 1'b0;
 	i_x = 1'b0;
 	for (i = PMP_REGIONS - 1; i >= 0; i = i - 1) begin
-		match_hw0 = |pmpcfg_a[i] && (i_addr     & match_mask[i]) == match_addr[i];
-		match_hw1 = |pmpcfg_a[i] && (i_addr_hw1 & match_mask[i]) == match_addr[i];
-		if (match_hw0 || match_hw1) begin
-			i_partial_match = (match_hw0 ^ match_hw1) && i_instr_is_32bit;
+		if (|pmpcfg_a[i] && (i_addr & match_mask[i]) == match_addr[i]) begin
 			i_m = pmpcfg_m[i];
 			i_l = pmpcfg_l[i];
 			i_x = pmpcfg_x[i];
@@ -286,11 +259,7 @@ assign d_kill = (!d_m_mode || d_l || d_m) && (
 	( d_write && !d_w)
 );
 
-// Straddling a protection boundary is always an error.
-
-assign i_kill = i_partial_match || (
-	(!i_m_mode || i_l || i_m) && !i_x
-);
+assign i_kill =	(!i_m_mode || i_l || i_m) && !i_x;
 
 end
 endgenerate
