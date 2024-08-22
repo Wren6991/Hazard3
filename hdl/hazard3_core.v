@@ -656,8 +656,11 @@ always @ (posedge clk) if (rst_n) begin
 	if (x_amo_phase == 3'h2)
 		assert(!m_stall);
 	// Make sure we don't pipeline AMO aphases with other exclusive dphases
-	if (x_amo_phase == 3'h0 || x_amo_phase == 3'h2)
+	if (d_memop_is_amo && bus_aph_req_d)
 		assert(!prop_dph_is_excl);
+	// Only phases 0 (read aphase) and 2 (write aphase) assert new bus transfers
+	if (d_memop_is_amo && bus_aph_req_d)
+		assert(x_amo_phase == 3'h0 || x_amo_phase == 3'h2);
 end
 `endif
 
