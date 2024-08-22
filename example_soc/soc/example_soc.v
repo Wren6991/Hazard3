@@ -42,7 +42,7 @@ wire              dmi_penable;
 wire              dmi_pwrite;
 wire [8:0]        dmi_paddr;
 wire [31:0]       dmi_pwdata;
-reg  [31:0]       dmi_prdata;
+wire [31:0]       dmi_prdata;
 wire              dmi_pready;
 wire              dmi_pslverr;
 
