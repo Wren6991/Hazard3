@@ -1124,7 +1124,7 @@ end
 assign illegal = (wen_soon || ren_soon) && !decode_match;
 
 // Trigger refetch of sequentially-next instructions on certain CSR updates:
-assign write_is_fetch_ordered = wen_raw && (
+assign write_is_fetch_ordered = wen_raw && !debug_mode && (
 	(PMP_REGIONS > 0 && addr >= PMPADDR0 && addr <= PMPADDR15) ||
 	(PMP_REGIONS > 0 && addr >= PMPCFG0  && addr <= PMPCFG3)
 );
