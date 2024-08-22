@@ -469,7 +469,7 @@ end else begin: have_pmp
 
 	assign pmp_i_addr = pmp_check_addr_dph;
 	assign pmp_i_m_mode = pmp_check_m_mode_dph;
-	assign pmp_kill_fetch_dph = pmp_i_kill;
+	assign pmp_kill_fetch_dph = pmp_i_kill && !debug_mode;
 
 end
 endgenerate
