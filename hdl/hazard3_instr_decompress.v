@@ -420,7 +420,7 @@ end
 endgenerate
 
 generate
-if (EXTENSION_ZCMP) begin: have_uop_ctr;
+if (EXTENSION_ZCMP) begin: have_uop_ctr
 	always @ (posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
 			uop_ctr <= 4'h0;

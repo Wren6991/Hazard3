@@ -184,7 +184,7 @@ always @ (*) begin: match_pc
 		trigger_enabled[i] = mcontrol_execute[i] && !fetch_d_mode && (
 			fetch_m_mode ? mcontrol_m[i] : mcontrol_u[i]
 		);
-		trigger_match[i] = fetch_addr == {tdata2[i][W_DATA-1:2], 2'b00};
+		trigger_match[i] = trigger_enabled[i] && fetch_addr == {tdata2[i][W_DATA-1:2], 2'b00};
 		// Decide the type of break implied by the trip
 		want_d_mode_break[i] = trigger_match[i] &&  mcontrol_action[i] && tdata1_dmode[i];
 		want_m_mode_break[i] = trigger_match[i] && !mcontrol_action[i] && trig_m_en;
