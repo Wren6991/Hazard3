@@ -72,7 +72,7 @@ WriteGprs
 #
 # "fail":
 #  * EtriggerTest ....................... Relies on exception trigger, not implemented
-#  * IcountTest ......................... Relies on interrupt count trigger, not implemented
+#  * IcountTest ......................... Relies on instruction count trigger, not implemented
 #  * TriggerDmode ....................... Relies on load/store triggers, not implemented
 # "exception":
 #  * ItriggerTest ....................... Relies on interrupt trigger, not implemented

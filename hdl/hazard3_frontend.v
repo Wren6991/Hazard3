@@ -51,11 +51,13 @@ module hazard3_frontend #(
 	// => decode is providing live feedback on the CIR it is decoding,
 	//    which we fetched previously
 	output wire [31:0]       cir,
-	output reg  [1:0]        cir_vld,        // number of valid halfwords in CIR
-	input  wire [1:0]        cir_use,        // number of halfwords D intends to consume
-	                                         // *may* be a function of hready
-	output wire [1:0]        cir_err,        // Bus error on upper/lower halfword of CIR.
-	output wire [1:0]        cir_predbranch, // Set for last halfword of a predicted-taken branch
+	output reg  [1:0]        cir_vld,          // number of valid halfwords in CIR
+	input  wire [1:0]        cir_use,          // number of halfwords D intends to consume
+	                                           // *may* be a function of hready
+	output wire [1:0]        cir_err,          // Bus error on upper/lower halfword of CIR.
+	output wire [1:0]        cir_predbranch,   // Set for last halfword of a predicted-taken branch
+	output wire              cir_break_any,    // Set for exact match of a breakpoint address on CIR LSB
+	output wire              cir_break_d_mode, // As above but specifically break to debug mode
 
 	// "flush_behind": do not flush the oldest instruction when accepting a
 	//  jump request (but still flush younger instructions). Sometimes a
@@ -95,7 +97,14 @@ module hazard3_frontend #(
 	// PMP query->kill interface for X permission checks
 	output wire [W_ADDR-1:0] pmp_i_addr,
 	output wire              pmp_i_m_mode,
-	input  wire              pmp_i_kill
+	input  wire              pmp_i_kill,
+
+	// Trigger unit query->break interface for breakpoints
+	output wire [W_ADDR-1:0] trigger_addr,
+	output wire              trigger_m_mode,
+	input  wire [1:0]        trigger_break_any,
+	input  wire [1:0]        trigger_break_d_mode
+
 );
 
 `include "rv_opcodes.vh"
@@ -116,20 +125,29 @@ reg [1:0] mem_data_hwvld;
 wire pmp_kill_fetch_dph;
 wire mem_or_pmp_err = mem_data_err || pmp_kill_fetch_dph;
 
+// Similarly, breakpoint matches are checked during fetch data phase. These
+// are called mem_xxx because they are the breakpoint metadata for the data
+// coming back from memory in this dphase.
+wire [1:0] mem_break_any;
+wire [1:0] mem_break_d_mode;
+
 // Mark data as containing a predicted-taken branch instruction so that
 // mispredicts can be recovered -- need to track both halfwords so that we
 // can mark the entire instruction, and nothing but the instruction:
 reg [1:0] mem_data_predbranch;
 
-// Bus errors travel alongside data. They cause an exception if the core tries
-// to decode the instruction, but until then can be flushed harmlessly.
+// Bus errors (and other metadata) travel alongside data. They cause an
+// exception if the core decodes the instruction, but until then can be
+// flushed harmlessly.
 
-reg  [W_DATA-1:0]    fifo_mem        [0:FIFO_DEPTH];
-reg                  fifo_err        [0:FIFO_DEPTH];
-reg  [1:0]           fifo_predbranch [0:FIFO_DEPTH];
-reg  [1:0]           fifo_valid_hw   [0:FIFO_DEPTH];
-reg                  fifo_valid      [0:FIFO_DEPTH];
-reg                  fifo_valid_m1   [0:FIFO_DEPTH];
+reg  [W_DATA-1:0]    fifo_mem          [0:FIFO_DEPTH];
+reg                  fifo_err          [0:FIFO_DEPTH];
+reg  [1:0]           fifo_break_any    [0:FIFO_DEPTH];
+reg  [1:0]           fifo_break_d_mode [0:FIFO_DEPTH];
+reg  [1:0]           fifo_predbranch   [0:FIFO_DEPTH];
+reg  [1:0]           fifo_valid_hw     [0:FIFO_DEPTH];
+reg                  fifo_valid        [0:FIFO_DEPTH];
+reg                  fifo_valid_m1     [0:FIFO_DEPTH];
 
 wire [W_DATA-1:0] fifo_rdata       = fifo_mem[0];
 wire              fifo_full        = fifo_valid[FIFO_DEPTH - 1];
@@ -145,6 +163,8 @@ always @ (*) begin: boundary_conditions
 	fifo_mem[FIFO_DEPTH] = mem_data;
 	fifo_predbranch[FIFO_DEPTH] = 2'b00;
 	fifo_err[FIFO_DEPTH] = 1'b0;
+	fifo_break_any[FIFO_DEPTH] = 2'b00;
+	fifo_break_d_mode[FIFO_DEPTH] = 2'b00;
 	fifo_valid_hw[FIFO_DEPTH] = 2'b00;
 	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 		fifo_valid[i] = |EXTENSION_C ? |fifo_valid_hw[i] : fifo_valid_hw[i][0];
@@ -166,14 +186,18 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 			fifo_valid_hw[i] <= 2'b00;
 			fifo_mem[i] <= 32'h0;
 			fifo_err[i] <= 1'b0;
+			fifo_break_any[i] <= 2'b00;
+			fifo_break_d_mode[i] <= 2'b00;
 			fifo_predbranch[i] <= 2'b00;
 		end
 	end else begin
 		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 			if (fifo_pop || (fifo_push && !fifo_valid[i])) begin
-				fifo_mem[i]        <= fifo_valid[i + 1] ? fifo_mem[i + 1]        : mem_data;
-				fifo_err[i]        <= fifo_valid[i + 1] ? fifo_err[i + 1]        : mem_or_pmp_err;
-				fifo_predbranch[i] <= fifo_valid[i + 1] ? fifo_predbranch[i + 1] : mem_data_predbranch;
+				fifo_mem[i]          <= fifo_valid[i + 1] ? fifo_mem[i + 1]          : mem_data;
+				fifo_err[i]          <= fifo_valid[i + 1] ? fifo_err[i + 1]          : mem_or_pmp_err;
+				fifo_break_any[i]    <= fifo_valid[i + 1] ? fifo_break_any[i + 1]    : mem_break_any;
+				fifo_break_d_mode[i] <= fifo_valid[i + 1] ? fifo_break_d_mode[i + 1] : mem_break_d_mode;
+				fifo_predbranch[i]   <= fifo_valid[i + 1] ? fifo_predbranch[i + 1]   : mem_data_predbranch;
 			end
 			fifo_valid_hw[i] <=
 				jump_now                                   ? 2'h0                            :
@@ -191,6 +215,8 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 			fifo_mem[0] <= dbg_instr_data;
 			fifo_err[0] <= 1'b0;
 			fifo_predbranch[0] <= 2'b00;
+			fifo_break_any[0] <= 2'b00;
+			fifo_break_d_mode[0] <= 2'b00;
 			fifo_valid_hw[0] <= jump_now ? 2'b00 : 2'b11;
 		end
 	end
@@ -250,7 +276,7 @@ endgenerate
 // Note this assumes the BTB target has not changed by the time the predicted
 // branch arrives at decode! This is always true because the only way for the
 // target address to change is when an older branch is taken, which would
-// flush the younger predicted-taken branch before it reaches decode. 
+// flush the younger predicted-taken branch before it reaches decode.
 
 assign btb_target_addr_out = btb_target_addr;
 
@@ -425,7 +451,7 @@ always @ (posedge clk or negedge rst_n) begin
 		end else if (mem_addr_vld && mem_addr_rdy) begin
 			if (|EXTENSION_C) begin
 				// If a predicted-taken branch instruction only spans the first
-				// half of a word, need to flag the second half as invalid. 
+				// half of a word, need to flag the second half as invalid.
 				mem_data_hwvld <= mem_aph_hwvld & {
 					!(|BRANCH_PREDICTOR && btb_match_now && (btb_src_addr[1] == btb_src_size)),
 					1'b1
@@ -449,7 +475,41 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // ----------------------------------------------------------------------------
-// PMP check/kill interface
+// PMP and trigger unit interfacing: query -> kill/break
+
+wire [W_ADDR-1:0] pmp_trigger_check_dph_addr;
+wire              pmp_trigger_check_dph_m_mode;
+
+// Register the fetch address into stage F so that the PMP can check it in
+// parallel with the bus data phase. Feels wasteful to have a separate
+// register, but using the fetch_addr counter is fraught due to the way that
+// new addresses go into it or past it (depending on aphase hold).
+
+generate
+if (PMP_REGIONS > 0 || BREAKPOINT_TRIGGERS > 0) begin: have_check_reg
+
+	reg [W_ADDR-1:0] check_addr_dph;
+	reg              check_m_mode_dph;
+	always @ (posedge clk or negedge rst_n) begin
+		if (!rst_n) begin
+			check_addr_dph <= {W_ADDR{1'b0}};
+			check_m_mode_dph <= 1'b0;
+		end else if (mem_addr_vld && mem_addr_rdy) begin
+			check_addr_dph <= mem_addr;
+			check_m_mode_dph <= mem_priv;
+		end
+	end
+
+	assign pmp_trigger_check_dph_addr = check_addr_dph;
+	assign pmp_trigger_check_dph_m_mode = check_m_mode_dph;
+
+end else begin: no_check_reg
+
+	assign pmp_trigger_check_dph_addr = {W_ADDR{1'b0}};
+	assign pmp_trigger_check_dph_m_mode = 1'b0;
+
+end
+endgenerate
 
 generate
 if (PMP_REGIONS == 0) begin: no_pmp
@@ -460,25 +520,27 @@ if (PMP_REGIONS == 0) begin: no_pmp
 
 end else begin: have_pmp
 
-	// Register the fetch address into stage F so that the PMP can check it in
-	// parallel with the bus data phase. Feels wasteful to have a separate
-	// register, but using the fetch_addr counter is fraught due to the way
-	// that new addresses go into it or past it (depending on aphase hold).
-	reg [W_ADDR-1:0] pmp_check_addr_dph;
-	reg              pmp_check_m_mode_dph;
-	always @ (posedge clk or negedge rst_n) begin
-		if (!rst_n) begin
-			pmp_check_addr_dph <= {W_ADDR{1'b0}};
-			pmp_check_m_mode_dph <= 1'b0;
-		end else if (mem_addr_vld && mem_addr_rdy) begin
-			pmp_check_addr_dph <= mem_addr;
-			pmp_check_m_mode_dph <= mem_priv;
-		end
-	end
-
-	assign pmp_i_addr = pmp_check_addr_dph;
-	assign pmp_i_m_mode = pmp_check_m_mode_dph;
+	assign pmp_i_addr = pmp_trigger_check_dph_addr;
+	assign pmp_i_m_mode = pmp_trigger_check_dph_m_mode;
 	assign pmp_kill_fetch_dph = pmp_i_kill && !debug_mode;
+
+end
+endgenerate
+
+generate
+if (BREAKPOINT_TRIGGERS == 0) begin: no_triggers
+
+	assign trigger_addr = {W_ADDR{1'b0}};
+	assign trigger_m_mode = 1'b0;
+	assign mem_break_any = 2'b00;
+	assign mem_break_d_mode = 2'b00;
+
+end else begin: have_triggers
+
+	assign trigger_addr = pmp_trigger_check_dph_addr;
+	assign trigger_m_mode = pmp_trigger_check_dph_m_mode;
+	assign mem_break_any = trigger_break_any;
+	assign mem_break_d_mode = trigger_break_d_mode;
 
 end
 endgenerate
@@ -501,27 +563,35 @@ endgenerate
 
 // The entries ("slots") are slightly larger than 16 bits because they also
 // contain metadata like bus errors:
-localparam W_SLOT              = 2 + W_BUNDLE;
-localparam SLOT_ERR_BIT        = 1 + W_BUNDLE;
-localparam SLOT_PREDBRANCH_BIT = 0 + W_BUNDLE;
+localparam W_SLOT                = 4 + W_BUNDLE;
+localparam SLOT_BREAK_ANY_BIT    = 3 + W_BUNDLE;
+localparam SLOT_BREAK_D_MODE_BIT = 2 + W_BUNDLE;
+localparam SLOT_ERR_BIT          = 1 + W_BUNDLE;
+localparam SLOT_PREDBRANCH_BIT   = 0 + W_BUNDLE;
 
 reg  [3*W_SLOT-1:0] buf_contents;
 reg  [1:0]          buf_level;
 
 wire                fetch_data_vld   = !fifo_empty || (mem_data_vld && ~|ctr_flush_pending && !debug_mode);
 
-wire [W_DATA-1:0]   fetch_data       = fifo_empty ? mem_data            : fifo_rdata;
-wire [1:0]          fetch_data_hwvld = fifo_empty ? mem_data_hwvld      : fifo_valid_hw[0];
-wire                fetch_bus_err    = fifo_empty ? mem_or_pmp_err      : fifo_err[0];
-wire [1:0]          fetch_predbranch = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
+wire [W_DATA-1:0]   fetch_data         = fifo_empty ? mem_data            : fifo_rdata;
+wire [1:0]          fetch_data_hwvld   = fifo_empty ? mem_data_hwvld      : fifo_valid_hw[0];
+wire                fetch_bus_err      = fifo_empty ? mem_or_pmp_err      : fifo_err[0];
+wire [1:0]          fetch_break_any    = fifo_empty ? mem_break_any       : fifo_break_any[0];
+wire [1:0]          fetch_break_d_mode = fifo_empty ? mem_break_d_mode    : fifo_break_d_mode[0];
+wire [1:0]          fetch_predbranch   = fifo_empty ? mem_data_predbranch : fifo_predbranch[0];
 
 wire [W_SLOT-1:0] fetch_contents_hw1 = {
+	fetch_break_any[1],
+	fetch_break_d_mode[1],
 	fetch_bus_err,
 	fetch_predbranch[1],
 	fetch_data[W_BUNDLE +: W_BUNDLE]
 };
 
 wire [W_SLOT-1:0] fetch_contents_hw0 = {
+	fetch_break_any[0],
+	fetch_break_d_mode[0],
 	fetch_bus_err,
 	fetch_predbranch[0],
 	fetch_data[0 +: W_BUNDLE]
@@ -606,6 +676,10 @@ assign cir_predbranch = {
 	buf_contents[1 * W_SLOT + SLOT_PREDBRANCH_BIT],
 	buf_contents[0 * W_SLOT + SLOT_PREDBRANCH_BIT]
 };
+
+assign cir_break_any = buf_contents[0 * W_SLOT + SLOT_BREAK_ANY_BIT] && |cir_vld;
+
+assign cir_break_d_mode = buf_contents[0 * W_SLOT + SLOT_BREAK_D_MODE_BIT] && |cir_vld;
 
 // ----------------------------------------------------------------------------
 // Register number predecode

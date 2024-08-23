@@ -108,6 +108,8 @@ wire [W_REGADDR-1:0] f_rs2_fine;
 
 wire [31:0]          fd_cir;
 wire [1:0]           fd_cir_err;
+wire                 fd_cir_break_any;
+wire                 fd_cir_break_d_mode;
 wire [1:0]           fd_cir_predbranch;
 wire [1:0]           fd_cir_vld;
 wire [1:0]           df_cir_use;
@@ -125,6 +127,11 @@ wire [W_ADDR-1:0]    d_btb_target_addr;
 wire [W_ADDR-1:0]    f_pmp_i_addr;
 wire                 f_pmp_i_m_mode;
 wire                 f_pmp_i_kill;
+
+wire [W_ADDR-1:0]    f_trigger_addr;
+wire                 f_trigger_m_mode;
+wire [1:0]           f_trigger_break_any;
+wire [1:0]           f_trigger_break_d_mode;
 
 assign bus_aph_panic_i = 1'b0;
 
@@ -162,6 +169,8 @@ hazard3_frontend #(
 	.cir                  (fd_cir),
 	.cir_err              (fd_cir_err),
 	.cir_predbranch       (fd_cir_predbranch),
+	.cir_break_any        (fd_cir_break_any),
+	.cir_break_d_mode     (fd_cir_break_d_mode),
 	.cir_vld              (fd_cir_vld),
 	.cir_use              (df_cir_use),
 	.cir_flush_behind     (df_cir_flush_behind),
@@ -182,7 +191,12 @@ hazard3_frontend #(
 
 	.pmp_i_addr           (f_pmp_i_addr),
 	.pmp_i_m_mode         (f_pmp_i_m_mode),
-	.pmp_i_kill           (f_pmp_i_kill)
+	.pmp_i_kill           (f_pmp_i_kill),
+
+	.trigger_addr         (f_trigger_addr),
+	.trigger_m_mode       (f_trigger_m_mode),
+	.trigger_break_any    (f_trigger_break_any),
+	.trigger_break_d_mode (f_trigger_break_d_mode)
 );
 
 // ----------------------------------------------------------------------------
@@ -421,8 +435,8 @@ assign x_stall =
 wire m_sleep_stall_release;
 
 wire x_loadstore_pmp_fail;
-wire x_trig_break;
-wire x_trig_break_d_mode;
+wire x_trig_break = fd_cir_break_any;
+wire x_trig_break_d_mode = fd_cir_break_d_mode;
 
 // ----------------------------------------------------------------------------
 // Execution logic
@@ -922,6 +936,9 @@ wire              x_trig_m_en;
 generate
 if (BREAKPOINT_TRIGGERS > 0) begin: have_triggers
 
+	// Connection of .fetch_d_mode is from the wrong stage: safe because we
+	// enter/exit debug mode via exceptions, which flush the frontend.
+
 	hazard3_triggers #(
 	`include "hazard3_config_inst.vh"
 	) triggers (
@@ -934,19 +951,21 @@ if (BREAKPOINT_TRIGGERS > 0) begin: have_triggers
 		.cfg_rdata        (x_trig_cfg_rdata),
 		.trig_m_en        (x_trig_m_en),
 
-		.pc               (d_pc),
-		.m_mode           (x_mmode_execution),
-		.d_mode           (debug_mode),
+		.fetch_addr       (f_trigger_addr),
+		.fetch_m_mode     (f_trigger_m_mode),
+		.fetch_d_mode     (debug_mode),
 
-		.break_any        (x_trig_break),
-		.break_d_mode     (x_trig_break_d_mode)
+		.break_any        (f_trigger_break_any),
+		.break_d_mode     (f_trigger_break_d_mode),
+
+		.x_d_mode         (debug_mode)
 	);
 
 end else begin: no_triggers
 
 	assign x_trig_cfg_rdata = {W_DATA{1'b0}};
-	assign x_trig_break = 1'b0;
-	assign x_trig_break_d_mode = 1'b0;
+	assign f_trigger_break_any = 2'b00;
+	assign f_trigger_break_d_mode = 2'b00;
 
 end
 endgenerate

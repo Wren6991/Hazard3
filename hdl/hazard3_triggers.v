@@ -24,14 +24,18 @@ module hazard3_triggers #(
 	// Global trigger-to-M-mode enable (e.g. from tcontrol or mstatus.mie)
 	input  wire              trig_m_en,
 
-	// PC query
-	input  wire [W_ADDR-1:0] pc,
-	input  wire              m_mode,
-	input  wire              d_mode,
+	// Fetch address query
+	input  wire [W_ADDR-1:0] fetch_addr,
+	input  wire              fetch_m_mode,
+	input  wire              fetch_d_mode,
 
-	// Break request
-	output wire              break_any,
-	output wire              break_d_mode
+	// Break request (for each halfword of the word-sized word-aligned fetch)
+	output wire [1:0]        break_any,
+	output wire [1:0]        break_d_mode,
+
+	// Stage-X debug mode flag, for CSR protection (may or may not be the same
+	// as the query debug mode flag)
+	input  wire              x_d_mode
 );
 
 `include "hazard3_csr_addr.vh"
@@ -85,11 +89,11 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		end
 	end else if (cfg_wen && cfg_addr == TSELECT) begin
 		tselect <= cfg_wdata[W_TSELECT-1:0];
-	end else if (cfg_wen && tselect_in_range && !(tdata1_dmode[tselect] && !d_mode)) begin
+	end else if (cfg_wen && tselect_in_range && !(tdata1_dmode[tselect] && !x_d_mode)) begin
 		// Handle writes to tselect-indexed registers (note writes to D-mode
 		// triggers in non-D-mode are ignored rather than raising an exception)
 		if (cfg_addr == TDATA1) begin
-			if (d_mode) begin
+			if (x_d_mode) begin
 				tdata1_dmode[tselect] <= cfg_wdata[27];
 			end
 			mcontrol_action[tselect] <= cfg_wdata[12];
@@ -152,23 +156,58 @@ end
 // ----------------------------------------------------------------------------
 // Trigger match logic
 
+// To reduce the fanin of jump and load/store gating in stage X, the address
+// lookup is in stage F (fetch data phase). We check *fetch addresses*, not
+// program counter values. Fetches are always word-sized and word-aligned.
+//
+// To ensure it is safe to do this, non-debug-mode writes to the TDATA1 and
+// TDATA2 CSRs cause a prefetch flush, to maintain write-to-fetch ordering.
+//
+// It's possible for different breakpoints to match different halfwords of the
+// fetch word. The trigger unit must report both matches separately, because
+// it is not known at this point where the instruction boundaries are (we
+// don't have the instruction data yet).
+
+reg [BREAKPOINT_TRIGGERS-1:0] trigger_enabled;
+reg [BREAKPOINT_TRIGGERS-1:0] trigger_match;
 reg [BREAKPOINT_TRIGGERS-1:0] want_d_mode_break;
 reg [BREAKPOINT_TRIGGERS-1:0] want_m_mode_break;
+reg [BREAKPOINT_TRIGGERS-1:0] want_d_mode_break_hw0;
+reg [BREAKPOINT_TRIGGERS-1:0] want_d_mode_break_hw1;
+reg [BREAKPOINT_TRIGGERS-1:0] want_m_mode_break_hw0;
+reg [BREAKPOINT_TRIGGERS-1:0] want_m_mode_break_hw1;
 
 always @ (*) begin: match_pc
 	integer i;
-	want_m_mode_break = {BREAKPOINT_TRIGGERS{1'b0}};
-	want_d_mode_break = {BREAKPOINT_TRIGGERS{1'b0}};
 	for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
-		if (mcontrol_execute[i] && tdata2[i] == pc && !d_mode && (m_mode ? mcontrol_m[i] : mcontrol_u[i])) begin
-			want_d_mode_break[i] = mcontrol_action[i] && tdata1_dmode[i];
-			want_m_mode_break[i] = !mcontrol_action[i] && trig_m_en;
-		end
+		// Detect tripped breakpoints
+		trigger_enabled[i] = mcontrol_execute[i] && !fetch_d_mode && (
+			fetch_m_mode ? mcontrol_m[i] : mcontrol_u[i]
+		);
+		trigger_match[i] = fetch_addr == {tdata2[i][W_DATA-1:2], 2'b00};
+		// Decide the type of break implied by the trip
+		want_d_mode_break[i] = trigger_match[i] &&  mcontrol_action[i] && tdata1_dmode[i];
+		want_m_mode_break[i] = trigger_match[i] && !mcontrol_action[i] && trig_m_en;
+		// Report separately for each halfword, so the frontend can pass this
+		// through the prefetch buffer. A breakpoint exception is taken when
+		// the first halfword of an instruction (of any size) is flagged with
+		// a breakpoint, implying an exact match.
+		want_d_mode_break_hw0[i] = want_d_mode_break[i] && !tdata2[i][1];
+		want_d_mode_break_hw1[i] = want_d_mode_break[i] &&  tdata2[i][1];
+		want_m_mode_break_hw0[i] = want_m_mode_break[i] && !tdata2[i][1];
+		want_m_mode_break_hw1[i] = want_m_mode_break[i] &&  tdata2[i][1];
 	end
 end
 
-assign break_any    = |want_m_mode_break || |want_d_mode_break;
-assign break_d_mode = |want_d_mode_break;
+assign break_any    = {
+	|want_m_mode_break_hw1 || |want_d_mode_break_hw1,
+	|want_m_mode_break_hw0 || |want_d_mode_break_hw0
+};
+
+assign break_d_mode = {
+	|want_d_mode_break_hw1,
+	|want_d_mode_break_hw0
+};
 
 end
 endgenerate
