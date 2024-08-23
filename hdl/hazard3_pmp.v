@@ -230,7 +230,6 @@ end
 // instruction fetch spanning two different regions which both grant X
 // permission *is* permitted, unlike the RP2350 version of Hazard3.
 
-reg i_partial_match;
 reg i_m; // Hazard3 extension (M-mode without locking)
 reg i_l;
 reg i_x;

@@ -166,7 +166,7 @@ always @ (*) begin: boundary_conditions
 	fifo_break_any[FIFO_DEPTH] = 2'b00;
 	fifo_break_d_mode[FIFO_DEPTH] = 2'b00;
 	fifo_valid_hw[FIFO_DEPTH] = 2'b00;
-	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
+	for (i = 0; i <= FIFO_DEPTH; i = i + 1) begin
 		fifo_valid[i] = |EXTENSION_C ? |fifo_valid_hw[i] : fifo_valid_hw[i][0];
 		// valid-to-right condition: i == 0 || fifo_valid[i - 1], but without
 		// using negative array bound (seems broken in Yosys?) or OOB in the

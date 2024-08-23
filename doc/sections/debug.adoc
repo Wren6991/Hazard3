@@ -10,6 +10,7 @@ Hazard3, along with its external debug components, implements version 0.13.2 of 
 * The hart array mask registers, for applying run/halt/reset controls to multiple cores simultaneously
 * (Optional) System Bus Access, either through a dedicated AHB5 manager interface, or multiplexed with a processor load/store port
 * (Optional) An instruction address trigger unit (hardware breakpoints)
+** The `tcontrol.mte` and `mpte` bits (to avoid trigger loops in M-mode trigger usage)
 
 === Debug Topologies
 
