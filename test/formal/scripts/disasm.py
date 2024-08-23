@@ -23,10 +23,7 @@ for netinfo in parse_vcd(argv[1]).values():
 assert len(fd_cir) == len(df_cir_use)
 
 with open("disasm.s", "w") as f:
-    even = False
     for instr, size in zip(fd_cir, df_cir_use):
-        even = not even
-        if not even: continue
         instr = int(instr[1], 2)
         size = int(size[1], 2)
         # print(f"cir={instr:08x} (used: {size} hwords)")

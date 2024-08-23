@@ -123,7 +123,7 @@ end
 // $past() in yosys-smtbmc.
 reg past_sleeping;
 reg past_stall_release;
-always @ (posedge clk_always_on or negedge rst_n) begin
+always @ (posedge clk_always_on) begin
 	if (!rst_n) begin
 		past_sleeping <= 1'b0;
 		past_stall_release <= 1'b0;

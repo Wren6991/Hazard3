@@ -579,30 +579,14 @@ always @ (posedge clk or negedge rst_n) begin
 		if (m_trap_enter_vld) begin
 			// Bail out, squash the in-progress AMO.
 			x_amo_phase <= 3'h0;
-`ifdef HAZARD3_ASSERTIONS
-			// Should only happen during an address phase, *or* the fault phase.
-			assert(x_amo_phase == 3'h0 || x_amo_phase == 3'h2 || x_amo_phase == 3'h4);
-			// The fault phase only holds when we have a misaligned AMO directly behind
-			// a regular memory access that subsequently excepts, and the AMO has gone
-			// straight to fault phase due to misalignment.
-			if (x_amo_phase == 3'h4)
-				assert(x_unaligned_addr);
-`endif
 		end else if (x_stall_on_raw || x_stall_on_exclusive_overlap || m_trap_enter_soon) begin
 			// First address phase stalled due to address dependency on
 			// previous load/mul/etc. Shouldn't be possible in later phases.
 			x_amo_phase <= 3'h0;
-`ifdef HAZARD3_ASSERTIONS
-			assert(x_amo_phase == 3'h0);
-`endif
 		end else if (x_amo_phase == 3'h4) begin
 			// Clear fault phase once it goes through to stage 3 and excepts
 			if (!x_stall)
 				x_amo_phase <= 3'h0;
-`ifdef HAZARD3_ASSERTIONS
-			// This should only happen when we are stalled on an older load/store etc
-			assert(!(x_stall && !m_stall));
-`endif
 		end else if (x_unaligned_addr) begin
 			x_amo_phase <= 3'h4;
 		end else if (x_amo_phase == 3'h1 && !bus_dph_exokay_d) begin
@@ -623,6 +607,34 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 `ifdef HAZARD3_ASSERTIONS
+// Assertions for above block, extracted to avoid making assertions
+// reset-sensitive (limitation of yosys-smtbmc)
+always @ (posedge clk) if (rst_n) begin
+	if (|EXTENSION_A && d_memop_is_amo && (
+		bus_aph_ready_d || bus_dph_ready_d ||
+		m_trap_enter_vld || x_unaligned_addr ||
+		x_amo_phase == 3'h4
+	)) begin
+		if (m_trap_enter_vld) begin
+			// Should only happen during an address phase, *or* the fault phase.
+			assert(x_amo_phase == 3'h0 || x_amo_phase == 3'h2 || x_amo_phase == 3'h4);
+			// The fault phase only holds when we have a misaligned AMO directly behind
+			// a regular memory access that subsequently excepts, and the AMO has gone
+			// straight to fault phase due to misalignment.
+			if (x_amo_phase == 3'h4)
+				assert(x_unaligned_addr);
+		end else if (x_stall_on_raw || x_stall_on_exclusive_overlap || m_trap_enter_soon) begin
+			assert(x_amo_phase == 3'h0);
+		end else if (x_amo_phase == 3'h4) begin
+			// This should only happen when we are stalled on an older load/store etc
+			assert(!(x_stall && !m_stall));
+		end
+	end
+end
+`endif
+
+`ifdef HAZARD3_ASSERTIONS
+// General AMO design assertions
 reg prop_dph_is_excl = 1'b0;
 always @ (posedge clk) if (rst_n) begin
 	if (bus_aph_ready_d && bus_aph_req_d) begin
@@ -1139,14 +1151,6 @@ always @ (posedge clk or negedge rst_n) begin
 				xm_sleep_block      <= 1'b0;
 				unblock_out         <= 1'b0;
 			end
-`ifdef HAZARD3_ASSERTIONS
-			// Assuming downstream bus is compliant, err && !stalled is the
-			// last cycle of an error response, in which case this must have
-			// been previously captured as an exception.
-			if (bus_dph_err_d && x_amo_phase == 3'h0) begin
-				assert(xm_except == EXCEPT_LOAD_FAULT || xm_except == EXCEPT_STORE_FAULT);
-			end
-`endif
 		end else if (bus_dph_err_d) begin
 			// First phase of 2-phase AHB5 error response. Pass the exception along on
 			// this cycle, and on the next cycle the trap entry will be asserted,
@@ -1154,33 +1158,44 @@ always @ (posedge clk or negedge rst_n) begin
 			xm_except <=
 				|EXTENSION_A && xm_memop == MEMOP_LR_W ? EXCEPT_LOAD_FAULT :
 				                xm_memop <= MEMOP_LBU  ? EXCEPT_LOAD_FAULT : EXCEPT_STORE_FAULT;
-`ifdef HAZARD3_ASSERTIONS
-			// There should be a bus transfer in stage 3 corresponding to this bus error
-			assert(xm_memop != MEMOP_NONE);
-			// We should capture this error exactly once, and if there were
-			// any other source of exception then the load/store should not
-			// have happened in the first place. Only exception is when the
-			// entry of the load/store trap is stalled on the frontend.
-			assert(xm_except == EXCEPT_NONE || (!m_trap_enter_rdy && (
-				xm_except == EXCEPT_LOAD_FAULT || xm_except == EXCEPT_STORE_FAULT
-			)));
-			// Make sure we don't have to clear any of the other stage 3 flags
-			assert(!xm_except_to_d_mode);
-			assert(!xm_sleep_wfi);
-			assert(!xm_sleep_block);
-			assert(!unblock_out);
-`endif
 		end
-`ifdef HAZARD3_ASSERTIONS
-		// Some of the exception->ls paths are cut as they are supposed to be
-		// impossible -- make sure there is no way to have a load/store that
-		// is not squashed. (This includes debug entry!)
-		if (m_trap_enter_vld) begin
-			assert(!bus_aph_req_d);
-		end
-`endif
 	end
 end
+
+`ifdef HAZARD3_ASSERTIONS
+// Properties for previous block
+always @ (posedge clk) if (rst_n) begin
+	if (!m_stall) begin
+		// Assuming downstream bus is compliant, err && !stalled is the
+		// last cycle of an error response, in which case this must have
+		// been previously captured as an exception.
+		if (bus_dph_err_d && x_amo_phase == 3'h0) begin
+			assert(xm_except == EXCEPT_LOAD_FAULT || xm_except == EXCEPT_STORE_FAULT);
+		end
+	end else if (bus_dph_err_d) begin
+		// There should be a bus transfer in stage 3 corresponding to this bus error
+		assert(xm_memop != MEMOP_NONE);
+		// We should capture this error exactly once, and if there were
+		// any other source of exception then the load/store should not
+		// have happened in the first place. Only exception is when the
+		// entry of the load/store trap is stalled on the frontend.
+		assert(xm_except == EXCEPT_NONE || (!m_trap_enter_rdy && (
+			xm_except == EXCEPT_LOAD_FAULT || xm_except == EXCEPT_STORE_FAULT
+		)));
+		// Make sure we don't have to clear any of the other stage 3 flags
+		assert(!xm_except_to_d_mode);
+		assert(!xm_sleep_wfi);
+		assert(!xm_sleep_block);
+		assert(!unblock_out);
+	end
+	// Some of the exception->ls paths are cut as they are supposed to be
+	// impossible -- make sure there is no way to have a load/store that
+	// is not squashed. (This includes debug entry!)
+	if (m_trap_enter_vld) begin
+		assert(!bus_aph_req_d);
+	end
+end
+`endif
 
 `ifdef HAZARD3_ASSERTIONS
 always @ (posedge clk) if (rst_n) begin

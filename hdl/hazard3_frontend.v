@@ -193,14 +193,17 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 			fifo_predbranch[0] <= 2'b00;
 			fifo_valid_hw[0] <= jump_now ? 2'b00 : 2'b11;
 		end
-`ifdef HAZARD3_ASSERTIONS
-		// FIFO validity must be compact, so we can always consume from the end
-		if (!fifo_valid[0]) begin
-			assert(!fifo_valid[1]);
-		end
-`endif
 	end
 end
+
+`ifdef HAZARD3_ASSERTIONS
+always @ (posedge clk) if (rst_n) begin
+	// FIFO validity must be compact, so we can always consume from the end
+	if (!fifo_valid[0]) begin
+		assert(!fifo_valid[1]);
+	end
+end
+`endif
 
 assign pwrdown_ok = fifo_full && !jump_target_vld;
 
@@ -315,11 +318,14 @@ always @ (posedge clk or negedge rst_n) begin
 		// This should be impossible, but assert to be sure, because it *will*
 		// change the fetch address (and we shouldn't check it in hardware if
 		// we can prove it doesn't happen)
-`ifdef HAZARD3_ASSERTIONS
-		assert(!(jump_target_vld && reset_holdoff));
-`endif
 	end
 end
+
+`ifdef HAZARD3_ASSERTIONS
+always @ (posedge clk) if (rst_n) begin
+	assert(!(jump_target_vld && reset_holdoff));
+end
+`endif
 
 reg [W_ADDR-1:0] mem_addr_r;
 reg              mem_priv_r;
@@ -382,11 +388,6 @@ always @ (posedge clk or negedge rst_n) begin
 		pending_fetches <= 2'h0;
 		ctr_flush_pending <= 2'h0;
 	end else begin
-`ifdef HAZARD3_ASSERTIONS
-		assert(ctr_flush_pending <= pending_fetches);
-		assert(pending_fetches < 2'd3);
-		assert(!(mem_data_vld && !pending_fetches));
-`endif
 		mem_addr_hold <= mem_addr_vld && !mem_addr_rdy;
 		pending_fetches <= pending_fetches_next;
 		if (jump_now) begin
@@ -396,6 +397,14 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
+
+`ifdef HAZARD3_ASSERTIONS
+always @ (posedge clk) if (rst_n) begin
+	assert(ctr_flush_pending <= pending_fetches);
+	assert(pending_fetches < 2'd3);
+	assert(!(mem_data_vld && !pending_fetches));
+end
+`endif
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
@@ -559,12 +568,6 @@ always @ (posedge clk or negedge rst_n) begin
 		cir_vld <= 2'h0;
 		buf_contents <= {3 * W_SLOT{1'b0}};
 	end else begin
-`ifdef HAZARD3_ASSERTIONS
-		assert(cir_vld <= 2);
- 		assert(cir_use <= cir_vld);
- 		if (!jump_now)
-	 		assert(buf_level_next >= level_next_no_fetch);
-`endif
 		buf_level <= buf_level_next;
 		cir_vld <= buf_level_next & ~(buf_level_next >> 1'b1);
 		buf_contents <= buf_shifted_plus_fetch;
@@ -572,14 +575,18 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 `ifdef HAZARD3_ASSERTIONS
-reg [1:0] property_past_buf_level; // Workaround for weird non-constant $past reset issue
-always @ (posedge clk or negedge rst_n) begin
+reg [1:0] prop_past_buf_level; // Workaround for weird non-constant $past reset issue
+always @ (posedge clk) begin
 	if (!rst_n) begin
-		property_past_buf_level <= 2'h0;
+		prop_past_buf_level <= 2'h0;
 	end else begin
-		property_past_buf_level <= buf_level;
+		prop_past_buf_level <= buf_level;
+
+		assert(cir_vld <= 2);
+		assert(cir_use <= cir_vld);
+		if (!jump_now) assert(buf_level_next >= level_next_no_fetch);
 		// We fetch 32 bits per cycle, max. If this happens it's due to negative overflow.
-		if (property_past_buf_level == 2'h0)
+		if (prop_past_buf_level == 2'h0)
 			assert(buf_level != 2'h3);
 	end
 end
