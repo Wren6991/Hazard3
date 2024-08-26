@@ -486,7 +486,7 @@ wire              pmp_trigger_check_dph_m_mode;
 // new addresses go into it or past it (depending on aphase hold).
 
 generate
-if (PMP_REGIONS > 0 || BREAKPOINT_TRIGGERS > 0) begin: have_check_reg
+if (PMP_REGIONS > 0 || DEBUG_SUPPORT != 0) begin: have_check_reg
 
 	reg [W_ADDR-1:0] check_addr_dph;
 	reg              check_m_mode_dph;
@@ -528,7 +528,7 @@ end
 endgenerate
 
 generate
-if (BREAKPOINT_TRIGGERS == 0) begin: no_triggers
+if (DEBUG_SUPPORT == 0) begin: no_triggers
 
 	assign trigger_addr = {W_ADDR{1'b0}};
 	assign trigger_m_mode = 1'b0;
@@ -539,8 +539,8 @@ end else begin: have_triggers
 
 	assign trigger_addr = pmp_trigger_check_dph_addr;
 	assign trigger_m_mode = pmp_trigger_check_dph_m_mode;
-	assign mem_break_any = trigger_break_any;
-	assign mem_break_d_mode = trigger_break_d_mode;
+	assign mem_break_any = trigger_break_any & {|EXTENSION_C, 1'b1};
+	assign mem_break_d_mode = trigger_break_d_mode & {|EXTENSION_C, 1'b1};
 
 end
 endgenerate

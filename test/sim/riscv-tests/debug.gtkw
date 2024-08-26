@@ -2,7 +2,7 @@
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
 [*] Sun Jul  3 23:06:37 2022
 [*]
-[dumpfile] "/home/luke/proj/hazard3/test/sim/riscv-tests/riscv-tests/debug/waves.vcd"
+[dumpfile] "./riscv-tests/debug/waves.vcd"
 [dumpfile_mtime] "Sun Jul  3 23:06:19 2022"
 [dumpfile_size] 259991106
 [savefile] "/home/luke/proj/hazard3/test/sim/riscv-tests/debug.gtkw"

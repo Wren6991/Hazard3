@@ -28,6 +28,7 @@ DebugTurbostep \
 DisconnectTest \
 DownloadTest \
 EbreakTest \
+EtriggerTest \
 Hwbp1 \
 Hwbp2 \
 HwbpManual \
@@ -35,6 +36,7 @@ InfoTest \
 InstantChangePc \
 InstantHaltTest \
 InterruptTest \
+ItriggerTest \
 JumpHbreak \
 MemorySampleMixed \
 MemorySampleSingle \
@@ -71,11 +73,9 @@ WriteGprs
 # invocation and allowing all tests to run:
 #
 # "fail":
-#  * EtriggerTest ....................... Relies on exception trigger, not implemented
 #  * IcountTest ......................... Relies on instruction count trigger, not implemented
 #  * TriggerDmode ....................... Relies on load/store triggers, not implemented
 # "exception":
-#  * ItriggerTest ....................... Relies on interrupt trigger, not implemented
 #  * ProgramHwWatchpoint ................ Relies on load/store trigger, not implemented
 #  * Sv32Test ........................... Relies on S-mode + vm, not implemented
 #  * TriggerLoadAddressInstant .......... Relies on load address trigger, not implemented

@@ -933,8 +933,12 @@ wire [W_DATA-1:0] x_trig_cfg_wdata;
 wire [W_DATA-1:0] x_trig_cfg_rdata;
 wire              x_trig_m_en;
 
+wire              m_trig_event_interrupt;
+wire              m_trig_event_exception;
+wire [3:0]        m_trig_event_trap_cause;
+
 generate
-if (BREAKPOINT_TRIGGERS > 0) begin: have_triggers
+if (DEBUG_SUPPORT != 0) begin: have_triggers
 
 	// Connection of .fetch_d_mode is from the wrong stage: safe because we
 	// enter/exit debug mode via exceptions, which flush the frontend.
@@ -955,10 +959,15 @@ if (BREAKPOINT_TRIGGERS > 0) begin: have_triggers
 		.fetch_m_mode     (f_trigger_m_mode),
 		.fetch_d_mode     (debug_mode),
 
+		.event_interrupt  (m_trig_event_interrupt),
+		.event_exception  (m_trig_event_exception),
+		.event_trap_cause (m_trig_event_trap_cause),
+
 		.break_any        (f_trigger_break_any),
 		.break_d_mode     (f_trigger_break_d_mode),
 
-		.x_d_mode         (debug_mode)
+		.x_d_mode         (debug_mode),
+		.x_m_mode         (x_mmode_execution)
 	);
 
 end else begin: no_triggers
@@ -1122,6 +1131,10 @@ hazard3_csr #(
 	.trig_cfg_wdata             (x_trig_cfg_wdata),
 	.trig_cfg_rdata             (x_trig_cfg_rdata),
 	.trig_m_en                  (x_trig_m_en),
+
+	.trig_event_interrupt       (m_trig_event_interrupt),
+	.trig_event_exception       (m_trig_event_exception),
+	.trig_event_trap_cause      (m_trig_event_trap_cause),
 
 	// Other CSR-specific signalling
 	.trap_wfi                   (x_trap_wfi),

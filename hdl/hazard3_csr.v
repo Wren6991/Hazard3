@@ -121,6 +121,11 @@ module hazard3_csr #(
 	input  wire [W_DATA-1:0]   trig_cfg_rdata,
 	output wire                trig_m_en,
 
+	// Interrupt/exception trigger events
+	output wire                trig_event_interrupt,
+	output wire                trig_event_exception,
+	output wire [3:0]          trig_event_trap_cause,
+
 	// Other CSR-specific signalling
 	output wire                trap_wfi,
 	input  wire                instr_ret
@@ -978,53 +983,41 @@ always @ (*) begin
 	// ------------------------------------------------------------------------
 	// Trigger Module CSRs
 
-	// If triggers aren't supported, we implement tselect as hardwired 0,
-	// tinfo as hardwired 1 (meaning type=0 always) and tdata as hardwired 0
-	// (meaning type=0). The debugger will see the first trigger as
-	// unimplemented, and immediately halt discovery.
+	// When debug support is enabled, we always have basic trigger support
+	// (instruction count, interrupt and exception). Breakpoints are optional.
 	TSELECT: if (DEBUG_SUPPORT) begin
 		decode_match = match_mrw;
-		if (BREAKPOINT_TRIGGERS > 0) begin
-			trig_cfg_wen = match_mrw && wen;
-			rdata = trig_cfg_rdata;
-		end else begin
-			rdata = 32'h00000000;
-		end
+		trig_cfg_wen = match_mrw && wen;
+		rdata = trig_cfg_rdata;
 	end
 
 	TDATA1: if (DEBUG_SUPPORT) begin
 		decode_match = match_mrw;
-		if (BREAKPOINT_TRIGGERS > 0) begin
-			trig_cfg_wen = match_mrw && wen;
-			rdata = trig_cfg_rdata;
-		end else begin
-			rdata = 32'h00000000;
-		end
+		trig_cfg_wen = match_mrw && wen;
+		rdata = trig_cfg_rdata;
 	end
 
 	TDATA2: if (DEBUG_SUPPORT) begin
 		decode_match = match_mrw;
-		if (BREAKPOINT_TRIGGERS > 0) begin
-			trig_cfg_wen = match_mrw && wen;
-			rdata = trig_cfg_rdata;
-		end else begin
-			rdata = 32'h00000000;
-		end
+		trig_cfg_wen = match_mrw && wen;
+		rdata = trig_cfg_rdata;
+	end
+
+	TDATA3: if (DEBUG_SUPPORT) begin
+		// Unimplemented but must be accessible, so hardwired to 0.
+		decode_match = match_mrw;
+		rdata = 32'h00000000;
 	end
 
 	TINFO: if (DEBUG_SUPPORT) begin
 		// Note tinfo is a read-write CSR (writes don't trap) even though it
 		// is entirely read-only.
 		decode_match = match_mrw;
-		if (BREAKPOINT_TRIGGERS > 0) begin
-			trig_cfg_wen = match_mrw && wen;
-			rdata = trig_cfg_rdata;
-		end else begin
-			rdata = 32'h00000001;
-		end
+		trig_cfg_wen = match_mrw && wen;
+		rdata = trig_cfg_rdata;
 	end
 
-	TCONTROL: if (DEBUG_SUPPORT && BREAKPOINT_TRIGGERS > 0) begin
+	TCONTROL: if (DEBUG_SUPPORT) begin
 		decode_match = match_mrw;
 		rdata = {
 			24'h0,
@@ -1342,6 +1335,11 @@ assign trap_enter_soon = trap_enter_vld || (
 
 assign mcause_irq_next = !exception_req_any;
 assign mcause_code_next = exception_req_any ? except : mcause_irq_num;
+
+// Report trap entry to trigger unit
+assign trig_event_exception = |DEBUG_SUPPORT && trapreg_update_enter && !trap_is_irq;
+assign trig_event_interrupt = |DEBUG_SUPPORT && trapreg_update_enter &&  trap_is_irq;
+assign trig_event_trap_cause = {4{|DEBUG_SUPPORT}} & mcause_code_next;
 
 // ----------------------------------------------------------------------------
 // Privilege state outputs
