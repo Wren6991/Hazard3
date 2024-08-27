@@ -138,7 +138,7 @@ reg [15:0]      trigger_exception_cause;
 localparam [15:0] IMPLEMENTED_EXCEPTION_CAUSES = {
 	4'h0,         // reserved
 	1'b1,         // 11 -> ecall from M-mode
-	2'h0          // reserved or unimplemented
+	2'h0,         // reserved or unimplemented
 	|U_MODE,      // 8  -> ecall from U-mode
 	1'b1,         // 7  -> store/AMO fault
 	1'b1,         // 6  -> store/AMO align
@@ -147,7 +147,7 @@ localparam [15:0] IMPLEMENTED_EXCEPTION_CAUSES = {
 	1'b0,         // 3  -> breakpoint; seems useless and risky so disallow
 	1'b1,         // 2  -> illegal opcode
 	1'b1,         // 1  -> fetch fault
-	~|EXTENSION_C // 0 -> fetch align (only when IALIGN is 32-bit)
+	~|EXTENSION_C // 0  -> fetch align (only when IALIGN is 32-bit)
 };
 
 // ----------------------------------------------------------------------------
@@ -256,24 +256,24 @@ always @ (*) begin: generate_padded_rdata
 	for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
 		tdata1_rdata[i] = {
 			4'h2,                              // type = address/data match
-			tdata1_dmode[tselect],
+			tdata1_dmode[i],
 			6'h00,                             // maskmax = 0, exact match only
 			1'b0,                              // hit = 0, not implemented
 			1'b0,                              // select = 0, address match only
 			1'b0,                              // timing = 0, trigger before execution
 			2'h0,                              // sizelo = 0, unsized
-			{3'h0, mcontrol_action[tselect]},  // action = 0/1, break to M-mode/D-mode
+			{3'h0, mcontrol_action[i]},        // action = 0/1, break to M-mode/D-mode
 			1'b0,                              // chain = 0, chaining is useless for exact matches
 			4'h0,                              // match = 0, exact match only
-			mcontrol_m[tselect],
+			mcontrol_m[i],
 			1'b0,
 			1'b0,                              // s = 0, no S-mode
-			mcontrol_u[tselect],
-			mcontrol_execute[tselect],
+			mcontrol_u[i],
+			mcontrol_execute[i],
 			1'b0,                              // store = 0, this is not a watchpoint
 			1'b0                               // load = 0, this is not a watchpoint
 		};
-		tdata2_rdata[i] = tdata2[tselect];
+		tdata2_rdata[i] = tdata2[i];
 		tinfo_rdata[i] = 32'd1 << 2;           // type = 2, address/data match
 	end
 
@@ -346,6 +346,7 @@ end
 // ----------------------------------------------------------------------------
 // Interrupt/exception trigger logic
 
+// Ignore tcontrol.mte as these triggers never target M-mode.
 wire exception_trigger_match =
 	!x_d_mode && trigger_exception_dmode &&
 	(x_m_mode ? trigger_exception_m : trigger_exception_u) &&
