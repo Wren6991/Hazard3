@@ -48,14 +48,21 @@ module hazard3_triggers #(
 	input  wire              fetch_m_mode,
 	input  wire              fetch_d_mode,
 
+	// Trap trigger events from stage X
+	input  wire              event_instr_ret,
+
 	// Trap trigger events from stage M
 	input  wire              event_interrupt,
 	input  wire              event_exception,
 	input  wire [3:0]        event_trap_cause,
+	input  wire              event_trap_enter,
 
-	// Break request (for each halfword of the word-sized word-aligned fetch)
+	// F-aligned break request (for each halfword of word-sized word-aligned fetch)
 	output wire [1:0]        break_any,
 	output wire [1:0]        break_d_mode,
+
+	// X-aligned step break request (to M-mode only)
+	output wire              break_m_step,
 
 	// Stage-X debug mode flag, for CSR protection (may or may not be the same
 	// as the query debug mode flag)
@@ -184,52 +191,63 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		trigger_exception_dmode <= 1'b0;
 		trigger_exception_cause <= 16'h0;
 
-	end else if (cfg_wen && cfg_addr == TSELECT) begin
+	end else begin
 
-		tselect <= cfg_wdata[W_TSELECT-1:0];
+		if (cfg_wen && cfg_addr == TSELECT) begin
 
-	end else if (cfg_wen && cfg_addr == TDATA1) begin
+			tselect <= cfg_wdata[W_TSELECT-1:0];
 
-		for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
-			if (tselect_match[i] && !(tdata1_dmode[i] && !x_d_mode)) begin
-				if (x_d_mode) begin
-					tdata1_dmode[i] <= cfg_wdata[27];
+		end else if (cfg_wen && cfg_addr == TDATA1) begin
+
+			for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
+				if (tselect_match[i] && !(tdata1_dmode[i] && !x_d_mode)) begin
+					if (x_d_mode) begin
+						tdata1_dmode[i] <= cfg_wdata[27];
+					end
+					mcontrol_action[i] <= cfg_wdata[12];
+					mcontrol_m[i] <= cfg_wdata[6];
+					mcontrol_u[i] <= cfg_wdata[3] && |U_MODE;
+					mcontrol_execute[i] <= cfg_wdata[2];
 				end
-				mcontrol_action[i] <= cfg_wdata[12];
-				mcontrol_m[i] <= cfg_wdata[6];
-				mcontrol_u[i] <= cfg_wdata[3] && |U_MODE;
-				mcontrol_execute[i] <= cfg_wdata[2];
 			end
-		end
-		if (tselect_match[TINDEX_ICOUNT]) begin
-			// This trigger does not implement a dmode bit, as Debug-mode
-			// break on single-step is already provided by dcsr.step
-			icount_m <= cfg_wdata[9];
-			icount_u <= cfg_wdata[6] && |U_MODE;
-		end
-		if (tselect_match[TINDEX_INTERRUPT] && !(trigger_irq_dmode && !x_d_mode)) begin
-			trigger_irq_dmode <= cfg_wdata[27];
-			trigger_irq_m <= cfg_wdata[9];
-			trigger_irq_u <= cfg_wdata[6] && |U_MODE;
-		end
-		if (tselect_match[TINDEX_EXCEPTION] && !(trigger_exception_dmode && !x_d_mode)) begin
-			trigger_exception_dmode <= cfg_wdata[27];
-			trigger_exception_m <= cfg_wdata[9];
-			trigger_exception_u <= cfg_wdata[6] && |U_MODE;
+			if (tselect_match[TINDEX_ICOUNT]) begin
+				// This trigger does not implement a dmode bit, as Debug-mode
+				// break on single-step is already provided by dcsr.step
+				icount_m <= cfg_wdata[9];
+				icount_u <= cfg_wdata[6] && |U_MODE;
+			end
+			if (tselect_match[TINDEX_INTERRUPT] && !(trigger_irq_dmode && !x_d_mode)) begin
+				trigger_irq_dmode <= cfg_wdata[27];
+				trigger_irq_m <= cfg_wdata[9];
+				trigger_irq_u <= cfg_wdata[6] && |U_MODE;
+			end
+			if (tselect_match[TINDEX_EXCEPTION] && !(trigger_exception_dmode && !x_d_mode)) begin
+				trigger_exception_dmode <= cfg_wdata[27];
+				trigger_exception_m <= cfg_wdata[9];
+				trigger_exception_u <= cfg_wdata[6] && |U_MODE;
+			end
+
+		end else if (cfg_wen && cfg_addr == TDATA2) begin
+
+			for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
+				if (tselect_match[i] && !(tdata1_dmode[i] && !x_d_mode)) begin
+					tdata2[i] <= cfg_wdata & {{W_ADDR-2{1'b1}}, |EXTENSION_C, 1'b0};
+				end
+			end
+			if (tselect_match[TINDEX_INTERRUPT] && !(trigger_irq_dmode && !x_d_mode)) begin
+				trigger_irq_cause <= cfg_wdata[15:0] & IMPLEMENTED_IRQ_CAUSES;
+			end
+			if (tselect_match[TINDEX_EXCEPTION] && !(trigger_exception_dmode && !x_d_mode)) begin
+				trigger_exception_cause <= cfg_wdata[15:0] & IMPLEMENTED_EXCEPTION_CAUSES;
+			end
+
 		end
 
-	end else if (cfg_wen && cfg_addr == TDATA2) begin
-
-		for (i = 0; i < BREAKPOINT_TRIGGERS; i = i + 1) begin
-			if (tselect_match[i] && !(tdata1_dmode[i] && !x_d_mode)) begin
-				tdata2[i] <= cfg_wdata & {{W_ADDR-2{1'b1}}, |EXTENSION_C, 1'b0};
-			end
-		end
-		if (tselect_match[TINDEX_INTERRUPT] && !(trigger_irq_dmode && !x_d_mode)) begin
-			trigger_irq_cause <= cfg_wdata[15:0] & IMPLEMENTED_IRQ_CAUSES;
-		end
-		if (tselect_match[TINDEX_EXCEPTION] && !(trigger_exception_dmode && !x_d_mode)) begin
-			trigger_exception_cause <= cfg_wdata[15:0] & IMPLEMENTED_EXCEPTION_CAUSES;
+		if ((x_d_mode || event_trap_enter) && break_m_step) begin
+			// count field is hardwired, so the trigger is required to disable
+			// itself by clearing its own enables
+			icount_m <= 1'b0;
+			icount_u <= 1'b0;
 		end
 
 	end
@@ -374,6 +392,29 @@ always @ (posedge clk or negedge rst_n) begin
 		));
 	end
 end
+
+// ----------------------------------------------------------------------------
+// Instruction count trigger logic (single-step under M-mode control)
+
+wire step_break_enabled = trig_m_en && !x_d_mode && (
+	x_m_mode ? icount_m : icount_u
+);
+
+reg break_on_step;
+
+always @ (posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
+		break_on_step <= 1'b0;
+	end else begin
+		// Note icount triggers differ from dcsr.step in that they ignore
+		// exceptions, only triggering on retired instructions.
+		break_on_step <= !(x_d_mode || event_trap_enter) && (break_on_step || (
+			event_instr_ret && step_break_enabled
+		));
+	end
+end
+
+assign break_m_step = break_on_step;
 
 // ----------------------------------------------------------------------------
 // Breakpoint trigger logic

@@ -435,7 +435,8 @@ assign x_stall =
 wire m_sleep_stall_release;
 
 wire x_loadstore_pmp_fail;
-wire x_trig_break = fd_cir_break_any;
+wire x_trig_step_break;
+wire x_trig_break = fd_cir_break_any || x_trig_step_break;
 wire x_trig_break_d_mode = fd_cir_break_d_mode;
 
 // ----------------------------------------------------------------------------
@@ -937,6 +938,8 @@ wire              m_trig_event_interrupt;
 wire              m_trig_event_exception;
 wire [3:0]        m_trig_event_trap_cause;
 
+wire              x_instr_ret;
+
 generate
 if (DEBUG_SUPPORT != 0) begin: have_triggers
 
@@ -959,12 +962,17 @@ if (DEBUG_SUPPORT != 0) begin: have_triggers
 		.fetch_m_mode     (f_trigger_m_mode),
 		.fetch_d_mode     (debug_mode),
 
+		.event_instr_ret  (x_instr_ret),
+
 		.event_interrupt  (m_trig_event_interrupt),
 		.event_exception  (m_trig_event_exception),
 		.event_trap_cause (m_trig_event_trap_cause),
+		.event_trap_enter (m_trap_enter_vld && m_trap_enter_rdy),
 
 		.break_any        (f_trigger_break_any),
 		.break_d_mode     (f_trigger_break_d_mode),
+
+		.break_m_step     (x_trig_step_break),
 
 		.x_d_mode         (debug_mode),
 		.x_m_mode         (x_mmode_execution)
@@ -975,6 +983,7 @@ end else begin: no_triggers
 	assign x_trig_cfg_rdata = {W_DATA{1'b0}};
 	assign f_trigger_break_any = 2'b00;
 	assign f_trigger_break_d_mode = 2'b00;
+	assign x_trig_step_break = 1'b0;
 
 end
 endgenerate
@@ -1041,7 +1050,8 @@ wire x_except_counts_as_retire =
 	x_except == EXCEPT_ECALL_M ||
 	x_except == EXCEPT_ECALL_U;
 
-wire x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
+assign x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
+
 wire m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 
 // Need to delay IRQ entry on sleep exit because, for deep sleep states, we

@@ -1138,6 +1138,12 @@ reg pending_dbg_resume_prev;
 
 wire pending_dbg_resume = (pending_dbg_resume_prev || dbg_req_resume_prev) && debug_mode;
 
+// Note exception entry is also considered a step -- in this case we are
+// supposed to take the trap and then break to debug mode before executing the
+// first trap instruction. *IRQ* entry does not occur when step is 1 (because
+// we hardwire dcsr.stepie to 0)
+wire step_event = instr_ret || (trap_enter_vld && trap_enter_rdy);
+
 // Halt request input register needs to always be clocked, because a WFI needs
 // to fall through if the debugger requests halt of a sleeping core.
 always @ (posedge clk_always_on or negedge rst_n) begin
@@ -1172,11 +1178,7 @@ always @ (posedge clk or negedge rst_n) begin
 
 		if (debug_mode) begin
 			step_halt_req <= 1'b0;
-		end else if (dcsr_step && (instr_ret || (trap_enter_vld && trap_enter_rdy))) begin
-			// Note exception entry is also considered a step -- in this case
-			// we are supposed to take the trap and then break to debug mode
-			// before executing the first trap instruction. *IRQ* entry does
-			// not occur when step is 1 (because we hardwire dcsr.stepie to 0)
+		end else if (dcsr_step && step_event) begin
 			step_halt_req <= 1'b1;
 		end
 
