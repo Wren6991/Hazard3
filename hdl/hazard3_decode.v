@@ -229,14 +229,14 @@ wire [W_ADDR-1:0] branch_offs =
 	 d_instr_is_32bit && fd_cir_predbranch[1] && |BRANCH_PREDICTOR ? 32'h4 : d_imm_b;
 
 always @ (*) begin
-	casez ({|EXTENSION_A, |EXTENSION_ZIFENCEI, d_instr[6:2]})
-	{1'bz, 1'bz, 5'b11011}: d_addr_offs = d_imm_j      ; // JAL
-	{1'bz, 1'bz, 5'b11000}: d_addr_offs = branch_offs  ; // Branches
-	{1'bz, 1'bz, 5'b01000}: d_addr_offs = d_imm_s      ; // Store
-	{1'bz, 1'bz, 5'b11001}: d_addr_offs = d_imm_i      ; // JALR
-	{1'bz, 1'bz, 5'b00000}: d_addr_offs = d_imm_i      ; // Loads
-	{1'b1, 1'bz, 5'b01011}: d_addr_offs = 32'h0000_0000; // Atomics
-	default:                d_addr_offs = 32'hxxxx_xxxx;
+	casez ({|EXTENSION_A, d_instr[6:2]})
+	{1'bz, 5'b11011}: d_addr_offs = d_imm_j      ; // JAL
+	{1'bz, 5'b11000}: d_addr_offs = branch_offs  ; // Branches
+	{1'bz, 5'b01000}: d_addr_offs = d_imm_s      ; // Store
+	{1'bz, 5'b11001}: d_addr_offs = d_imm_i      ; // JALR
+	{1'bz, 5'b00000}: d_addr_offs = d_imm_i      ; // Loads
+	{1'b1, 5'b01011}: d_addr_offs = 32'h0000_0000; // Atomics
+	default:          d_addr_offs = 32'hxxxx_xxxx;
 	endcase
 	if (partial_predicted_branch) begin
 		d_addr_offs = 32'h0000_0000;
@@ -482,8 +482,6 @@ always @ (*) begin
 		d_sleep_wfi       = 1'b0;
 		d_sleep_block     = 1'b0;
 		d_sleep_unblock   = 1'b0;
-		// Ensure address bus is 0 in reset if register file is resettable:
-		d_addr_is_regoffs = 1'b1;
 
 		if (EXTENSION_M)
 			d_aluop = ALUOP_ADD;

@@ -636,7 +636,9 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		buf_level <= 2'h0;
 		cir_vld <= 2'h0;
-		buf_contents <= {3 * W_SLOT{1'b0}};
+		// Mysterious reset value ensures address buses are zero in reset
+		// (see definition of d_addr_offs in hazard3_decode)
+		buf_contents <= {{3 * W_SLOT - 2{1'b0}}, 2'b11};
 	end else begin
 		buf_level <= buf_level_next;
 		cir_vld <= buf_level_next & ~(buf_level_next >> 1'b1);
