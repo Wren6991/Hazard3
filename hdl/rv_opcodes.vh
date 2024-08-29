@@ -148,7 +148,7 @@ localparam RV_RD_BITS = 5;
 
 // Hazard3 custom instructions
 
-// Xh3b (Hazard3 custom bitmanip): currently just a multi-bit version of bext/bexti from Zbs
+// Xh3bextm (Hazard3 multi-bit extract): multi-bit versions of bext/bexti from Zbs
 `define RVOPC_H3_BEXTM    32'b000???0??????????000?????0001011 // custom-0 funct3=0
 `define RVOPC_H3_BEXTMI   32'b000???0??????????100?????0001011 // custom-0 funct3=4
 

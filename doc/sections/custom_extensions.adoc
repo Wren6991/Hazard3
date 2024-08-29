@@ -107,7 +107,7 @@ Encoding (R-type):
 | 19:15 | `rs1`         | -        | Source register 1
 | 14:12 | `funct3`      | `0b000`  | `h3.bextm`
 | 11:7  | `rd`          | -        | Destination register
-| 6:2   | `opc`         | `0b01011`| custom0 opcode
+| 6:2   | `opc`         | `0b00010`| custom0 opcode
 | 1:0   | `size`        | `0b11`   | 32-bit instruction
 |===
 
@@ -159,7 +159,7 @@ Encoding (I-type):
 | 19:15 | `rs1`         | -        | Source register 1
 | 14:12 | `funct3`      | `0b100`  | `h3.bextmi`
 | 11:7  | `rd`          | -        | Destination register
-| 6:2   | `opc`         | `0b01011`| custom0 opcode
+| 6:2   | `opc`         | `0b00010`| custom0 opcode
 | 1:0   | `size`        | `0b11`   | 32-bit instruction
 |===
 
