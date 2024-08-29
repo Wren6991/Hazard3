@@ -57,10 +57,9 @@ parameter W_CTR = $clog2(XLEN + 1);
 
 reg [W_MULOP-1:0] op_r;
 reg [2*XLEN-1:0]  accum;
+reg [XLEN-1:0]    op_b_r;
 reg               op_a_neg_r;
 reg               op_b_neg_r;
-
-reg               prenegate_op_b;
 
 wire op_a_signed =
 	op_r == M_OP_MULH ||
@@ -74,15 +73,12 @@ wire op_b_signed =
 	op_r == M_OP_REM;
 
 wire op_a_neg = op_a_signed && accum[XLEN-1];
-wire op_b_neg = op_b_signed && op_b[XLEN-1];
+wire op_b_neg = op_b_signed && op_b_r[XLEN-1];
 
 // Non-divide parts of the circuit should be constant-folded if all the MUL
 // operations are handled by the fast multiplier
 
 wire is_div = op_r[2] || (MUL_FAST && MULH_FAST);
-
-
-wire [XLEN-1:0] op_b_sign_adj = prenegate_op_b ? -op_b : op_b;
 
 // Controls for modifying sign of all/part of accumulator
 wire accum_neg_l;
@@ -107,7 +103,7 @@ always @ (*) begin: alu
 	addsub_tmp = {2*XLEN{1'b0}};
 	neg_l_borrow = 1'b0;
 	for (i = 0; i < MULDIV_UNROLL; i = i + 1) begin
-		addend = {is_div && |op_b_sign_adj, op_b_sign_adj, {XLEN-1{1'b0}}};
+		addend = {is_div && |op_b_r, op_b_r, {XLEN-1{1'b0}}};
 		shift_tmp = is_div ? accum_next : accum_next >> 1;
 		addsub_tmp = shift_tmp + addend;
 		accum_next = (is_div ? !addsub_tmp[2 * XLEN - 1] : accum_next[0]) ?
@@ -142,7 +138,7 @@ always @ (posedge clk or negedge rst_n) begin
 		op_r <= {W_MULOP{1'b0}};
 		op_a_neg_r <= 1'b0;
 		op_b_neg_r <= 1'b0;
-		prenegate_op_b <= 1'b0;
+		op_b_r <= {XLEN{1'b0}};
 		accum <= {XLEN*2{1'b0}};
 	end else if (op_kill || (op_vld && op_rdy)) begin
 		// Initialise circuit with operands + state
@@ -150,8 +146,8 @@ always @ (posedge clk or negedge rst_n) begin
 		sign_preadj_done <= !op_vld;
 		sign_postadj_done <= !op_vld;
 		sign_postadj_carry <= 1'b0;
-		prenegate_op_b <= 1'b0;
 		op_r <= op;
+		op_b_r <= op_b;
 		accum <= {{XLEN{1'b0}}, op_a};
 	end else if (!sign_preadj_done) begin
 		// Pre-adjust sign if necessary, else perform first iteration immediately
@@ -161,9 +157,8 @@ always @ (posedge clk or negedge rst_n) begin
 		if (accum_neg_l || (op_b_neg ^ is_div)) begin
 			if (accum_neg_l)
 				accum[0 +: XLEN] <= accum_next[0 +: XLEN];
-			if (op_b_neg ^ is_div) begin
-				prenegate_op_b <= 1'b1;
-			end
+			if (op_b_neg ^ is_div)
+				op_b_r <= -op_b_r;
 		end else begin
 			ctr <= ctr - MULDIV_UNROLL[W_CTR-1:0];
 			accum <= accum_next;
@@ -211,7 +206,7 @@ wire op_signs_differ = op_a_neg_r ^ op_b_neg_r;
 
 assign accum_neg_l =
 	!sign_preadj_done && op_a_neg ||
-	do_postadj && !sign_postadj_carry && op_signs_differ && !(is_div && ~|op_b_sign_adj);
+	do_postadj && !sign_postadj_carry && op_signs_differ && !(is_div && ~|op_b_r);
 
 assign {accum_incr_h, accum_inv_h} =
 	do_postadj &&  is_div && op_a_neg_r                             ? 2'b11 :
