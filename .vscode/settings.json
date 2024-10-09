@@ -1,0 +1,21 @@
+{
+    "rtlDebugger.command": [
+        "${workspaceFolder}/test/sim/tb_cxxrtl/tb",
+        "--bin",
+        "/dev/zero",
+        "--debug"
+    ],
+    "rtlDebugger.variableOptions": {
+        "cpu i_haddr": {
+            "radix": 16
+        }
+    },
+    "rtlDebugger.watchList": [
+        {
+            "id": "cpu clk"
+        },
+        {
+            "id": "cpu i_haddr"
+        }
+    ]
+}
