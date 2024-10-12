@@ -529,7 +529,6 @@ always @ (posedge clk or negedge rst_n) begin
 	end
 end
 
-// We only support abstractauto on data0 update (use case is bulk memory read/write)
 reg       abstractauto_autoexecdata;
 reg [1:0] abstractauto_autoexecprogbuf;
 
@@ -622,16 +621,19 @@ always @ (posedge clk or negedge rst_n) begin
 		acmd_prev_postexec <= 1'b0;
 		acmd_prev_transfer <= 1'b0;
 		acmd_prev_write <= 1'b0;
+		acmd_prev_regno <= 5'h0;
 		acmd_prev_unsupported <= 1'b1;
 	end else if (!dmactive) begin
 		acmd_prev_postexec <= 1'b0;
 		acmd_prev_transfer <= 1'b0;
 		acmd_prev_write <= 1'b0;
+		acmd_prev_regno <= 5'h0;
 		acmd_prev_unsupported <= 1'b1;
 	end else if (start_abstract_cmd && acmd_new) begin
 		acmd_prev_postexec <= acmd_new_postexec;
 		acmd_prev_transfer <= acmd_new_transfer;
 		acmd_prev_write <= acmd_new_write;
+		acmd_prev_regno <= acmd_new_regno;
 		acmd_prev_unsupported <= acmd_new_unsupported;
 	end
 end
@@ -639,6 +641,7 @@ end
 wire       acmd_postexec    = acmd_new ? acmd_new_postexec    : acmd_prev_postexec   ;
 wire       acmd_transfer    = acmd_new ? acmd_new_transfer    : acmd_prev_transfer   ;
 wire       acmd_write       = acmd_new ? acmd_new_write       : acmd_prev_write      ;
+wire [4:0] acmd_regno       = acmd_new ? acmd_new_regno       : acmd_prev_regno      ;
 wire       acmd_unsupported = acmd_new ? acmd_new_unsupported : acmd_prev_unsupported;
 
 always @ (*) begin
@@ -744,11 +747,11 @@ wire [N_HARTS-1:0] hart_instr_data_vld_nxt = {{N_HARTS-1{1'b0}},
 } << hartsel;
 
 wire [31:0] hart_instr_data_nxt =
-	acmd_state_nxt == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_new_regno,  7'd0} : // csrr xx, dmdata0
-	acmd_state_nxt == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_new_regno, 15'd0} : // csrw dmdata0, xx
-	acmd_state_nxt == S_ISSUE_PROGBUF0  ? progbuf0                                      :
-	acmd_state_nxt == S_ISSUE_PROGBUF1  ? progbuf1                                      :
-	                                      32'h00100073;                                   // ebreak
+	acmd_state_nxt == S_ISSUE_REGWRITE  ? 32'hbff02073 | {20'd0, acmd_regno,  7'd0} : // csrr xx, dmdata0
+	acmd_state_nxt == S_ISSUE_REGREAD   ? 32'hbff01073 | {12'd0, acmd_regno, 15'd0} : // csrw dmdata0, xx
+	acmd_state_nxt == S_ISSUE_PROGBUF0  ? progbuf0                                  :
+	acmd_state_nxt == S_ISSUE_PROGBUF1  ? progbuf1                                  :
+	                                      32'h00100073;                               // ebreak
 
 reg [31:0] hart_instr_data_reg;
 assign hart_instr_data = {N_HARTS{hart_instr_data_reg}};
