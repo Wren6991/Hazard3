@@ -9,65 +9,78 @@ for fname in $(find -name "*" -maxdepth 1); do
 	if file ${fname} | grep -q "ELF 32-bit"; then rm ${fname}; fi
 done
 
-# Only applicable tests are included
+# Only applicable tests are run
+TESTS=""
+TESTS="${TESTS} CheckMisa"
+TESTS="${TESTS} CrashLoopOpcode"
+TESTS="${TESTS} DebugBreakpoint"
+TESTS="${TESTS} DebugChangeString"
+TESTS="${TESTS} DebugCompareSections"
+TESTS="${TESTS} DebugExit"
+TESTS="${TESTS} DebugFunctionCall"
+TESTS="${TESTS} DebugSymbols"
+TESTS="${TESTS} DebugTurbostep"
+TESTS="${TESTS} DisconnectTest"
+TESTS="${TESTS} DownloadTest"
+TESTS="${TESTS} EbreakTest"
+TESTS="${TESTS} EtriggerTest"
+TESTS="${TESTS} Hwbp1"
+TESTS="${TESTS} Hwbp2"
+TESTS="${TESTS} HwbpManual"
+TESTS="${TESTS} InfoTest"
+TESTS="${TESTS} InstantChangePc"
+TESTS="${TESTS} InstantHaltTest"
+TESTS="${TESTS} InterruptTest"
+TESTS="${TESTS} ItriggerTest"
+TESTS="${TESTS} JumpHbreak"
+TESTS="${TESTS} MemorySampleMixed"
+TESTS="${TESTS} MemorySampleSingle"
+TESTS="${TESTS} MemTest16"
+TESTS="${TESTS} MemTest32"
+TESTS="${TESTS} MemTest64"
+TESTS="${TESTS} MemTest8"
+TESTS="${TESTS} MemTestBlock0"
+TESTS="${TESTS} MemTestBlock1"
+TESTS="${TESTS} MemTestBlock2"
+TESTS="${TESTS} MemTestReadInvalid"
+TESTS="${TESTS} PrivChange"
+TESTS="${TESTS} PrivRw"
+TESTS="${TESTS} ProgramSwWatchpoint"
+TESTS="${TESTS} Registers"
+TESTS="${TESTS} RepeatReadTest"
+TESTS="${TESTS} Semihosting"
+TESTS="${TESTS} SemihostingFileio"
+TESTS="${TESTS} SimpleF18Test"
+TESTS="${TESTS} SimpleNoExistTest"
+TESTS="${TESTS} SimpleS0Test"
+TESTS="${TESTS} SimpleS1Test"
+TESTS="${TESTS} SimpleT0Test"
+TESTS="${TESTS} SimpleT1Test"
+TESTS="${TESTS} SimpleV13Test"
+TESTS="${TESTS} StepTest"
+TESTS="${TESTS} TooManyHwbp"
+TESTS="${TESTS} TriggerExecuteInstant"
+TESTS="${TESTS} UserInterrupt"
+TESTS="${TESTS} WriteCsrs"
+TESTS="${TESTS} WriteGprs"
+
+# Run all tests with SBA enabled
 ./gdbserver.py \
 	--sim_cmd "../../../tb_cxxrtl/tb --port 9824" \
 	--server_cmd "riscv-openocd" \
 	--gdb riscv32-unknown-elf-gdb \
 	--gcc riscv32-unknown-elf-gcc \
 	targets/luke/hazard3.py \
-CheckMisa \
-CrashLoopOpcode \
-DebugBreakpoint \
-DebugChangeString \
-DebugCompareSections \
-DebugExit \
-DebugFunctionCall \
-DebugSymbols \
-DebugTurbostep \
-DisconnectTest \
-DownloadTest \
-EbreakTest \
-EtriggerTest \
-Hwbp1 \
-Hwbp2 \
-HwbpManual \
-InfoTest \
-InstantChangePc \
-InstantHaltTest \
-InterruptTest \
-ItriggerTest \
-JumpHbreak \
-MemorySampleMixed \
-MemorySampleSingle \
-MemTest16 \
-MemTest32 \
-MemTest64 \
-MemTest8 \
-MemTestBlock0 \
-MemTestBlock1 \
-MemTestBlock2 \
-MemTestReadInvalid \
-PrivChange \
-PrivRw \
-ProgramSwWatchpoint \
-Registers \
-RepeatReadTest \
-Semihosting \
-SemihostingFileio \
-SimpleF18Test \
-SimpleNoExistTest \
-SimpleS0Test \
-SimpleS1Test \
-SimpleT0Test \
-SimpleT1Test \
-SimpleV13Test \
-StepTest \
-TooManyHwbp \
-TriggerExecuteInstant \
-UserInterrupt \
-WriteCsrs \
-WriteGprs
+	${TESTS}
+
+# Re-run without SBA -- covers some additional Debug Module logic like abstractauto
+./gdbserver.py \
+	--sim_cmd "../../../tb_cxxrtl/tb --port 9824" \
+	--server_cmd "riscv-openocd" \
+	--gdb riscv32-unknown-elf-gdb \
+	--gcc riscv32-unknown-elf-gcc \
+	targets/luke/hazard3_nosba.py \
+	${TESTS}
 
 # List of excluded tests, as seen by removing the test list from the above
 # invocation and allowing all tests to run:
