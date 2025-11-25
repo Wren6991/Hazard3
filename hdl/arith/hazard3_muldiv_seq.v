@@ -138,8 +138,6 @@ always @ (posedge clk or negedge rst_n) begin
 		op_r <= {W_MULOP{1'b0}};
 		op_a_neg_r <= 1'b0;
 		op_b_neg_r <= 1'b0;
-		op_b_r <= {XLEN{1'b0}};
-		accum <= {XLEN*2{1'b0}};
 	end else if (op_kill || (op_vld && op_rdy)) begin
 		// Initialise circuit with operands + state
 		ctr <= op_vld ? CTR_TOP : {W_CTR{1'b0}};
@@ -147,31 +145,19 @@ always @ (posedge clk or negedge rst_n) begin
 		sign_postadj_done <= !op_vld;
 		sign_postadj_carry <= 1'b0;
 		op_r <= op;
-		op_b_r <= op_b;
-		accum <= {{XLEN{1'b0}}, op_a};
 	end else if (!sign_preadj_done) begin
 		// Pre-adjust sign if necessary, else perform first iteration immediately
 		op_a_neg_r <= op_a_neg;
 		op_b_neg_r <= op_b_neg;
 		sign_preadj_done <= 1'b1;
-		if (accum_neg_l || (op_b_neg ^ is_div)) begin
-			if (accum_neg_l)
-				accum[0 +: XLEN] <= accum_next[0 +: XLEN];
-			if (op_b_neg ^ is_div)
-				op_b_r <= -op_b_r;
-		end else begin
+		if (!(accum_neg_l || (op_b_neg ^ is_div))) begin
 			ctr <= ctr - MULDIV_UNROLL[W_CTR-1:0];
-			accum <= accum_next;
 		end
 	end else if (|ctr) begin
 		ctr <= ctr - MULDIV_UNROLL[W_CTR-1:0];
-		accum <= accum_next;
 	end else if (!sign_postadj_done || sign_postadj_carry) begin
 		sign_postadj_done <= 1'b1;
-		if (accum_inv_h || accum_incr_h)
-			accum[XLEN +: XLEN] <= accum_next[XLEN +: XLEN];
 		if (accum_neg_l) begin
-			accum[0 +: XLEN] <= accum_next[0 +: XLEN];
 			if (!is_div) begin
 				sign_postadj_carry <= neg_l_borrow;
 				sign_postadj_done <= !neg_l_borrow;
@@ -179,6 +165,32 @@ always @ (posedge clk or negedge rst_n) begin
 		end
 	end
 end
+
+// GF180MCU: remove reset
+always @ (posedge clk or negedge rst_n) begin
+	if (op_kill || (op_vld && op_rdy)) begin
+		op_b_r <= op_b;
+		accum <= {{XLEN{1'b0}}, op_a};
+	end else if (!sign_preadj_done) begin
+		if (accum_neg_l || (op_b_neg ^ is_div)) begin
+			if (accum_neg_l)
+				accum[0 +: XLEN] <= accum_next[0 +: XLEN];
+			if (op_b_neg ^ is_div)
+				op_b_r <= -op_b_r;
+		end else begin
+			accum <= accum_next;
+		end
+	end else if (|ctr) begin
+		accum <= accum_next;
+	end else if (!sign_postadj_done || sign_postadj_carry) begin
+		if (accum_inv_h || accum_incr_h)
+			accum[XLEN +: XLEN] <= accum_next[XLEN +: XLEN];
+		if (accum_neg_l) begin
+			accum[0 +: XLEN] <= accum_next[0 +: XLEN];
+		end
+	end
+end
+
 
 // ----------------------------------------------------------------------------
 // Sign adjustment control

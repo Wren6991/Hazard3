@@ -189,7 +189,6 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 	if (!rst_n) begin
 		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 			fifo_valid_hw[i] <= 2'b00;
-			fifo_mem[i] <= 32'd0;
 			fifo_err[i] <= 1'b0;
 			fifo_break_any[i] <= 2'b00;
 			fifo_break_d_mode[i] <= 2'b00;
@@ -202,7 +201,6 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 	end else begin
 		for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
 			if (fifo_pop || (fifo_push && !fifo_valid[i])) begin
-				fifo_mem[i]          <= fifo_valid[i + 1] ? fifo_mem[i + 1]          : mem_data;
 				fifo_err[i]          <= fifo_valid[i + 1] ? fifo_err[i + 1]          : mem_or_pmp_err;
 				fifo_break_any[i]    <= fifo_valid[i + 1] ? fifo_break_any[i + 1]    : mem_break_any;
 				fifo_break_d_mode[i] <= fifo_valid[i + 1] ? fifo_break_d_mode[i + 1] : mem_break_d_mode;
@@ -221,7 +219,6 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 		// path. Note that flush takes precedence over debug injection
 		// (and the debug module design must account for this)
 		if (fifo_dbg_inject) begin
-			fifo_mem[0] <= dbg_instr_data;
 			fifo_err[0] <= 1'b0;
 			fifo_predbranch[0] <= 2'b00;
 			fifo_break_any[0] <= 2'b00;
@@ -231,6 +228,20 @@ always @ (posedge clk or negedge rst_n) begin: fifo_update
 		fifo_valid_hw[FIFO_DEPTH] <= 2'b00;
 	end
 end
+
+// GF180MCU: remove reset
+always @ (posedge clk) begin: fifo_update_noreset
+	integer i;
+	for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
+		if (fifo_pop || (fifo_push && !fifo_valid[i])) begin
+			fifo_mem[i] <= fifo_valid[i + 1] ? fifo_mem[i + 1] : mem_data;
+		end
+	end
+	if (fifo_dbg_inject) begin
+		fifo_mem[0] <= dbg_instr_data;
+	end
+end
+
 
 `ifdef HAZARD3_ASSERTIONS
 always @ (posedge clk) if (rst_n) begin
@@ -263,21 +274,25 @@ if (BRANCH_PREDICTOR) begin: have_btb
 	assign btb_valid       = btb_valid_r;
 	always @ (posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
-			btb_src_addr_r <= {W_ADDR{1'b0}};
-			btb_src_size_r <= 1'b0;
-			btb_target_addr_r <= {W_ADDR{1'b0}};
 			btb_valid_r <= 1'b0;
 		end else if (btb_clear) begin
 			// Clear takes precedences over set. E.g. if a taken branch is in
 			// stage 2 and an exception is in stage 3, we must clear the BTB.
 			btb_valid_r <= 1'b0;
 		end else if (btb_set) begin
-			btb_src_addr_r <= btb_set_src_addr;
-			btb_src_size_r <= btb_set_src_size;
-			btb_target_addr_r <= btb_set_target_addr;
 			btb_valid_r <= 1'b1;
 		end
 	end
+
+	// GF180MCU: remove reset
+	always @ (posedge clk) begin
+		if (btb_set) begin
+			btb_src_addr_r <= btb_set_src_addr;
+			btb_src_size_r <= btb_set_src_size;
+			btb_target_addr_r <= btb_set_target_addr;
+		end
+	end
+
 end else begin: no_btb
 	assign btb_src_addr = {W_ADDR{1'b0}};
 	assign btb_src_size = 1'b0;
@@ -653,15 +668,17 @@ always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		buf_level <= 2'h0;
 		cir_vld <= 2'h0;
-		// Mysterious reset value ensures address buses are zero in reset
-		// (see definition of d_addr_offs in hazard3_decode)
-		buf_contents <= {{3 * W_SLOT - 2{1'b0}}, 2'b11};
 	end else begin
 		buf_level <= buf_level_next;
 		cir_vld <= buf_level_next & ~(buf_level_next >> 1'b1);
-		buf_contents <= buf_shifted_plus_fetch;
 	end
 end
+
+// GF180MCU: remove reset
+always @ (posedge clk) begin
+	buf_contents <= buf_shifted_plus_fetch;
+end
+
 
 `ifdef HAZARD3_ASSERTIONS
 reg [1:0] prop_past_buf_level; // Workaround for weird non-constant $past reset issue
@@ -821,7 +838,7 @@ if (~|EXTENSION_C) begin: no_decompress
 		cir_uop_nonfinal     = 1'b0;
 		cir_uop_no_pc_update = 1'b0;
 		cir_uop_atomic       = 1'b0;
-	end	
+	end
 
 	assign decomp_uop_step = 4'h0;
 
@@ -881,7 +898,6 @@ end else begin: have_decompress
 			cir_uop_no_pc_update <= 1'b0;
 			cir_uop_atomic       <= 1'b0;
 		end else if (cir_clken) begin
-			cir                  <= decomp_instr_out | 32'd3;
 			cir_is_32bit         <= decomp_instr_is_32bit;
 			cir_invalid_16bit    <= decomp_invalid;
 			cir_is_uop           <= |EXTENSION_ZCMP && !uop_clear && cir_is_uop_next;
@@ -889,6 +905,11 @@ end else begin: have_decompress
 			cir_uop_no_pc_update <= |EXTENSION_ZCMP && !uop_clear && decomp_uop_no_pc_update;
 			cir_uop_atomic       <= |EXTENSION_ZCMP && !uop_clear && decomp_uop_atomic;
 		end
+	end
+
+	// GF180MCU: remove reset
+	always @ (posedge clk) if (cir_clken) begin
+		cir <= decomp_instr_out | 32'd3;
 	end
 
 end

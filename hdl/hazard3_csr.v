@@ -266,10 +266,9 @@ assign trap_wfi = mstatus_tw && !(debug_mode || m_mode);
 
 reg [XLEN-1:0] mscratch;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mscratch <= X0;
-	end else if (!CSR_M_TRAP) begin
+// GF180MCU: remove reset from datapath flops
+always @ (posedge clk) begin
+	if (!CSR_M_TRAP) begin
 		// Explicit tie-off when unimplemented
 		mscratch <= X0;
 	end else begin
@@ -302,10 +301,9 @@ reg [XLEN-1:0] mepc;
 // mepc only holds values aligned to instruction alignment
 localparam MEPC_MASK = {{XLEN-2{1'b1}}, |EXTENSION_C, 1'b0};
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mepc <= X0;
-	end else if (!CSR_M_TRAP) begin
+// GF180MCU: remove reset
+always @ (posedge clk) begin
+	if (!CSR_M_TRAP) begin
 		// Explicit tie-off when unimplemented
 		mepc <= X0;
 	end else begin

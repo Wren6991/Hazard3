@@ -505,11 +505,9 @@ wire x_trig_break_d_mode = fd_cir_break_d_mode;
 reg [W_REGADDR-1:0] d_rs1_predecoded;
 reg [W_REGADDR-1:0] d_rs2_predecoded;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		d_rs1_predecoded <= {W_REGADDR{1'b0}};
-		d_rs2_predecoded <= {W_REGADDR{1'b0}};
-	end else if (d_starved || !x_stall) begin
+// GF180MCU: remove reset
+always @ (posedge clk) begin
+	if (d_starved || !x_stall) begin
 		d_rs1_predecoded <= f_rs1_fine & REGADDR_MASK;
 		d_rs2_predecoded <= f_rs2_fine & REGADDR_MASK;
 	end
@@ -528,18 +526,14 @@ wire [W_REGADDR-1:0] mw_rd_nxt;
 reg [2:0] x_rs1_select_regs_xm_mw;
 reg [2:0] x_rs2_select_regs_xm_mw;
 
+// GF180MCU: remove reset
 always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		x_rs1_select_regs_xm_mw <= 3'b000;
-		x_rs2_select_regs_xm_mw <= 3'b000;
-	end else begin
-		x_rs1_select_regs_xm_mw <=
-			5'h00     == d_rs1_predecoded_nxt ? 3'b100 : // Zeroes are enforced in register file.
-			xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 : 3'b100;
-		x_rs2_select_regs_xm_mw <=
-			5'h00     == d_rs2_predecoded_nxt ? 3'b100 :
-			xm_rd_nxt == d_rs2_predecoded_nxt ? 3'b010 : 3'b100;
-	end
+	x_rs1_select_regs_xm_mw <=
+		5'h00     == d_rs1_predecoded_nxt ? 3'b100 : // Zeroes are enforced in register file.
+		xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 : 3'b100;
+	x_rs2_select_regs_xm_mw <=
+		5'h00     == d_rs2_predecoded_nxt ? 3'b100 :
+		xm_rd_nxt == d_rs2_predecoded_nxt ? 3'b010 : 3'b100;
 end
 
 `ifdef HAZARD3_ASSERTIONS
@@ -1336,11 +1330,9 @@ end
 `endif
 
 // Datapath flops
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		xm_result <= {W_DATA{1'b0}};
-		xm_addr_align <= 2'b00;
-	end else if (!m_stall && !(|EXTENSION_A && x_amo_phase == 3'h3 && !bus_dph_ready_d)) begin
+// GF180MCU: remove reset
+always @ (posedge clk) begin
+	if (!m_stall && !(|EXTENSION_A && x_amo_phase == 3'h3 && !bus_dph_ready_d)) begin
 		// AMOs need special attention (of course):
 		// - Steer captured read phase data in mw_result back through xm_result at end of AMO
 		// - Make sure xm_result (store data) doesn't transition during stalled write dphase
@@ -1534,19 +1526,16 @@ assign mw_rd_nxt = REGADDR_MASK & (
 	m_reg_wen_if_nonzero ? xm_rd : mw_rd
 );
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mw_rd <= {W_REGADDR{1'b0}};
-	end else begin
+// GF180MCU: remove reset
+always @ (posedge clk) begin
 `ifdef HAZARD3_X_CHECKS
-		if (!m_stall && ^bus_wdata_d === 1'bX) begin
-			$display("Writing Xs to memory!");
-			$finish;
-		end
+	if (!m_stall && ^bus_wdata_d === 1'bX) begin
+		$display("Writing Xs to memory!");
+		$finish;
+	end
 `endif
-		if (m_reg_wen_if_nonzero) begin
-			mw_rd <= REGADDR_MASK & xm_rd;
-		end
+	if (m_reg_wen_if_nonzero) begin
+		mw_rd <= REGADDR_MASK & xm_rd;
 	end
 end
 
