@@ -534,13 +534,11 @@ always @ (posedge clk or negedge rst_n) begin
 		x_rs2_select_regs_xm_mw <= 3'b000;
 	end else begin
 		x_rs1_select_regs_xm_mw <=
-			5'h00     == d_rs1_predecoded_nxt ? 3'b000 :
-			xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 :
-			mw_rd_nxt == d_rs1_predecoded_nxt ? 3'b100 : 3'b100;
+			5'h00     == d_rs1_predecoded_nxt ? 3'b100 : // Zeroes are enforced in register file.
+			xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 : 3'b100;
 		x_rs2_select_regs_xm_mw <=
-			5'h00     == d_rs2_predecoded_nxt ? 3'b000 :
-			xm_rd_nxt == d_rs2_predecoded_nxt ? 3'b010 :
-			mw_rd_nxt == d_rs2_predecoded_nxt ? 3'b100 : 3'b100;
+			5'h00     == d_rs2_predecoded_nxt ? 3'b100 :
+			xm_rd_nxt == d_rs2_predecoded_nxt ? 3'b010 : 3'b100;
 	end
 end
 
@@ -571,15 +569,10 @@ end
 
 always @ (*) begin
 
-	x_rs1_bypass =
-		(x_rdata1  & {W_DATA{x_rs1_select_regs_xm_mw[2]}}) |
-		(xm_result & {W_DATA{x_rs1_select_regs_xm_mw[1]}}) |
-		(mw_result & {W_DATA{x_rs1_select_regs_xm_mw[0]}});
+	// MW -> X bypass is unnecessary due to write transparency in latch-based register file
+	x_rs1_bypass = x_rs1_select_regs_xm_mw[2] ? x_rdata1 : xm_result;
 
-	x_rs2_bypass =
-		(x_rdata2  & {W_DATA{x_rs2_select_regs_xm_mw[2]}}) |
-		(xm_result & {W_DATA{x_rs2_select_regs_xm_mw[1]}}) |
-		(mw_result & {W_DATA{x_rs2_select_regs_xm_mw[0]}});
+	x_rs2_bypass = x_rs2_select_regs_xm_mw[2] ? x_rdata2 : xm_result;
 
 	// AMO captures rdata into mw_result at end of read data phase, so we can
 	// feed back through the ALU.
