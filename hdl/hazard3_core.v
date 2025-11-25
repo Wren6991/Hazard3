@@ -1557,9 +1557,11 @@ hazard3_regfile_1w2r #(
 	.rst_n  (rst_n),
 	// On downstream stall, we feed D's addresses back into regfile
 	// so that output does not change.
-	.raddr1 (x_stall && !d_starved ? d_rs1 : f_rs1_coarse),
+	// GF180MCU: use fine rather than coarse predecode as the we rely on the
+	// regfile read port for zeroing x0.
+	.raddr1 (x_stall && !d_starved ? d_rs1 : f_rs1_fine),
 	.rdata1 (x_rdata1),
-	.raddr2 (x_stall && !d_starved ? d_rs2 : f_rs2_coarse),
+	.raddr2 (x_stall && !d_starved ? d_rs2 : f_rs2_fine),
 	.rdata2 (x_rdata2),
 
 	.waddr  (xm_rd),
