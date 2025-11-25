@@ -25,57 +25,47 @@ module hazard3_regfile_1w2r #(
 	input wire              wen
 );
 
-localparam       N_REGS      = EXTENSION_E == 0 ? 32 : 16;
-localparam [4:0] REGNUM_MASK = {~|EXTENSION_E, 4'hf};
+localparam N_REGS = EXTENSION_E == 0 ? 32 : 16;
 
-wire [4:0] raddr1_masked = raddr1 & REGNUM_MASK;
-wire [4:0] raddr2_masked = raddr2 & REGNUM_MASK;
-wire [4:0] waddr_masked  = waddr  & REGNUM_MASK;
+wire [31:0] reg_q [0:N_REGS-1];
 
+wire [N_REGS-1:0] wen_mask = {{N_REGS{1'b0}}, 1'b1} << waddr[$clog2(N_REGS)-1:0];
+
+// Active-low enable in second half of clock cycle (note half-cycle path
+// through wen_mask into E; not suitable for systems where HREADY is late)
+wire [N_REGS-1:0] latch_enable_n;
+gf180mcu_fd_sc_mcu9t5v0__icgtn_4 clkgate_u [N_REGS-1:0] (
+	.TE   (1'b0),
+	.E    (wen_mask),
+	.CLKN (clk),
+	.Q    (latch_enable_n)
+);
+
+// Write data passes transparently through latches to be registered in output
+// flops at the end of the cycle
+assign reg_q[0] = 32'd0;
+genvar g;
 generate
-if (RESET_REGFILE) begin: real_dualport_reset
-	// This will presumably always be implemented with flops
-	reg [W_DATA-1:0] mem [0:N_REGS-1];
-
-	integer i;
-	always @ (posedge clk or negedge rst_n) begin
-		if (!rst_n) begin
-			for (i = 0; i < N_REGS; i = i + 1) begin
-				mem[i] <= {W_DATA{1'b0}};
-			end
-			rdata1 <= {W_DATA{1'b0}};
-			rdata2 <= {W_DATA{1'b0}};
-		end else begin
-			if (wen) begin
-				mem[waddr_masked] <= wdata;
-			end
-			rdata1 <= mem[raddr1_masked];
-			rdata2 <= mem[raddr2_masked];
-		end
-	end
-end else begin: real_dualport_noreset
-	// This should be inference-compatible on FPGAs with dual-port (or 1R1W) BRAMs
-	`ifdef YOSYS
-	`ifdef FPGA_ICE40
-	// We do not require write-to-read bypass logic on the BRAM
-	(* no_rw_check *)
-	`endif
-	`endif
-	// Optionally force use of distributed RAM on Xilinx for better timing
-	`ifdef HAZARD3_REGFILE_RAM_STYLE_DISTRIBUTED
-	(* ram_style = "distributed" *)
-	`endif
-	reg [W_DATA-1:0] mem [0:N_REGS-1];
-
-	always @ (posedge clk) begin
-		if (wen) begin
-			mem[waddr_masked] <= wdata;
-		end
-		rdata1 <= mem[raddr1_masked];
-		rdata2 <= mem[raddr2_masked];
-	end
+for (g = 1; g < N_REGS; g = g + 1) begin: loop_g
+	wire [31:0] latch_q;
+	gf180mcu_fd_sc_mcu9t5v0__latq_1 reg_u [31:0] (
+		.D (wdata),
+		.E (!latch_enable_n[g]),
+		.Q (latch_q)
+	);
+	assign reg_q[g] = latch_q;
 end
 endgenerate
+
+// Combinatorial mux of latch outputs
+wire [31:0] rdata1_nxt = reg_q[raddr1[$clog2(N_REGS)-1:0]];
+wire [31:0] rdata2_nxt = reg_q[raddr2[$clog2(N_REGS)-1:0]];
+
+// Present read data to next stage
+always @ (posedge clk) begin
+	rdata1 <= rdata1_nxt;
+	rdata2 <= rdata2_nxt;
+end
 
 endmodule
 

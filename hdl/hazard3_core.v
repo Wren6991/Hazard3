@@ -536,11 +536,11 @@ always @ (posedge clk or negedge rst_n) begin
 		x_rs1_select_regs_xm_mw <=
 			5'h00     == d_rs1_predecoded_nxt ? 3'b000 :
 			xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 :
-			mw_rd_nxt == d_rs1_predecoded_nxt ? 3'b001 : 3'b100;
+			mw_rd_nxt == d_rs1_predecoded_nxt ? 3'b100 : 3'b100;
 		x_rs2_select_regs_xm_mw <=
 			5'h00     == d_rs2_predecoded_nxt ? 3'b000 :
 			xm_rd_nxt == d_rs2_predecoded_nxt ? 3'b010 :
-			mw_rd_nxt == d_rs2_predecoded_nxt ? 3'b001 : 3'b100;
+			mw_rd_nxt == d_rs2_predecoded_nxt ? 3'b100 : 3'b100;
 	end
 end
 
