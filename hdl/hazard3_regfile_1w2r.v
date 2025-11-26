@@ -26,6 +26,7 @@ module hazard3_regfile_1w2r #(
 );
 
 localparam N_REGS = EXTENSION_E == 0 ? 32 : 16;
+localparam W_RNUM = $clog2(N_REGS);
 
 `ifdef GF180MCU
 
@@ -33,7 +34,7 @@ localparam N_REGS = EXTENSION_E == 0 ? 32 : 16;
 
 wire [31:0] reg_q [0:N_REGS-1];
 
-wire [N_REGS-1:0] wen_mask = {{N_REGS{1'b0}}, 1'b1} << waddr[$clog2(N_REGS)-1:0];
+wire [N_REGS-1:0] wen_mask = {{N_REGS{1'b0}}, 1'b1} << waddr[W_RNUM-1:0];
 
 // Active-low enable in second half of clock cycle (note half-cycle path
 // through wen_mask into E; not suitable for systems where HREADY is late)
@@ -62,13 +63,36 @@ end
 endgenerate
 
 // Combinatorial mux of latch outputs
-wire [31:0] rdata1_nxt = reg_q[raddr1[$clog2(N_REGS)-1:0]];
-wire [31:0] rdata2_nxt = reg_q[raddr2[$clog2(N_REGS)-1:0]];
+wire [31:0] rdata1_nxt_l = reg_q[{1'b0, raddr1[W_RNUM-2:0]}];
+wire [31:0] rdata1_nxt_h = reg_q[{1'b1, raddr1[W_RNUM-2:0]}];
 
-// Present read data to next stage
-always @ (posedge clk) begin
-	rdata1 <= rdata1_nxt;
-	rdata2 <= rdata2_nxt;
+wire [31:0] rdata2_nxt_l = reg_q[{1'b0, raddr2[W_RNUM-2:0]}];
+wire [31:0] rdata2_nxt_h = reg_q[{1'b1, raddr2[W_RNUM-2:0]}];
+
+// Use scan flop for final mux level and to present data to next stage
+
+wire [31:0] rdata1_q;
+wire [31:0] rdata2_q;
+
+gf180mcu_fd_sc_mcu9t5v0__sdffq_1 flop_rdata1_u [31:0] (
+	.CLK (clk),
+	.D   (rdata1_nxt_l),
+	.SI  (rdata1_nxt_h),
+	.SE  (raddr1[W_RNUM-1]),
+	.Q   (rdata1_q)
+);
+
+gf180mcu_fd_sc_mcu9t5v0__sdffq_1 flop_rdata2_u [31:0] (
+	.CLK (clk),
+	.D   (rdata2_nxt_l),
+	.SI  (rdata2_nxt_h),
+	.SE  (raddr2[W_RNUM-1]),
+	.Q   (rdata2_q)
+);
+
+always @ (*) begin
+	rdata1 = rdata1_q;
+	rdata2 = rdata2_q;
 end
 
 `else
@@ -79,18 +103,18 @@ reg [31:0] reg_q [0:N_REGS-1];
 
 always @ (posedge clk) begin
 	if (wen) begin
-		reg_q[waddr[$clog2(N_REGS)-1:0]] <= wdata;
+		reg_q[waddr[W_RNUM-1:0]] <= wdata;
 	end
 	reg_q[0] <= 32'd0;
-	if (wen && |waddr && waddr[$clog2(N_REGS)-1:0] == raddr1[$clog2(N_REGS)-1:0]) begin
+	if (wen && |waddr && waddr[W_RNUM-1:0] == raddr1[W_RNUM-1:0]) begin
 		rdata1 <= wdata;
 	end else begin
-		rdata1 <= reg_q[raddr1[$clog2(N_REGS)-1:0]];
+		rdata1 <= reg_q[raddr1[W_RNUM-1:0]];
 	end
-	if (wen && |waddr && waddr[$clog2(N_REGS)-1:0] == raddr2[$clog2(N_REGS)-1:0]) begin
+	if (wen && |waddr && waddr[W_RNUM-1:0] == raddr2[W_RNUM-1:0]) begin
 		rdata2 <= wdata;
 	end else begin
-		rdata2 <= reg_q[raddr2[$clog2(N_REGS)-1:0]];
+		rdata2 <= reg_q[raddr2[W_RNUM-1:0]];
 	end
 end
 
