@@ -167,7 +167,7 @@ always @ (posedge clk or negedge rst_n) begin
 end
 
 // GF180MCU: remove reset
-always @ (posedge clk or negedge rst_n) begin
+always @ (posedge clk) begin
 	if (op_kill || (op_vld && op_rdy)) begin
 		op_b_r <= op_b;
 		accum <= {{XLEN{1'b0}}, op_a};

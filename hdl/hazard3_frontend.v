@@ -890,7 +890,6 @@ end else begin: have_decompress
 
 	always @ (posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
-			cir                  <= 32'd3;
 			cir_is_32bit         <= 1'b0;
 			cir_invalid_16bit    <= 1'b0;
 			cir_is_uop           <= 1'b0;

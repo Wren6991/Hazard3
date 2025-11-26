@@ -27,6 +27,10 @@ module hazard3_regfile_1w2r #(
 
 localparam N_REGS = EXTENSION_E == 0 ? 32 : 16;
 
+`ifdef GF180MCU
+
+// Process-specific cells
+
 wire [31:0] reg_q [0:N_REGS-1];
 
 wire [N_REGS-1:0] wen_mask = {{N_REGS{1'b0}}, 1'b1} << waddr[$clog2(N_REGS)-1:0];
@@ -66,6 +70,31 @@ always @ (posedge clk) begin
 	rdata1 <= rdata1_nxt;
 	rdata2 <= rdata2_nxt;
 end
+
+`else
+
+// Behavioural model (synthesisable) for transparent-write register file
+
+reg [31:0] reg_q [0:N_REGS-1];
+
+always @ (posedge clk) begin
+	if (wen) begin
+		reg_q[waddr[$clog2(N_REGS)-1:0]] <= wdata;
+	end
+	reg_q[0] <= 32'd0;
+	if (wen && |waddr && waddr[$clog2(N_REGS)-1:0] == raddr1[$clog2(N_REGS)-1:0]) begin
+		rdata1 <= wdata;
+	end else begin
+		rdata1 <= reg_q[raddr1[$clog2(N_REGS)-1:0]];
+	end
+	if (wen && |waddr && waddr[$clog2(N_REGS)-1:0] == raddr2[$clog2(N_REGS)-1:0]) begin
+		rdata2 <= wdata;
+	end else begin
+		rdata2 <= reg_q[raddr2[$clog2(N_REGS)-1:0]];
+	end
+end
+
+`endif
 
 endmodule
 

@@ -527,7 +527,7 @@ reg [2:0] x_rs1_select_regs_xm_mw;
 reg [2:0] x_rs2_select_regs_xm_mw;
 
 // GF180MCU: remove reset
-always @ (posedge clk or negedge rst_n) begin
+always @ (posedge clk) begin
 	x_rs1_select_regs_xm_mw <=
 		5'h00     == d_rs1_predecoded_nxt ? 3'b100 : // Zeroes are enforced in register file.
 		xm_rd_nxt == d_rs1_predecoded_nxt ? 3'b010 : 3'b100;
