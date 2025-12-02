@@ -36,33 +36,25 @@ wire [31:0] reg_q [0:N_REGS-1];
 
 wire [N_REGS-1:0] wen_mask = {{N_REGS{1'b0}}, 1'b1} << waddr[W_RNUM-1:0];
 
-// Active-low enable in second half of clock cycle (note half-cycle path
-// through wen_mask into E; not suitable for systems where HREADY is late)
-wire [N_REGS-1:0] latch_enable_n;
-gf180mcu_fd_sc_mcu9t5v0__icgtn_4 clkgate_u [N_REGS-1:0] (
-	.TE   (1'b0),
-	.E    (wen_mask),
-	.CLKN (clk),
-	.Q    (latch_enable_n)
-);
-
-// Write data passes transparently through latches to be registered in output
-// flops at the end of the cycle
 assign reg_q[0] = 32'd0;
 genvar g;
 generate
 for (g = 1; g < N_REGS; g = g + 1) begin: loop_g
-	wire [31:0] latch_q;
-	gf180mcu_fd_sc_mcu9t5v0__latq_1 reg_u [31:0] (
-		.D (wdata),
-		.E (!latch_enable_n[g]),
-		.Q (latch_q)
+	wire [31:0] reg_q_;
+	// Use scan flop to replace missing DFFE. Constraints should disable false
+	// hold check on Q->D path (Q is stable when D is selected).
+	gf180mcu_fd_sc_mcu9t5v0__sdffq_1 reg_u [31:0] (
+		.CLK (clk),
+		.D   (reg_q_),
+		.Q   (reg_q_),
+		.SI  (wdata),
+		.SE  (wen_mask[g])
 	);
-	assign reg_q[g] = latch_q;
+	assign reg_q[g] = wen_mask[g] ? wdata : reg_q_;
 end
 endgenerate
 
-// Combinatorial mux of latch outputs
+// Combinatorial mux of register outputs
 wire [31:0] rdata1_nxt_l = reg_q[{1'b0, raddr1[W_RNUM-2:0]}];
 wire [31:0] rdata1_nxt_h = reg_q[{1'b1, raddr1[W_RNUM-2:0]}];
 
@@ -74,7 +66,7 @@ wire [31:0] rdata2_nxt_h = reg_q[{1'b1, raddr2[W_RNUM-2:0]}];
 wire [31:0] rdata1_q;
 wire [31:0] rdata2_q;
 
-gf180mcu_fd_sc_mcu9t5v0__sdffq_1 flop_rdata1_u [31:0] (
+gf180mcu_fd_sc_mcu9t5v0__sdffq_4 flop_rdata1_u [31:0] (
 	.CLK (clk),
 	.D   (rdata1_nxt_l),
 	.SI  (rdata1_nxt_h),
@@ -82,7 +74,7 @@ gf180mcu_fd_sc_mcu9t5v0__sdffq_1 flop_rdata1_u [31:0] (
 	.Q   (rdata1_q)
 );
 
-gf180mcu_fd_sc_mcu9t5v0__sdffq_1 flop_rdata2_u [31:0] (
+gf180mcu_fd_sc_mcu9t5v0__sdffq_4 flop_rdata2_u [31:0] (
 	.CLK (clk),
 	.D   (rdata2_nxt_l),
 	.SI  (rdata2_nxt_h),
