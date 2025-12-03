@@ -8,6 +8,7 @@
 // ----------------------------------------------------------------------------
 // M-mode CSRs
 
+/* verilator lint_off UNUSEDPARAM */
 // Machine Information Registers (RO)
 localparam MVENDORID      = 12'hf11; // Vendor ID.
 localparam MARCHID        = 12'hf12; // Architecture ID.
@@ -202,3 +203,4 @@ localparam MCONTEXT      = 12'h7a8;
 localparam DCSR           = 12'h7b0;
 localparam DPC            = 12'h7b1;
 localparam DMDATA0        = 12'hbff; // Custom read/write
+/* verilator lint_on UNUSEDPARAM */

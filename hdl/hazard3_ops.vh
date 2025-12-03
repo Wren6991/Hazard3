@@ -5,6 +5,7 @@
 
 // ALU operation selectors
 
+/* verilator lint_off UNUSEDPARAM */
 localparam ALUOP_ADD     = 6'h00; 
 localparam ALUOP_SUB     = 6'h01; 
 localparam ALUOP_LT      = 6'h02;
@@ -122,3 +123,4 @@ localparam M_OP_DIV    = 3'h4;
 localparam M_OP_DIVU   = 3'h5;
 localparam M_OP_REM    = 3'h6;
 localparam M_OP_REMU   = 3'h7;
+/* verilator lint_on UNUSEDPARAM */

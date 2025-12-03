@@ -34,7 +34,7 @@ localparam W_RNUM = $clog2(N_REGS);
 
 wire [31:0] reg_q [0:N_REGS-1];
 
-wire [N_REGS-1:0] wen_mask = {{N_REGS{1'b0}}, 1'b1} << waddr[W_RNUM-1:0];
+wire [N_REGS-1:0] wen_mask = {{N_REGS-1{1'b0}}, wen} << waddr[W_RNUM-1:0];
 
 assign reg_q[0] = 32'd0;
 genvar g;
@@ -43,6 +43,8 @@ for (g = 1; g < N_REGS; g = g + 1) begin: loop_g
 	wire [31:0] reg_q_;
 	// Use scan flop to replace missing DFFE. Constraints should disable false
 	// hold check on Q->D path (Q is stable when D is selected).
+	/* verilator lint_off PINMISSING */
+	// waiver: VDD/VSS not connected on cell instance (handled in backend)
 	gf180mcu_fd_sc_mcu9t5v0__sdffq_1 reg_u [31:0] (
 		.CLK (clk),
 		.D   (reg_q_),
@@ -50,6 +52,7 @@ for (g = 1; g < N_REGS; g = g + 1) begin: loop_g
 		.SI  (wdata),
 		.SE  (wen_mask[g])
 	);
+	/* verilator lint_on PINMISSING */
 	assign reg_q[g] = wen_mask[g] ? wdata : reg_q_;
 end
 endgenerate
@@ -66,6 +69,8 @@ wire [31:0] rdata2_nxt_h = reg_q[{1'b1, raddr2[W_RNUM-2:0]}];
 wire [31:0] rdata1_q;
 wire [31:0] rdata2_q;
 
+/* verilator lint_off PINMISSING */
+// waiver: VDD/VSS not connected on cell instance (handled in backend)
 gf180mcu_fd_sc_mcu9t5v0__sdffq_4 flop_rdata1_u [31:0] (
 	.CLK (clk),
 	.D   (rdata1_nxt_l),
@@ -81,6 +86,7 @@ gf180mcu_fd_sc_mcu9t5v0__sdffq_4 flop_rdata2_u [31:0] (
 	.SE  (raddr2[W_RNUM-1]),
 	.Q   (rdata2_q)
 );
+/* verilator lint_on PINMISSING */
 
 always @ (*) begin
 	rdata1 = rdata1_q;
