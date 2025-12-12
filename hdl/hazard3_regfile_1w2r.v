@@ -53,7 +53,7 @@ for (g = 1; g < N_REGS; g = g + 1) begin: loop_g
 		.SE  (wen_mask[g])
 	);
 	/* verilator lint_on PINMISSING */
-	assign reg_q[g] = wen_mask[g] ? wdata : reg_q_;
+	assign reg_q[g] = wen_mask[g] || wen_mask[(g + N_REGS / 2) % N_REGS] ? wdata : reg_q_;
 end
 endgenerate
 
