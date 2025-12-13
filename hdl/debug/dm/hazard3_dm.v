@@ -328,11 +328,8 @@ reg [2:0]  sbaccess; // Size of the transfer
 
 wire sbdata_write_blocked;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		sbaddress <= {32{1'b0}};
-		sbdata <= {32{1'b0}};
-	end else if (!dmactive) begin
+always @ (posedge clk) begin
+	if (!dmactive) begin
 		sbaddress <= {32{1'b0}};
 		sbdata <= {32{1'b0}};
 	end else if (HAVE_SBA) begin
@@ -417,17 +414,8 @@ wire sb_badalign =
 
 wire sb_badsize = sbaccess > 3'h2;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		sbbusy              <= 1'b0;
-		sbbusyerror         <= 1'b0;
-		sbreadonaddr        <= 1'b0;
-		sbreadondata        <= 1'b0;
-		sbaccess            <= 3'h0;
-		sbautoincrement     <= 1'b0;
-		sberror             <= 3'h0;
-		sb_current_is_write <= 1'b0;
-	end else if (!dmactive) begin
+always @ (posedge clk) begin
+	if (!dmactive) begin
 		sbbusy              <= 1'b0;
 		sbbusyerror         <= 1'b0;
 		sbreadonaddr        <= 1'b0;
@@ -495,11 +483,9 @@ reg [XLEN-1:0] abstract_data0;
 
 assign hart_data0_rdata = {N_HARTS{abstract_data0}};
 
-always @ (posedge clk or negedge rst_n) begin: update_hart_data0
+always @ (posedge clk) begin: update_hart_data0
 	reg signed [31:0] i;
-	if (!rst_n) begin
-		abstract_data0 <= {XLEN{1'b0}};
-	end else if (!dmactive) begin
+	if (!dmactive) begin
 		abstract_data0 <= {XLEN{1'b0}};
 	end else if (dmi_write && dmi_regaddr == ADDR_DATA0) begin
 		abstract_data0 <= dmi_pwdata;
@@ -514,11 +500,8 @@ end
 reg [XLEN-1:0] progbuf0;
 reg [XLEN-1:0] progbuf1;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		progbuf0 <= {XLEN{1'b0}};
-		progbuf1 <= {XLEN{1'b0}};
-	end else if (!dmactive) begin
+always @ (posedge clk) begin
+	if (!dmactive) begin
 		progbuf0 <= {XLEN{1'b0}};
 		progbuf1 <= {XLEN{1'b0}};
 	end else if (dmi_write && !abstractcs_busy) begin
@@ -532,11 +515,8 @@ end
 reg       abstractauto_autoexecdata;
 reg [1:0] abstractauto_autoexecprogbuf;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		abstractauto_autoexecdata <= 1'b0;
-		abstractauto_autoexecprogbuf <= 2'b00;
-	end else if (!dmactive) begin
+always @ (posedge clk) begin
+	if (!dmactive) begin
 		abstractauto_autoexecdata <= 1'b0;
 		abstractauto_autoexecprogbuf <= 2'b00;
 	end else if (dmi_write && dmi_regaddr == ADDR_ABSTRACTAUTO) begin
@@ -617,14 +597,8 @@ reg        acmd_prev_write;
 reg [4:0]  acmd_prev_regno;
 reg        acmd_prev_unsupported;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		acmd_prev_postexec <= 1'b0;
-		acmd_prev_transfer <= 1'b0;
-		acmd_prev_write <= 1'b0;
-		acmd_prev_regno <= 5'h0;
-		acmd_prev_unsupported <= 1'b1;
-	end else if (!dmactive) begin
+always @ (posedge clk) begin
+	if (!dmactive) begin
 		acmd_prev_postexec <= 1'b0;
 		acmd_prev_transfer <= 1'b0;
 		acmd_prev_write <= 1'b0;
@@ -729,11 +703,8 @@ always @ (*) begin
 	endcase
 end
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		abstractcs_cmderr <= CMDERR_OK;
-		acmd_state <= S_IDLE;
-	end else if (!dmactive) begin
+always @ (posedge clk) begin
+	if (!dmactive) begin
 		abstractcs_cmderr <= CMDERR_OK;
 		acmd_state <= S_IDLE;
 	end else begin

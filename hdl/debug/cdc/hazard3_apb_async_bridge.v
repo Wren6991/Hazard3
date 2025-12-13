@@ -113,7 +113,6 @@ always @ (posedge clk_src or negedge rst_n_src) begin
     if (!rst_n_src) begin
         src_req <= 1'b0;
         src_waiting_for_downstream <= 1'b0;
-        src_prdata_pslverr <= {W_DATA + 1{1'b0}};
         src_pready_r <= 1'b1;
     end else if (src_waiting_for_downstream) begin
         if (src_req && src_ack) begin
@@ -123,9 +122,6 @@ always @ (posedge clk_src or negedge rst_n_src) begin
             // Downstream transfer has finished, data is valid.
             src_pready_r <= 1'b1;
             src_waiting_for_downstream <= 1'b0;
-            // Note this assignment is cross-domain (but data has been stable
-            // for duration of ack synchronisation delay):
-            src_prdata_pslverr <= dst_prdata_pslverr;
         end
     end else begin
         // paddr, pwdata and pwrite are all valid during the setup phase, and
@@ -139,10 +135,16 @@ always @ (posedge clk_src or negedge rst_n_src) begin
     end
 end
 
-// Bus request launch register is not resettable
+// Bus request launch register and response capture register are not resettable
 always @ (posedge clk_src) begin
-    if (src_psel && !src_waiting_for_downstream)
+    if (src_psel && !src_waiting_for_downstream) begin
         src_paddr_pwdata_pwrite <= {src_paddr, src_pwdata, src_pwrite};
+    end
+    if (src_waiting_for_downstream && !(src_req || src_ack)) begin
+        // Note this assignment is cross-domain (but data has been stable
+        // for duration of ack synchronisation delay):
+        src_prdata_pslverr <= dst_prdata_pslverr;
+    end
 end
 
 assign {src_prdata, src_pslverr} = src_prdata_pslverr;
@@ -169,12 +171,8 @@ always @ (posedge clk_dst or negedge rst_n_dst) begin
     if (!rst_n_dst) begin
         dst_psel_r <= 1'b0;
         dst_penable_r <= 1'b0;
-        dst_paddr_pwdata_pwrite <= {W_ADDR + W_DATA + 1{1'b0}};
     end else if (dst_req && !dst_ack) begin
         dst_psel_r <= 1'b1;
-        // Note this assignment is cross-domain. The src register has been
-        // stable for the duration of the req sync delay.
-        dst_paddr_pwdata_pwrite <= src_paddr_pwdata_pwrite;
     end else if (dst_psel_r && !dst_penable_r) begin
         dst_penable_r <= 1'b1;
     end else if (dst_bus_finish) begin
@@ -183,10 +181,16 @@ always @ (posedge clk_dst or negedge rst_n_dst) begin
     end
 end
 
-// Bus response launch register is not resettable
+// Bus request capture and response launch register are not resettable
 always @ (posedge clk_dst) begin
-    if (dst_bus_finish)
+    if (dst_req && !dst_ack) begin
+        // Note this assignment is cross-domain. The src register has been
+        // stable for the duration of the req sync delay.
+        dst_paddr_pwdata_pwrite <= src_paddr_pwdata_pwrite;
+    end
+    if (dst_bus_finish) begin
         dst_prdata_pslverr <= {dst_prdata, dst_pslverr};
+    end
 end
 
 assign dst_psel = dst_psel_r;
