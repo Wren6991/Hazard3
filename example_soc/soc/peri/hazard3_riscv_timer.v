@@ -83,7 +83,7 @@ wire bus_read = !pwrite && psel && penable;
 
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
-		ctrl_en <= 1'b1;
+		ctrl_en <= 1'b0;
 	end else if (bus_write && paddr == ADDR_CTRL) begin
 		ctrl_en <= pwdata[0];
 	end
@@ -91,34 +91,25 @@ end
 
 reg [63:0] mtime;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mtime <= 64'h0;
-	end else begin
-		if (tick_now)
-			mtime <= mtime + 1'b1;
-		if (bus_write && paddr == ADDR_MTIME)
-			mtime[31:0] <= pwdata;
-		if (bus_write && paddr == ADDR_MTIMEH)
-			mtime[63:32] <= pwdata;
-	end
+always @ (posedge clk) begin
+	if (tick_now)
+		mtime <= mtime + 1'b1;
+	if (bus_write && paddr == ADDR_MTIME)
+		mtime[31:0] <= pwdata;
+	if (bus_write && paddr == ADDR_MTIMEH)
+		mtime[63:32] <= pwdata;
 end
 
 // mtimecmp is stored inverted for minor LUT savings on iCE40
 reg  [63:0] mtimecmp;
 wire [64:0] cmp_diff = {1'b0, mtime} + {1'b0, mtimecmp} + 65'd1;
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mtimecmp <= 64'h0;
-		timer_irq <= 1'b0;
-	end else begin
-		if (bus_write && paddr == ADDR_MTIMECMP)
-			mtimecmp[31:0] <= ~pwdata;
-		if (bus_write && paddr == ADDR_MTIMECMPH)
-			mtimecmp[63:32] <= ~pwdata;
-		timer_irq <= cmp_diff[64];
-	end
+always @ (posedge clk) begin
+	if (bus_write && paddr == ADDR_MTIMECMP)
+		mtimecmp[31:0] <= ~pwdata;
+	if (bus_write && paddr == ADDR_MTIMECMPH)
+		mtimecmp[63:32] <= ~pwdata;
+	timer_irq <= ctrl_en && cmp_diff[64];
 end
 
 always @ (*) begin
