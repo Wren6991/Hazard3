@@ -1513,10 +1513,8 @@ always @ (posedge clk) if (rst_n) begin
 end
 `endif
 
-always @ (posedge clk or negedge rst_n) begin
-	if (!rst_n) begin
-		mw_result <= {W_DATA{1'b0}};
-	end else if (m_reg_wen_if_nonzero && !(|EXTENSION_A && x_amo_phase[1])) begin
+always @ (posedge clk) begin
+	if (m_reg_wen_if_nonzero && !(|EXTENSION_A && x_amo_phase[1])) begin
 		// (don't trash the captured AMO read phase data during stage 2/3 of AMO -- we need it!)
 		mw_result <= m_result;
 	end
