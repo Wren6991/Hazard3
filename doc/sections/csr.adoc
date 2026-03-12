@@ -33,7 +33,7 @@ Architecture identifier for Hazard3. Read-only, constant.
 |===
 | Bits | Name | Description
 | 31 | - | 0: Open-source implementation
-| 30:0 | - | 0x1b (decimal 27): the https://github.com/riscv/riscv-isa-manual/blob/master/marchid.md[registered] architecture ID for Hazard3
+| 30:0 | - | 0x1b (decimal 27): the https://github.com/riscv/riscv-isa-manual/blob/main/marchid.md[registered] architecture ID for Hazard3
 |===
 
 [[reg-mimpid]]
@@ -990,16 +990,15 @@ Indices `0x500` onward contain versions of custom Hazard3 extensions:
 | `0x504` | Xh3bextm
 |===
 
-The custom extension entries have the same `major.minor.patch` format as <<reg-mimpid>>:
+The custom extension entries have the same `major.minor` bitfields as <<reg-mimpid>>:
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits   | Name       | Description
 | 31:28  | -          | RES0
-| 27:24  | `major`    | Major release version, i.e. the `1` in `v1.2.3`
-| 23:16  | `minor`    | Minor release version, i.e. the `2` in `v1.2.3`
-| 15:8   | `patch`    | Patch version, i.e. the `3` in `v1.2.3`
-| 7:0    | -          | RES0
+| 27:24  | `major`    | Major release version, i.e. the `1` in `v1.2`
+| 23:16  | `minor`    | Minor release version, i.e. the `2` in `v1.2`
+| 15:0   | -          | RES0
 |===
 
 
