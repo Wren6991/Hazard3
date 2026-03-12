@@ -15,7 +15,7 @@ Other changes:
 
 * Improve riscv-formal coverage for AHB5 exclusives and the A extension.
 
-See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.1[here].
+See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.1.1[here].
 
 === Version 1.1
 
