@@ -523,7 +523,7 @@ localparam [0:0]   EXTENSION_ZKT   = !(|EXTENSION_M && !(|MUL_FAST && |MULH_FAST
 // Zmmul is (instructions-wise) a subset of M:
 localparam [0:0]   EXTENSION_ZMMUL = |EXTENSION_M;
 
-localparam [31:0]  h3misa_standard_len = 32'd77;
+localparam [31:0]  h3misa_standard_len = 32'd78;
 
 localparam [127:0] h3misa_standard_extensions =
 	({127'd0, |EXTENSION_A       } << 0 ) |

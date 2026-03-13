@@ -42,6 +42,8 @@ simulators:
       - zilsd_memcpy
       # Reports E instead of I, so fails:
       - h3misa
+      # Can't assemble immediates >= 16 because x16..x31 don't exist;
+      - zibi_instr
       - csr_id
   cxxrtl_min:
     make_dir:  tb_cxxrtl
