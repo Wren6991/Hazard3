@@ -6,6 +6,7 @@ Hazard3 is a configurable 3-stage RISC-V processor, implementing:
 * `M`: integer multiply/divide/modulo
 * `A`: atomic memory operations, with AHB5 global exclusives
 * `C`: compressed instructions
+* `Zibi`: branch-with-immediate instructions (unratified)
 * `Zicsr`: CSR access
 * `Zilsd`: load/store pair
 * `Zba`: address generation
@@ -122,6 +123,7 @@ These are links to the ratified versions of the base instruction set and extensi
 | `M` v2.0          | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
 | `A` v2.1          | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
 | `C` v2.0          | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
+| `Zibi` v0.6      | https://github.com/riscv/zibi/releases/download/v0.6/zibi.pdf[Zibi unratified v0.6]
 | `Zicsr` v2.0      | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
 | `Zifencei` v2.0   | https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf[Unprivileged ISA 20191213]
 | `Zilsd` v1.0-rc3 | https://github.com/riscv/riscv-zilsd/releases/download/v1.0-rc3/riscv-zilsd-v1.0-rc3.pdf[Load/Store Pair for RV32 frozen v1.0-rc3]

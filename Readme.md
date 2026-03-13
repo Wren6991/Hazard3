@@ -5,6 +5,7 @@ Hazard3 is a 3-stage RISC-V processor, implementing the `RV32I` or `RV32E` instr
 * `M`: integer multiply/divide/modulo
 * `A` : atomic memory operations, with AHB5 global exclusives
 * `C`: compressed instructions
+* `Zibi`: branch-with-immediate instructions (unratified)
 * `Zicsr`: CSR access
 * `Zilsd`: load/store pair instructions
 * `Zba`: address generation
