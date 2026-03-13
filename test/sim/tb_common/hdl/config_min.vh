@@ -16,6 +16,7 @@ localparam EXTENSION_ZBS       = 0;
 localparam EXTENSION_ZCB       = 0;
 localparam EXTENSION_ZCLSD     = 0;
 localparam EXTENSION_ZCMP      = 0;
+localparam EXTENSION_ZIBI      = 0;
 localparam EXTENSION_ZIFENCEI  = 0;
 localparam EXTENSION_ZILSD     = 0;
 localparam EXTENSION_XH3BEXTM  = 0;

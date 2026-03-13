@@ -940,6 +940,7 @@ The bit assignment is provided by the RISC-V C API documentation here: https://g
 | Zcmp | 1 | 10
 | Zifencei | 1 | 11
 | Zmmul | 1 | 12
+| Zibi | 1 | 13
 |====
 
 The bit index within the `h3.misa` bitmap can be calculated as `64 * groupid + bit position`. A read from <<reg-h3.misa>> returns a 32-bit slice of the bitmap, indexed by the write data of the same CSR instruction. For example, Zcmp is at bit index 74, which is bit 10 of word 2.

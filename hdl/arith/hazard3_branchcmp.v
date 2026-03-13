@@ -32,6 +32,8 @@ wire [W_DATA-1:0] diff = op_a - op_b;
 // ------------------
 // 000    BEQ
 // 001    BNE
+// 010    BEQI (Zibi only)
+// 011    BNEI (Zibi only)
 // 100    BLT
 // 101    BGE
 // 110    BLTU
@@ -43,7 +45,10 @@ wire lt = op_a[W_DATA-1] == op_b[W_DATA-1] ? diff[W_DATA-1] :
           cmp_is_unsigned                  ? op_b[W_DATA-1] :
                                              op_a[W_DATA-1] ;
 
-assign cmp = cir[14] ? lt : op_a != op_b;
+wire [31:0] zibi_imm = {27'd0, cir[24:20]} | {32{~|cir[24:20]}};
+wire eq = op_a == (cir[13] && |EXTENSION_ZIBI ? zibi_imm : op_b);
+
+assign cmp = cir[14] ? lt : eq;
 
 endmodule
 

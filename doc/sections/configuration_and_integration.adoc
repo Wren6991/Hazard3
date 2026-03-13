@@ -432,6 +432,13 @@ NOTE: The RISC-V specifications state that Zcmp depends on Zca; on Hazard3, Zca 
 
 Default value: `0`
 
+[[param-EXTENSION_ZIBI]]
+===== EXTENSION_ZIBI
+
+Support for Zibi branch-with-immediate instructions.
+
+Default value: `0`
+
 [[param-EXTENSION_ZIFENCEI]]
 ===== EXTENSION_ZIFENCEI
 

@@ -547,6 +547,7 @@ localparam [127:0] h3misa_standard_extensions =
 	({127'd0, |EXTENSION_ZCMP    } << 74) |
 	({127'd0, |EXTENSION_ZIFENCEI} << 75) |
 	({127'd0, |EXTENSION_ZMMUL   } << 76) |
+	({127'd0, |EXTENSION_ZIBI    } << 77) |
 	128'd0;
 
 localparam [31:0]  h3misa_custom_len = 32'd5;

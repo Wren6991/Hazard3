@@ -374,8 +374,8 @@ always @ (*) begin
 	d_invalid_32bit = 1'b0;
 
 	casez (d_instr)
-	`RVOPC_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO;  end
-	`RVOPC_BNE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO;  end
+	`RVOPC_BNE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO; end
 	`RVOPC_BLT:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO; end
 	`RVOPC_BGE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO;  end
 	`RVOPC_BLTU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO; end
@@ -448,6 +448,9 @@ always @ (*) begin
 	`RVOPC_AMOMAX_W:  if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MAX;  end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_AMOMINU_W: if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MINU; end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_AMOMAXU_W: if (EXTENSION_A) begin raw_addr_is_regoffs = 1'b1; raw_memop = MEMOP_AMO;  raw_aluop = ALUOP_MAXU; end else begin d_invalid_32bit = 1'b1; end
+
+	`RVOPC_BEQI:      if (EXTENSION_ZIBI) begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_BNEI:      if (EXTENSION_ZIBI) begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO; end else begin d_invalid_32bit = 1'b1; end
 
 	`RVOPC_LD:        if (EXTENSION_ZILSD) begin raw_addr_is_regoffs = 1'b1; raw_rs2 = X0; raw_memop = MEMOP_LW; raw_rd  = {d_instr[11: 8], d_lspair_reg_sel};                        end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_SD:        if (EXTENSION_ZILSD) begin raw_addr_is_regoffs = 1'b1; raw_rd  = X0; raw_memop = MEMOP_SW; raw_rs2 = {d_instr[24:21], d_lspair_reg_sel}; raw_aluop = ALUOP_RS2; end else begin d_invalid_32bit = 1'b1; end

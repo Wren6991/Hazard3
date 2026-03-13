@@ -78,6 +78,9 @@ parameter EXTENSION_ZCLSD     = 0,
 // Requires: EXTENSION_C.
 parameter EXTENSION_ZCMP      = 0,
 
+// EXTENSION_ZIBI: support for branch-with-immediate instructions.
+parameter EXTENSION_ZIBI      = 0,
+
 // EXTENSION_ZIFENCEI: Support for the fence.i instruction
 // Optional, since a plain branch/jump will also flush the prefetch queue.
 parameter EXTENSION_ZIFENCEI  = 0,
