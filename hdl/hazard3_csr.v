@@ -388,7 +388,7 @@ localparam [3:0] MIMPID_MAJOR      = 4'd1;
 // Minor version, e.g. the 2 in v1.2.3:
 localparam [7:0] MIMPID_MINOR      = 8'd2;
 // Patch version, e.g. the 3 in v1.2.3:
-localparam [7:0] MIMPID_PATCH      = 8'd1;
+localparam [7:0] MIMPID_PATCH      = 8'd0;
 
 // Note the eco_version field is connected externally -- on ASIC this may be
 // connected to tie cells so it can be incremented following a metal ECO.
