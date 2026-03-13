@@ -283,7 +283,6 @@ hazard3_cpu_2port #(
 	.NUM_IRQS            (1),
 
 	.REDUCED_BYPASS      (0),
-	.FAST_BRANCHCMP      (1),
 	.MUL_FAST            (1),
 	.MULH_FAST           (1),
 	.MULDIV_UNROLL       (4)  // Increased so more divide instructions fit in BMC depth

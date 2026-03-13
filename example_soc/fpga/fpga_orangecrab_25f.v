@@ -54,7 +54,6 @@ example_soc #(
 	.MUL_FASTER          (0),
 	.MULH_FAST           (0),
 	.MULDIV_UNROLL       (1),
-	.FAST_BRANCHCMP      (1),
 	.BRANCH_PREDICTOR    (1)
 ) soc_u (
 	.clk     (clk_sys),

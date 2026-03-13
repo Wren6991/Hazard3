@@ -44,7 +44,6 @@ localparam MULDIV_UNROLL       = 2;
 localparam MUL_FAST            = 1;
 localparam MUL_FASTER          = 1;
 localparam MULH_FAST           = 1;
-localparam FAST_BRANCHCMP      = 1;
 localparam RESET_REGFILE       = 1;
 localparam BRANCH_PREDICTOR    = 1;
 localparam MTVEC_WMASK         = 32'hfffffffd;

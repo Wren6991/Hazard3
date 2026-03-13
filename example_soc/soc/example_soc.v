@@ -305,7 +305,6 @@ hazard3_cpu_1port #(
 	.MUL_FAST            (MUL_FAST),
 	.MUL_FASTER          (MUL_FASTER),
 	.MULH_FAST           (MULH_FAST),
-	.FAST_BRANCHCMP      (FAST_BRANCHCMP),
 	.BRANCH_PREDICTOR    (BRANCH_PREDICTOR),
 	.MTVEC_WMASK         (MTVEC_WMASK)
 ) cpu (

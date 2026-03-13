@@ -759,15 +759,6 @@ Requires: <<param-MUL_FAST>> = `1`.
 
 Default value: `0`
 
-[[param-FAST_BRANCHCMP]]
-===== FAST_BRANCHCMP
-
-Instantiate a separate comparator (equal, less-than-signed, less-than-unsigned) for branch comparisons, rather
-than using the ALU. Enabling the separate comparator improves the address-phase timing for instruction fetch, especially if the `Zba`
-extension is enabled (<<param-EXTENSION_ZBA>>). Disabling may save area.
-
-Default value: `1`
-
 [[param-RESET_REGFILE]]
 ===== RESET_REGFILE
 

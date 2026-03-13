@@ -382,7 +382,6 @@ reg   [W_DATA-1:0]   x_rs2_bypass;
 reg   [W_DATA-1:0]   x_op_a;
 reg   [W_DATA-1:0]   x_op_b;
 wire  [W_DATA-1:0]   x_alu_result;
-wire                 x_alu_cmp;
 
 wire [W_DATA-1:0]    m_trap_addr;
 wire                 m_trap_is_irq;
@@ -604,8 +603,7 @@ hazard3_alu #(
 	.funct7_32b (d_funct7_32b),
 	.op_a       (x_op_a),
 	.op_b       (x_op_b),
-	.result     (x_alu_result),
-	.cmp        (x_alu_cmp)
+	.result     (x_alu_result)
 );
 
 // Load/store bus request
@@ -912,24 +910,14 @@ wire              x_branch_cmp_noinvert;
 wire              x_branch_was_predicted = |BRANCH_PREDICTOR && fd_cir_predbranch[0];
 wire              x_branch_cmp = x_branch_cmp_noinvert ^ x_branch_was_predicted;
 
-generate
-if (~|FAST_BRANCHCMP) begin: alu_branchcmp
-
-	assign x_branch_cmp_noinvert = x_alu_cmp;
-
-end else begin: fast_branchcmp
-
-	hazard3_branchcmp #(
-	`include "hazard3_config_inst.vh"
-	) branchcmp_u (
-		.cir   (fd_cir),
-		.op_a  (x_rs1_bypass),
-		.op_b  (x_rs2_bypass),
-		.cmp   (x_branch_cmp_noinvert)
-	);
-
-end
-endgenerate
+hazard3_branchcmp #(
+`include "hazard3_config_inst.vh"
+) branchcmp_u (
+	.cir   (fd_cir),
+	.op_a  (x_rs1_bypass),
+	.op_b  (x_rs2_bypass),
+	.cmp   (x_branch_cmp_noinvert)
+);
 
 // Be careful not to take branches whose comparisons depend on a load result
 wire x_jump_req_unchecked = !x_stall_on_raw && (

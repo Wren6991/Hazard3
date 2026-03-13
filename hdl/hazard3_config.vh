@@ -225,11 +225,6 @@ parameter MUL_FASTER          = 0,
 // Requires: MUL_FAST
 parameter MULH_FAST           = 0,
 
-// FAST_BRANCHCMP: Instantiate a separate comparator (eq/lt/ltu) for branch
-// comparisons, rather than using the ALU. Improves fetch address delay,
-// especially if Zba extension is enabled. Disabling may save area.
-parameter FAST_BRANCHCMP      = 1,
-
 // RESET_REGFILE: whether to support reset of the general purpose registers.
 // There are around 1k bits in the register file, so the reset can be
 // disabled e.g. to permit block-RAM inference on FPGA.

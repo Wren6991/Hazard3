@@ -374,12 +374,12 @@ always @ (*) begin
 	d_invalid_32bit = 1'b0;
 
 	casez (d_instr)
-	`RVOPC_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_SUB; raw_branchcond = BCOND_ZERO;  end
-	`RVOPC_BNE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_SUB; raw_branchcond = BCOND_NZERO; end
-	`RVOPC_BLT:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LT;  raw_branchcond = BCOND_NZERO; end
-	`RVOPC_BGE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LT;  raw_branchcond = BCOND_ZERO;  end
-	`RVOPC_BLTU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LTU; raw_branchcond = BCOND_NZERO; end
-	`RVOPC_BGEU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_aluop = ALUOP_LTU; raw_branchcond = BCOND_ZERO;  end
+	`RVOPC_BEQ:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO;  end
+	`RVOPC_BNE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BLT:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BGE:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO;  end
+	`RVOPC_BLTU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_NZERO; end
+	`RVOPC_BGEU:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_rd = X0; raw_branchcond = BCOND_ZERO;  end
 	`RVOPC_JALR:      begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_branchcond = BCOND_ALWAYS; raw_addr_is_regoffs = 1'b1;
 	                        raw_rs2 = X0; raw_aluop = ALUOP_ADD; raw_alusrc_a = ALUSRCA_PC; raw_alusrc_b = ALUSRCB_IMM; raw_imm = fd_cir_is_32bit ? 32'd4 : 32'd2; end
 	`RVOPC_JAL:       begin d_invalid_32bit = DEBUG_SUPPORT && debug_mode; raw_branchcond = BCOND_ALWAYS; raw_rs1 = X0;

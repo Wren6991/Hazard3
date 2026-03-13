@@ -15,8 +15,7 @@ module hazard3_alu #(
 	input  wire [2:0]         funct3_32b,
 	input  wire [W_DATA-1:0]  op_a,
 	input  wire [W_DATA-1:0]  op_b,
-	output reg  [W_DATA-1:0]  result,
-	output wire               cmp
+	output reg  [W_DATA-1:0]  result
 );
 
 `include "hazard3_ops.vh"
@@ -47,8 +46,6 @@ wire cmp_is_unsigned = aluop == ALUOP_LTU ||
 
 wire lt = op_a[W_DATA-1] == op_b[W_DATA-1] ? sum[W_DATA-1]  :
           cmp_is_unsigned                  ? op_b[W_DATA-1] : op_a[W_DATA-1] ;
-
-assign cmp = aluop == ALUOP_SUB ? |op_xor : lt;
 
 // ----------------------------------------------------------------------------
 // Separate units for shift, ctz etc

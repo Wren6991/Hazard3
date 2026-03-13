@@ -139,7 +139,6 @@ example_soc #(
 	.MUL_FAST            (0),
 	.MUL_FASTER          (0),
 	.MULH_FAST           (0),
-	.FAST_BRANCHCMP      (1),
 	.BRANCH_PREDICTOR    (0)
 ) soc_u (
 	.clk            (clk_sys),
