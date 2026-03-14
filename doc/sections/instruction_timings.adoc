@@ -115,6 +115,15 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 | `ebreak` | 3 | Time given is for jumping to `mtvec`
 |===
 
+=== Branch with Immediate (Zibi)
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+| `beqi rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `bnei rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+|===
+
 === Load/Store Pair (Zilsd)
 
 [%autowidth.stretch, options="header"]
