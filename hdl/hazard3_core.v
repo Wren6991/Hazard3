@@ -637,11 +637,18 @@ assign bus_aph_excl_d = |EXTENSION_A && (
 // AMO stalls the pipe, then generates two bus transfers per 4-cycle
 // iteration, unless it bails out due to a bus fault or failed load
 // reservation.
+
+// Careful: if a load/store dphase pipelines with AMO phase 0, dphase ready
+// does *not* imply aphase ready. Certain stalls (e.g. trap stall on 1-cycle
+// IRQ pulse coincident with load/store dphase) prevent AMO from issuing its
+// address immediately. Only look at bus ready for current AMO AHB phase.
+wire x_amo_bus_ready = x_amo_phase[0] ? bus_dph_ready_d : bus_aph_ready_d;
+
 always @ (posedge clk or negedge rst_n) begin
 	if (!rst_n) begin
 		x_amo_phase <= 3'h0;
 	end else if (|EXTENSION_A && d_memop_is_amo && (
-		bus_aph_ready_d || bus_dph_ready_d ||
+		x_amo_bus_ready ||
 		m_trap_enter_vld || x_unaligned_addr || x_loadstore_pmp_fail ||
 		x_amo_phase == 3'h4
 	)) begin
