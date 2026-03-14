@@ -39,8 +39,7 @@ void __attribute__((naked)) do_ecall() {
 
 // Call function in U mode, from M mode. Catch exception, or break back to M
 // mode if the function returned normally (via dummy ecall), and then return.
-static void __attribute__((naked)) umode_call_and_catch(void (*f)(void)) {
-	(void)f;
+static void __attribute__((naked)) umode_call_and_catch(__attribute__((unused)) void (*f)(void)) {
 	asm volatile (
 		// Set up return-from-M-mode to U-mode at *f
 		" csrw mepc, a0\n"

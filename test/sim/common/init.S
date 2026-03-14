@@ -216,7 +216,6 @@ _str_sp:             .asciz "sp: "
 
 .macro weak_handler name:req
 .p2align 2
-.global \name
 .weak \name
 \name:
 	la gp, _str_\name

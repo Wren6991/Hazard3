@@ -29,8 +29,7 @@ int main() {
 	asm volatile (".word 0xffffffff");
 
 	tb_puts("3: unimplemented CSR 0xfff\n");
-	uint32_t junk;
-	asm volatile ("csrr %0, 0xfff" : "=r" (junk));
+	asm volatile ("csrr a5, 0xfff" : : : "a5");
 
 	tb_puts("4: write to read-only CSR\n");
 	asm volatile ("csrw mvendorid, zero");

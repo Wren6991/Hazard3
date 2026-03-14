@@ -37,7 +37,7 @@ const uint32_t call_nums[] = {
 	0xdeadbeef
 };
 
-void main() {
+int main() {
 	tb_puts("mcause initial value:\n");
 	tb_put_u32(read_csr(mcause));
 	for (int i = 0; i < sizeof(call_nums) / sizeof(*call_nums); ++i)
@@ -45,5 +45,4 @@ void main() {
 	tb_puts("Finished making calls.\n");
 	tb_puts("mcause final value:\n");
 	tb_put_u32(read_csr(mcause));
-	tb_exit(0);
 }

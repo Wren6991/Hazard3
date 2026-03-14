@@ -1,4 +1,5 @@
 #include "hazard3_csr.h"
+.altmacro
 
 .global isr_external_irq
 isr_external_irq:
@@ -112,7 +113,7 @@ isr_irq\num:
 
 .equ i, 0
 .rept NUM_IRQS
-decl_eirq i
+decl_eirq %i
 .equ i, i + 1
 .endr
 	ebreak
@@ -126,7 +127,7 @@ _external_irq_table:
 
 .equ i, 0
 .rept NUM_IRQS
-ref_eirq i
+ref_eirq %i
 .equ i, i + 1
 .endr
 

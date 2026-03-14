@@ -12,10 +12,7 @@ static inline uint32_t test_pattern(uint32_t i) {
 }
 
 // Loop 1: single ld, two sw
-void __attribute__((naked)) copy1(void *dst, const void *src, uint32_t len) {
-	(void)dst;
-	(void)src;
-	(void)len;
+void __attribute__((naked)) copy1(__attribute__((unused)) void *dst, __attribute__((unused)) const void *src, __attribute__((unused)) uint32_t len) {
 	asm volatile (
 		"add a2, a2, a1\n"
 		"bgeu a1, a2, 2f\n"
@@ -33,10 +30,7 @@ void __attribute__((naked)) copy1(void *dst, const void *src, uint32_t len) {
 
 
 // Loop 2: two lw, single sd
-void __attribute__((naked)) copy2(void *dst, const void *src, uint32_t len) {
-	(void)dst;
-	(void)src;
-	(void)len;
+void __attribute__((naked)) copy2(__attribute__((unused)) void *dst, __attribute__((unused)) const void *src, __attribute__((unused)) uint32_t len) {
 	asm volatile (
 		"add a2, a2, a1\n"
 		"bgeu a1, a2, 2f\n"
@@ -53,10 +47,7 @@ void __attribute__((naked)) copy2(void *dst, const void *src, uint32_t len) {
 }
 
 // Loop 3: two ld, two sd (use some immediate bits)
-void __attribute__((naked)) copy3(void *dst, const void *src, uint32_t len) {
-	(void)dst;
-	(void)src;
-	(void)len;
+void __attribute__((naked)) copy3(__attribute__((unused)) void *dst, __attribute__((unused)) const void *src, __attribute__((unused)) uint32_t len) {
 	asm volatile (
 		"add a2, a2, a1\n"
 		"bgeu a1, a2, 2f\n"

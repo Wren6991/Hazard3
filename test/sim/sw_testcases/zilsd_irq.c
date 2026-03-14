@@ -24,9 +24,6 @@ static inline uint32_t test_pattern(uint32_t i) {
 }
 
 void __attribute__((naked)) copy1(void *dst, const void *src, uint32_t len) {
-	(void)dst;
-	(void)src;
-	(void)len;
 	asm volatile (
 		"add a2, a2, a1\n"
 		"bgeu a1, a2, 2f\n"
