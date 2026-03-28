@@ -66,8 +66,8 @@ localparam ALUOP_FCHECK2E_H  = 7'h42;
 localparam ALUOP_FCHECK2E_S  = 7'h43;
 localparam ALUOP_FPACKRQ3_H  = 7'h44;
 localparam ALUOP_FPACKRQ3_S  = 7'h45;
-localparam ALUOP_CRSQ3       = 7'h48;
-localparam ALUOP_SRASTICKY   = 7'h4a;
+localparam ALUOP_FEADJQ3     = 7'h48;
+localparam ALUOP_SSRASTICKY  = 7'h4a;
 localparam ALUOP_SSLA        = 7'h4b;
 
 // Parameters to control ALU input muxes. Bypass mux paths are
