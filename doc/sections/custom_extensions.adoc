@@ -288,7 +288,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_funpackq3_s(rs1) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x40"\
+    asm (".insn r 0x0b, 0x1, 0x40, %0, %1, zero"\
         : "=r" (__rd) \
         : "r" (rs1) \
     ); \
@@ -323,7 +323,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_funpackq3_h(rs1) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x00"\
+    asm (".insn r 0x0b, 0x1, 0x00, %0, %1, zero"\
         : "=r" (__rd) \
         : "r" (rs1) \
     ); \
@@ -356,7 +356,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fcheck2e_s(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x41"\
+    asm (".insn r 0x0b, 0x1, 0x41, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -389,7 +389,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fcheck2e_h(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x01"\
+    asm (".insn r 0x0b, 0x1, 0x01, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -432,7 +432,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fpackrq3_s(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x42"\
+    asm (".insn r 0x0b, 0x1, 0x42, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -477,7 +477,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fpackrq3_h(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x02"\
+    asm (".insn r 0x0b, 0x1, 0x02, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -516,7 +516,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_feadjq3(rs1) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x04"\
+    asm (".insn r 0x0b, 0x1, 0x04, %0, %1, zero"\
         : "=r" (__rd) \
         : "r" (rs1) \
     ); \
@@ -555,7 +555,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_feadju3(rs1) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x05"\
+    asm (".insn r 0x0b, 0x1, 0x05, %0, %1, zero"\
         : "=r" (__rd) \
         : "r" (rs1) \
     ); \
@@ -586,7 +586,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_xorsign(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x06"\
+    asm (".insn r 0x0b, 0x1, 0x06, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -617,7 +617,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_xnorsign(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x07"\
+    asm (".insn r 0x0b, 0x1, 0x07, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -658,7 +658,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssrasticky(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x0b"\
+    asm (".insn r 0x0b, 0x1, 0x0b, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -695,7 +695,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssrlsticky(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x0a"\
+    asm (".insn r 0x0b, 0x1, 0x0a, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -728,7 +728,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssla(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x0d"\
+    asm (".insn r 0x0b, 0x1, 0x0d, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -736,6 +736,7 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
+[[xh3sfx-examples-section]]
 ==== Examples
 
 NOTE: The function names in this section follow the conventions for https://gcc.gnu.org/onlinedocs/gccint/Soft-float-library-routines.html[libgcc].

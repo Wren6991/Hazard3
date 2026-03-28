@@ -48,33 +48,35 @@ wire lt = op_a[W_DATA-1] == op_b[W_DATA-1] ? sum[W_DATA-1]  :
           cmp_is_unsigned                  ? op_b[W_DATA-1] : op_a[W_DATA-1] ;
 
 // ----------------------------------------------------------------------------
-// Separate units for shift, ctz etc
+// Shifter and shifter control decode
 
-wire [W_DATA-1:0] shift_dout;
+wire shamt_is_bidirectional =
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRASTICKY) ||
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRLSTICKY) ||
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SSLA      );
+
+wire       shamt_neg = op_b[8];
+wire [8:0] shamt_abs = shamt_is_bidirectional && shamt_neg ? -op_b[8:0] : op_b[8:0];
+wire       shamt_over = |shamt_abs[8:5];
+
 wire shift_right_nleft =
 	aluop == ALUOP_SRL ||
 	aluop == ALUOP_SRA ||
 	(|EXTENSION_ZBB      && aluop == ALUOP_ROR                   ) ||
 	(|EXTENSION_ZBS      && aluop == ALUOP_BEXT                  ) ||
 	(|EXTENSION_XH3BEXTM && aluop == ALUOP_BEXTM                 ) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRASTICKY && !op_b[8]) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRLSTICKY && !op_b[8]) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSLA       &&  op_b[8]);
+	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRASTICKY && !shamt_neg) ||
+	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRLSTICKY && !shamt_neg) ||
+	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSLA       &&  shamt_neg);
 
 wire shift_arith =
 	aluop == ALUOP_SRA ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRASTICKY) ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSLA);
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRASTICKY && !shamt_neg) ||
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SSLA       &&  shamt_neg);
 
 wire shift_rotate = |EXTENSION_ZBB & (aluop == ALUOP_ROR || aluop == ALUOP_ROL);
 
-wire shamt_is_bidirectional =
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRASTICKY) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRLSTICKY) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSLA      );
-
-wire [8:0] shamt_abs = shamt_is_bidirectional && op_b[8] ? -op_b[8:0] : op_b[8:0];
-wire       shamt_over = |shamt_abs[8:5];
+wire [W_DATA-1:0] shift_dout;
 
 hazard3_shift_barrel #(
 `include "hazard3_config_inst.vh"
@@ -86,6 +88,9 @@ hazard3_shift_barrel #(
 	.arith       (shift_arith),
 	.dout        (shift_dout)
 );
+
+// ----------------------------------------------------------------------------
+// Bit manipulation functions
 
 // Only used for h3.feadjq3; hopefully the carry chain is folded into the
 // lookahead on the priority encode.
@@ -177,10 +182,13 @@ always @ (*) begin: do_xperm4
 	end
 end
 
+// ----------------------------------------------------------------------------
+// Xh3sfx operations
+
 // Q3 format has 29 fractional bits. For single-precision this is 6 excess
 // bits, and for half-precision it's 19 excess bits.
 wire [31:0] xh3sfx_sig_abs = op_a[31] ? -op_a : op_a;
-wire [31:0] xh3sfx_rnd_bias = aluop == ALUOP_FPACKRQ3_H ? 32'h0007ffff : 32'h0000003f;
+wire [31:0] xh3sfx_rnd_bias = aluop == ALUOP_FPACKRQ3_H ? 32'h0003ffff : 32'h0000001f;
 wire [31:0] xh3sfx_odd_bias = {
 	31'd0,
 	aluop == ALUOP_FPACKRQ3_H ? xh3sfx_sig_abs[29 - 10] : xh3sfx_sig_abs[29 - 23]
@@ -190,18 +198,18 @@ wire [9:0]  xh3sfx_exp_adj = op_b[9:0] + {9'd0, xh3sfx_sig_rnd[30]};
 wire [31:0] xh3sfx_sig_norm = xh3sfx_sig_rnd >> xh3sfx_sig_rnd[30];
 
 wire [31:0] xh3sfx_fpackrq3_s =
-	~|op_a[28:6]                  ? 32'd0                      :                  // Exact cancellation
-	xh3sfx_exp_adj[9]             ? {op_a[31], 31'd0}          :                  // Underflow
-	~|xh3sfx_exp_adj[8:0]         ? {op_a[31], 31'd0}          :                  // Flushed subnormal
-	xh3sfx_exp_adj[8:0] >= 9'h0ff ? {op_a[31], 8'hff, 23'd0}   :                  // Overflow
-	                                {op_a[31], xh3sfx_exp_adj[7:0], op_a[28:6]};  // Normal result
+	~|op_a[31:6]                  ? 32'd0                      :  // Exact cancellation
+	xh3sfx_exp_adj[9]             ? {op_a[31], 31'd0}          :  // Underflow
+	xh3sfx_exp_adj[8:0] == 9'h000 ? {op_a[31], 31'd0}          :  // Flushed subnormal
+	xh3sfx_exp_adj[8:0] >= 9'h0ff ? {op_a[31], 8'hff, 23'd0}   :  // Overflow
+	                                {op_a[31], xh3sfx_exp_adj[7:0], xh3sfx_sig_norm[28:6]};
 
 wire [15:0] xh3sfx_fpackrq3_h =
-	~|op_a[28:19]                 ? 16'd0                      :                  // Exact cancellation
-	xh3sfx_exp_adj[9]             ? {op_a[31], 15'd0}          :                  // Underflow
-	~|xh3sfx_exp_adj[8:0]         ? {op_a[31], 15'd0}          :                  // Flushed subnormal
-	xh3sfx_exp_adj[8:0] >= 9'h01f ? {op_a[31], 5'h1f, 10'd0}   :                  // Overflow
-	                                {op_a[31], xh3sfx_exp_adj[4:0], op_a[28:19]}; // Normal result
+	~|op_a[31:19]                 ? 16'd0                      :  // Exact cancellation
+	xh3sfx_exp_adj[9]             ? {op_a[31], 15'd0}          :  // Underflow
+	xh3sfx_exp_adj[8:0] == 9'h000 ? {op_a[31], 15'd0}          :  // Flushed subnormal
+	xh3sfx_exp_adj[8:0] >= 9'h01f ? {op_a[31], 5'h1f, 10'd0}   :  // Overflow
+	                                {op_a[31], xh3sfx_exp_adj[4:0], xh3sfx_sig_norm[28:19]};
 
 wire [W_SHAMT:0] xh3sfx_feadj = 6'h2 - ctz_clz;
 
@@ -285,10 +293,10 @@ always @ (*) begin
 		// Xh3bextm
 		{9'bzzzzzzz1z, ALUOP_BEXTM      }: result = shift_dout & {24'h0, {~(8'hfe << funct7_32b[3:1])}};
 		// Xh3sfx
-		{9'bzzzzzzzz1, ALUOP_FUNPACKQ3_H}: result = ({3'd1, op_a[10:0], 18'd0} ^ {32{op_a[15]}}) + {31'd0, op_a[15]};
-		{9'bzzzzzzzz1, ALUOP_FUNPACKQ3_S}: result = ({3'd1, op_a[22:0],  6'd0} ^ {32{op_a[31]}}) + {31'd0, op_a[31]}; 
-		{9'bzzzzzzzz1, ALUOP_FCHECK2E_H }: result = {31'd0, &op_a[4:0] || ~|op_a[4:0] || &op_b[4:0] || |op_a[4:0]};
-		{9'bzzzzzzzz1, ALUOP_FCHECK2E_S }: result = {31'd0, &op_a[7:0] || ~|op_a[7:0] || &op_b[7:0] || |op_a[7:0]};
+		{9'bzzzzzzzz1, ALUOP_FUNPACKQ3_H}: result = ({3'd1, op_a[9:0], 19'd0} ^ {32{op_a[15]}}) + {31'd0, op_a[15]};
+		{9'bzzzzzzzz1, ALUOP_FUNPACKQ3_S}: result = ({3'd1, op_a[22:0], 6'd0} ^ {32{op_a[31]}}) + {31'd0, op_a[31]};
+		{9'bzzzzzzzz1, ALUOP_FCHECK2E_H }: result = {31'd0, &op_a[4:0] || ~|op_a[4:0] || &op_b[4:0] || ~|op_b[4:0]};
+		{9'bzzzzzzzz1, ALUOP_FCHECK2E_S }: result = {31'd0, &op_a[7:0] || ~|op_a[7:0] || &op_b[7:0] || ~|op_b[7:0]};
 		{9'bzzzzzzzz1, ALUOP_FPACKRQ3_H }: result = {16'd0, xh3sfx_fpackrq3_h};
 		{9'bzzzzzzzz1, ALUOP_FPACKRQ3_S }: result = xh3sfx_fpackrq3_s;
 		{9'bzzzzzzzz1, ALUOP_FEADJQ3    }: result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
