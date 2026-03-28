@@ -259,7 +259,11 @@ This fixed-point format represents real numbers in the interval -4 ≤ _x_ < 4, 
 
 ==== h3.funpackq3.s
 
-Unpack significand from single-precision to Q3.29.
+Unpack significand from single-precision to Q3.29. The result is in the range `0xc0000040` through `0x3fffffc0` inclusive, which is approximately -2 through +2.
+
+The implicit one is set even if the exponent is all-zeroes.
+
+NOTE: The expectation is that zero exponents are checked with `h3.fcheck2e.s` and handled as a special case to enforce consistent flush-to-zero semantics on both inputs and outputs. Another (non-IEEE-compliant) option is to treat exponent `0` as the next normal exponent below `1`, which slightly extends the range without having to handle subnormals.
 
 Encoding (R-type):
 
@@ -291,6 +295,10 @@ Example C macro (using GCC statement expressions):
 ==== h3.funpackq3.h
 
 Unpack significand from half-precision to Q3.29.
+
+The implicit one is set even if the exponent is all-zeroes. The result is in the range `0xc0040000` through `0x3ffc0000` inclusive, which is approximately -2 through +2.
+
+NOTE: The expectation is that zero exponents are checked with `h3.fcheck2e.h` and handled as a special case to enforce consistent flush-to-zero semantics on both inputs and outputs. Another (non-IEEE-compliant) option is to treat exponent `0` as the next normal exponent below `1`, which slightly extends the range without having to handle subnormals.
 
 Encoding (R-type):
 
@@ -395,7 +403,7 @@ The significand in `rs1` is in Q3.29 format and must be normalised or zero; that
 * In the range 1 ≤ _x_ < 2.
 * Equal to zero.
 
-The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ ≤ 511.
+The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ ≤ 510.
 
 Rounding is always to-nearest with even on tie. Exponent overflow (including due to rounding) results in infinity with the same sign as the significand. Exponent underflow results in zero with the same sign as the significand. A zero significand results in positive zero.
 
@@ -438,7 +446,9 @@ The significand in `rs1` is in Q3.29 format and must be normalised or zero; that
 * In the range 1 ≤ _x_ < 2.
 * Equal to zero.
 
-The exponent in `rs2` is a signed integer and must be in the range -64 ≤ _x_ ≤ 63.
+The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ ≤ 510.
+
+NOTE: This exponent range is wider than required for half-precision calculations but is useful when converting from single-precision to half-precision.
 
 Rounding is always to-nearest with even on tie. Exponent overflow (including due to rounding) results in infinity with the same sign as the significand. Exponent underflow results in zero with the same sign as the significand. A zero significand results in positive zero.
 
@@ -504,11 +514,19 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
-==== h3.srasticky
+==== h3.ssrasticky
 
-Shift right, arithmetic, with sticky bits collected at LSB. The shift is wrapped into the range 0 ≤ _x_ ≤ 255. Shifts ≥ 32 result in all-sign (plus the sticky bit).
+Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[9:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
 
-NOTE: The expanded range of the shift amount avoids a special case branch for large exponent differences.
+NOTE: The size of the shift range is chosen to avoid special-case branching when adding numbers with large exponent differences.
+
+Shifts outside of the range ±31 are handled as follows:
+
+* `rs2[9:0]` ≥ 32 results in all-sign, except for bit `0` of the result, which is the OR of all bits in `rs1`.
+
+* `rs2[9:0]` ≤ -32 results in all-zero.
+
+NOTE: A non-sticky `ssra` can be synthesised as `neg; h3.ssla`. The asymmetry between these instructions is optimised for the common use of left shifts in normalisation, and right shifts in alignment of operands with differing exponents.
 
 Encoding (R-type):
 
@@ -539,7 +557,9 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssla
 
-Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. Left shifts ≥ 32 result in all-zeroes. Right shifts ≥ 32 result in all-sign.
+Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[9:0]` ≥ 32 then the result is all-zeroes. If `rs2[9:0]` ≤ -32 then the result is all-sign.
+
+This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrasticky`.
 
 Encoding (R-type):
 
@@ -568,7 +588,11 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
-==== Example: fadd
+==== Examples
+
+NOTE: The function names in this section follow the conventions for https://gcc.gnu.org/onlinedocs/gccint/Soft-float-library-routines.html[libgcc].
+
+===== Single-precision Add and Subtract
 
 ----
 .global __subsf3
@@ -607,8 +631,7 @@ __addsf_special_exponent:
 	// Handle special cases...
 ----
 
-
-==== Example: fmul
+===== Single-precision Multiply
 
 ----
 .global __mulsf3
@@ -625,9 +648,10 @@ __mulsf3:
     // Multiply Q3.29 x Q3.29 -> Q6.58
     mul a1, a4, a5
     mulh a4, a4, a5
-    // Normalise (shift left by either 3 or 4)
+    // Normalise (shift left by either 2 or 3)
     h3.crsq3 a0, a4
     sll a4, a4, a0
+	// Calculate new exponent
     sub a2, a2, a0
     add a2, a2, a3
     // Subtract redundant bias term (127), add 3 for normalisation correction
@@ -635,7 +659,6 @@ __mulsf3:
     // Gather sticky bits from low fraction:
     snez a1, a1
     or a4, a4, a1
-
     h3.fpackrq3.s
     ret
 
@@ -643,3 +666,74 @@ __mulsf_special_exponent:
 	// Handle special cases...
 ----
 
+===== Convert Single-precision to Signed Integer
+
+#TODO: this implements round-to-negative-infinity, but GCC requires round-to-zero.#
+
+----
+.global __fixsfdi
+__fixsfdi:
+	h3.bextmi a1, a0, 23, 8
+	li t0, 127 + 31
+	bgeu a1, t0, __fixsfdi_large_exponent
+	h3.funpackq3.s a0, a0
+	addi a1, a1, -127 - 29
+	h3.ssla a0, a0, a1
+	ret
+
+__fixsfdi_large_exponent:
+	li a1, 1 << 31
+	srai a0, a0, 31
+	xor a1, a1, a0
+	sub a0, a1, a0
+	ret
+----
+
+===== Convert Single-precision to Half-precision
+
+----
+.global __truncsfhf2
+__truncsfhf2:
+	h3.funpackq3.s a1, a0
+	h3.bextmi a2, a0, 23, 8
+	addi a2, -127 + 15
+	h3.fpackrq3.h a0, a1, a2
+	ret
+----
+
+===== Convert Signed Integer to Single-precision
+
+----
+.global __floatsisf
+__floatsisf:
+	beqz a0, 1f
+	h3.crsq3 a1, a0
+	neg a1, a1
+	h3.ssrasticky a0, a0, a1
+	// E.g.: integer 1 will have Q3 normalisation shift of 29, and
+	// should have unbiased exponent of 0. Larger value have smaller
+	// normalisation shifts, but larger exponents, so a1 is negated.
+	addi a1, a1, 127 - 29
+	h3.fpackrq3.s a0, a0, a1
+1:
+	ret
+----
+
+===== Convert Unsigned Integer to Single-precision
+
+----
+.global __floatunsisf
+__floatsisf:
+	beqz a0, 1f
+	// Normalise to Q3.29
+	clz a1, a0
+	addi a1, a1, -3
+	h3.sslasticky a0, a0, a1
+	// Calculate exponent
+	neg a1, a1
+	addi a1, a1, 127 - 29
+	// Round and pack
+	h3.fpackrq3.s a0, a0, a1
+1:
+	ret
+----

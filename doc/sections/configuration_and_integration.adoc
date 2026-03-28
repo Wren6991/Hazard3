@@ -496,7 +496,11 @@ Default value: `0`
 [[param-EXTENSION_XH3SFX]]
 ===== EXTENSION_XH3SFX
 
-Soft float acceleration instructions for Hazard3. See <<extension-xh3sfx-section>>.
+Soft float acceleration instructions for Hazard3. This adds a small number of ALU operations which dramatically speed up single-precision and half-precision floating point calculations. See <<extension-xh3sfx-section>>.
+
+NOTE: The following extensions are also recommended when Xh3sfx is enabled: <<param-EXTENSION_M>> = `1`, <<param-EXTENSION_XH3BEXTM>> = `1` and <<param-EXTENSION_ZBS>> = `1`.
+
+NOTE: For optimal multiply performance, the following performance options are recommended: <<param-MUL_FAST>> = `1` and <<param-MULH_FAST>> = `1`.
 
 Default value: `0`
 
