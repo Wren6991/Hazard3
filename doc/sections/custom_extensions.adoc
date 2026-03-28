@@ -259,18 +259,129 @@ This fixed-point format represents real numbers in the interval -4 ≤ _x_ < 4, 
 
 Unpack significand from single-precision to Q3.29.
 
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b1000000`  | `h3.funpackq3.s`
+| 24:20 | -        | `0b00000`    | RES0
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_funpackq3_s(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x40"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.funpackq3.h
 
 Unpack significand from half-precision to Q3.29.
 
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000000`  | `h3.funpackq3.h`
+| 24:20 | -        | `0b00000`    | RES0
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_funpackq3_h(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x00"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.fcheck2e.s
 
-Check two single-precision biased exponents for special cases. Returns `1` if either `rs1` or `rs2` is equal to either `0` or `255`. Otherwise returns `0`.
+Check two single-precision biased exponents for special cases. Returns `1` if either `rs1[7:0]` or `rs2[7:0]` is equal to either `0` or `255`. Otherwise returns `0`.
+
+Operand bits `31:8` are not checked.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b1000001`  | `h3.fcheck2e.s`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_fcheck2e_s(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x41"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
 
 ==== h3.fcheck2e.h
 
-Check two half-precision biased exponents for special cases. Returns `1` if either `rs1` or `rs2` is equal to either `0` or `31`. Otherwise returns `0`.
+Check two half-precision biased exponents for special cases. Returns `1` if either `rs1[4:0]` or `rs2[4:0]` is equal to either `0` or `31`. Otherwise returns `0`.
 
+Operand bits `31:5` are not checked.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000001`  | `h3.fcheck2e.h`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_fcheck2e_h(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x01"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
 
 ==== h3.fpackrq3.s
 
@@ -288,6 +399,33 @@ Rounding is always to-nearest with even on tie. Exponent overflow (including due
 
 NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero.
 
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b1000010`  | `h3.fpackrq3.s`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_fpackrq3_s(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x42"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.fpackrq3.h
 
 Pack rounded significand and exponent into half-precision.
@@ -304,6 +442,32 @@ Rounding is always to-nearest with even on tie. Exponent overflow (including due
 
 NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero.
 
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000010`  | `h3.fpackrq3.h`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_fpackrq3_h(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x02"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
 
 ==== h3.crsq3
 
@@ -311,6 +475,32 @@ Count redundant sign, for Q3.29 format. Returns an integer in the range -2 ≤ _
 
 This is equivalent to an integer "count redundant sign" operation, with a bias of -2.
 
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000100`  | `h3.crsq3`
+| 24:20 | -        | `0b00000`    | RES0
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_crsq3(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x04"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+----
 
 ==== h3.srasticky
 
@@ -318,9 +508,63 @@ Shift right, arithmetic, with sticky bits collected at LSB. The shift is wrapped
 
 NOTE: The expanded range of the shift amount avoids a special case branch for large exponent differences.
 
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000110`  | `h3.srasticky`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_srasticky(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x06"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.ssla
 
 Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. Left shifts ≥ 32 result in all-zeroes. Right shifts ≥ 32 result in all-sign.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000111`  | `h3.ssla`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_ssla(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x07"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
 
 ==== Example: fadd
 
