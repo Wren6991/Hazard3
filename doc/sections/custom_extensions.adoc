@@ -481,18 +481,24 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
-==== h3.crsq3
+==== h3.feadjq3
 
-Count redundant sign, for Q3.29 format. Returns an integer in the range -2 ≤ _x_ ≤ 30. If `rs1` is nonzero, then the result is the minimum left shift which can be applied to `rs1` to produce a value whose integer part is ±1. Negative values imply a right shift. If `rs1` is zero, the result is 30.
+Calculate exponent adjustment for Q3.29 format. Returns the greatest integer _x_ in the range -30 ≤ _x_ ≤ 2 such that right-shifting `rs1` by this integer produces a Q3.29 value _y_ in the range 1 ≤ |_y_| < 2. Negative values imply a left shift. If `rs1` is zero, the result is -30.
 
-This is equivalent to an integer "count redundant sign" operation, with a bias of -2.
+This calculation is equivalent to the following C code:
+
+----
+return 2 - __builtin_clz(rs1 < 0 ? -rs1 : rs1);
+----
+
+This value can be passed into `h3.ssrasticky` in `rs2` to re-normalise a Q3.29 value in `rs1`. It is also exactly the value which should be added to the floating-point exponent to account for the re-normalisation.
 
 Encoding (R-type):
 
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000100`  | `h3.crsq3`
+| 31:25 | `funct7` | `0b0000100`  | `h3.feadjq3`
 | 24:20 | -        | `0b00000`    | RES0
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -504,7 +510,7 @@ Encoding (R-type):
 Example C macro (using GCC statement expressions):
 
 ----
-#define __h3_crsq3(rs1) ({\
+#define __h3_feadjq3(rs1) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x04"\
         : "=r" (__rd) \
@@ -516,7 +522,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssrasticky
 
-Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[9:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
+Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[8:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
 
 NOTE: The size of the shift range is chosen to avoid special-case branching when adding numbers with large exponent differences.
 
@@ -526,7 +532,7 @@ Shifts outside of the range ±31 are handled as follows:
 
 * `rs2[9:0]` ≤ -32 results in all-zero.
 
-NOTE: A non-sticky `ssra` can be synthesised as `neg; h3.ssla`. The asymmetry between these instructions is optimised for the common use of left shifts in normalisation, and right shifts in alignment of operands with differing exponents.
+NOTE: A non-sticky `ssra` can be synthesised as `neg; h3.ssla`.
 
 Encoding (R-type):
 
@@ -545,7 +551,7 @@ Encoding (R-type):
 Example C macro (using GCC statement expressions):
 
 ----
-#define __h3_srasticky(rs1, rs2) ({\
+#define __h3_ssrasticky(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x06"\
         : "=r" (__rd) \
@@ -557,7 +563,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssla
 
-Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[9:0]` ≥ 32 then the result is all-zeroes. If `rs2[9:0]` ≤ -32 then the result is all-sign.
+Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[8:0]` ≥ 32 then the result is all-zeroes. If `rs2[8:0]` ≤ -32 then the result is all-sign.
 
 This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrasticky`.
 
@@ -614,9 +620,9 @@ __addsf3:
     sub \packed_rhs, \exp_lhs, \exp_rhs
     h3.srasticky \packed_lhs, \sig_rhs, \packed_rhs
     add \sig_lhs, \sig_lhs, \packed_lhs
-    h3.crsq3 \packed_lhs, \sig_lhs
-    h3.ssla \sig_lhs, \packed_lhs
-    sub \exp_lhs, \exp_lhs, \packed_lhs
+    h3.feadjq3 \packed_lhs, \sig_lhs
+    h3.ssrasticky \sig_lhs, \packed_lhs
+    add \exp_lhs, \exp_lhs, \packed_lhs
     h3.fpackrq3.s a0, \sig_lhs, \exp_lhs
     ret
 .endm
@@ -648,22 +654,34 @@ __mulsf3:
     // Multiply Q3.29 x Q3.29 -> Q6.58
     mul a1, a4, a5
     mulh a4, a4, a5
-    // Normalise (shift left by either 2 or 3)
-    h3.crsq3 a0, a4
-    sll a4, a4, a0
-	// Calculate new exponent
-    sub a2, a2, a0
-    add a2, a2, a3
-    // Subtract redundant bias term (127), add 3 for normalisation correction
-    addi a2, a2, -127 + 3
-    // Gather sticky bits from low fraction:
+    // Gather sticky bits from low fraction; a4 now effectively Q6.26
     snez a1, a1
     or a4, a4, a1
-    h3.fpackrq3.s
+    // Normalise (shift left by either 2 or 3)
+    h3.feadjq3 a0, a4
+    h3.ssrasticky a4, a4, a0
+	// Calculate new exponent;
+    // -127 is for redundant bias, +3 is for Q6 -> Q3 compensation
+    add a2, a2, a0
+    add a2, a2, a3
+    addi a2, a2, -127 + 3
+    h3.fpackrq3.s a0, a4, a2
     ret
 
 __mulsf_special_exponent:
 	// Handle special cases...
+----
+
+===== Convert Single-precision to Half-precision
+
+----
+.global __truncsfhf2
+__truncsfhf2:
+	h3.funpackq3.s a1, a0
+	h3.bextmi a2, a0, 23, 8
+	addi a2, -127 + 15
+	h3.fpackrq3.h a0, a1, a2
+	ret
 ----
 
 ===== Convert Single-precision to Signed Integer
@@ -689,31 +707,18 @@ __fixsfdi_large_exponent:
 	ret
 ----
 
-===== Convert Single-precision to Half-precision
-
-----
-.global __truncsfhf2
-__truncsfhf2:
-	h3.funpackq3.s a1, a0
-	h3.bextmi a2, a0, 23, 8
-	addi a2, -127 + 15
-	h3.fpackrq3.h a0, a1, a2
-	ret
-----
-
 ===== Convert Signed Integer to Single-precision
 
 ----
 .global __floatsisf
 __floatsisf:
 	beqz a0, 1f
-	h3.crsq3 a1, a0
-	neg a1, a1
+	h3.feadjq3 a1, a0
 	h3.ssrasticky a0, a0, a1
-	// E.g.: integer 1 will have Q3 normalisation shift of 29, and
-	// should have unbiased exponent of 0. Larger value have smaller
-	// normalisation shifts, but larger exponents, so a1 is negated.
-	addi a1, a1, 127 - 29
+	// E.g.: integer 1 will have Q3 normalisation shift of -29, and
+	// should have unbiased exponent of 0. Larger values have smaller
+	// (i.e. more-positive) normalisation shifts.
+	addi a1, a1, 127 + 29
 	h3.fpackrq3.s a0, a0, a1
 1:
 	ret
@@ -728,9 +733,9 @@ __floatsisf:
 	// Normalise to Q3.29
 	clz a1, a0
 	addi a1, a1, -3
-	h3.sslasticky a0, a0, a1
-	// Calculate exponent
 	neg a1, a1
+	h3.ssrasticky a0, a0, a1
+	// Calculate exponent
 	addi a1, a1, 127 - 29
 	// Round and pack
 	h3.fpackrq3.s a0, a0, a1
