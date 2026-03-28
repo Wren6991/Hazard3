@@ -426,7 +426,7 @@ Encoding (R-type):
 Example C macro (using GCC statement expressions):
 
 ----
-#define __h3_fpackrq3_s(rs1) ({\
+#define __h3_fpackrq3_s(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x42"\
         : "=r" (__rd) \
@@ -471,7 +471,7 @@ Encoding (R-type):
 Example C macro (using GCC statement expressions):
 
 ----
-#define __h3_fpackrq3_h(rs1) ({\
+#define __h3_fpackrq3_h(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x02"\
         : "=r" (__rd) \
@@ -539,7 +539,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000110`  | `h3.srasticky`
+| 31:25 | `funct7` | `0b0000110`  | `h3.ssrasticky`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -618,10 +618,10 @@ __addsf3:
 
 .macro addsf_core packed_lhs, packed_rhs, sig_lhs, sig_rhs, exp_lhs, exp_rhs
     sub \packed_rhs, \exp_lhs, \exp_rhs
-    h3.srasticky \packed_lhs, \sig_rhs, \packed_rhs
+    h3.ssrasticky \packed_lhs, \sig_rhs, \packed_rhs
     add \sig_lhs, \sig_lhs, \packed_lhs
     h3.feadjq3 \packed_lhs, \sig_lhs
-    h3.ssrasticky \sig_lhs, \packed_lhs
+    h3.ssrasticky \sig_lhs, \sig_lhs, \packed_lhs
     add \exp_lhs, \exp_lhs, \packed_lhs
     h3.fpackrq3.s a0, \sig_lhs, \exp_lhs
     ret
@@ -645,7 +645,7 @@ __addsf_special_exponent:
 __mulsf3:
     h3.bextmi a2, a0, 23, 8
     h3.bextmi a3, a1, 23, 8
-    h3.fcheck2e t0, a2, a3
+    h3.fcheck2e.s t0, a2, a3
     bnez t0, __mulsf_special_exponent
 
     h3.funpackq3.s a4, a0
@@ -679,9 +679,18 @@ __mulsf_special_exponent:
 __truncsfhf2:
 	h3.funpackq3.s a1, a0
 	h3.bextmi a2, a0, 23, 8
-	addi a2, -127 + 15
+    li t0, 255
+    beq a2, t0, 2f
+1:
+	addi a2, a2, -127 + 15
 	h3.fpackrq3.h a0, a1, a2
 	ret
+2:
+    // Return canonical NaN on NaN input.
+    slli a0, a0, 9
+    beqz 1b
+    li a0, -1
+    ret
 ----
 
 ===== Convert Single-precision to Signed Integer
@@ -689,8 +698,8 @@ __truncsfhf2:
 #TODO: this implements round-to-negative-infinity, but GCC requires round-to-zero.#
 
 ----
-.global __fixsfdi
-__fixsfdi:
+.global __fixsfsi
+__fixsfsi:
 	h3.bextmi a1, a0, 23, 8
 	li t0, 127 + 31
 	bgeu a1, t0, __fixsfdi_large_exponent
@@ -699,7 +708,7 @@ __fixsfdi:
 	h3.ssla a0, a0, a1
 	ret
 
-__fixsfdi_large_exponent:
+__fixsfsi_large_exponent:
 	li a1, 1 << 31
 	srai a0, a0, 31
 	xor a1, a1, a0
@@ -728,11 +737,11 @@ __floatsisf:
 
 ----
 .global __floatunsisf
-__floatsisf:
+__floatunsisf:
 	beqz a0, 1f
 	// Normalise to Q3.29
 	clz a1, a0
-	addi a1, a1, -3
+	addi a1, a1, -2
 	neg a1, a1
 	h3.ssrasticky a0, a0, a1
 	// Calculate exponent
