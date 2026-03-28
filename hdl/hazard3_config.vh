@@ -107,6 +107,9 @@ parameter EXTENSION_XH3PMPM   = 0,
 // EXTENSION_XH3POWER: Custom power management controls for Hazard3
 parameter EXTENSION_XH3POWER  = 0,
 
+// EXTENSION_XH3SFX: Soft float acceleration for Hazard3
+parameter EXTENSION_XH3SFX    = 0,
+
 // ----------------------------------------------------------------------------
 // Standard CSR support
 

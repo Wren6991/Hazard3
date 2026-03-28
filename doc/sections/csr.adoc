@@ -984,11 +984,12 @@ Indices `0x500` onward contain versions of custom Hazard3 extensions:
 [options="header"]
 |===
 | Word index  | Extension
-| `0x500` | Xh3misa
-| `0x501` | Xh3irq
-| `0x502` | Xh3pmpm
-| `0x503` | Xh3power
-| `0x504` | Xh3bextm
+| `0x500` | <<extension-xh3misa-section,Xh3misa>>
+| `0x501` | <<extension-xh3irq-section,Xh3irq>>
+| `0x502` | <<extension-xh3pmpm-section,Xh3pmpm>>
+| `0x503` | <<extension-xh3power-section,Xh3power>>
+| `0x504` | <<extension-xh3bextm-section,Xh3bextm>>
+| `0x505` | <<extension-xh3sfx-section,Xh3sfx>>
 |===
 
 The custom extension entries have the same `major.minor` bitfields as <<reg-mimpid>>:

@@ -10,7 +10,7 @@
 
 parameter W_REGADDR = 5,
 
-parameter W_ALUOP   = 6,
+parameter W_ALUOP   = 7,
 parameter W_ALUSRC  = 1,
 parameter W_MEMOP   = 5,
 parameter W_BCOND   = 2,

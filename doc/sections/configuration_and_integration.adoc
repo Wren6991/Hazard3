@@ -493,6 +493,13 @@ Custom power management controls for Hazard3. This adds the <<reg-h3.msleep>> CS
 
 Default value: `0`
 
+[[param-EXTENSION_XH3SFX]]
+===== EXTENSION_XH3SFX
+
+Soft float acceleration instructions for Hazard3. See <<extension-xh3sfx-section>>.
+
+Default value: `0`
+
 ==== CSR support
 
 NOTE: the Zicsr extension is implied by any of <<param-CSR_M_MANDATORY>>, <<param-CSR_M_TRAP>>,

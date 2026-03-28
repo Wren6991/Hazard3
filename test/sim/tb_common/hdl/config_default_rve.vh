@@ -22,6 +22,7 @@ localparam EXTENSION_XH3BEXTM  = 1;
 localparam EXTENSION_XH3IRQ    = 1;
 localparam EXTENSION_XH3PMPM   = 1;
 localparam EXTENSION_XH3POWER  = 1;
+localparam EXTENSION_XH3SFX    = 1;
 localparam CSR_M_MANDATORY     = 1;
 localparam CSR_M_TRAP          = 1;
 localparam CSR_COUNTER         = 1;

@@ -229,7 +229,9 @@ Example assembly macro:
 [[extension-xh3sfx-section]]
 === Xh3sfx: Soft Float Acceleration
 
-This document describes Xh3sfx version: 0.0 (dev)
+This document describes Xh3sfx version: 0.1 (dev)
+
+This extension is enabled by: <<param-EXTENSION_XH3SFX>>.
 
 Xh3sfx is a lightweight extension for accelerating calculations with IEEE 754 binary32 and binary16 formats, also known as single-precision and half-precision floating point. It focuses on packing, unpacking and rounding of floating-point values; the actual floating-point computation uses the existing integer instructions. It adds no architectural state, therefore there is no overhead for interrupts.
 

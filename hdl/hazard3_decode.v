@@ -506,6 +506,17 @@ always @ (*) begin
 	                                           raw_aluop = ALUOP_BEXTM;                                                                end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_H3_BEXTMI: if (EXTENSION_XH3BEXTM) begin
 	                                           raw_aluop = ALUOP_BEXTM;   raw_rs2 = X0; raw_imm = d_imm_i; raw_alusrc_b = ALUSRCB_IMM; end else begin d_invalid_32bit = 1'b1; end
+
+	`RVOPC_H3_FUNPACKQ3_H: if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FUNPACKQ3_H; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_FUNPACKQ3_S: if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FUNPACKQ3_S; end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_FCHECK2E_H:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FCHECK2E_H;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_FCHECK2E_S:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FCHECK2E_S;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_FPACKRQ3_H:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FPACKRQ3_H;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_FPACKRQ3_S:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FPACKRQ3_S;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_CRSQ3:       if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_CRSQ3;       end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_SRASTICKY:   if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_SRASTICKY;   end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_SSLA:        if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_SSLA;        end else begin d_invalid_32bit = 1'b1; end
+
 	`RVOPC_CSRRW:     if (HAVE_CSR)              begin raw_rs2 = X0; raw_imm = d_imm_i; raw_csr_wen = 1'b1  ;   raw_csr_ren = |raw_rd; raw_csr_wtype = CSR_WTYPE_W;                       end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_CSRRS:     if (HAVE_CSR)              begin raw_rs2 = X0; raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_S;                       end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_CSRRC:     if (HAVE_CSR)              begin raw_rs2 = X0; raw_imm = d_imm_i; raw_csr_wen = |raw_rs1; raw_csr_ren = 1'b1 ;   raw_csr_wtype = CSR_WTYPE_C;                       end else begin d_invalid_32bit = 1'b1; end
