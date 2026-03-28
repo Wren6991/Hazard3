@@ -526,7 +526,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.feadju3
 
-Calculate exponent adjustment for U3.29 format. Returns the greatest integer _x_ in the range -30 ≤ _x_ ≤ 2 such that right-shifting `rs1` by this integer produces a U3.29 value _y_ in the range 1 ≤ |_y_| < 2. Negative values imply a left shift. If `rs1` is zero, the result is -30.
+Calculate exponent adjustment for U3.29 format. Returns the greatest integer _x_ in the range -30 ≤ _x_ ≤ 2 such that right-shifting `rs1` by this integer produces a U3.29 value _y_ in the range 1 ≤ _y_ < 2. Negative values imply a left shift. If `rs1` is zero, the result is -30.
 
 This calculation is equivalent to the following C code:
 

@@ -50,13 +50,9 @@ wire lt = op_a[W_DATA-1] == op_b[W_DATA-1] ? sum[W_DATA-1]  :
 // ----------------------------------------------------------------------------
 // Shifter and shifter control decode
 
-wire shamt_is_bidirectional =
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRASTICKY) ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRLSTICKY) ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSLA      );
-
 wire       shamt_neg = op_b[8];
-wire [8:0] shamt_abs = shamt_is_bidirectional && shamt_neg ? -op_b[8:0] : op_b[8:0];
+wire       shamt_is_bidir = |EXTENSION_XH3SFX && aluop == ALUOP_SFX;
+wire [8:0] shamt_abs = shamt_is_bidir && shamt_neg ? -op_b[8:0] : op_b[8:0];
 wire       shamt_over = |shamt_abs[8:5];
 
 wire shift_right_nleft =
@@ -65,14 +61,11 @@ wire shift_right_nleft =
 	(|EXTENSION_ZBB      && aluop == ALUOP_ROR                   ) ||
 	(|EXTENSION_ZBS      && aluop == ALUOP_BEXT                  ) ||
 	(|EXTENSION_XH3BEXTM && aluop == ALUOP_BEXTM                 ) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRASTICKY && !shamt_neg) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSRLSTICKY && !shamt_neg) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SSLA       &&  shamt_neg);
+	(|EXTENSION_XH3SFX   && aluop == ALUOP_SFX && (shamt_neg == funct7_32b[2]));
 
 wire shift_arith =
 	aluop == ALUOP_SRA ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSRASTICKY && !shamt_neg) ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SSLA       &&  shamt_neg);
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SFX && funct7_32b[0] && shamt_neg == funct7_32b[2]);
 
 wire shift_rotate = |EXTENSION_ZBB & (aluop == ALUOP_ROR || aluop == ALUOP_ROL);
 
@@ -92,8 +85,6 @@ hazard3_shift_barrel #(
 // ----------------------------------------------------------------------------
 // Bit manipulation functions
 
-// Only used for h3.feadjq3; hopefully the carry chain is folded into the
-// lookahead on the priority encode.
 wire [W_DATA-1:0] op_a_abs = op_a[W_DATA-1] ? -op_a : op_a;
 
 reg  [W_DATA-1:0] op_a_rev;
@@ -106,9 +97,9 @@ always @ (*) begin: rev_op_a
 		// "leading" means starting at MSB. Using an LSB-first priority encoder, so
 		// "leading" is reversed and "trailing" is not.
 		ctz_search_mask[i] =
-			|EXTENSION_ZBB    && aluop == ALUOP_CLZ     ? op_a[W_DATA - 1 - i]     :
-			|EXTENSION_XH3SFX && aluop == ALUOP_FEADJU3 ? op_a[W_DATA - 1 - i]     :
-			|EXTENSION_XH3SFX && aluop == ALUOP_FEADJQ3 ? op_a_abs[W_DATA - 1 - i] : op_a[i];
+			|EXTENSION_ZBB    && aluop == ALUOP_CLZ                   ? op_a[W_DATA - 1 - i]     :
+			|EXTENSION_XH3SFX && aluop == ALUOP_SFX &&  funct7_32b[0] ? op_a[W_DATA - 1 - i]     :
+			|EXTENSION_XH3SFX && aluop == ALUOP_SFX && !funct7_32b[0] ? op_a_abs[W_DATA - 1 - i] : op_a[i];
 	end
 end
 
@@ -187,11 +178,14 @@ end
 
 // Q3 format has 29 fractional bits. For single-precision this is 6 excess
 // bits, and for half-precision it's 19 excess bits.
+
+wire xh3sfx_pack_is_s = funct7_32b[6];
+
 wire [31:0] xh3sfx_sig_abs = op_a[31] ? -op_a : op_a;
-wire [31:0] xh3sfx_rnd_bias = aluop == ALUOP_FPACKRQ3_H ? 32'h0003ffff : 32'h0000001f;
+wire [31:0] xh3sfx_rnd_bias = xh3sfx_pack_is_s ? 32'h0000001f : 32'h0003ffff;
 wire [31:0] xh3sfx_odd_bias = {
 	31'd0,
-	aluop == ALUOP_FPACKRQ3_H ? xh3sfx_sig_abs[29 - 10] : xh3sfx_sig_abs[29 - 23]
+	xh3sfx_pack_is_s ? xh3sfx_sig_abs[29 - 23] : xh3sfx_sig_abs[29 - 10]
 };
 wire [31:0] xh3sfx_sig_rnd = xh3sfx_sig_abs + xh3sfx_rnd_bias + xh3sfx_odd_bias;
 wire [9:0]  xh3sfx_exp_adj = op_b[9:0] + {9'd0, xh3sfx_sig_rnd[30]};
@@ -216,6 +210,27 @@ wire [W_SHAMT:0] xh3sfx_feadj = 6'h2 - ctz_clz;
 wire xh3sfx_sr_sticky = !op_b[8] && (
 	shamt_over ? |op_a : |(op_a & ~({32{1'b1}} << op_b[4:0]))
 );
+
+reg [W_DATA-1:0] sfx_result;
+always @ (*) begin
+	case (funct7_32b)
+		SFX_OP_FUNPACKQ3_H: sfx_result = ({3'd1, op_a[9:0], 19'd0} ^ {32{op_a[15]}}) + {31'd0, op_a[15]};
+		SFX_OP_FUNPACKQ3_S: sfx_result = ({3'd1, op_a[22:0], 6'd0} ^ {32{op_a[31]}}) + {31'd0, op_a[31]};
+		SFX_OP_FCHECK2E_H:  sfx_result = {31'd0, &op_a[4:0] || ~|op_a[4:0] || &op_b[4:0] || ~|op_b[4:0]};
+		SFX_OP_FCHECK2E_S:  sfx_result = {31'd0, &op_a[7:0] || ~|op_a[7:0] || &op_b[7:0] || ~|op_b[7:0]};
+		SFX_OP_FPACKRQ3_H:  sfx_result = {16'd0, xh3sfx_fpackrq3_h};
+		SFX_OP_FPACKRQ3_S:  sfx_result = xh3sfx_fpackrq3_s;
+		SFX_OP_FEADJQ3:     sfx_result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
+		SFX_OP_FEADJU3:     sfx_result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
+		SFX_OP_XORSIGN:     sfx_result = op_b[31] ? -op_a :  op_a;
+		SFX_OP_XNORSIGN:    sfx_result = op_b[31] ? op_a  : -op_a;
+		SFX_OP_SSRASTICKY:  sfx_result = (shamt_over ? {32{op_a[31] && !op_b[8]}} : shift_dout) | {31'd0, xh3sfx_sr_sticky};
+		SFX_OP_SSRLSTICKY:  sfx_result = (shamt_over ? 32'd0                      : shift_dout) | {31'd0, xh3sfx_sr_sticky};
+		SFX_OP_SSLA:        sfx_result = shamt_over ? {32{op_a[31] && op_b[8]}} : shift_dout;
+		default:            sfx_result = 32'hxxxxxxxx;
+	endcase
+end
+
 
 // ----------------------------------------------------------------------------
 // Output mux, with simple operations inline
@@ -286,27 +301,13 @@ always @ (*) begin
 		{9'bzzzzz1zzz, ALUOP_PACK       }: result = {op_b[15:0], op_a[15:0]};
 		{9'bzzzzz1zzz, ALUOP_PACKH      }: result = {{W_DATA-16{1'b0}}, op_b[7:0], op_a[7:0]};
 		{9'bzzzzz1zzz, ALUOP_BREV8      }: result = {op_a_rev[7:0], op_a_rev[15:8], op_a_rev[23:16], op_a_rev[31:24]};
-		{9'bzzzzz1zzz, ALUOP_UNZIP      }: result = unzip;
-		{9'bzzzzz1zzz, ALUOP_ZIP        }: result = zip;
+		{9'bzzzzz1zzz, ALUOP_ZIP        }: result = funct3_32b[2] ? unzip : zip;
 		// Zbkx
 		{9'bzzzzzz1zz, ALUOP_XPERM      }: result = funct3_32b[2] ? xperm8 : xperm4;
 		// Xh3bextm
 		{9'bzzzzzzz1z, ALUOP_BEXTM      }: result = shift_dout & {24'h0, {~(8'hfe << funct7_32b[3:1])}};
 		// Xh3sfx
-		{9'bzzzzzzzz1, ALUOP_FUNPACKQ3_H}: result = ({3'd1, op_a[9:0], 19'd0} ^ {32{op_a[15]}}) + {31'd0, op_a[15]};
-		{9'bzzzzzzzz1, ALUOP_FUNPACKQ3_S}: result = ({3'd1, op_a[22:0], 6'd0} ^ {32{op_a[31]}}) + {31'd0, op_a[31]};
-		{9'bzzzzzzzz1, ALUOP_FCHECK2E_H }: result = {31'd0, &op_a[4:0] || ~|op_a[4:0] || &op_b[4:0] || ~|op_b[4:0]};
-		{9'bzzzzzzzz1, ALUOP_FCHECK2E_S }: result = {31'd0, &op_a[7:0] || ~|op_a[7:0] || &op_b[7:0] || ~|op_b[7:0]};
-		{9'bzzzzzzzz1, ALUOP_FPACKRQ3_H }: result = {16'd0, xh3sfx_fpackrq3_h};
-		{9'bzzzzzzzz1, ALUOP_FPACKRQ3_S }: result = xh3sfx_fpackrq3_s;
-		{9'bzzzzzzzz1, ALUOP_FEADJQ3    }: result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
-		{9'bzzzzzzzz1, ALUOP_FEADJU3    }: result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
-		{9'bzzzzzzzz1, ALUOP_XORSIGN    }: result = op_b[31] ? -op_a :  op_a;
-		{9'bzzzzzzzz1, ALUOP_XNORSIGN   }: result = op_b[31] ? op_a  : -op_a;
-		{9'bzzzzzzzz1, ALUOP_SSRASTICKY }: result = (shamt_over ? {32{op_a[31] && !op_b[8]}} : shift_dout) | {31'd0, xh3sfx_sr_sticky};
-		{9'bzzzzzzzz1, ALUOP_SSRLSTICKY }: result = (shamt_over ? 32'd0                      : shift_dout) | {31'd0, xh3sfx_sr_sticky};
-		{9'bzzzzzzzz1, ALUOP_SSLA       }: result = shamt_over ? {32{op_a[31] && op_b[8]}} : shift_dout;
-
+		{9'bzzzzzzzz1, ALUOP_SFX        }: result = sfx_result;
 		default:                           result = bitwise;
 	endcase
 end

@@ -5,74 +5,62 @@
 
 // ALU operation selectors
 
-localparam ALUOP_ADD         = 7'h00;
-localparam ALUOP_SUB         = 7'h01;
-localparam ALUOP_LT          = 7'h02;
-localparam ALUOP_LTU         = 7'h04;
-localparam ALUOP_AND         = 7'h06;
-localparam ALUOP_OR          = 7'h07;
-localparam ALUOP_XOR         = 7'h08;
-localparam ALUOP_SRL         = 7'h09;
-localparam ALUOP_SRA         = 7'h0a;
-localparam ALUOP_SLL         = 7'h0b;
-localparam ALUOP_MULDIV      = 7'h0c;
-localparam ALUOP_RS2         = 7'h0d; // differs from AND/OR/XOR in [1:0]
+localparam ALUOP_ADD         = 6'h00;
+localparam ALUOP_SUB         = 6'h01;
+localparam ALUOP_LT          = 6'h02;
+localparam ALUOP_LTU         = 6'h04;
+localparam ALUOP_AND         = 6'h06;
+localparam ALUOP_OR          = 6'h07;
+localparam ALUOP_XOR         = 6'h08;
+localparam ALUOP_SRL         = 6'h09;
+localparam ALUOP_SRA         = 6'h0a;
+localparam ALUOP_SLL         = 6'h0b;
+localparam ALUOP_MULDIV      = 6'h0c;
+localparam ALUOP_RS2         = 6'h0d; // differs from AND/OR/XOR in [1:0]
 // Bitmanip ALU operations (some also used by AMOs):
-localparam ALUOP_SHXADD      = 7'h20;
-localparam ALUOP_CLZ         = 7'h23;
-localparam ALUOP_CPOP        = 7'h24;
-localparam ALUOP_CTZ         = 7'h25;
-localparam ALUOP_ANDN        = 7'h26; // Same LSBs as non-inverted
-localparam ALUOP_ORN         = 7'h27; // Same LSBs as non-inverted
-localparam ALUOP_XNOR        = 7'h28; // Same LSBs as non-inverted
-localparam ALUOP_MAX         = 7'h29;
-localparam ALUOP_MAXU        = 7'h2a;
-localparam ALUOP_MIN         = 7'h2b;
-localparam ALUOP_MINU        = 7'h2c;
-localparam ALUOP_ORC_B       = 7'h2d;
-localparam ALUOP_REV8        = 7'h2e;
-localparam ALUOP_ROL         = 7'h2f;
-localparam ALUOP_ROR         = 7'h30;
-localparam ALUOP_SEXT_B      = 7'h31;
-localparam ALUOP_SEXT_H      = 7'h32;
-localparam ALUOP_ZEXT_H      = 7'h33;
+localparam ALUOP_SHXADD      = 6'h20;
+localparam ALUOP_CLZ         = 6'h23;
+localparam ALUOP_CPOP        = 6'h24;
+localparam ALUOP_CTZ         = 6'h25;
+localparam ALUOP_ANDN        = 6'h26; // Same LSBs as non-inverted
+localparam ALUOP_ORN         = 6'h27; // Same LSBs as non-inverted
+localparam ALUOP_XNOR        = 6'h28; // Same LSBs as non-inverted
+localparam ALUOP_MAX         = 6'h29;
+localparam ALUOP_MAXU        = 6'h2a;
+localparam ALUOP_MIN         = 6'h2b;
+localparam ALUOP_MINU        = 6'h2c;
+localparam ALUOP_ORC_B       = 6'h2d;
+localparam ALUOP_REV8        = 6'h2e;
+localparam ALUOP_ROL         = 6'h2f;
+localparam ALUOP_ROR         = 6'h30;
+localparam ALUOP_SEXT_B      = 6'h31;
+localparam ALUOP_SEXT_H      = 6'h32;
+localparam ALUOP_ZEXT_H      = 6'h33;
 
 // Zbc
-localparam ALUOP_CLMUL       = 7'h34;
+localparam ALUOP_CLMUL       = 6'h34;
 
 // Zbs
-localparam ALUOP_BCLR        = 7'h35;
-localparam ALUOP_BEXT        = 7'h36;
-localparam ALUOP_BINV        = 7'h37;
-localparam ALUOP_BSET        = 7'h38;
+localparam ALUOP_BCLR        = 6'h35;
+localparam ALUOP_BEXT        = 6'h36;
+localparam ALUOP_BINV        = 6'h37;
+localparam ALUOP_BSET        = 6'h38;
 
 // Zbkb
-localparam ALUOP_PACK        = 7'h39;
-localparam ALUOP_PACKH       = 7'h3a;
-localparam ALUOP_BREV8       = 7'h3b;
-localparam ALUOP_ZIP         = 7'h3c;
-localparam ALUOP_UNZIP       = 7'h3d;
-
-// Xh3bextm
-localparam ALUOP_BEXTM       = 7'h3e;
-
-// Zbkx
-localparam ALUOP_XPERM       = 7'h3f;
+localparam ALUOP_PACK        = 6'h39;
+localparam ALUOP_PACKH       = 6'h3a;
+localparam ALUOP_BREV8       = 6'h3b;
+localparam ALUOP_ZIP         = 6'h3c;
 
 // Xh3sfx
-localparam ALUOP_FUNPACKQ3_H = 7'h40;
-localparam ALUOP_FUNPACKQ3_S = 7'h41;
-localparam ALUOP_FCHECK2E_H  = 7'h42;
-localparam ALUOP_FCHECK2E_S  = 7'h43;
-localparam ALUOP_FPACKRQ3_H  = 7'h44;
-localparam ALUOP_FPACKRQ3_S  = 7'h45;
-localparam ALUOP_FEADJQ3     = 7'h48;
-localparam ALUOP_FEADJU3     = 7'h49;
-localparam ALUOP_XORSIGN     = 7'h4a;
-localparam ALUOP_XNORSIGN    = 7'h4b;
-localparam ALUOP_SSRASTICKY  = 7'h4c;
-localparam ALUOP_SSRLSTICKY  = 7'h4d;
-localparam ALUOP_SSLA        = 7'h4e;
+localparam ALUOP_SFX         = 6'h3d;
+
+// Xh3bextm
+localparam ALUOP_BEXTM       = 6'h3e;
+
+// Zbkx
+localparam ALUOP_XPERM       = 6'h3f;
+
 
 // Parameters to control ALU input muxes. Bypass mux paths are
 // controlled by X, so D has no parameters to choose these.
@@ -142,3 +130,18 @@ localparam M_OP_DIV    = 3'h4;
 localparam M_OP_DIVU   = 3'h5;
 localparam M_OP_REM    = 3'h6;
 localparam M_OP_REMU   = 3'h7;
+
+// funct7 values for Xh3sfx extension
+localparam SFX_OP_FUNPACKQ3_H = 7'h00;
+localparam SFX_OP_FUNPACKQ3_S = 7'h40;
+localparam SFX_OP_FCHECK2E_H  = 7'h01;
+localparam SFX_OP_FCHECK2E_S  = 7'h41;
+localparam SFX_OP_FPACKRQ3_H  = 7'h02;
+localparam SFX_OP_FPACKRQ3_S  = 7'h42;
+localparam SFX_OP_FEADJQ3     = 7'h04;
+localparam SFX_OP_FEADJU3     = 7'h05;
+localparam SFX_OP_XORSIGN     = 7'h06;
+localparam SFX_OP_XNORSIGN    = 7'h07;
+localparam SFX_OP_SSRLSTICKY  = 7'h0a;
+localparam SFX_OP_SSRASTICKY  = 7'h0b;
+localparam SFX_OP_SSLA        = 7'h0d;
