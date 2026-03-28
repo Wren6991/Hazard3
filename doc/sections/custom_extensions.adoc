@@ -235,6 +235,8 @@ This extension is enabled by: <<param-EXTENSION_XH3SFX>>.
 
 Xh3sfx is a lightweight extension for accelerating calculations with IEEE 754 binary32 and binary16 formats, also known as single-precision and half-precision floating point. It focuses on packing, unpacking and rounding of floating-point values; the actual floating-point computation uses the existing integer instructions. It adds no architectural state, therefore there is no overhead for interrupts.
 
+==== Data Formats
+
 The binary16 format (half precision) is defined as follows:
 
 * 1 sign bit, bit `15`.
@@ -257,11 +259,13 @@ Unpacked significands are represented with the Q3.29 format (or simply `q3`), wh
 
 This fixed-point format represents real numbers in the interval -4 ≤ _x_ < 4, which is sufficient for addition of IEEE 754 significands normalised to the interval -2 < _x_ < 2. It also has sufficient fractional bits that a 32 × 32 -> 64-bit multiply (`mul; mulh`) leaves the guard and round bits, plus space for the sticky bit, in the upper half of the result.
 
+In some cases, such as converting unsigned integers to floating point numbers, it can be useful to interpret integer registers as U3.29 format (or simply `u3`). This is the same as Q3.29, except it is unsigned. It represents real numbers in the interval 0 ≤ _x_ < 8.
+
 ==== h3.funpackq3.s
 
 Unpack significand from single-precision to Q3.29. The result is in the range `0xc0000040` through `0x3fffffc0` inclusive, which is approximately -2 through +2.
 
-The implicit one is set even if the exponent is all-zeroes.
+The result is a function only of the sign and significand bits of `rs1`. It does not depend on the exponent. Therefore the implicit one is set even if the exponent is all-zeroes.
 
 NOTE: The expectation is that zero exponents are checked with `h3.fcheck2e.s` and handled as a special case to enforce consistent flush-to-zero semantics on both inputs and outputs. Another (non-IEEE-compliant) option is to treat exponent `0` as the next normal exponent below `1`, which slightly extends the range without having to handle subnormals.
 
@@ -294,9 +298,9 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.funpackq3.h
 
-Unpack significand from half-precision to Q3.29.
+Unpack significand from half-precision to Q3.29. The result is in the range `0xc0040000` through `0x3ffc0000` inclusive, which is approximately -2 through +2.
 
-The implicit one is set even if the exponent is all-zeroes. The result is in the range `0xc0040000` through `0x3ffc0000` inclusive, which is approximately -2 through +2.
+The result is a function only of the sign and significand bits of `rs1`. It does not depend on the exponent. Therefore the implicit one is set even if the exponent is all-zeroes.
 
 NOTE: The expectation is that zero exponents are checked with `h3.fcheck2e.h` and handled as a special case to enforce consistent flush-to-zero semantics on both inputs and outputs. Another (non-IEEE-compliant) option is to treat exponent `0` as the next normal exponent below `1`, which slightly extends the range without having to handle subnormals.
 
@@ -438,7 +442,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.fpackrq3.h
 
-Pack rounded significand and exponent into half-precision.
+Pack rounded significand and exponent into half-precision. The result is returned in the 16 LSBs of `rd`; the remaining bits are all-zeroes.
 
 The significand in `rs1` is in Q3.29 format and must be normalised or zero; that is, it must be either:
 
@@ -491,7 +495,7 @@ This calculation is equivalent to the following C code:
 return 2 - __builtin_clz(rs1 < 0 ? -rs1 : rs1);
 ----
 
-This value can be passed into `h3.ssrasticky` in `rs2` to re-normalise a Q3.29 value in `rs1`. It is also exactly the value which should be added to the floating-point exponent to account for the re-normalisation.
+This value can be passed into `h3.ssrasticky` in `rs2` to re-normalise a Q3.29 value in `rs1`. It is also exactly the value which should be added to the floating-point exponent to account for the re-normalisation performed by `h3.ssrasticky`.
 
 Encoding (R-type):
 
@@ -520,6 +524,107 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
+==== h3.feadju3
+
+Calculate exponent adjustment for U3.29 format. Returns the greatest integer _x_ in the range -30 ≤ _x_ ≤ 2 such that right-shifting `rs1` by this integer produces a U3.29 value _y_ in the range 1 ≤ |_y_| < 2. Negative values imply a left shift. If `rs1` is zero, the result is -30.
+
+This calculation is equivalent to the following C code:
+
+----
+return 2 - __builtin_clz(rs1);
+----
+
+This value can be passed into `h3.ssrlsticky` in `rs2` to re-normalise a U3.29 value in `rs1`. It is also exactly the value which should be added to the floating-point exponent to account for the re-normalisation performed by `h3.ssrlsticky`.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000101`  | `h3.feadju3`
+| 24:20 | -        | `0b00000`    | RES0
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_feadju3(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, zero, 0x05"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+----
+
+==== h3.xorsign
+
+Returns `rs2 < 0 ? -rs1 : rs1`.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000110`  | `h3.xorsign`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_xorsign(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x06"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
+==== h3.xnorsign
+
+Returns `rs2 < 0 ? rs1 : -rs1`.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000111`  | `h3.xnorsign`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_xnorsign(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x07"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.ssrasticky
 
 Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[8:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
@@ -539,7 +644,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000110`  | `h3.ssrasticky`
+| 31:25 | `funct7` | `0b0001011`  | `h3.ssrasticky`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -553,7 +658,44 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssrasticky(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x06"\
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x0b"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
+==== h3.ssrlsticky
+
+Shift signed-right, logical, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[8:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
+
+Shifts outside of the range ±31 are handled as follows:
+
+* `rs2[9:0]` ≥ 32 results in all-zeroes, except for bit `0` of the result, which is the OR of all bits in `rs1`.
+
+* `rs2[9:0]` ≤ -32 results in all-zeroes.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0001010`  | `h3.ssrlsticky`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_ssrlsticky(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x0a"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -572,7 +714,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000111`  | `h3.ssla`
+| 31:25 | `funct7` | `0b0001101`  | `h3.ssla`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -586,7 +728,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssla(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x07"\
+    asm (".insn r 0x0b, 0x1, %0, %1, %2, 0x0d"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -599,6 +741,12 @@ Example C macro (using GCC statement expressions):
 NOTE: The function names in this section follow the conventions for https://gcc.gnu.org/onlinedocs/gccint/Soft-float-library-routines.html[libgcc].
 
 ===== Single-precision Add and Subtract
+
+The `h3.fcheck2e.s` instruction and the accompanying branch eliminates any NaN, infinity and (potentially unflushed) zero inputs from the main path. The remainder of the function only needs to deal with normal inputs.
+
+The first `h3.ssrasticky` serves to align the lower-exponent number against the higher-exponent number. The higher-exponent number remains normalised to Q3.29.
+
+The second `h3.ssrasticky` re-aligns the result. The range of possible values for  `h3.feadjq3` here is `1` to `-30`. The value of `-30` only occurs in the case of exact cancellation (i.e. _x_ + -__x__ for some _x_). We actually get the wrong exponent in this case; this is fine since `h3.fpackrq3.s` already handles all-zeroes significand as a special case, in order to produce the _positive_ zero that IEEE 754 requires for exact cancellation.
 
 ----
 .global __subsf3
@@ -674,6 +822,8 @@ __mulsf_special_exponent:
 
 ===== Convert Single-precision to Half-precision
 
+Most cases are correctly handled by simply unpacking single-precision to Q3.29, adjusting the exponent bias, and re-packing as half-precision. The one troublesome case is a signaling NaN input may have its payload rounded to all-zeroes, producing an infinity. This requires a special case to promote all input NaNs to a canonical quiet NaN.
+
 ----
 .global __truncsfhf2
 __truncsfhf2:
@@ -688,14 +838,14 @@ __truncsfhf2:
 2:
     // Return canonical NaN on NaN input.
     slli a0, a0, 9
-    beqz 1b
+    beqz a0, 1b
     li a0, -1
     ret
 ----
 
 ===== Convert Single-precision to Signed Integer
 
-#TODO: this implements round-to-negative-infinity, but GCC requires round-to-zero.#
+The double negation using `h3.xorsign` is used to implement round-to-zero semantics, as required by GCC.
 
 ----
 .global __fixsfsi
@@ -705,14 +855,14 @@ __fixsfsi:
 	bgeu a1, t0, __fixsfdi_large_exponent
 	h3.funpackq3.s a0, a0
 	addi a1, a1, -127 - 29
-	h3.ssla a0, a0, a1
+    h3.xorsign a2, a0, a0
+	h3.ssla a2, a2, a1
+    h3.xorsign a0, a0, a2
 	ret
 
 __fixsfsi_large_exponent:
 	li a1, 1 << 31
-	srai a0, a0, 31
-	xor a1, a1, a0
-	sub a0, a1, a0
+    h3.xnorsign a0, a1, a0
 	ret
 ----
 
@@ -740,10 +890,8 @@ __floatsisf:
 __floatunsisf:
 	beqz a0, 1f
 	// Normalise to Q3.29
-	clz a1, a0
-	addi a1, a1, -2
-	neg a1, a1
-	h3.ssrasticky a0, a0, a1
+    h3.feadju3 a1, a0
+	h3.ssrlsticky a0, a0, a1
 	// Calculate exponent
 	addi a1, a1, 127 - 29
 	// Round and pack

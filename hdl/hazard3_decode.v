@@ -514,7 +514,11 @@ always @ (*) begin
 	`RVOPC_H3_FPACKRQ3_H:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FPACKRQ3_H;  end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_H3_FPACKRQ3_S:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FPACKRQ3_S;  end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_H3_FEADJQ3:     if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FEADJQ3;     end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_FEADJU3:     if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_FEADJU3;     end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_XORSIGN:     if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_XORSIGN;     end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_XNORSIGN:    if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_XNORSIGN;    end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_H3_SSRASTICKY:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_SSRASTICKY;  end else begin d_invalid_32bit = 1'b1; end
+	`RVOPC_H3_SSRLSTICKY:  if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_SSRLSTICKY;  end else begin d_invalid_32bit = 1'b1; end
 	`RVOPC_H3_SSLA:        if (EXTENSION_XH3SFX) begin raw_aluop = ALUOP_SSLA;        end else begin d_invalid_32bit = 1'b1; end
 
 	`RVOPC_CSRRW:     if (HAVE_CSR)              begin raw_rs2 = X0; raw_imm = d_imm_i; raw_csr_wen = 1'b1  ;   raw_csr_ren = |raw_rd; raw_csr_wtype = CSR_WTYPE_W;                       end else begin d_invalid_32bit = 1'b1; end
