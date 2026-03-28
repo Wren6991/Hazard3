@@ -231,7 +231,7 @@ Example assembly macro:
 
 This document describes Xh3sfx version: 0.0 (dev)
 
-Xh3sfx is a lightweight extension for accelerating calculations with IEEE 754 binary32 and binary16 formats, also known as single-precision and half-precision floating point. It focuses on packing, unpacking and rounding of floating point values. The actual floating point computation is performed using the usual integer instructions. It adds no architectural state, therefore there is no overhead for interrupts.
+Xh3sfx is a lightweight extension for accelerating calculations with IEEE 754 binary32 and binary16 formats, also known as single-precision and half-precision floating point. It focuses on packing, unpacking and rounding of floating-point values; the actual floating-point computation uses the existing integer instructions. It adds no architectural state, therefore there is no overhead for interrupts.
 
 The binary16 format (half precision) is defined as follows:
 
@@ -278,7 +278,7 @@ Pack rounded significand and exponent into single-precision.
 
 The significand in `rs1` is in Q3.29 format and must be normalised or zero; that is, it must be either:
 
-* In the range -2 < _x_ ≤ 1.
+* In the range -2 < _x_ ≤ -1.
 * In the range 1 ≤ _x_ < 2.
 * Equal to zero.
 
@@ -294,7 +294,7 @@ Pack rounded significand and exponent into half-precision.
 
 The significand in `rs1` is in Q3.29 format and must be normalised or zero; that is, it must be either:
 
-* In the range -2 < _x_ ≤ 1.
+* In the range -2 < _x_ ≤ -1.
 * In the range 1 ≤ _x_ < 2.
 * Equal to zero.
 
@@ -340,7 +340,7 @@ __addsf3:
 
     bltu a2, a3, __addsf_ye_gt_xe
 
-.macro addsf_core packed_lhs, packed_rhs, sig_lhs, sig_rhs, exp_lhs, exp_rhs, rhs_is_x
+.macro addsf_core packed_lhs, packed_rhs, sig_lhs, sig_rhs, exp_lhs, exp_rhs
     sub \packed_rhs, \exp_lhs, \exp_rhs
     h3.srasticky \packed_lhs, \sig_rhs, \packed_rhs
     add \sig_lhs, \sig_lhs, \packed_lhs
@@ -352,10 +352,10 @@ __addsf3:
 .endm
 
 __addsf_xe_gte_ye:
-    addsf_core a0, a1, a4, a5, a2, a3, 0
+    addsf_core a0, a1, a4, a5, a2, a3
 .p2align 2
 __addsf_ye_gt_xe:
-    addsf_core a1, a0, a5, a4, a3, a2, 1
+    addsf_core a1, a0, a5, a4, a3, a2
 
 __addsf_special_exponent:
 	// Handle special cases...
