@@ -325,7 +325,7 @@ funcsection(floatunsisf)
 .global funcname(floatunsisf)
 funcname(floatunsisf):
 	beqz a0, 1f
-	// Normalise to Q3.29
+	// Normalise to U3.29
     h3.feadju3 a1, a0
 	h3.ssrlsticky a0, a0, a1
 	// Calculate exponent

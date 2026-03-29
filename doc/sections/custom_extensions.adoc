@@ -821,6 +821,10 @@ __addsf_special_exponent:
 
 ===== Single-precision Multiply
 
+Again, any zeroes and infinities are swiftly eliminated from the main path because these have complex rules in IEEE 754. The main path only deals with multiplication of normals.
+
+It's necessary to collect sticky bits from the low fraction in `a0` _before_ normalising `a4`, to ensure correct handling of a nearly-subnormal result whose fractional bits in `a4` are all zero.
+
 ----
 .global __mulsf3
 .p2align 2
@@ -829,7 +833,6 @@ __mulsf3:
     h3.bextmi a3, a1, 23, 8
     h3.fcheck2e.s t0, a2, a3
     bnez t0, __mulsf_special_exponent
-
     h3.funpackq3.s a4, a0
     h3.funpackq3.s a5, a1
 
@@ -877,9 +880,40 @@ __truncsfhf2:
     ret
 ----
 
+===== Compare Single-precision
+
+Concatenation of exponent and significand is correctly ordered with respect to
+magnitude. This is a 31-bit value; converting sign-magnitude to two's complement
+gives a fully correctly ordered 32-bit integer.
+
+This doesn't handle NaNs gracefully but, quote libgcc docs, "you should not
+rely on this; if NaN is a possibility, use one of the higher-level comparison
+functions".
+
+----
+.global __fcmpsf2
+__fcmpsf2:
+    bclri a2, a0, 31
+    bclri a3, a1, 31
+    h3.xorsign a2, a2, a0
+    h3.xorsign a3, a3, a1
+    blt a2, a3, __fcmpsf2_lt
+    bgt a2, a3, __fcmpsf2_gt
+    li a0, 0
+    ret
+__fcmpsf2_lt:
+    li a0, -1
+    ret
+__fcmpsf2_gt:
+    li a0, 1
+    ret
+----
+
 ===== Convert Single-precision to Signed Integer
 
 The double negation using `h3.xorsign` is used to implement round-to-zero semantics, as required by GCC.
+
+This implementation chooses to return `INT_MIN` or `INT_MAX` for large exponents, depending on sign. This includes NaNs and infinities.
 
 ----
 .global __fixsfsi
@@ -893,24 +927,33 @@ __fixsfsi:
 	h3.ssla a2, a2, a1
     h3.xorsign a0, a0, a2
 	ret
-
+.p2align 2
 __fixsfsi_large_exponent:
-	li a1, 1 << 31
-    h3.xnorsign a0, a1, a0
-	ret
+    li a1, 1 << 31
+    srai a0, a0, 31
+    xor a0, a0, a1
+    ret
 ----
 
 ===== Convert Signed Integer to Single-precision
+
+To understand how the exponent is calculated, consider how the integer `1`
+will have been normalised. Its Q3 normalisation shift is -29, as the single
+set bit should end up in the first integer place in Q3 format. The unbiased
+exponent of floating-point `1.f` should be zero, since it's two to the power
+zero. The biased exponent is calculated by adding 127 to this values.
+
+Larger values have smaller (i.e. more-positive) normalisation shifts, so
+increasing integer values have increasing exponents as we would hope.
 
 ----
 .global __floatsisf
 __floatsisf:
 	beqz a0, 1f
+    // Normalise to Q3.29; sticky shift helps ensure correct rounding
 	h3.feadjq3 a1, a0
 	h3.ssrasticky a0, a0, a1
-	// E.g.: integer 1 will have Q3 normalisation shift of -29, and
-	// should have unbiased exponent of 0. Larger values have smaller
-	// (i.e. more-positive) normalisation shifts.
+    // Calculate exponent
 	addi a1, a1, 127 + 29
 	h3.fpackrq3.s a0, a0, a1
 1:
@@ -919,11 +962,13 @@ __floatsisf:
 
 ===== Convert Unsigned Integer to Single-precision
 
+This is very similar to the previous example, but a logical sticky shift is required to avoid smearing bit 31 of the unsigned integer input. Similarly the U3.29 variant of `h3.feadjq3` is required to get the correct normalisation shift when bit 31 is set.
+
 ----
 .global __floatunsisf
 __floatunsisf:
 	beqz a0, 1f
-	// Normalise to Q3.29
+	// Normalise to U3.29; sticky shift helps ensure correct rounding.
     h3.feadju3 a1, a0
 	h3.ssrlsticky a0, a0, a1
 	// Calculate exponent
