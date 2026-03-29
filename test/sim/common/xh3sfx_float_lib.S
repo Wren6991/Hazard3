@@ -374,6 +374,26 @@ __fcmpsf2_gt:
 	li a0, 1
 	ret
 
+funcsection(fcmphf2)
+.global funcname(fcmphf2)
+funcname(fcmphf2):
+	slli a0, a0, 16
+	slli a1, a1, 16
+	bclri a2, a0, 31
+	bclri a3, a1, 31
+	h3.xorsign a2, a0, a2
+	h3.xorsign a3, a1, a3
+	blt a2, a3, __fcmphf2_lt
+	bgt a2, a3, __fcmphf2_gt
+	li a0, 0
+	ret
+__fcmphf2_lt:
+	li a0, -1
+	ret
+__fcmphf2_gt:
+	li a0, 1
+	ret
+
 // ----------------------------------------------------------------------------
 // Conversions: f32 <-> f16
 
