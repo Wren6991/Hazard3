@@ -594,40 +594,14 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
-==== h3.xnorsign
-
-Returns `rs2 < 0 ? rs1 : -rs1`.
-
-Encoding (R-type):
-
-[cols="10h,20h,20h,~", options="header"]
-|===
-| Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000111`  | `h3.xnorsign`
-| 24:20 | `rs2`    | -            | Source register 2
-| 19:15 | `rs1`    | -            | Source register 1
-| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
-| 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
-|===
-
-Example C macro (using GCC statement expressions):
-
-----
-#define __h3_xnorsign(rs1, rs2) ({\
-    uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x07, %0, %1, %2"\
-        : "=r" (__rd) \
-        : "r" (rs1), "r" (rs2) \
-    ); \
-    __rd; \
-})
-----
-
 ==== h3.ssla
 
-Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[8:0]` ≥ 32 then the result is all-zeroes. If `rs2[8:0]` ≤ -32 then the result is all-sign.
+Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. The cases are:
+
+* -256 ≤ `rs2[8:0]` ≤ -32: result is all-sign.
+* -32 < `rs2[8:0]` < 0: result is `rs1 >> -rs2[8:0]` (arithmetic right shift).
+* 0 ≤ `rs2[8:0]` < 32: result is `rs1 << rs2[8:0]`.
+* 32 ≤ `rs2[8:0]` ≤ 255: result is all-zeroes.
 
 This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrasticky`.
 
@@ -660,7 +634,13 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssll
 
-Shift signed-left, logical. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[8:0]` is outside the range ±31 then the result is all-zeroes.
+Shift signed-left, logical. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. The cases are:
+
+* -256 ≤ `rs2[8:0]` ≤ -32: result is all-zeroes.
+* -32 < `rs2[8:0]` < 0: result is `rs1 >> -rs2[8:0]` (logical right shift).
+* 0 ≤ `rs2[8:0]` < 32: result is `rs1 << rs2[8:0]`.
+* 32 ≤ `rs2[8:0]` ≤ 255: result is all-zeroes.
+
 
 This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrlsticky`.
 
@@ -699,9 +679,9 @@ NOTE: The size of the shift range is chosen to avoid special-case branching when
 
 Shifts outside of the range ±31 are handled as follows:
 
-* `rs2[9:0]` ≥ 32 results in all-sign, except for bit `0` of the result, which is the OR of all bits in `rs1`.
+* `rs2[8:0]` ≥ 32 results in all-sign, except for bit `0` of the result, which is the OR of all bits in `rs1`.
 
-* `rs2[9:0]` ≤ -32 results in all-zero.
+* `rs2[8:0]` ≤ -32 results in all-zero.
 
 NOTE: A non-sticky `ssra` can be synthesised as `neg; h3.ssla`.
 
@@ -738,9 +718,9 @@ Shift signed-right, logical, with sticky bits collected at LSB. `rs1` is shifted
 
 Shifts outside of the range ±31 are handled as follows:
 
-* `rs2[9:0]` ≥ 32 results in all-zeroes, except for bit `0` of the result, which is the OR of all bits in `rs1`.
+* `rs2[8:0]` ≥ 32 results in all-zeroes, except for bit `0` of the result, which is the OR of all bits in `rs1`.
 
-* `rs2[9:0]` ≤ -32 results in all-zeroes.
+* `rs2[8:0]` ≤ -32 results in all-zeroes.
 
 Encoding (R-type):
 
@@ -873,10 +853,11 @@ __truncsfhf2:
     h3.fpackrq3.h a0, a1, a2
     ret
 2:
-    // Return canonical NaN on NaN input.
+    // Return canonical NaN on NaN input. Use a zero-extended value for
+    // consistency with other half-precision results.
     slli a0, a0, 9
     beqz a0, 1b
-    li a0, -1
+    li a0, 0xffff
     ret
 ----
 
@@ -930,8 +911,9 @@ __fixsfsi:
 .p2align 2
 __fixsfsi_large_exponent:
     srai a0, a0, 31
-    srli a0, a0, 1
-    not a0, a0
+    li a1, -1
+    srli a1, a1, 1
+    xor a0, a0, a1
     ret
 ----
 
@@ -972,7 +954,7 @@ __floatunsisf:
     h3.feadju3 a1, a0
     h3.ssrlsticky a0, a0, a1
     // Calculate exponent
-    addi a1, a1, 127 - 29
+    addi a1, a1, 127 + 29
     // Round and pack
     h3.fpackrq3.s a0, a0, a1
 1:

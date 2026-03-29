@@ -133,13 +133,6 @@ int main() {
 	check_equal(__h3_xorsign(0xdeadbeefu, 0x80000000u), -0xdeadbeefu);
 	check_equal(__h3_xorsign(0xdeadbeefu, 0), 0xdeadbeefu);
 
-	check_equal(__h3_xnorsign( 1,  1), -1);
-	check_equal(__h3_xnorsign( 1, -1),  1);
-	check_equal(__h3_xnorsign( -1, 1),  1);
-	check_equal(__h3_xnorsign( -1,-1), -1);
-	check_equal(__h3_xnorsign(0xdeadbeefu, 0x80000000u), 0xdeadbeefu);
-	check_equal(__h3_xnorsign(0xdeadbeefu, 0), -0xdeadbeefu);
-
 	check_equal(__h3_fpackrq3_s(0, 0),                0x00000000); // Exact cancellation
 	check_equal(__h3_fpackrq3_s(0, 255),              0x00000000); // Exact cancellation
 	check_equal(__h3_fpackrq3_s(0, 510),              0x00000000); // Exact cancellation
