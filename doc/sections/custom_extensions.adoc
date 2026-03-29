@@ -229,7 +229,7 @@ Example assembly macro:
 [[extension-xh3sfx-section]]
 === Xh3sfx: Soft Float Acceleration
 
-This document describes Xh3sfx version: 0.1 (dev)
+This document describes Xh3sfx version: 1.0
 
 This extension is enabled by: <<param-EXTENSION_XH3SFX>>.
 
@@ -263,7 +263,16 @@ In some cases, such as converting unsigned integers to floating point numbers, i
 
 ==== h3.funpackq3.s
 
-Unpack significand from single-precision to Q3.29. The result is in the range `0xc0000040` through `0x3fffffc0` inclusive, which is approximately -2 through +2.
+Unpack significand from single-precision to Q3.29. The result is in the range `0xc0000040` through `0x3fffffc0` inclusive, which is approximately -2 through +2. This is equivalent to the following C code:
+
+----
+uint32_t h3_funpackq3_s(uint32_t rs1) {
+    uint32_t tmp0 = rs1 << 9;
+    uint32_t tmp1 = tmp0 >> 3;
+    uint32_t tmp2 = tmp1 | (1u << 29);
+    return rs1 & (1u << 31) ? -tmp2 : tmp2;
+}
+----
 
 The result is a function only of the sign and significand bits of `rs1`. It does not depend on the exponent. Therefore the implicit one is set even if the exponent is all-zeroes.
 
@@ -298,7 +307,17 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.funpackq3.h
 
-Unpack significand from half-precision to Q3.29. The result is in the range `0xc0040000` through `0x3ffc0000` inclusive, which is approximately -2 through +2.
+Unpack significand from half-precision to Q3.29. The result is in the range `0xc0040000` through `0x3ffc0000` inclusive, which is approximately -2 through +2. This is equivalent to the following C code:
+
+----
+uint32_t h3_funpackq3_h(uint32_t rs1) {
+    uint32_t tmp0 = rs1 << 22;
+    uint32_t tmp1 = tmp0 >> 3
+    uint32_t tmp2 = tmp1 | (1u << 29);
+    return rs1 & (1u << 15) ? -tmp2 : tmp2;
+}
+----
+
 
 The result is a function only of the sign and significand bits of `rs1`. It does not depend on the exponent. Therefore the implicit one is set even if the exponent is all-zeroes.
 
@@ -407,9 +426,15 @@ The significand in `rs1` is in Q3.29 format and must be normalised or zero; that
 * In the range 1 ≤ _x_ < 2.
 * Equal to zero.
 
-The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ ≤ 510.
+The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ ≤ 510. The instruction applies the following steps in sequence:
 
-Rounding is always to-nearest with even on tie. Exponent overflow (including due to rounding) results in infinity with the same sign as the significand. Exponent underflow results in zero with the same sign as the significand. A zero significand results in positive zero.
+* If all significant bits of `rs1` are zero, return `+0.f`.
+* Take absolute value of `rs1`.
+* Round `rs1` to 23 fractional bits; the rounding rule is to-nearest, even on tie.
+* If bit 30 of `rs1` is set, shift right by 1 and increment exponent by 1
+* If exponent ≤ 0, return `0.f` with input sign
+* If exponent ≥ 255, return `inf` with input sign
+* Pack sign, exponent and rounded significand, and return
 
 NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero.
 
@@ -454,7 +479,15 @@ The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ 
 
 NOTE: This exponent range is wider than required for half-precision calculations but is useful when converting from single-precision to half-precision.
 
-Rounding is always to-nearest with even on tie. Exponent overflow (including due to rounding) results in infinity with the same sign as the significand. Exponent underflow results in zero with the same sign as the significand. A zero significand results in positive zero.
+The instruction applies the following steps in sequence:
+
+* If all significant bits of `rs1` are zero, return `+0.f`
+* Take absolute value of `rs1`
+* Round `rs1` to 10 fractional bits; the rounding rule is to-nearest, even on tie.
+* If bit 30 of `rs1` is set, shift right by 1 and increment exponent by 1
+* If exponent ≤ 0, return `0.f` with input sign
+* If exponent ≥ 31, return `inf` with input sign
+* Pack sign, exponent and rounded significand, and return
 
 NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero.
 
@@ -566,6 +599,8 @@ Example C macro (using GCC statement expressions):
 ==== h3.xorsign
 
 Returns `rs2 < 0 ? -rs1 : rs1`.
+
+This conditional negation is useful for making integer right-shifts truncate towards zero instead of towards negative infinity, as shown in the `fixsfsi2` example. It also implements the C `abs()` operation in one instruction, when the same register is passed as `rs1` and `rs2`.
 
 Encoding (R-type):
 
