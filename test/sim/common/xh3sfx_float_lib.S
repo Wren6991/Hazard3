@@ -280,9 +280,9 @@ funcname(fixsfsi):
 	ret
 .p2align 2
 __fixsfsi_large_exponent:
-	li a1, 1 << 31
     srai a0, a0, 31
-    xor a0, a0, a1
+    srli a0, a0, 1
+    not a0, a0
 	ret
 
 // Convert single-precision to unsigned integer

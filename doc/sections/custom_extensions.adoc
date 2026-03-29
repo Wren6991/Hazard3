@@ -85,7 +85,7 @@ Example assembly macro:
 
 ----
 .macro h3.block
-	slt x0, x0, x0
+    slt x0, x0, x0
 .endm
 ----
 
@@ -107,7 +107,7 @@ Example assembly macro:
 
 ----
 .macro h3.unblock
-	slt x0, x0, x1
+    slt x0, x0, x1
 .endm
 ----
 
@@ -131,7 +131,7 @@ Encoding (R-type):
 | Bits  | Name          | Value    | Description
 | 31:29 | `funct7[6:4]` | `0b000`  | RES0
 | 28:26 | `size`        | -        | Number of ones in mask, values 0->7 encode 1->8 bits.
-| 25    | `funct7[0]`   | `0b0`    | RES0, because aligns with `shamt[5]` of potential RV64 version of `h3.bextmi` 
+| 25    | `funct7[0]`   | `0b0`    | RES0, because aligns with `shamt[5]` of potential RV64 version of `h3.bextmi`
 | 24:20 | `rs2`         | -        | Source register 2 (shift amount)
 | 19:15 | `rs1`         | -        | Source register 1
 | 14:12 | `funct3`      | `0b000`  | `h3.bextm`
@@ -145,12 +145,12 @@ Example C macro (using GCC statement expressions):
 ----
 // nbits must be a constant expression
 #define __h3_bextm(nbits, rs1, rs2) ({\
-	uint32_t __h3_bextm_rd; \
-	asm (".insn r 0x0b, 0, %3, %0, %1, %2"\
-		: "=r" (__h3_bextm_rd) \
-		: "r" (rs1), "r" (rs2), "i" ((((nbits) - 1) & 0x7) << 1)\
-	); \
-	__h3_bextm_rd; \
+    uint32_t __h3_bextm_rd; \
+    asm (".insn r 0x0b, 0, %3, %0, %1, %2"\
+        : "=r" (__h3_bextm_rd) \
+        : "r" (rs1), "r" (rs2), "i" ((((nbits) - 1) & 0x7) << 1)\
+    ); \
+    __h3_bextm_rd; \
 })
 ----
 
@@ -183,8 +183,8 @@ Encoding (I-type):
 | Bits  | Name          | Value    | Description
 | 31:29 | `imm[11:9]`   | `0b000`  | RES0
 | 28:26 | `size`        | -        | Number of ones in mask, values 0->7 encode 1->8 bits.
-| 25    | `imm[5]`      | `0b0`    | RES0, for potential future RV64 version 
-| 24:20 | `shamt`       | -        | Shift amount, 0 through 31 
+| 25    | `imm[5]`      | `0b0`    | RES0, for potential future RV64 version
+| 24:20 | `shamt`       | -        | Shift amount, 0 through 31
 | 19:15 | `rs1`         | -        | Source register 1
 | 14:12 | `funct3`      | `0b100`  | `h3.bextmi`
 | 11:7  | `rd`          | -        | Destination register
@@ -197,12 +197,12 @@ Example C macro (using GCC statement expressions):
 ----
 // nbits and shamt must be constant expressions
 #define __h3_bextmi(nbits, rs1, shamt) ({\
-	uint32_t __h3_bextmi_rd; \
-	asm (".insn i 0x0b, 0x4, %0, %1, %2"\
-		: "=r" (__h3_bextmi_rd) \
-		: "r" (rs1), "i" ((((nbits) - 1) & 0x7) << 6 | ((shamt) & 0x1f)) \
-	); \
-	__h3_bextmi_rd; \
+    uint32_t __h3_bextmi_rd; \
+    asm (".insn i 0x0b, 0x4, %0, %1, %2"\
+        : "=r" (__h3_bextmi_rd) \
+        : "r" (rs1), "i" ((((nbits) - 1) & 0x7) << 6 | ((shamt) & 0x1f)) \
+    ); \
+    __h3_bextmi_rd; \
 })
 ----
 
@@ -816,7 +816,7 @@ __addsf_ye_gt_xe:
     addsf_core a1, a0, a5, a4, a3, a2
 
 __addsf_special_exponent:
-	// Handle special cases...
+    // Handle special cases...
 ----
 
 ===== Single-precision Multiply
@@ -845,7 +845,7 @@ __mulsf3:
     // Normalise (shift left by either 2 or 3)
     h3.feadjq3 a0, a4
     h3.ssrasticky a4, a4, a0
-	// Calculate new exponent;
+    // Calculate new exponent;
     // -127 is for redundant bias, +3 is for Q6 -> Q3 compensation
     add a2, a2, a0
     add a2, a2, a3
@@ -854,7 +854,7 @@ __mulsf3:
     ret
 
 __mulsf_special_exponent:
-	// Handle special cases...
+    // Handle special cases...
 ----
 
 ===== Convert Single-precision to Half-precision
@@ -864,14 +864,14 @@ Most cases are correctly handled by simply unpacking single-precision to Q3.29, 
 ----
 .global __truncsfhf2
 __truncsfhf2:
-	h3.funpackq3.s a1, a0
-	h3.bextmi a2, a0, 23, 8
+    h3.funpackq3.s a1, a0
+    h3.bextmi a2, a0, 23, 8
     li t0, 255
     beq a2, t0, 2f
 1:
-	addi a2, a2, -127 + 15
-	h3.fpackrq3.h a0, a1, a2
-	ret
+    addi a2, a2, -127 + 15
+    h3.fpackrq3.h a0, a1, a2
+    ret
 2:
     // Return canonical NaN on NaN input.
     slli a0, a0, 9
@@ -918,20 +918,20 @@ This implementation chooses to return `INT_MIN` or `INT_MAX` for large exponents
 ----
 .global __fixsfsi
 __fixsfsi:
-	h3.bextmi a1, a0, 23, 8
-	li t0, 127 + 31
-	bgeu a1, t0, __fixsfsi_large_exponent
-	h3.funpackq3.s a0, a0
-	addi a1, a1, -127 - 29
+    h3.bextmi a1, a0, 23, 8
+    li t0, 127 + 31
+    bgeu a1, t0, __fixsfsi_large_exponent
+    h3.funpackq3.s a0, a0
+    addi a1, a1, -127 - 29
     h3.xorsign a2, a0, a0
-	h3.ssla a2, a2, a1
+    h3.ssla a2, a2, a1
     h3.xorsign a0, a0, a2
-	ret
+    ret
 .p2align 2
 __fixsfsi_large_exponent:
-    li a1, 1 << 31
     srai a0, a0, 31
-    xor a0, a0, a1
+    srli a0, a0, 1
+    not a0, a0
     ret
 ----
 
@@ -949,15 +949,15 @@ increasing integer values have increasing exponents as we would hope.
 ----
 .global __floatsisf
 __floatsisf:
-	beqz a0, 1f
+    beqz a0, 1f
     // Normalise to Q3.29; sticky shift helps ensure correct rounding
-	h3.feadjq3 a1, a0
-	h3.ssrasticky a0, a0, a1
+    h3.feadjq3 a1, a0
+    h3.ssrasticky a0, a0, a1
     // Calculate exponent
-	addi a1, a1, 127 + 29
-	h3.fpackrq3.s a0, a0, a1
+    addi a1, a1, 127 + 29
+    h3.fpackrq3.s a0, a0, a1
 1:
-	ret
+    ret
 ----
 
 ===== Convert Unsigned Integer to Single-precision
@@ -967,14 +967,14 @@ This is very similar to the previous example, but a logical sticky shift is requ
 ----
 .global __floatunsisf
 __floatunsisf:
-	beqz a0, 1f
-	// Normalise to U3.29; sticky shift helps ensure correct rounding.
+    beqz a0, 1f
+    // Normalise to U3.29; sticky shift helps ensure correct rounding.
     h3.feadju3 a1, a0
-	h3.ssrlsticky a0, a0, a1
-	// Calculate exponent
-	addi a1, a1, 127 - 29
-	// Round and pack
-	h3.fpackrq3.s a0, a0, a1
+    h3.ssrlsticky a0, a0, a1
+    // Calculate exponent
+    addi a1, a1, 127 - 29
+    // Round and pack
+    h3.fpackrq3.s a0, a0, a1
 1:
-	ret
+    ret
 ----
