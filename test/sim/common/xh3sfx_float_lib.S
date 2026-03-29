@@ -1,7 +1,13 @@
+/*****************************************************************************\
+|                        Copyright (C) 2026 Luke Wren                         |
+|                     SPDX-License-Identifier: Apache-2.0                     |
+\*****************************************************************************/
+
+// Soft float library for Hazard3, using custom Xh3sfx and Xh3bextm extensions.
+// Also uses the following standard ISA extensions: RV32IMZbbZbs
+
 #include "xh3sfx_intrinsics.h"
 #include "xh3bextm_intrinsics.h"
-
-// Soft float library for Xh3sfx
 
 #define funcname(name) __ ## name
 #define funcsection(name) .section .text. ## name
