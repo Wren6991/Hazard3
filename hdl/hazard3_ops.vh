@@ -144,4 +144,5 @@ localparam SFX_OP_XORSIGN     = 7'h06;
 localparam SFX_OP_XNORSIGN    = 7'h07;
 localparam SFX_OP_SSRLSTICKY  = 7'h0a;
 localparam SFX_OP_SSRASTICKY  = 7'h0b;
+localparam SFX_OP_SSLL        = 7'h0c;
 localparam SFX_OP_SSLA        = 7'h0d;

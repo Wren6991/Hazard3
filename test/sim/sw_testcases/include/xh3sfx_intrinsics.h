@@ -113,6 +113,15 @@
     __rd; \
 })
 
+#define __h3_ssll(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x0c, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+
 #define __h3_ssla(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, 0x0d, %0, %1, %2"\
@@ -170,6 +179,10 @@
 
 .macro h3.ssrlsticky rd, rs1, rs2
 .insn r 0x0b, 0x1, 0x0a, \rd, \rs1, \rs2
+.endm
+
+.macro h3.ssll rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x0c, \rd, \rs1, \rs2
 .endm
 
 .macro h3.ssla rd, rs1, rs2

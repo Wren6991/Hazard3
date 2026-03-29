@@ -226,7 +226,8 @@ always @ (*) begin
 		SFX_OP_XNORSIGN:    sfx_result = op_b[31] ? op_a  : -op_a;
 		SFX_OP_SSRASTICKY:  sfx_result = (shamt_over ? {32{op_a[31] && !op_b[8]}} : shift_dout) | {31'd0, xh3sfx_sr_sticky};
 		SFX_OP_SSRLSTICKY:  sfx_result = (shamt_over ? 32'd0                      : shift_dout) | {31'd0, xh3sfx_sr_sticky};
-		SFX_OP_SSLA:        sfx_result = shamt_over ? {32{op_a[31] && op_b[8]}} : shift_dout;
+		SFX_OP_SSLL:        sfx_result =  shamt_over ? 32'd0                      : shift_dout;
+		SFX_OP_SSLA:        sfx_result =  shamt_over ? {32{op_a[31] && op_b[8]}}  : shift_dout;
 		default:            sfx_result = 32'hxxxxxxxx;
 	endcase
 end

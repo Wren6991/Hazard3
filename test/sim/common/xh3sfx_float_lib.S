@@ -296,8 +296,7 @@ funcname(fixunsfsi):
     bgtu a1, t0, __fixunsfsi_large_exponent
     h3.funpackq3.s a0, a0
     addi a1, a1, -127 - 29
-    // arithmetic shift is ok as we checked it's non-negative:
-    h3.ssla a2, a2, a1
+    h3.ssll a2, a2, a1
     ret
 __fixunsfsi_large_exponent:
     li a0, -1

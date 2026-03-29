@@ -625,6 +625,72 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
+==== h3.ssla
+
+Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[8:0]` ≥ 32 then the result is all-zeroes. If `rs2[8:0]` ≤ -32 then the result is all-sign.
+
+This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrasticky`.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0001101`  | `h3.ssla`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_ssla(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x0d, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
+==== h3.ssll
+
+Shift signed-left, logical. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[8:0]` is outside the range ±31 then the result is all-zeroes.
+
+This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrlsticky`.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0001100`  | `h3.ssll`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_ssll(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x0c, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.ssrasticky
 
 Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[8:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
@@ -696,39 +762,6 @@ Example C macro (using GCC statement expressions):
 #define __h3_ssrlsticky(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, 0x0a, %0, %1, %2"\
-        : "=r" (__rd) \
-        : "r" (rs1), "r" (rs2) \
-    ); \
-    __rd; \
-})
-----
-
-==== h3.ssla
-
-Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. If `rs2` is positive, the result is `rs1 << rs2`. if `rs2` is negative, the result is `rs1 >> -rs2`. If `rs2[8:0]` ≥ 32 then the result is all-zeroes. If `rs2[8:0]` ≤ -32 then the result is all-sign.
-
-This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrasticky`.
-
-Encoding (R-type):
-
-[cols="10h,20h,20h,~", options="header"]
-|===
-| Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0001101`  | `h3.ssla`
-| 24:20 | `rs2`    | -            | Source register 2
-| 19:15 | `rs1`    | -            | Source register 1
-| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
-| 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
-|===
-
-Example C macro (using GCC statement expressions):
-
-----
-#define __h3_ssla(rs1, rs2) ({\
-    uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x0d, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
