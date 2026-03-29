@@ -7,7 +7,7 @@
 #define funcsection(name) .section .text. ## name
 
 // ----------------------------------------------------------------------------
-// Single-precision add and subtract
+// Add and subtract
 
 funcsection(addsf3)
 .global funcname(subsf3)
@@ -89,8 +89,78 @@ __addsf_return_y:
 __addsf_return_x:
 	ret
 
+// Half-precision: essentially the same as single-precision
+funcsection(addhf3)
+.global funcname(subhf3)
+.p2align 2
+funcname(subhf3):
+	binvi a1, a1, 31
+.global funcname(addhf3)
+funcname(addhf3):
+	h3.bextmi a2, a0, 10, 5
+	h3.bextmi a3, a1, 10, 5
+	h3.fcheck2e.h t0, a2, a3
+	bnez t0, __addhf_special_exponent
+	h3.funpackq3.h a4, a0
+	h3.funpackq3.h a5, a1
+
+	bltu a2, a3, __addhf_ye_gt_xe
+
+.macro addhf_core packed_lhs, packed_rhs, sig_lhs, sig_rhs, exp_lhs, exp_rhs
+	sub \packed_rhs, \exp_lhs, \exp_rhs
+	h3.ssrasticky \packed_lhs, \sig_rhs, \packed_rhs
+	add \sig_lhs, \sig_lhs, \packed_lhs
+	h3.feadjq3 \packed_lhs, \sig_lhs
+	h3.ssrasticky \sig_lhs, \sig_lhs, \packed_lhs
+	add \exp_lhs, \exp_lhs, \packed_lhs
+	h3.fpackrq3.h a0, \sig_lhs, \exp_lhs
+	ret
+.endm
+
+__addhf_xe_gte_ye:
+	addhf_core a0, a1, a4, a5, a2, a3
+.p2align 2
+__addhf_ye_gt_xe:
+	addhf_core a1, a0, a5, a4, a3, a2
+
+__addhf_special_exponent:
+	beqz a2, __addhf_return_y_flushed
+	beqz a3, __addhf_return_x
+	li t0, 31
+	slli a4, a0, 22
+	slli a5, a1, 22
+	beq a2, t0, __addhf_x_nan_inf
+
+__addhf_y_nan_inf:
+	bnez a5, __addhf_return_y
+__addhf_y_inf:
+	bne  a2, t0, __addhf_return_y
+	bnez a4,     __addhf_return_x
+	j __addhf_both_inf
+
+__addhf_x_nan_inf:
+	bnez a4, __addhf_return_x
+__addhf_x_inf:
+	bne  a3, t0, __addhf_return_x
+	bnez a5,     __addhf_return_y
+__addhf_both_inf:
+	xor a1, a1, a0
+	bgez a1,     __addhf_return_x
+	li a0, 0xffff
+	ret
+
+__addhf_return_y_flushed:
+	bnez a3, 1f
+	andi a1, a1, -1 << 10
+1:
+__addhf_return_y:
+	mv a0, a1
+__addhf_return_x:
+	ret
+
+
 // ----------------------------------------------------------------------------
-// Single-precision multiply
+// Multiply
 
 funcsection(mulsf3)
 .global funcname(mulsf3)
@@ -186,14 +256,90 @@ __mulsf_x_nan_inf:
 	bnez a5, __mulsf_return_y
 	ret // return x
 
+
+// Half-precision: essentially the same as single-precision
+funcsection(mulhf3)
+.global funcname(mulhf3)
+.p2align 2
+funcname(mulhf3):
+	h3.bextmi a2, a0, 10, 5
+	h3.bextmi a3, a1, 10, 5
+	h3.fcheck2e.h t0, a2, a3
+	bnez t0, __mulhf_special_exponent
+	h3.funpackq3.h a4, a0
+	h3.funpackq3.h a5, a1
+
+	mul a1, a4, a5
+	mulh a4, a4, a5
+	snez a1, a1
+	or a4, a4, a1
+	h3.feadjq3 a0, a4
+	h3.ssrasticky a4, a4, a0
+
+	add a2, a2, a0
+	add a2, a2, a3
+	addi a2, a2, -15 + 3
+	h3.fpackrq3.h a0, a4, a2
+	ret
+
+.p2align 2
+__mulhf_special_exponent:
+	bexti t1, a1, 15
+	slli t1, t1, 15
+	xor a0, a0, t1
+	li t0, 31
+	slli a4, a0, 9
+	slli a5, a1, 9
+	beqz a2, __mulhf_x_0
+	beqz a3, __mulhf_y_0
+	beq a2, t0, __mulhf_x_nan_inf
+__mulhf_y_nan_inf:
+	bnez a5, __mulhf_return_y
+	h3.fpackrq3.h a0, a0, a3
+	ret
+
+__mulhf_x_0:
+	bne a3, t0, __mulhf_return_flushed_x
+	beqz a5, 1f
+__mulhf_return_y:
+	mv a0, a1
+	ret
+
+__mulhf_y_0:
+	bne a2, t0, __mulhf_return_flushed_x
+	bnez a4, 2f
+1:
+	li a0, 0xffff
+2:
+	ret
+
+__mulhf_return_flushed_x:
+	srli a0, a0, 15
+	slli a0, a0, 15
+__mulhf_return_x:
+	ret
+
+__mulhf_x_nan_inf:
+	bnez a4, __mulhf_return_x
+	bne a3, t0, __mulhf_return_x
+	bnez a5, __mulhf_return_y
+	ret
+
 // ----------------------------------------------------------------------------
-// Other single-precision arithmetic
+// Other arithmetic
 
 funcsection(negsf2)
 .global funcname(negsf2)
 .p2align 2
 funcname(negsf2):
 	binvi a0, a0, 31
+	ret
+
+funcsection(neghf2)
+.global funcname(neghf2)
+.p2align 2
+funcname(neghf2):
+	binvi a0, a0, 15
 	ret
 
 // Concatenation of exponent and significand is correctly ordered with respect
@@ -222,7 +368,7 @@ __fcmpsf2_gt:
 	ret
 
 // ----------------------------------------------------------------------------
-// Conversions
+// Conversions: f32 <-> f16
 
 // Convert single-precision to half-precision
 funcsection(truncsfhf2)
@@ -273,6 +419,8 @@ funcname(extendhfsf2):
 	slli a2, a2, 4
 	j 1b
 
+// ----------------------------------------------------------------------------
+// Conversions: f32 <-> i32, u32
 
 // Convert single-precision to signed integer
 funcsection(fixsfsi)
@@ -301,7 +449,7 @@ funcsection(fixunsfsi)
 .global funcname(fixunsfsi)
 .p2align 2
 funcname(fixunsfsi):
-	bltz a0, __fixunsfi_neg
+	bltz a0, __fixunsfsi_neg
 	h3.bextmi a1, a0, 23, 8
 	li t0, 127 + 31
 	bgtu a1, t0, __fixunsfsi_large_exponent
@@ -312,7 +460,7 @@ funcname(fixunsfsi):
 __fixunsfsi_large_exponent:
 	li a0, -1
 	ret
-__fixunsfi_neg:
+__fixunsfsi_neg:
 	li a0, 0
 	ret
 
@@ -343,5 +491,80 @@ funcname(floatunsisf):
 	addi a1, a1, 127 + 29
 	// Round and pack
 	h3.fpackrq3.s a0, a0, a1
+1:
+	ret
+
+// ----------------------------------------------------------------------------
+// Conversions: f16 <-> i32, u32
+
+// Convert half-precision to signed integer
+funcsection(fixhfsi)
+.global funcname(fixhfsi)
+.p2align 2
+funcname(fixhfsi):
+	h3.bextmi a1, a0, 10, 5
+	h3.funpackq3.h a0, a0
+	li t0, 31
+	beq a1, t0, __fixhfsi_inf_nan
+	addi a1, a1, -15 - 29
+	h3.xorsign a2, a0, a0
+	h3.ssla a2, a2, a1
+	h3.xorsign a0, a0, a2
+	ret
+.p2align 2
+__fixhfsi_inf_nan:
+	srai a0, a0, 31
+	li a1, -1
+	srli a1, a1, 1
+	xor a0, a0, a1
+	ret
+
+// Convert half-precision to unsigned integer
+funcsection(fixunhfsi)
+.global funcname(fixunhfsi)
+.p2align 2
+funcname(fixunhfsi):
+	h3.bextmi a1, a0, 10, 5
+	h3.funpackq3.h a0, a0
+	bltz a0, __fixunsfhi_neg
+	li t0, 31
+	beq a1, t0, __fixunhfsi_inf_nan
+	addi a1, a1, -15 - 29
+	h3.ssll a0, a0, a1
+	ret
+__fixunhfsi_inf_nan:
+	li a0, -1
+	ret
+__fixunsfhi_neg:
+	li a0, 0
+	ret
+
+// Convert signed integer to half-precision
+funcsection(floatsihf)
+.global funcname(floatsihf)
+funcname(floatsihf):
+	beqz a0, 1f
+	h3.feadjq3 a1, a0
+	h3.ssrasticky a0, a0, a1
+	// E.g.: integer 1 will have Q3 normalisation shift of -29, and
+	// should have unbiased exponent of 0. Larger values have smaller
+	// (i.e. more-positive) normalisation shifts.
+	addi a1, a1, 15 + 29
+	h3.fpackrq3.h a0, a0, a1
+1:
+	ret
+
+// Convert unsigned integer to half-precision
+funcsection(floatunsihf)
+.global funcname(floatunsihf)
+funcname(floatunsihf):
+	beqz a0, 1f
+	// Normalise to U3.29
+	h3.feadju3 a1, a0
+	h3.ssrlsticky a0, a0, a1
+	// Calculate exponent
+	addi a1, a1, 15 + 29
+	// Round and pack
+	h3.fpackrq3.h a0, a0, a1
 1:
 	ret
