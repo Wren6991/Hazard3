@@ -4,7 +4,7 @@
 // Soft float library for Xh3sfx
 
 #define funcname(name) __ ## name
-#define funcsection(name) .section ".text"
+#define funcsection(name) .section .text. ## name
 
 // ----------------------------------------------------------------------------
 // Single-precision add and subtract
@@ -53,8 +53,16 @@ __addsf_special_exponent:
     li t0, 255
     slli a4, a0, 9
     slli a5, a1, 9
-    beq a3, t0, __addsf_x_nan_inf
+    beq a2, t0, __addsf_x_nan_inf
     // fall through:
+
+__addsf_y_nan_inf:
+    // Mirror of __addsf_x_nan_inf
+    bnez a5, __addsf_return_y
+__addsf_y_inf:
+    bne  a2, t0, __addsf_return_y
+    bnez a4,     __addsf_return_x
+    j __addsf_both_inf
 
 __addsf_x_nan_inf:
     // When at least one operand is nan, we must propagate at least one of
@@ -65,20 +73,10 @@ __addsf_x_inf:
     // If x is +-inf, need to distinguish the following cases:
     bne  a3, t0, __addsf_return_x // y is neither inf nor nan   -> return x (propagate inf)
     bnez a5,     __addsf_return_y // y is nan:                  -> return y (propagate nan)
+__addsf_both_inf:
     xor a1, a1, a0
     bgez a1,     __addsf_return_x // y is inf of same sign      -> return either x or y (x is faster)
     li a0, -1                     // y is inf of different sign -> return nan
-    ret
-
-__addsf_y_nan_inf:
-    // Mirror of __addsf_x_nan_inf
-    bnez a5, __addsf_return_y
-__addsf_y_inf:
-    bne  a2, t0, __addsf_return_y
-    bnez a4,     __addsf_return_x
-    xor a1, a1, a0
-    bgez a1,     __addsf_return_x
-    li a0, -1
     ret
 
 __addsf_return_y_flushed:
@@ -89,9 +87,6 @@ __addsf_return_y_flushed:
 __addsf_return_y:
     mv a0, a1
 __addsf_return_x:
-    ret
-__addsf_return_0:
-    li a0, 0
     ret
 
 // ----------------------------------------------------------------------------
@@ -144,9 +139,8 @@ __mulsf_y_nan_inf:
     // y is nan -> return y
     // y is inf -> return inf * sgn(x) (since we already merged the signs)
     bnez a5, __mulsf_return_y
-    srai a0, a0, 31
-    packh a0, t0, a0
-    slli a0, a0, 23
+    // Works because we have nonzero "significand" and exp=255:
+    h3.fpackrq3.s a0, a0, a3
     ret
 
 __mulsf_x_0:
@@ -193,6 +187,41 @@ __mulsf_x_nan_inf:
     ret // return x
 
 // ----------------------------------------------------------------------------
+// Other single-precision arithmetic
+
+funcsection(negsf2)
+.global funcname(negsf2)
+.p2align 2
+funcname(negsf2):
+    binvi a0, a0, 31
+    ret
+
+// Concatenation of exponent and significand is correctly ordered with respect
+// to magnitude. This is a 31-bit value; convert sign-magnitude to two's
+// complement to get a fully correctly ordered 32-bit integer. This doesn't
+// handle NaNs gracefully but, quote libgcc docs, "you should not rely on
+// this; if NaN is a possibility, use one of the higher-level comparison
+// functions"
+funcsection(fcmpsf2)
+.global funcname(fcmpsf2)
+.p2align 2
+funcname(fcmpsf2):
+    bclri a2, a0, 31
+    bclri a3, a1, 31
+    h3.xorsign a2, a2, a0
+    h3.xorsign a3, a3, a1
+    blt a2, a3, __fcmpsf2_lt
+    bgt a2, a3, __fcmpsf2_gt
+    li a0, 0
+    ret
+__fcmpsf2_lt:
+    li a0, -1
+    ret
+__fcmpsf2_gt:
+    li a0, 1
+    ret
+
+// ----------------------------------------------------------------------------
 // Conversions
 
 // Convert single-precision to half-precision
@@ -202,8 +231,8 @@ funcsection(truncsfhf2)
 funcname(truncsfhf2):
 	h3.funpackq3.s a1, a0
 	h3.bextmi a2, a0, 23, 8
-    li t0, 255
-    beq a2, t0, 2f
+    addi t0, a2, -255
+    beqz t0, 2f
 1:
 	addi a2, a2, -127 + 15
 	h3.fpackrq3.h a0, a1, a2
@@ -214,6 +243,26 @@ funcname(truncsfhf2):
     beqz a0, 1b
     li a0, -1
     ret
+
+// Convert half-precision to single-precision
+funcsection(extendhfsf2)
+.global funcname(extendhfsf2)
+.p2align 2
+funcname(extendhfsf2):
+    h3.funpackq3.h a1, a0
+    h3.bextmi a2, a0, 10, 5
+    addi t0, a2, -31
+    beqz t0, 2f
+1:
+    addi a2, a2, -15 + 127
+    h3.fpackrq3.s a0, a1, a2
+    ret
+2:
+    slli a0, a0, 22
+    beqz a0, 1b
+    li a0, -1
+    ret
+
 
 // Convert single-precision to signed integer
 funcsection(fixsfsi)
@@ -232,8 +281,30 @@ funcname(fixsfsi):
 .p2align 2
 __fixsfsi_large_exponent:
 	li a1, 1 << 31
-    h3.xnorsign a0, a1, a0
+    srai a0, a0, 31
+    xor a0, a0, a1
 	ret
+
+// Convert single-precision to unsigned integer
+funcsection(fixunsfsi)
+.global funcname(fixunsfsi)
+.p2align 2
+funcname(fixunsfsi):
+    bltz a0, __fixunsfi_neg
+    h3.bextmi a1, a0, 23, 8
+    li t0, 127 + 31
+    bgtu a1, t0, __fixunsfsi_large_exponent
+    h3.funpackq3.s a0, a0
+    addi a1, a1, -127 - 29
+    // arithmetic shift is ok as we checked it's non-negative:
+    h3.ssla a2, a2, a1
+    ret
+__fixunsfsi_large_exponent:
+    li a0, -1
+    ret
+__fixunsfi_neg:
+    li a0, 0
+    ret
 
 // Convert signed integer to single-precision
 funcsection(floatsisf)
