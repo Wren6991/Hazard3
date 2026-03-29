@@ -254,61 +254,55 @@ end
 wire [W_DATA-1:0] zbs_mask = {{W_DATA-1{1'b0}}, 1'b1} << op_b[W_SHAMT-1:0];
 
 always @ (*) begin
-	casez ({|EXTENSION_A, |EXTENSION_ZBA, |EXTENSION_ZBB, |EXTENSION_ZBC,
-	        |EXTENSION_ZBS, |EXTENSION_ZBKB, |EXTENSION_ZBKX, |EXTENSION_XH3BEXTM,
-	        |EXTENSION_XH3SFX, aluop})
-		// Base ISA
-		{9'bzzzzzzzzz, ALUOP_ADD        }: result = sum;
-		{9'bzzzzzzzzz, ALUOP_SUB        }: result = sum;
-		{9'bzzzzzzzzz, ALUOP_LT         }: result = {{W_DATA-1{1'b0}}, lt};
-		{9'bzzzzzzzzz, ALUOP_LTU        }: result = {{W_DATA-1{1'b0}}, lt};
-		{9'bzzzzzzzzz, ALUOP_SRL        }: result = shift_dout;
-		{9'bzzzzzzzzz, ALUOP_SRA        }: result = shift_dout;
-		{9'bzzzzzzzzz, ALUOP_SLL        }: result = shift_dout;
-		// A or Zbb (written this way to avoid case overlap)
-		{9'b1zzzzzzzz, ALUOP_MAX        },
-		{9'b0z1zzzzzz, ALUOP_MAX        }: result = lt ? op_b : op_a;
-		{9'b1zzzzzzzz, ALUOP_MIN        },
-		{9'b0z1zzzzzz, ALUOP_MIN        }: result = lt ? op_a : op_b;
-		{9'b1zzzzzzzz, ALUOP_MAXU       },
-		{9'b0z1zzzzzz, ALUOP_MAXU       }: result = lt ? op_b : op_a;
-		{9'b1zzzzzzzz, ALUOP_MINU       },
-		{9'b0z1zzzzzz, ALUOP_MINU       }: result = lt ? op_a : op_b;
-		// Zba
-		{9'bz1zzzzzzz, ALUOP_SHXADD     }: result = sum;
-		// Zbb
-		{9'bzz1zzzzzz, ALUOP_ANDN       }: result = bitwise;
-		{9'bzz1zzzzzz, ALUOP_ORN        }: result = bitwise;
-		{9'bzz1zzzzzz, ALUOP_XNOR       }: result = bitwise;
-		{9'bzz1zzzzzz, ALUOP_CLZ        }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
-		{9'bzz1zzzzzz, ALUOP_CTZ        }: result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
-		{9'bzz1zzzzzz, ALUOP_CPOP       }: result = {{W_DATA-W_SHAMT-1{1'b0}}, cpop};
-		{9'bzz1zzzzzz, ALUOP_SEXT_B     }: result = {{W_DATA-8{op_a[7]}}, op_a[7:0]};
-		{9'bzz1zzzzzz, ALUOP_SEXT_H     }: result = {{W_DATA-16{op_a[15]}}, op_a[15:0]};
-		{9'bzz1zzzzzz, ALUOP_ZEXT_H     }: result = {{W_DATA-16{1'b0}}, op_a[15:0]};
-		{9'bzz1zzzzzz, ALUOP_ORC_B      }: result = {{8{|op_a[31:24]}}, {8{|op_a[23:16]}}, {8{|op_a[15:8]}}, {8{|op_a[7:0]}}};
-		{9'bzz1zzzzzz, ALUOP_REV8       }: result = {op_a[7:0], op_a[15:8], op_a[23:16], op_a[31:24]};
-		{9'bzz1zzzzzz, ALUOP_ROL        }: result = shift_dout;
-		{9'bzz1zzzzzz, ALUOP_ROR        }: result = shift_dout;
-		// Zbc
-		{9'bzzz1zzzzz, ALUOP_CLMUL      }: result = clmul;
-		// Zbs
-		{9'bzzzz1zzzz, ALUOP_BCLR       }: result = op_a & ~zbs_mask;
-		{9'bzzzz1zzzz, ALUOP_BSET       }: result = op_a |  zbs_mask;
-		{9'bzzzz1zzzz, ALUOP_BINV       }: result = op_a ^  zbs_mask;
-		{9'bzzzz1zzzz, ALUOP_BEXT       }: result = {{W_DATA-1{1'b0}}, shift_dout[0]};
-		// Zbkb
-		{9'bzzzzz1zzz, ALUOP_PACK       }: result = {op_b[15:0], op_a[15:0]};
-		{9'bzzzzz1zzz, ALUOP_PACKH      }: result = {{W_DATA-16{1'b0}}, op_b[7:0], op_a[7:0]};
-		{9'bzzzzz1zzz, ALUOP_BREV8      }: result = {op_a_rev[7:0], op_a_rev[15:8], op_a_rev[23:16], op_a_rev[31:24]};
-		{9'bzzzzz1zzz, ALUOP_ZIP        }: result = funct3_32b[2] ? unzip : zip;
-		// Zbkx
-		{9'bzzzzzz1zz, ALUOP_XPERM      }: result = funct3_32b[2] ? xperm8 : xperm4;
-		// Xh3bextm
-		{9'bzzzzzzz1z, ALUOP_BEXTM      }: result = shift_dout & {24'h0, {~(8'hfe << funct7_32b[3:1])}};
-		// Xh3sfx
-		{9'bzzzzzzzz1, ALUOP_SFX        }: result = sfx_result;
-		default:                           result = bitwise;
+	casez (aluop)
+	// Base ISA
+	ALUOP_ADD: result = sum;
+	ALUOP_SUB: result = sum;
+	ALUOP_LT:  result = {{W_DATA-1{1'b0}}, lt};
+	ALUOP_LTU: result = {{W_DATA-1{1'b0}}, lt};
+	ALUOP_SRL: result = shift_dout;
+	ALUOP_SRA: result = shift_dout;
+	ALUOP_SLL: result = shift_dout;
+	// A or Zbb
+	ALUOP_MAX:    if (~|EXTENSION_ZBB && ~|EXTENSION_A) result = 32'hxxxxxxxx; else result = lt ? op_b : op_a;
+	ALUOP_MIN:    if (~|EXTENSION_ZBB && ~|EXTENSION_A) result = 32'hxxxxxxxx; else result = lt ? op_a : op_b;
+	ALUOP_MAXU:   if (~|EXTENSION_ZBB && ~|EXTENSION_A) result = 32'hxxxxxxxx; else result = lt ? op_b : op_a;
+	ALUOP_MINU:   if (~|EXTENSION_ZBB && ~|EXTENSION_A) result = 32'hxxxxxxxx; else result = lt ? op_a : op_b;
+	// Zba
+	ALUOP_SHXADD: if (~|EXTENSION_ZBA)       result = 32'hxxxxxxxx; else result = sum;
+	// Zbb
+	ALUOP_ANDN:   if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = bitwise;
+	ALUOP_ORN:    if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = bitwise;
+	ALUOP_XNOR:   if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = bitwise;
+	ALUOP_CLZ:    if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
+	ALUOP_CTZ:    if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{W_DATA-W_SHAMT-1{1'b0}}, ctz_clz};
+	ALUOP_CPOP:   if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{W_DATA-W_SHAMT-1{1'b0}}, cpop};
+	ALUOP_SEXT_B: if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{W_DATA-8{op_a[7]}}, op_a[7:0]};
+	ALUOP_SEXT_H: if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{W_DATA-16{op_a[15]}}, op_a[15:0]};
+	ALUOP_ZEXT_H: if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{W_DATA-16{1'b0}}, op_a[15:0]};
+	ALUOP_ORC_B:  if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {{8{|op_a[31:24]}}, {8{|op_a[23:16]}}, {8{|op_a[15:8]}}, {8{|op_a[7:0]}}};
+	ALUOP_REV8:   if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = {op_a[7:0], op_a[15:8], op_a[23:16], op_a[31:24]};
+	ALUOP_ROL:    if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = shift_dout;
+	ALUOP_ROR:    if (~|EXTENSION_ZBB)       result = 32'hxxxxxxxx; else result = shift_dout;
+	// Zbc
+	ALUOP_CLMUL:  if (~|EXTENSION_ZBC)       result = 32'hxxxxxxxx; else result = clmul;
+	// Zbs
+	ALUOP_BCLR:   if (~|EXTENSION_ZBS)       result = 32'hxxxxxxxx; else result = op_a & ~zbs_mask;
+	ALUOP_BSET:   if (~|EXTENSION_ZBS)       result = 32'hxxxxxxxx; else result = op_a |  zbs_mask;
+	ALUOP_BINV:   if (~|EXTENSION_ZBS)       result = 32'hxxxxxxxx; else result = op_a ^  zbs_mask;
+	ALUOP_BEXT:   if (~|EXTENSION_ZBS)       result = 32'hxxxxxxxx; else result = {{W_DATA-1{1'b0}}, shift_dout[0]};
+	// Zbkb
+	ALUOP_PACK:   if (~|EXTENSION_ZBKB)      result = 32'hxxxxxxxx; else result = {op_b[15:0], op_a[15:0]};
+	ALUOP_PACKH:  if (~|EXTENSION_ZBKB)      result = 32'hxxxxxxxx; else result = {{W_DATA-16{1'b0}}, op_b[7:0], op_a[7:0]};
+	ALUOP_BREV8:  if (~|EXTENSION_ZBKB)      result = 32'hxxxxxxxx; else result = {op_a_rev[7:0], op_a_rev[15:8], op_a_rev[23:16], op_a_rev[31:24]};
+	ALUOP_ZIP:    if (~|EXTENSION_ZBKB)      result = 32'hxxxxxxxx; else result = funct3_32b[2] ? unzip : zip;
+	// Zbkx
+	ALUOP_XPERM:  if (~|EXTENSION_ZBKX)      result = 32'hxxxxxxxx; else result = funct3_32b[2] ? xperm8 : xperm4;
+	// Xh3bextm
+	ALUOP_BEXTM:  if (~|EXTENSION_XH3BEXTM)  result = 32'hxxxxxxxx; else result = shift_dout & {24'h0, {~(8'hfe << funct7_32b[3:1])}};
+	// Xh3sfx
+	ALUOP_SFX:    if (~|EXTENSION_XH3SFX)    result = 32'hxxxxxxxx; else result = sfx_result;
+	default:                                                             result = bitwise;
 	endcase
 end
 
