@@ -598,7 +598,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.xorsign
 
-Returns `rs2 < 0 ? -rs1 : rs1`.
+Returns `rs1 < 0 ? -rs2 : rs2`.
 
 This conditional negation is useful for making integer right-shifts truncate towards zero instead of towards negative infinity, as shown in the `fixsfsi2` example. It also implements the C `abs()` operation in one instruction, when the same register is passed as `rs1` and `rs2`.
 
@@ -645,7 +645,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0001101`  | `h3.ssla`
+| 31:25 | `funct7` | `0b0101100`  | `h3.ssla`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -659,7 +659,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssla(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x0d, %0, %1, %2"\
+    asm (".insn r 0x0b, 0x1, 0x2c, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -725,7 +725,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0001011`  | `h3.ssrasticky`
+| 31:25 | `funct7` | `0b0101010`  | `h3.ssrasticky`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -739,7 +739,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_ssrasticky(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x0b, %0, %1, %2"\
+    asm (".insn r 0x0b, 0x1, 0x2a, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -911,8 +911,8 @@ functions".
 __fcmpsf2:
     bclri a2, a0, 31
     bclri a3, a1, 31
-    h3.xorsign a2, a2, a0
-    h3.xorsign a3, a3, a1
+    h3.xorsign a2, a0, a2
+    h3.xorsign a3, a1, a3
     blt a2, a3, __fcmpsf2_lt
     bgt a2, a3, __fcmpsf2_gt
     li a0, 0
@@ -941,7 +941,7 @@ __fixsfsi:
     addi a1, a1, -127 - 29
     h3.xorsign a2, a0, a0
     h3.ssla a2, a2, a1
-    h3.xorsign a0, a2, a0
+    h3.xorsign a0, a0, a2
     ret
 .p2align 2
 __fixsfsi_large_exponent:

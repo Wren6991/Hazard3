@@ -89,7 +89,7 @@ AHB5 is one of the two protocols described in the https://documentation-service.
 
 ==== Multiply/Divide
 
-For minimal M-extension support, as enabled by <<param-EXTENSION_M>>, Hazard3 instantiates a sequential multiply/divide circuit (restoring divide, naive repeated-addition multiply). Instructions stall in stage `X` until the multiply/divide completes. Optionally, the circuit can be unrolled by a small factor to produce multiple bits ber clock. A throughput of one, two or four bits per cycle is achievable in practice, with the internal logic delay becoming quite significant at four.
+For minimal M-extension support, as enabled by <<param-EXTENSION_M>>, Hazard3 instantiates a sequential multiply/divide circuit (restoring divide, naive repeated-addition multiply). Instructions stall in stage `X` until the multiply/divide completes. Optionally, the circuit can be unrolled by a small factor to produce multiple bits per clock. A throughput of one, two or four bits per cycle is achievable in practice, with the internal logic delay becoming quite significant at four.
 
 Set <<param-MUL_FAST>> to instantiate the single-cycle multiplier circuit. The fast multiplier returns results either to stage 3 or stage 2, depending on the <<param-MUL_FASTER>> parameter.
 

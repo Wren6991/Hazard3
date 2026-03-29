@@ -23,7 +23,11 @@ module hazard3_alu #(
 // ----------------------------------------------------------------------------
 // Fiddle around with add/sub, comparisons etc (all related).
 
-wire sub = !(aluop == ALUOP_ADD || (|EXTENSION_ZBA && aluop == ALUOP_SHXADD));
+wire sub = !(
+	aluop == ALUOP_ADD ||
+	(|EXTENSION_ZBA && aluop == ALUOP_SHXADD) ||
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SFX && !op_a[W_DATA - 1])
+);
 
 wire inv_op_b = sub && !(
 	aluop == ALUOP_AND || aluop == ALUOP_OR || aluop == ALUOP_XOR || aluop == ALUOP_RS2
@@ -33,6 +37,9 @@ wire [W_DATA-1:0] op_a_shifted =
 	|EXTENSION_ZBA && aluop == ALUOP_SHXADD ? (
 		!funct3_32b[2] ? op_a << 1 :
 		!funct3_32b[1] ? op_a << 2 : op_a << 3
+	) :
+	|EXTENSION_XH3SFX && aluop == ALUOP_SFX ? (
+		{W_DATA{1'b0}}
 	) : op_a;
 
 wire [W_DATA-1:0] op_b_inv = op_b ^ {W_DATA{inv_op_b}};
@@ -55,19 +62,23 @@ wire       shamt_is_bidir = |EXTENSION_XH3SFX && aluop == ALUOP_SFX;
 wire [8:0] shamt_abs = shamt_is_bidir && shamt_neg ? -op_b[8:0] : op_b[8:0];
 wire       shamt_over = |shamt_abs[8:5];
 
+wire shift_right_sfx = shamt_neg == funct7_32b[2];
+wire shift_arith_sfx = funct7_32b[5];
 wire shift_right_nleft =
 	aluop == ALUOP_SRL ||
 	aluop == ALUOP_SRA ||
 	(|EXTENSION_ZBB      && aluop == ALUOP_ROR                   ) ||
 	(|EXTENSION_ZBS      && aluop == ALUOP_BEXT                  ) ||
 	(|EXTENSION_XH3BEXTM && aluop == ALUOP_BEXTM                 ) ||
-	(|EXTENSION_XH3SFX   && aluop == ALUOP_SFX && (shamt_neg == funct7_32b[2]));
+	(|EXTENSION_XH3SFX   && aluop == ALUOP_SFX && shift_right_sfx);
 
 wire shift_arith =
 	aluop == ALUOP_SRA ||
-	(|EXTENSION_XH3SFX && aluop == ALUOP_SFX && funct7_32b[0] && shamt_neg == funct7_32b[2]);
+	(|EXTENSION_XH3SFX && aluop == ALUOP_SFX && shift_arith_sfx && shift_right_sfx);
 
 wire shift_rotate = |EXTENSION_ZBB & (aluop == ALUOP_ROR || aluop == ALUOP_ROL);
+
+wire shift_sticky = |EXTENSION_XH3SFX && aluop == ALUOP_SFX && funct7_32b[1] && shift_right_sfx;
 
 wire [W_DATA-1:0] shift_dout;
 
@@ -78,6 +89,7 @@ hazard3_shift_barrel #(
 	.shamt       (shamt_abs[4:0]),
 	.right_nleft (shift_right_nleft),
 	.rotate      (shift_rotate),
+	.sticky      (shift_sticky),
 	.arith       (shift_arith),
 	.dout        (shift_dout)
 );
@@ -207,9 +219,10 @@ wire [15:0] xh3sfx_fpackrq3_h =
 
 wire [W_SHAMT:0] xh3sfx_feadj = 6'h2 - ctz_clz;
 
-wire xh3sfx_sr_sticky = !op_b[8] && (
-	shamt_over ? |op_a : |(op_a & ~({32{1'b1}} << op_b[4:0]))
-);
+wire [W_DATA-1:0] shift_sticky_over = {{W_DATA-1{1'b0}}, |op_a && shift_sticky};
+wire [W_DATA-1:0] shift_dout_masked_sfx =
+	shamt_over && shift_right_sfx && shift_arith_sfx ? {W_DATA{op_a[W_DATA-1]}} | shift_sticky_over :
+	shamt_over                                       ? {W_DATA{1'b0}}           | shift_sticky_over : shift_dout;
 
 reg [W_DATA-1:0] sfx_result;
 always @ (*) begin
@@ -222,11 +235,11 @@ always @ (*) begin
 		SFX_OP_FPACKRQ3_S:  sfx_result = xh3sfx_fpackrq3_s;
 		SFX_OP_FEADJQ3:     sfx_result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
 		SFX_OP_FEADJU3:     sfx_result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
-		SFX_OP_XORSIGN:     sfx_result = op_b[31] ? -op_a :  op_a;
-		SFX_OP_SSRASTICKY:  sfx_result = (shamt_over ? {32{op_a[31] && !op_b[8]}} : shift_dout) | {31'd0, xh3sfx_sr_sticky};
-		SFX_OP_SSRLSTICKY:  sfx_result = (shamt_over ? 32'd0                      : shift_dout) | {31'd0, xh3sfx_sr_sticky};
-		SFX_OP_SSLL:        sfx_result =  shamt_over ? 32'd0                      : shift_dout;
-		SFX_OP_SSLA:        sfx_result =  shamt_over ? {32{op_a[31] && op_b[8]}}  : shift_dout;
+		SFX_OP_XORSIGN:     sfx_result = sum;
+		SFX_OP_SSRASTICKY:  sfx_result = shift_dout_masked_sfx;
+		SFX_OP_SSRLSTICKY:  sfx_result = shift_dout_masked_sfx;
+		SFX_OP_SSLL:        sfx_result = shift_dout_masked_sfx;
+		SFX_OP_SSLA:        sfx_result = shift_dout_masked_sfx;
 		default:            sfx_result = 32'hxxxxxxxx;
 	endcase
 end

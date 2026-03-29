@@ -19,6 +19,7 @@ module hazard3_shift_barrel #(
 	input wire               right_nleft,
 	input wire               rotate,
 	input wire               arith,
+	input wire               sticky,
 	output reg [W_DATA-1:0]  dout
 );
 
@@ -39,7 +40,8 @@ always @ (*) begin: shift
 		if (shamt[i]) begin
 			shift_accum = (shift_accum << (1 << i)) |
 				({W_DATA{sext}} & ~({W_DATA{1'b1}} << (1 << i))) |
-				({W_DATA{rotate && |EXTENSION_ZBB}} & (shift_accum >> (W_DATA - (1 << i))));
+				({W_DATA{rotate && |EXTENSION_ZBB}} & (shift_accum >> (W_DATA - (1 << i)))) |
+				{|EXTENSION_XH3SFX && sticky && |(shift_accum & ~({W_DATA{1'b1}} >> (1 << i))), {W_DATA-1{1'b0}}};
 		end
 	end
 

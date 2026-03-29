@@ -208,8 +208,8 @@ funcsection(fcmpsf2)
 funcname(fcmpsf2):
 	bclri a2, a0, 31
 	bclri a3, a1, 31
-	h3.xorsign a2, a2, a0
-	h3.xorsign a3, a3, a1
+	h3.xorsign a2, a0, a2
+	h3.xorsign a3, a1, a3
 	blt a2, a3, __fcmpsf2_lt
 	bgt a2, a3, __fcmpsf2_gt
 	li a0, 0
@@ -286,7 +286,7 @@ funcname(fixsfsi):
 	addi a1, a1, -127 - 29
 	h3.xorsign a2, a0, a0
 	h3.ssla a2, a2, a1
-	h3.xorsign a0, a2, a0
+	h3.xorsign a0, a0, a2
 	ret
 .p2align 2
 __fixsfsi_large_exponent:
