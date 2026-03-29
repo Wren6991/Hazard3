@@ -288,13 +288,14 @@ __mulhf_special_exponent:
 	slli t1, t1, 15
 	xor a0, a0, t1
 	li t0, 31
-	slli a4, a0, 9
-	slli a5, a1, 9
+	slli a4, a0, 22
+	slli a5, a1, 22
 	beqz a2, __mulhf_x_0
 	beqz a3, __mulhf_y_0
 	beq a2, t0, __mulhf_x_nan_inf
 __mulhf_y_nan_inf:
 	bnez a5, __mulhf_return_y
+	sext.h a0, a0
 	h3.fpackrq3.h a0, a0, a3
 	ret
 
@@ -526,7 +527,7 @@ funcsection(fixunhfsi)
 funcname(fixunhfsi):
 	h3.bextmi a1, a0, 10, 5
 	h3.funpackq3.h a0, a0
-	bltz a0, __fixunsfhi_neg
+	bltz a0, __fixunhfsi_neg
 	li t0, 31
 	beq a1, t0, __fixunhfsi_inf_nan
 	addi a1, a1, -15 - 29
@@ -535,7 +536,7 @@ funcname(fixunhfsi):
 __fixunhfsi_inf_nan:
 	li a0, -1
 	ret
-__fixunsfhi_neg:
+__fixunhfsi_neg:
 	li a0, 0
 	ret
 
