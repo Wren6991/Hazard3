@@ -124,7 +124,57 @@
 
 #else
 
-#error "Oops not done yet"
+.macro h3.funpackq3.s rd, rs1
+.insn r 0x0b, 0x1, 0x40, \rd, \rs1, zero
+.endm
+
+.macro h3.funpackq3.h rd, rs1
+.insn r 0x0b, 0x1, 0x00, \rd, \rs1, zero
+.endm
+
+.macro h3.fcheck2e.s rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x41, \rd, \rs1, \rs2
+.endm
+
+.macro h3.fcheck2e.h rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x01, \rd, \rs1, \rs2
+.endm
+
+.macro h3.fpackrq3.s rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x42, \rd, \rs1, \rs2
+.endm
+
+.macro h3.fpackrq3.h rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x02, \rd, \rs1, \rs2
+.endm
+
+.macro h3.feadjq3 rd, rs1
+.insn r 0x0b, 0x1, 0x04, \rd, \rs1, zero
+.endm
+
+.macro h3.feadju3 rd, rs1
+.insn r 0x0b, 0x1, 0x05, \rd, \rs1, zero
+.endm
+
+.macro h3.xorsign rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x06, \rd, \rs1, \rs2
+.endm
+
+.macro h3.xnorsign rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x07, \rd, \rs1, \rs2
+.endm
+
+.macro h3.ssrasticky rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x0b, \rd, \rs1, \rs2
+.endm
+
+.macro h3.ssrlsticky rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x0a, \rd, \rs1, \rs2
+.endm
+
+.macro h3.ssla rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x0d, \rd, \rs1, \rs2
+.endm
 
 #endif
 
