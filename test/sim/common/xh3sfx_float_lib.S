@@ -252,17 +252,26 @@ funcsection(extendhfsf2)
 funcname(extendhfsf2):
 	h3.funpackq3.h a1, a0
 	h3.bextmi a2, a0, 10, 5
-	addi t0, a2, -31
-	beqz t0, 2f
-1:
+	h3.fcheck2e.h t0, a2, a2
+	bnez t0, 2f
 	addi a2, a2, -15 + 127
+1:
 	h3.fpackrq3.s a0, a1, a2
 	ret
 2:
+	// Zero, infinity or NaN. Zero will underflow correctly if re-packed
+	// without re-biasing exponent:
+	beqz a2, 1b
+	// Distinguish infinity from NaN:
 	slli a0, a0, 22
-	beqz a0, 1b
+	beqz a0, 3f
+	// Canonicalise NaN
 	li a0, -1
 	ret
+3:
+	// Force exponent overflow to generate signed infinity:
+	slli a2, a2, 4
+	j 1b
 
 
 // Convert single-precision to signed integer
@@ -277,7 +286,7 @@ funcname(fixsfsi):
 	addi a1, a1, -127 - 29
 	h3.xorsign a2, a0, a0
 	h3.ssla a2, a2, a1
-	h3.xorsign a0, a0, a2
+	h3.xorsign a0, a2, a0
 	ret
 .p2align 2
 __fixsfsi_large_exponent:
@@ -298,7 +307,7 @@ funcname(fixunsfsi):
 	bgtu a1, t0, __fixunsfsi_large_exponent
 	h3.funpackq3.s a0, a0
 	addi a1, a1, -127 - 29
-	h3.ssll a2, a2, a1
+	h3.ssll a0, a0, a1
 	ret
 __fixunsfsi_large_exponent:
 	li a0, -1
