@@ -467,7 +467,9 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.fpackrq3.h
 
-Pack rounded significand and exponent into half-precision. The result is returned in the 16 LSBs of `rd`; the remaining bits are all-zeroes.
+Pack rounded significand and exponent into half-precision. The packed floating-point result is returned in the 16 LSBs of `rd`, and the sign bit is extended to fill the remaining XLEN - 16 bits.
+
+NOTE: Sign extension up from bit `15` matches the results produced by the standard Zhinx extension, and differs from the NaN boxing scheme used by the Zfh extension.
 
 The significand in `rs1` is in Q3.29 format and must be normalised or zero; that is, it must be either:
 

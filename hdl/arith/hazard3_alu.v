@@ -231,7 +231,7 @@ always @ (*) begin
 		SFX_OP_FUNPACKQ3_S: sfx_result = ({3'd1, op_a[22:0], 6'd0} ^ {32{op_a[31]}}) + {31'd0, op_a[31]};
 		SFX_OP_FCHECK2E_H:  sfx_result = {31'd0, &op_a[4:0] || ~|op_a[4:0] || &op_b[4:0] || ~|op_b[4:0]};
 		SFX_OP_FCHECK2E_S:  sfx_result = {31'd0, &op_a[7:0] || ~|op_a[7:0] || &op_b[7:0] || ~|op_b[7:0]};
-		SFX_OP_FPACKRQ3_H:  sfx_result = {16'd0, xh3sfx_fpackrq3_h};
+		SFX_OP_FPACKRQ3_H:  sfx_result = {{16{xh3sfx_fpackrq3_h[15]}}, xh3sfx_fpackrq3_h};
 		SFX_OP_FPACKRQ3_S:  sfx_result = xh3sfx_fpackrq3_s;
 		SFX_OP_FEADJQ3:     sfx_result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};
 		SFX_OP_FEADJU3:     sfx_result = {{W_DATA-W_SHAMT-1{xh3sfx_feadj[W_SHAMT]}}, xh3sfx_feadj};

@@ -15,7 +15,7 @@
 
 // Data types other than unsigned bit vector are not real and cannot hurt you
 uint32_t __extendhfsf2(uint16_t x);
-uint16_t __truncsfhf2(uint32_t x);
+uint32_t __truncsfhf2(uint32_t x);
 uint32_t __fixsfsi(uint32_t x);
 uint32_t __fixunsfsi(uint32_t x);
 uint32_t __floatsisf(uint32_t x);
@@ -26,16 +26,16 @@ int main() {
     // f32 <-> f16
 
     // Check some round-trips f16 -> f32 -> f16
-    check_equal(0x0000, __truncsfhf2(__extendhfsf2(0x0000)));
-    check_equal(0x8000, __truncsfhf2(__extendhfsf2(0x8000)));
-    check_equal(0x7c00, __truncsfhf2(__extendhfsf2(0x7c00)));
-    check_equal(0xfc00, __truncsfhf2(__extendhfsf2(0xfc00)));
-    check_equal(0x7bff, __truncsfhf2(__extendhfsf2(0x7bff)));
-    check_equal(0xfbff, __truncsfhf2(__extendhfsf2(0xfbff)));
-    check_equal(0x0400, __truncsfhf2(__extendhfsf2(0x0400)));
-    check_equal(0x8400, __truncsfhf2(__extendhfsf2(0x8400)));
-    check_equal(0x0401, __truncsfhf2(__extendhfsf2(0x0401)));
-    check_equal(0x8401, __truncsfhf2(__extendhfsf2(0x8401)));
+    check_equal(0x0000, 0xffff & __truncsfhf2(__extendhfsf2(0x0000)));
+    check_equal(0x8000, 0xffff & __truncsfhf2(__extendhfsf2(0x8000)));
+    check_equal(0x7c00, 0xffff & __truncsfhf2(__extendhfsf2(0x7c00)));
+    check_equal(0xfc00, 0xffff & __truncsfhf2(__extendhfsf2(0xfc00)));
+    check_equal(0x7bff, 0xffff & __truncsfhf2(__extendhfsf2(0x7bff)));
+    check_equal(0xfbff, 0xffff & __truncsfhf2(__extendhfsf2(0xfbff)));
+    check_equal(0x0400, 0xffff & __truncsfhf2(__extendhfsf2(0x0400)));
+    check_equal(0x8400, 0xffff & __truncsfhf2(__extendhfsf2(0x8400)));
+    check_equal(0x0401, 0xffff & __truncsfhf2(__extendhfsf2(0x0401)));
+    check_equal(0x8401, 0xffff & __truncsfhf2(__extendhfsf2(0x8401)));
 
     // Check f16 subnormals flush to +-0 on f32 conversion
     check_equal(__extendhfsf2(0x0000), 0x00000000);
@@ -46,41 +46,41 @@ int main() {
     check_equal(__extendhfsf2(0x83ff), 0x80000000);
 
     // Check f32 subnormals flush to +-0 on f16 conversion
-    check_equal(__truncsfhf2(0x00000000), 0x0000);
-    check_equal(__truncsfhf2(0x80000000), 0x8000);
-    check_equal(__truncsfhf2(0x00000001), 0x0000);
-    check_equal(__truncsfhf2(0x80000001), 0x8000);
-    check_equal(__truncsfhf2(0x007fffff), 0x0000);
-    check_equal(__truncsfhf2(0x807fffff), 0x8000);
+    check_equal(0xffff & __truncsfhf2(0x00000000), 0x0000);
+    check_equal(0xffff & __truncsfhf2(0x80000000), 0x8000);
+    check_equal(0xffff & __truncsfhf2(0x00000001), 0x0000);
+    check_equal(0xffff & __truncsfhf2(0x80000001), 0x8000);
+    check_equal(0xffff & __truncsfhf2(0x007fffff), 0x0000);
+    check_equal(0xffff & __truncsfhf2(0x807fffff), 0x8000);
 
     // Check exponent saturation on f32 -> f16
-    check_equal(__truncsfhf2(0x7f800000), 0x7c00); // f32 inf
-    check_equal(__truncsfhf2(0xff800000), 0xfc00);
-    check_equal(__truncsfhf2(0x47800000), 0x7c00); // exact f16 max exp
-    check_equal(__truncsfhf2(0xc7800000), 0xfc00);
-    check_equal(__truncsfhf2(0x47c00000), 0x7c00); // same, with nonzero significand (should clear)
-    check_equal(__truncsfhf2(0xc7c00000), 0xfc00);
-    check_equal(__truncsfhf2(0x47000000), 0x7800); // one less than f16 max exp
-    check_equal(__truncsfhf2(0xc7000000), 0xf800);
-    check_equal(__truncsfhf2(0x47400000), 0x7a00); // same, with nonzero significand:
-    check_equal(__truncsfhf2(0xc7400000), 0xfa00);
-    check_equal(__truncsfhf2(0x477fffff), 0x7c00); // round up to f16 max exp
-    check_equal(__truncsfhf2(0xc77fffff), 0xfc00);
-    check_equal(__truncsfhf2(0x47ffffff), 0x7c00); // round up above f16 max exp
-    check_equal(__truncsfhf2(0xc7ffffff), 0xfc00);
+    check_equal(0xffff & __truncsfhf2(0x7f800000), 0x7c00); // f32 inf
+    check_equal(0xffff & __truncsfhf2(0xff800000), 0xfc00);
+    check_equal(0xffff & __truncsfhf2(0x47800000), 0x7c00); // exact f16 max exp
+    check_equal(0xffff & __truncsfhf2(0xc7800000), 0xfc00);
+    check_equal(0xffff & __truncsfhf2(0x47c00000), 0x7c00); // same, with nonzero significand (should clear)
+    check_equal(0xffff & __truncsfhf2(0xc7c00000), 0xfc00);
+    check_equal(0xffff & __truncsfhf2(0x47000000), 0x7800); // one less than f16 max exp
+    check_equal(0xffff & __truncsfhf2(0xc7000000), 0xf800);
+    check_equal(0xffff & __truncsfhf2(0x47400000), 0x7a00); // same, with nonzero significand:
+    check_equal(0xffff & __truncsfhf2(0xc7400000), 0xfa00);
+    check_equal(0xffff & __truncsfhf2(0x477fffff), 0x7c00); // round up to f16 max exp
+    check_equal(0xffff & __truncsfhf2(0xc77fffff), 0xfc00);
+    check_equal(0xffff & __truncsfhf2(0x47ffffff), 0x7c00); // round up above f16 max exp
+    check_equal(0xffff & __truncsfhf2(0xc7ffffff), 0xfc00);
 
     // Check rounding on f32 -> f16
-    check_equal(__truncsfhf2(0x3f800000), 0x3c00); // 1.f
-    check_equal(__truncsfhf2(0x3f800fff), 0x3c00); // round down
-    check_equal(__truncsfhf2(0x3f801000), 0x3c00); // tie-break down
-    check_equal(__truncsfhf2(0x3f801001), 0x3c01); // round up
-    check_equal(__truncsfhf2(0x3f802000), 0x3c01); // exact
-    check_equal(__truncsfhf2(0x3f802fff), 0x3c01); // round down
-    check_equal(__truncsfhf2(0x3f803000), 0x3c02); // tie-break up
-    check_equal(__truncsfhf2(0x3f803001), 0x3c02); // round up
+    check_equal(0xffff & __truncsfhf2(0x3f800000), 0x3c00); // 1.f
+    check_equal(0xffff & __truncsfhf2(0x3f800fff), 0x3c00); // round down
+    check_equal(0xffff & __truncsfhf2(0x3f801000), 0x3c00); // tie-break down
+    check_equal(0xffff & __truncsfhf2(0x3f801001), 0x3c01); // round up
+    check_equal(0xffff & __truncsfhf2(0x3f802000), 0x3c01); // exact
+    check_equal(0xffff & __truncsfhf2(0x3f802fff), 0x3c01); // round down
+    check_equal(0xffff & __truncsfhf2(0x3f803000), 0x3c02); // tie-break up
+    check_equal(0xffff & __truncsfhf2(0x3f803001), 0x3c02); // round up
 
     // Check canonical NaNs
-    check_equal(__truncsfhf2(0xffffffff), 0xffff);
+    check_equal(__truncsfhf2(0xffffffff), 0xffffffff);
     check_equal(__extendhfsf2(0xffff), 0xffffffff);
 
     // ------------------------------------------------------------------------

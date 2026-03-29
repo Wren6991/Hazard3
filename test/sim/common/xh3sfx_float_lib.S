@@ -152,7 +152,7 @@ __addhf_x_inf:
 __addhf_both_inf:
 	xor a1, a1, a0
 	bgez a1,     __addhf_return_x
-	li a0, 0xffff
+	li a0, -1
 	ret
 
 __addhf_return_y_flushed:
@@ -316,7 +316,7 @@ __mulhf_y_0:
 	bne a2, t0, __mulhf_return_flushed_x
 	bnez a4, 2f
 1:
-	li a0, 0xffff
+	li a0, -1
 2:
 	ret
 
@@ -415,7 +415,7 @@ funcname(truncsfhf2):
 	// consistency with other half-precision results.
 	slli a0, a0, 9
 	beqz a0, 1b
-	li a0, 0xffff
+	li a0, -1
 	ret
 
 // Convert half-precision to single-precision

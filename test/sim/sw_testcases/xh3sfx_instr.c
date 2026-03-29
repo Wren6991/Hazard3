@@ -162,34 +162,34 @@ int main() {
 	check_equal(__h3_fpackrq3_s(-0x3fffffe0, 127),    0xc0000000); // Exponent increase on round down
 	check_equal(__h3_fpackrq3_s(-0x3fffffff, 0),      0x80800000); // Round down to normality
 
-	check_equal(__h3_fpackrq3_h(0, 0),                    0x0000); // Exact cancellation
-	check_equal(__h3_fpackrq3_h(0, 31),                   0x0000); // Exact cancellation
-	check_equal(__h3_fpackrq3_h(0, 510),                  0x0000); // Exact cancellation
-	check_equal(__h3_fpackrq3_h(0, -512),                 0x0000); // Exact cancellation
-	check_equal(__h3_fpackrq3_h(1 << 29, 0),              0x0000); // Flush to +0
-	check_equal(__h3_fpackrq3_h(1 << 29, 31),             0x7c00); // Smallest +inf
-	check_equal(__h3_fpackrq3_h((1 << 30) - 1, 31),       0x7c00); // Exponent increase on round from +inf
-	check_equal(__h3_fpackrq3_h((1 << 30) - 1, 30),       0x7c00); // Exponent increase on round to +inf
-	check_equal(__h3_fpackrq3_h(-1 << 29, 0),             0x8000); // Flush to -0
-	check_equal(__h3_fpackrq3_h(-1 << 29, 31),            0xfc00)  // Smallest -inf
-	check_equal(__h3_fpackrq3_h((-1 << 30) + 1, 31),      0xfc00); // Exponent increase on round from -inf
-	check_equal(__h3_fpackrq3_h((-1 << 30) + 1, 30),      0xfc00); // Exponent increase on round to -inf
-	check_equal(__h3_fpackrq3_h(0x2003ffff, 15),          0x3c00); // Round down to even
-	check_equal(__h3_fpackrq3_h(0x20040000, 15),          0x3c00); // Tie-break down to even
-	check_equal(__h3_fpackrq3_h(0x20040001, 15),          0x3c01); // Round up to odd
-	check_equal(__h3_fpackrq3_h(0x200bffff, 15),          0x3c01); // Round down to odd
-	check_equal(__h3_fpackrq3_h(0x200c0000, 15),          0x3c02); // Tie-break up to even
-	check_equal(__h3_fpackrq3_h(0x200c0001, 15),          0x3c02); // Round up to even
-	check_equal(__h3_fpackrq3_h(0x3fffffe0, 15),          0x4000); // Exponent increase on round up
-	check_equal(__h3_fpackrq3_h(0x3fffffff, 0),           0x0400); // Round up to normality
-	check_equal(__h3_fpackrq3_h(-0x2003ffff, 15),         0xbc00); // Round up to even
-	check_equal(__h3_fpackrq3_h(-0x20040000, 15),         0xbc00); // Tie-break up to even
-	check_equal(__h3_fpackrq3_h(-0x20040001, 15),         0xbc01); // Round down to odd
-	check_equal(__h3_fpackrq3_h(-0x200bffff, 15),         0xbc01); // Round up to odd
-	check_equal(__h3_fpackrq3_h(-0x200c0000, 15),         0xbc02); // Tie-break down to even
-	check_equal(__h3_fpackrq3_h(-0x200c0001, 15),         0xbc02); // Round down to even
-	check_equal(__h3_fpackrq3_h(-0x3fffffe0, 15),         0xc000); // Exponent increase on round down
-	check_equal(__h3_fpackrq3_h(-0x3fffffff, 0),          0x8400); // Round down to normality
+	check_equal(__h3_fpackrq3_h(0, 0),                    0x00000000); // Exact cancellation
+	check_equal(__h3_fpackrq3_h(0, 31),                   0x00000000); // Exact cancellation
+	check_equal(__h3_fpackrq3_h(0, 510),                  0x00000000); // Exact cancellation
+	check_equal(__h3_fpackrq3_h(0, -512),                 0x00000000); // Exact cancellation
+	check_equal(__h3_fpackrq3_h(1 << 29, 0),              0x00000000); // Flush to +0
+	check_equal(__h3_fpackrq3_h(1 << 29, 31),             0x00007c00); // Smallest +inf
+	check_equal(__h3_fpackrq3_h((1 << 30) - 1, 31),       0x00007c00); // Exponent increase on round from +inf
+	check_equal(__h3_fpackrq3_h((1 << 30) - 1, 30),       0x00007c00); // Exponent increase on round to +inf
+	check_equal(__h3_fpackrq3_h(-1 << 29, 0),             0xffff8000); // Flush to -0
+	check_equal(__h3_fpackrq3_h(-1 << 29, 31),            0xfffffc00)  // Smallest -inf
+	check_equal(__h3_fpackrq3_h((-1 << 30) + 1, 31),      0xfffffc00); // Exponent increase on round from -inf
+	check_equal(__h3_fpackrq3_h((-1 << 30) + 1, 30),      0xfffffc00); // Exponent increase on round to -inf
+	check_equal(__h3_fpackrq3_h(0x2003ffff, 15),          0x00003c00); // Round down to even
+	check_equal(__h3_fpackrq3_h(0x20040000, 15),          0x00003c00); // Tie-break down to even
+	check_equal(__h3_fpackrq3_h(0x20040001, 15),          0x00003c01); // Round up to odd
+	check_equal(__h3_fpackrq3_h(0x200bffff, 15),          0x00003c01); // Round down to odd
+	check_equal(__h3_fpackrq3_h(0x200c0000, 15),          0x00003c02); // Tie-break up to even
+	check_equal(__h3_fpackrq3_h(0x200c0001, 15),          0x00003c02); // Round up to even
+	check_equal(__h3_fpackrq3_h(0x3fffffe0, 15),          0x00004000); // Exponent increase on round up
+	check_equal(__h3_fpackrq3_h(0x3fffffff, 0),           0x00000400); // Round up to normality
+	check_equal(__h3_fpackrq3_h(-0x2003ffff, 15),         0xffffbc00); // Round up to even
+	check_equal(__h3_fpackrq3_h(-0x20040000, 15),         0xffffbc00); // Tie-break up to even
+	check_equal(__h3_fpackrq3_h(-0x20040001, 15),         0xffffbc01); // Round down to odd
+	check_equal(__h3_fpackrq3_h(-0x200bffff, 15),         0xffffbc01); // Round up to odd
+	check_equal(__h3_fpackrq3_h(-0x200c0000, 15),         0xffffbc02); // Tie-break down to even
+	check_equal(__h3_fpackrq3_h(-0x200c0001, 15),         0xffffbc02); // Round down to even
+	check_equal(__h3_fpackrq3_h(-0x3fffffe0, 15),         0xffffc000); // Exponent increase on round down
+	check_equal(__h3_fpackrq3_h(-0x3fffffff, 0),          0xffff8400); // Round down to normality
 
 	return 0;
 }
