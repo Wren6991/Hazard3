@@ -405,7 +405,7 @@ decl_func_with_section truncsfhf2
 	h3.fpackrq3.h a0, a1, a2
 	ret
 2:
-	// Return canonical NaN on NaN input. Use a zero-extended value for
+	// Return canonical NaN on NaN input. Use a sign-extended value for
 	// consistency with other half-precision results.
 	slli a0, a0, 9
 	beqz a0, 1b

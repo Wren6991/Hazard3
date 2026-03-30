@@ -312,7 +312,7 @@ Unpack significand from half-precision to Q3.29. The result is in the range `0xc
 ----
 uint32_t h3_funpackq3_h(uint32_t rs1) {
     uint32_t tmp0 = rs1 << 22;
-    uint32_t tmp1 = tmp0 >> 3
+    uint32_t tmp1 = tmp0 >> 3;
     uint32_t tmp2 = tmp1 | (1u << 29);
     return rs1 & (1u << 15) ? -tmp2 : tmp2;
 }
@@ -707,10 +707,10 @@ Example C macro (using GCC statement expressions):
 
 Shift signed-right, arithmetic. `rs2` is a signed integer wrapped to the range -512 ≤ _x_ ≤ 511. The cases are:
 
-* -512 ≤ _x_ ≤ -32: result is all-sign.
+* -512 ≤ _x_ ≤ -32: result is all-zeroes.
 * -32 < _x_ < 0: result is `rs1 << -rs2[4:0]`.
 * 0 ≤ _x_ < 32: result is `rs1 >> rs2[4:0]` (arithmetic right shift).
-* 32 ≤ _x_ ≤ 511: result is all-zeroes.
+* 32 ≤ _x_ ≤ 511: result is all-sign.
 
 Encoding (R-type):
 
@@ -747,9 +747,6 @@ Shift signed-right, logical. `rs2` is a signed integer wrapped to the range -512
 * -32 < _x_ < 0: result is `rs1 << -rs2[4:0]`.
 * 0 ≤ _x_ < 32: result is `rs1 >> rs2[4:0]` (logical right shift).
 * 32 ≤ _x_ ≤ 511: result is all-zeroes.
-
-
-This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrlsticky`.
 
 Encoding (R-type):
 
@@ -958,11 +955,11 @@ __truncsfhf2:
     h3.fpackrq3.h a0, a1, a2
     ret
 2:
-    // Return canonical NaN on NaN input. Use a zero-extended value for
+    // Return canonical NaN on NaN input. Use a sign-extended value for
     // consistency with other half-precision results.
     slli a0, a0, 9
     beqz a0, 1b
-    li a0, 0xffff
+    li a0, -1
     ret
 ----
 
