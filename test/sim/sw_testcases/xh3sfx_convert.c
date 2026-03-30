@@ -17,7 +17,7 @@
 uint32_t __extendhfsf2(uint16_t x);
 uint32_t __truncsfhf2(uint32_t x);
 uint32_t __fixsfsi(uint32_t x);
-uint32_t __fixunsfsi(uint32_t x);
+uint32_t __fixunssfsi(uint32_t x);
 uint32_t __floatsisf(uint32_t x);
 uint32_t __floatunsisf(uint32_t x);
 
@@ -129,23 +129,23 @@ int main() {
     // ------------------------------------------------------------------------
     // f32 <-> u32
 
-    check_equal(__fixunsfsi(0x00000000),  0                       ); // +- 0
-    check_equal(__fixunsfsi(0x80000000),  0                       );
-    check_equal(__fixunsfsi(0x007fffff),  0                       ); // +- subnormal
-    check_equal(__fixunsfsi(0x807fffff),  0                       );
-    check_equal(__fixunsfsi(0x3f000000),  0                       ); // +- 1/2 (note GCC requires truncate-to-zero)
-    check_equal(__fixunsfsi(0xbf000000),  0                       );
-    check_equal(__fixunsfsi(0xff800000),  0                       ); // -inf: clamped to 0
-    check_equal(__fixunsfsi(0x3f800000),  1                       ); // 1
-    check_equal(__fixunsfsi(0x3f7fffff),  0                       ); // 1 - 1ulp
-    check_equal(__fixunsfsi(0x40000000),  2                       ); // 2
-    check_equal(__fixunsfsi(0x3fffffff),  1                       ); // 2 - 1ulp
-    check_equal(__fixunsfsi(0x4b7fffff), (1 << 24) - 1            ); // largest odd number
-    check_equal(__fixunsfsi(0x4f7fffff), UINT_MAX - (1 << 8) + 1  ); // largest non-saturated
-    check_equal(__fixunsfsi(0x4f000000), (UINT_MAX >> 1) + 1      ); // one less than max exponent
-    check_equal(__fixunsfsi(0x4f800000), UINT_MAX                 ); // max exponent
-    check_equal(__fixunsfsi(0x7f800000), UINT_MAX                 ); // inf
-    check_equal(__fixunsfsi(0x7fffffff), UINT_MAX                 ); // "+nan"
+    check_equal(__fixunssfsi(0x00000000),  0                       ); // +- 0
+    check_equal(__fixunssfsi(0x80000000),  0                       );
+    check_equal(__fixunssfsi(0x007fffff),  0                       ); // +- subnormal
+    check_equal(__fixunssfsi(0x807fffff),  0                       );
+    check_equal(__fixunssfsi(0x3f000000),  0                       ); // +- 1/2 (note GCC requires truncate-to-zero)
+    check_equal(__fixunssfsi(0xbf000000),  0                       );
+    check_equal(__fixunssfsi(0xff800000),  0                       ); // -inf: clamped to 0
+    check_equal(__fixunssfsi(0x3f800000),  1                       ); // 1
+    check_equal(__fixunssfsi(0x3f7fffff),  0                       ); // 1 - 1ulp
+    check_equal(__fixunssfsi(0x40000000),  2                       ); // 2
+    check_equal(__fixunssfsi(0x3fffffff),  1                       ); // 2 - 1ulp
+    check_equal(__fixunssfsi(0x4b7fffff), (1 << 24) - 1            ); // largest odd number
+    check_equal(__fixunssfsi(0x4f7fffff), UINT_MAX - (1 << 8) + 1  ); // largest non-saturated
+    check_equal(__fixunssfsi(0x4f000000), (UINT_MAX >> 1) + 1      ); // one less than max exponent
+    check_equal(__fixunssfsi(0x4f800000), UINT_MAX                 ); // max exponent
+    check_equal(__fixunssfsi(0x7f800000), UINT_MAX                 ); // inf
+    check_equal(__fixunssfsi(0x7fffffff), UINT_MAX                 ); // "+nan"
 
     check_equal(__floatunsisf( 0                     ), 0x00000000); // +- 0
     check_equal(__floatunsisf( 1                     ), 0x3f800000); // 1

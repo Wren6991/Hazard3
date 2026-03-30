@@ -9,19 +9,37 @@
 #include "xh3sfx_intrinsics.h"
 #include "xh3bextm_intrinsics.h"
 
-#define funcname(name) __ ## name
-#define funcsection(name) .section .text. ## name
+// Redefine XH3SFX_LIB_SECTION move library functions to a different section,
+// e.g. RAM vs flash. Functions are still put in individual sections, with
+// the function name applied as a suffix on the section name.
+#ifndef XH3SFX_LIB_SECTION
+#define XH3SFX_LIB_SECTION .text
+#endif
+
+// Redefine XH3SFX_LIB_PREFIX to apply a different prefix to the name of all
+// functions in this file. The default __ will result in names like __addsf3,
+// which replace the libgcc functions.
+#ifndef XH3SFX_LIB_PREFIX
+#define XH3SFX_LIB_PREFIX __
+#endif
+
+.macro decl_func name
+.p2align 2
+.global XH3SFX_LIB_PREFIX\name
+XH3SFX_LIB_PREFIX\name:
+.endm
+
+.macro decl_func_with_section name
+.section XH3SFX_LIB_SECTION.xh3sfxlib.\name
+decl_func \name
+.endm
 
 // ----------------------------------------------------------------------------
 // Add and subtract
 
-funcsection(addsf3)
-.global funcname(subsf3)
-.p2align 2
-funcname(subsf3):
+decl_func_with_section subsf3
 	binvi a1, a1, 31
-.global funcname(addsf3)
-funcname(addsf3):
+decl_func addsf3
 	h3.bextmi a2, a0, 23, 8
 	h3.bextmi a3, a1, 23, 8
 	h3.fcheck2e.s t0, a2, a3
@@ -96,13 +114,9 @@ __addsf_return_x:
 	ret
 
 // Half-precision: essentially the same as single-precision
-funcsection(addhf3)
-.global funcname(subhf3)
-.p2align 2
-funcname(subhf3):
+decl_func_with_section subhf3
 	binvi a1, a1, 31
-.global funcname(addhf3)
-funcname(addhf3):
+decl_func addhf3
 	h3.bextmi a2, a0, 10, 5
 	h3.bextmi a3, a1, 10, 5
 	h3.fcheck2e.h t0, a2, a3
@@ -168,10 +182,7 @@ __addhf_return_x:
 // ----------------------------------------------------------------------------
 // Multiply
 
-funcsection(mulsf3)
-.global funcname(mulsf3)
-.p2align 2
-funcname(mulsf3):
+decl_func_with_section mulsf3
 	h3.bextmi a2, a0, 23, 8
 	h3.bextmi a3, a1, 23, 8
 	h3.fcheck2e.s t0, a2, a3
@@ -264,10 +275,7 @@ __mulsf_x_nan_inf:
 
 
 // Half-precision: essentially the same as single-precision
-funcsection(mulhf3)
-.global funcname(mulhf3)
-.p2align 2
-funcname(mulhf3):
+decl_func_with_section mulhf3
 	h3.bextmi a2, a0, 10, 5
 	h3.bextmi a3, a1, 10, 5
 	h3.fcheck2e.h t0, a2, a3
@@ -335,17 +343,11 @@ __mulhf_x_nan_inf:
 // ----------------------------------------------------------------------------
 // Other arithmetic
 
-funcsection(negsf2)
-.global funcname(negsf2)
-.p2align 2
-funcname(negsf2):
+decl_func_with_section negsf2
 	binvi a0, a0, 31
 	ret
 
-funcsection(neghf2)
-.global funcname(neghf2)
-.p2align 2
-funcname(neghf2):
+decl_func_with_section neghf2
 	binvi a0, a0, 15
 	ret
 
@@ -353,55 +355,42 @@ funcname(neghf2):
 // to magnitude. This is a 31-bit value; convert sign-magnitude to two's
 // complement to get a fully correctly ordered 32-bit integer. This doesn't
 // handle NaNs gracefully but, quote libgcc docs, "you should not rely on
-// this; if NaN is a possibility, use one of the higher-level comparison
-// functions"
-funcsection(fcmpsf2)
-.global funcname(fcmpsf2)
-.p2align 2
-funcname(fcmpsf2):
+// this".
+decl_func_with_section fcmpsf2
+decl_func lesf2
+decl_func ltsf2
+decl_func gesf2
+decl_func gtsf2
 	bclri a2, a0, 31
 	bclri a3, a1, 31
 	h3.xorsign a2, a0, a2
 	h3.xorsign a3, a1, a3
-	blt a2, a3, __fcmpsf2_lt
-	bgt a2, a3, __fcmpsf2_gt
-	li a0, 0
-	ret
-__fcmpsf2_lt:
-	li a0, -1
-	ret
-__fcmpsf2_gt:
-	li a0, 1
+	slt a1, a2, a3
+	slt a0, a3, a2
+	sub a0, a0, a1
 	ret
 
-funcsection(fcmphf2)
-.global funcname(fcmphf2)
-funcname(fcmphf2):
+decl_func_with_section fcmphf2
+decl_func lehf2
+decl_func lthf2
+decl_func gehf2
+decl_func gthf2
 	slli a0, a0, 16
 	slli a1, a1, 16
 	bclri a2, a0, 31
 	bclri a3, a1, 31
 	h3.xorsign a2, a0, a2
 	h3.xorsign a3, a1, a3
-	blt a2, a3, __fcmphf2_lt
-	bgt a2, a3, __fcmphf2_gt
-	li a0, 0
-	ret
-__fcmphf2_lt:
-	li a0, -1
-	ret
-__fcmphf2_gt:
-	li a0, 1
+	slt a1, a2, a3
+	slt a0, a3, a2
+	sub a0, a0, a1
 	ret
 
 // ----------------------------------------------------------------------------
 // Conversions: f32 <-> f16
 
 // Convert single-precision to half-precision
-funcsection(truncsfhf2)
-.global funcname(truncsfhf2)
-.p2align 2
-funcname(truncsfhf2):
+decl_func_with_section truncsfhf2
 	h3.funpackq3.s a1, a0
 	h3.bextmi a2, a0, 23, 8
 	addi t0, a2, -255
@@ -419,10 +408,7 @@ funcname(truncsfhf2):
 	ret
 
 // Convert half-precision to single-precision
-funcsection(extendhfsf2)
-.global funcname(extendhfsf2)
-.p2align 2
-funcname(extendhfsf2):
+decl_func_with_section extendhfsf2
 	h3.funpackq3.h a1, a0
 	h3.bextmi a2, a0, 10, 5
 	h3.fcheck2e.h t0, a2, a2
@@ -450,10 +436,7 @@ funcname(extendhfsf2):
 // Conversions: f32 <-> i32, u32
 
 // Convert single-precision to signed integer
-funcsection(fixsfsi)
-.global funcname(fixsfsi)
-.p2align 2
-funcname(fixsfsi):
+decl_func_with_section fixsfsi
 	h3.bextmi a1, a0, 23, 8
 	li t0, 127 + 31
 	bgeu a1, t0, __fixsfsi_large_exponent
@@ -472,29 +455,24 @@ __fixsfsi_large_exponent:
 	ret
 
 // Convert single-precision to unsigned integer
-funcsection(fixunsfsi)
-.global funcname(fixunsfsi)
-.p2align 2
-funcname(fixunsfsi):
-	bltz a0, __fixunsfsi_neg
+decl_func_with_section fixunssfsi
+	bltz a0, __fixunssfsi_neg
 	h3.bextmi a1, a0, 23, 8
 	li t0, 127 + 31
-	bgtu a1, t0, __fixunsfsi_large_exponent
+	bgtu a1, t0, __fixunssfsi_large_exponent
 	h3.funpackq3.s a0, a0
 	addi a1, a1, -127 - 29
 	h3.ssll a0, a0, a1
 	ret
-__fixunsfsi_large_exponent:
+__fixunssfsi_large_exponent:
 	li a0, -1
 	ret
-__fixunsfsi_neg:
+__fixunssfsi_neg:
 	li a0, 0
 	ret
 
 // Convert signed integer to single-precision
-funcsection(floatsisf)
-.global funcname(floatsisf)
-funcname(floatsisf):
+decl_func_with_section floatsisf
 	beqz a0, 1f
 	h3.feadjq3 a1, a0
 	h3.ssrasticky a0, a0, a1
@@ -507,9 +485,7 @@ funcname(floatsisf):
 	ret
 
 // Convert unsigned integer to single-precision
-funcsection(floatunsisf)
-.global funcname(floatunsisf)
-funcname(floatunsisf):
+decl_func_with_section floatunssisf
 	beqz a0, 1f
 	// Normalise to U3.29
 	h3.feadju3 a1, a0
@@ -525,10 +501,7 @@ funcname(floatunsisf):
 // Conversions: f16 <-> i32, u32
 
 // Convert half-precision to signed integer
-funcsection(fixhfsi)
-.global funcname(fixhfsi)
-.p2align 2
-funcname(fixhfsi):
+decl_func_with_section fixhfsi
 	h3.bextmi a1, a0, 10, 5
 	h3.funpackq3.h a0, a0
 	li t0, 31
@@ -547,29 +520,24 @@ __fixhfsi_inf_nan:
 	ret
 
 // Convert half-precision to unsigned integer
-funcsection(fixunhfsi)
-.global funcname(fixunhfsi)
-.p2align 2
-funcname(fixunhfsi):
+decl_func_with_section fixunshfsi
 	h3.bextmi a1, a0, 10, 5
 	h3.funpackq3.h a0, a0
-	bltz a0, __fixunhfsi_neg
+	bltz a0, __fixunshfsi_neg
 	li t0, 31
-	beq a1, t0, __fixunhfsi_inf_nan
+	beq a1, t0, __fixunshfsi_inf_nan
 	addi a1, a1, -15 - 29
 	h3.ssll a0, a0, a1
 	ret
-__fixunhfsi_inf_nan:
+__fixunshfsi_inf_nan:
 	li a0, -1
 	ret
-__fixunhfsi_neg:
+__fixunshfsi_neg:
 	li a0, 0
 	ret
 
 // Convert signed integer to half-precision
-funcsection(floatsihf)
-.global funcname(floatsihf)
-funcname(floatsihf):
+decl_func_with_section floatsihf
 	beqz a0, 1f
 	h3.feadjq3 a1, a0
 	h3.ssrasticky a0, a0, a1
@@ -582,9 +550,8 @@ funcname(floatsihf):
 	ret
 
 // Convert unsigned integer to half-precision
-funcsection(floatunsihf)
-.global funcname(floatunsihf)
-funcname(floatunsihf):
+// Note: for "float" functions the unsigned prefix is "un" instead of "uns"
+decl_func_with_section floatunsihf
 	beqz a0, 1f
 	// Normalise to U3.29
 	h3.feadju3 a1, a0
