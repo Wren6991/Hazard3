@@ -216,6 +216,32 @@ These 16-bit instructions behave identically to their 32-bit counterparts, namel
 |`cm.mvsa01 r1s', r2s'` | 2 |
 |===
 
+// __ magic comment to reset sublime text asciidoc lexer
+
+=== Hazard3 Custom Extensions
+
+[%autowidth.stretch, options="header"]
+|===
+| Instruction | Cycles | Note
+3+| Xh3bextm (bit extract multiple)
+|`h3.bextm rd, rs1, rs2, immw`  | 1 |
+|`h3.bextmi rd, rs1, imm, immw` | 1 |
+3+| Xh3sfx (soft float acceleration)
+|`h3.funpackrq3.s rd, rs1`      | 1 |
+|`h3.funpackrq3.h rd, rs1`      | 1 |
+|`h3.fpackrq3.s rd, rs1, rs2`   | 1 |
+|`h3.fpackrq3.h rd, rs1, rs2`   | 1 |
+|`h3.fcheck2e.s rd, rs1, rs2`   | 1 |
+|`h3.fcheck2e.h rd, rs1, rs2`   | 1 |
+|`h3.feadjq3 rd, rs1`           | 1 |
+|`h3.feadju3 rd, rs1`           | 1 |
+|`h3.xorsign rd, rs1, rs2`      | 1 |
+|`h3.ssla rd, rs1, rs2`         | 1 |
+|`h3.ssll rd, rs1, rs2`         | 1 |
+|`h3.sslrasticky rd, rs1, rs2`  | 1 |
+|`h3.sslrlsticky rd, rs1, rs2`  | 1 |
+|===
+
 [[instruction-timings-branch-predictor]]
 === Branch Predictor
 

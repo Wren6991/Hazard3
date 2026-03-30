@@ -112,7 +112,7 @@ Example assembly macro:
 ----
 
 [[extension-xh3bextm-section]]
-=== Xh3bextm: Hazard3 bit extract multiple
+=== Xh3bextm: Hazard3 Bit Extract Multiple
 
 This document describes Xh3bextm version: 1.0
 
@@ -227,7 +227,7 @@ Example assembly macro:
 ----
 
 [[extension-xh3sfx-section]]
-=== Xh3sfx: Soft Float Acceleration
+=== Xh3sfx: Hazard3 Soft Float Acceleration
 
 This document describes Xh3sfx version: 1.0
 
