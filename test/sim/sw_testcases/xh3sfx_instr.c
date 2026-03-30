@@ -4,7 +4,7 @@
 // Directed per-instruction tests for Xh3sfx
 
 // ebreak is easier to find in waves.
-#if 0
+#if 1
 #define check_equal(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %08x != %08x\n", __LINE__, (a), (b))
 #else
 #define check_equal(a, b) if ((a) != (b)) {asm ("ebreak");}

@@ -23,7 +23,11 @@ int main() {
     // -0 * 0 = -0
     check_equal(__mulsf3(0x80000000u, 0x00000000u), 0x80000000u);
     // 0 * -0 = - 0
-    check_equal(__mulsf3(0x00000000u, 0x80000000u), 0x80000000u);    
+    check_equal(__mulsf3(0x00000000u, 0x80000000u), 0x80000000u);
+    // +0 * +0 = +0
+    check_equal(__mulsf3(0x00000000u, 0x00000000u), 0x00000000u);
+    // -0 * -0 = +0 (sign XOR of two negatives)
+    check_equal(__mulsf3(0x80000000u, 0x80000000u), 0x00000000u);
     // 1 * 2 = 2
     check_equal(__mulsf3(0x3f800000u, 0x40000000u), 0x40000000u);
     // 2 * 1 = 2
@@ -32,10 +36,18 @@ int main() {
     check_equal(__mulsf3(0x7f800000u, 0x7f800000u), 0x7f800000u);
     // inf * -inf = -inf
     check_equal(__mulsf3(0x7f800000u, 0xff800000u), 0xff800000u);
+    // -inf * inf = -inf
+    check_equal(__mulsf3(0xff800000u, 0x7f800000u), 0xff800000u);
+    // -inf * -inf = inf
+    check_equal(__mulsf3(0xff800000u, 0xff800000u), 0x7f800000u);
     // inf * 0 = nan
     check_equal(__mulsf3(0x7f800000u, 0x00000000u), 0xffffffffu);
     // 0 * inf = nan
     check_equal(__mulsf3(0x00000000u, 0x7f800000u), 0xffffffffu);
+    // inf * -0 = nan
+    check_equal(__mulsf3(0x7f800000u, 0x80000000u), 0xffffffffu);
+    // -0 * inf = nan
+    check_equal(__mulsf3(0x80000000u, 0x7f800000u), 0xffffffffu);
     // 1 * -inf = -inf
     check_equal(__mulsf3(0x3f800000u, 0xff800000u), 0xff800000u);
     // -inf * 1 = -inf
@@ -48,8 +60,14 @@ int main() {
     check_equal(__mulsf3(0x3f800000u, 0x007fffffu), 0x00000000u);
     // nonzero subnormal * -1 = exactly -0
     check_equal(__mulsf3(0x007fffffu, 0xbf800000u), 0x80000000u);
+    // -subnormal * 1 = -0 (negative subnormal flushed to -0)
+    check_equal(__mulsf3(0x807fffffu, 0x3f800000u), 0x80000000u);
+    // -subnormal * -1 = +0 (sign XOR of -0 and -1)
+    check_equal(__mulsf3(0x807fffffu, 0xbf800000u), 0x00000000u);
     // nan * 0 = same nan
     check_equal(__mulsf3(0xffff1234u, 0x00000000u), 0xffff1234u);
+    // nan * nan = first nan (implementation detail)
+    check_equal(__mulsf3(0x7fff1234u, 0x7fff5678), 0x7fff1234u);
     // 0 * nan = same nan
     check_equal(__mulsf3(0x00000000u, 0xffff1234u), 0xffff1234u);
     // nan * 1 = same nan
@@ -86,5 +104,11 @@ int main() {
     check_equal(__mulsf3(0x0ffffffeu, 0xb0000001u), 0x80800000u);
     check_equal(__mulsf3(0x8ffffffeu, 0x30000001u), 0x80800000u);
     check_equal(__mulsf3(0x8ffffffeu, 0xb0000001u), 0x00800000u);
+    // (1 + 2^-12)^2: exact tie, even LSB, rounds down
+    check_equal(__mulsf3(0x3f800800u, 0x3f800800u), 0x3f801000u);
+    // (1 + 2^-23) * 1.5: exact tie, odd LSB, rounds up
+    check_equal(__mulsf3(0x3f800001u, 0x3fc00000u), 0x3fc00002u);
+    // (1 + 2^-23) * (1.5 + 2^-23): guard=1, sticky set only at lowest product bit
+    check_equal(__mulsf3(0x3f800001u, 0x3fc00001u), 0x3fc00003u);
 	return 0;
 }
