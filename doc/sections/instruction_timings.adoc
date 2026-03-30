@@ -238,8 +238,10 @@ These 16-bit instructions behave identically to their 32-bit counterparts, namel
 |`h3.xorsign rd, rs1, rs2`      | 1 |
 |`h3.ssla rd, rs1, rs2`         | 1 |
 |`h3.ssll rd, rs1, rs2`         | 1 |
-|`h3.sslrasticky rd, rs1, rs2`  | 1 |
-|`h3.sslrlsticky rd, rs1, rs2`  | 1 |
+|`h3.ssra rd, rs1, rs2`         | 1 |
+|`h3.ssrl rd, rs1, rs2`         | 1 |
+|`h3.ssrasticky rd, rs1, rs2`   | 1 |
+|`h3.ssrlsticky rd, rs1, rs2`   | 1 |
 |===
 
 [[instruction-timings-branch-predictor]]
