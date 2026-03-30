@@ -4,7 +4,7 @@
 // Directed per-instruction tests for Xh3sfx
 
 // ebreak is easier to find in waves.
-#if 1
+#if 0
 #define check_equal(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %08x != %08x\n", __LINE__, (a), (b))
 #else
 #define check_equal(a, b) if ((a) != (b)) {asm ("ebreak");}
@@ -78,6 +78,10 @@ int main() {
 	check_equal(__h3_ssrasticky(1u << 31, 32), -1);
 	check_equal(__h3_ssrasticky(1u << 31, 255), -1);
 	check_equal(__h3_ssrasticky((1u << 31) + (1u << 8), 16), (-1 << 15) + 1);
+	check_equal(__h3_ssrasticky(1, 511), 1);
+	check_equal(__h3_ssrasticky(1u << 31, 511), -1);
+	check_equal(__h3_ssrasticky(1, -512), 0);
+	check_equal(__h3_ssrasticky(1u << 31, -512), 0);
 
 	check_equal(__h3_ssrlsticky(1, 0), 1);
 	check_equal(__h3_ssrlsticky(1, 1), 1);
@@ -91,6 +95,10 @@ int main() {
 	check_equal(__h3_ssrlsticky(1 << 31, 31), 1);
 	check_equal(__h3_ssrlsticky(1 << 31, 32), 1);
 	check_equal(__h3_ssrlsticky(1 << 31, 255), 1);
+	check_equal(__h3_ssrlsticky(1, 511), 1);
+	check_equal(__h3_ssrlsticky(1u << 31, 511), 1);
+	check_equal(__h3_ssrlsticky(1, -512), 0);
+	check_equal(__h3_ssrlsticky(1u << 31, -512), 0);
 
 	check_equal(__h3_ssla(1, 0), 1);
 	check_equal(__h3_ssla(1, 1), 2);
@@ -108,6 +116,10 @@ int main() {
 	check_equal(__h3_ssla(1u << 31, -31), -1);
 	check_equal(__h3_ssla(1u << 31, -32), -1);
 	check_equal(__h3_ssla(1u << 31, -256), -1);
+	check_equal(__h3_ssla(1, 511), 0);
+	check_equal(__h3_ssla(1u << 31, 511), 0);
+	check_equal(__h3_ssla(1, -512), 0);
+	check_equal(__h3_ssla(1u << 31, -512), -1);
 
 	check_equal(__h3_ssll(1, 0), 1);
 	check_equal(__h3_ssll(1, 1), 2);
@@ -125,6 +137,10 @@ int main() {
 	check_equal(__h3_ssll(1u << 31, -31), 1);
 	check_equal(__h3_ssll(1u << 31, -32), 0);
 	check_equal(__h3_ssll(1u << 31, -256), 0);
+	check_equal(__h3_ssll(1, 511), 0);
+	check_equal(__h3_ssll(1u << 31, 511), 0);
+	check_equal(__h3_ssll(1, -512), 0);
+	check_equal(__h3_ssll(1u << 31, -512), 0);
 
 	check_equal(__h3_ssra(1, 0), 1);
 	check_equal(__h3_ssra(1, -1), 2);
@@ -142,6 +158,10 @@ int main() {
 	check_equal(__h3_ssra(1u << 31, 30), -2);
 	check_equal(__h3_ssra(1u << 31, 31), -1);
 	check_equal(__h3_ssra(1u << 31, 32), -1);
+	check_equal(__h3_ssra(1, 511), 0);
+	check_equal(__h3_ssra(1u << 31, 511), -1);
+	check_equal(__h3_ssra(1, -512), 0);
+	check_equal(__h3_ssra(1u << 31, -512), 0);
 
 	check_equal(__h3_ssrl(1, 0), 1);
 	check_equal(__h3_ssrl(1, -1), 2);
@@ -159,6 +179,10 @@ int main() {
 	check_equal(__h3_ssrl(1u << 31, 30), 2);
 	check_equal(__h3_ssrl(1u << 31, 31), 1);
 	check_equal(__h3_ssrl(1u << 31, 32), 0);
+	check_equal(__h3_ssrl(1, 511), 0);
+	check_equal(__h3_ssrl(1u << 31, 511), 0);
+	check_equal(__h3_ssrl(1, -512), 0);
+	check_equal(__h3_ssrl(1u << 31, -512), 0);
 
 	check_equal(__h3_xorsign( 1,  1),  1);
 	check_equal(__h3_xorsign( 1, -1), -1);

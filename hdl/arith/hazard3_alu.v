@@ -57,10 +57,13 @@ wire lt = op_a[W_DATA-1] == op_b[W_DATA-1] ? sum[W_DATA-1]  :
 // ----------------------------------------------------------------------------
 // Shifter and shifter control decode
 
-wire       shamt_neg = op_b[8];
-wire       shamt_is_bidir = |EXTENSION_XH3SFX && aluop == ALUOP_SFX;
-wire [8:0] shamt_abs = shamt_is_bidir && shamt_neg ? -op_b[8:0] : op_b[8:0];
-wire       shamt_over = |shamt_abs[8:5];
+// Sign bit of signed shift amount for Xh3sfx extended shifts:
+localparam SSHAMT_MSB = 9;
+
+wire                shamt_neg = op_b[SSHAMT_MSB];
+wire                shamt_is_bidir = |EXTENSION_XH3SFX && aluop == ALUOP_SFX;
+wire [SSHAMT_MSB:0] shamt_abs = shamt_is_bidir && shamt_neg ? -op_b[SSHAMT_MSB:0] : op_b[SSHAMT_MSB:0];
+wire                shamt_over = |shamt_abs[SSHAMT_MSB:5];
 
 wire shift_right_sfx = shamt_neg == funct7_32b[2];
 wire shift_arith_sfx = funct7_32b[5];

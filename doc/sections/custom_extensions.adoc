@@ -633,14 +633,12 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssla
 
-Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. The cases are:
+Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -512 ≤ _x_ ≤ 511. The cases are:
 
-* -256 ≤ `rs2[8:0]` ≤ -32: result is all-sign.
-* -32 < `rs2[8:0]` < 0: result is `rs1 >> -rs2[8:0]` (arithmetic right shift).
-* 0 ≤ `rs2[8:0]` < 32: result is `rs1 << rs2[8:0]`.
-* 32 ≤ `rs2[8:0]` ≤ 255: result is all-zeroes.
-
-This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrasticky`.
+* -512 ≤ _x_ ≤ -32: result is all-sign.
+* -32 < _x_ < 0: result is `rs1 >> -rs2[4:0]` (arithmetic right shift).
+* 0 ≤ _x_ < 32: result is `rs1 << rs2[4:0]`.
+* 32 ≤ _x_ ≤ 511: result is all-zeroes.
 
 Encoding (R-type):
 
@@ -671,15 +669,12 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssll
 
-Shift signed-left, logical. `rs2` is a signed integer wrapped to the range -256 ≤ _x_ ≤ 255. The cases are:
+Shift signed-left, logical. `rs2` is a signed integer wrapped to the range -512 ≤ _x_ ≤ 511. The cases are:
 
-* -256 ≤ `rs2[8:0]` ≤ -32: result is all-zeroes.
-* -32 < `rs2[8:0]` < 0: result is `rs1 >> -rs2[8:0]` (logical right shift).
-* 0 ≤ `rs2[8:0]` < 32: result is `rs1 << rs2[8:0]`.
-* 32 ≤ `rs2[8:0]` ≤ 255: result is all-zeroes.
-
-
-This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrlsticky`.
+* -512 ≤ _x_ ≤ -32: result is all-zeroes.
+* -32 < _x_ < 0: result is `rs1 >> -rs2[4:0]` (logical right shift).
+* 0 ≤ _x_ < 32: result is `rs1 << rs2[4:0]`.
+* 32 ≤ _x_ ≤ 511: result is all-zeroes.
 
 Encoding (R-type):
 
@@ -708,19 +703,92 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
+==== h3.ssra
+
+Shift signed-right, arithmetic. `rs2` is a signed integer wrapped to the range -512 ≤ _x_ ≤ 511. The cases are:
+
+* -512 ≤ _x_ ≤ -32: result is all-sign.
+* -32 < _x_ < 0: result is `rs1 << -rs2[4:0]`.
+* 0 ≤ _x_ < 32: result is `rs1 >> rs2[4:0]` (arithmetic right shift).
+* 32 ≤ _x_ ≤ 511: result is all-zeroes.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0101000`  | `h3.ssra`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_ssra(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x28, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
+==== h3.ssrl
+
+Shift signed-right, logical. `rs2` is a signed integer wrapped to the range -512 ≤ _x_ ≤ 511. The cases are:
+
+* -512 ≤ _x_ ≤ -32: result is all-zeroes.
+* -32 < _x_ < 0: result is `rs1 << -rs2[4:0]`.
+* 0 ≤ _x_ < 32: result is `rs1 >> rs2[4:0]` (logical right shift).
+* 32 ≤ _x_ ≤ 511: result is all-zeroes.
+
+
+This instruction does not collect sticky bits. Instead, use `neg` followed by `h3.ssrlsticky`.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0001000`  | `h3.ssrl`
+| 24:20 | `rs2`    | -            | Source register 2
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:2   | `opc`    | `0b00010`    | custom0 opcode
+| 1:0   | `size`   | `0b11`       | 32-bit instruction
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_ssrl(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x08, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.ssrasticky
 
-Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[8:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
+Shift signed-right, arithmetic, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[9:0]`. The shift amount is wrapped into the range -512 ≤ _x_ ≤ 511. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
 
-NOTE: The size of the shift range is chosen to avoid special-case branching when adding numbers with large exponent differences.
+NOTE: The size of the shift range is chosen to avoid special-case branching when adding numbers with large exponent differences. For addition of normals, the greatest possible exponent difference is 253. For fused multiply-add it may be even larger.
 
 Shifts outside of the range ±31 are handled as follows:
 
-* `rs2[8:0]` ≥ 32 results in all-sign, except for bit `0` of the result, which is the OR of all bits in `rs1`.
+* `rs2[9:0]` ≥ 32 results in all-sign, except for bit `0` of the result, which is the OR of all bits in `rs1`.
 
-* `rs2[8:0]` ≤ -32 results in all-zero.
-
-NOTE: A non-sticky `ssra` can be synthesised as `neg; h3.ssla`.
+* `rs2[9:0]` ≤ -32 results in all-zero.
 
 Encoding (R-type):
 
@@ -751,13 +819,13 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.ssrlsticky
 
-Shift signed-right, logical, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[8:0]`. The shift amount is wrapped into the range -256 ≤ _x_ ≤ 255. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
+Shift signed-right, logical, with sticky bits collected at LSB. `rs1` is shifted right by a signed amount stored in `rs2[9:0]`. The shift amount is wrapped into the range -512 ≤ _x_ ≤ 511. Positive shift amounts shift to the right, and negative to the left. Bits shifted off the right end of `rs1` are ORed into the LSB.
 
 Shifts outside of the range ±31 are handled as follows:
 
-* `rs2[8:0]` ≥ 32 results in all-zeroes, except for bit `0` of the result, which is the OR of all bits in `rs1`.
+* `rs2[9:0]` ≥ 32 results in all-zeroes, except for bit `0` of the result, which is the OR of all bits in `rs1`.
 
-* `rs2[8:0]` ≤ -32 results in all-zeroes.
+* `rs2[9:0]` ≤ -32 results in all-zeroes.
 
 Encoding (R-type):
 
@@ -1000,7 +1068,7 @@ __floatunsisf:
 
 ===== 64-bit Arithmetic Right Shift
 
-The saturating behaviour of the extended shifts is useful for computing the crossing bits between two registers in a 64-bit integer shift. Shifting right by -32 is equivalent to shifting left by 32, which is all-zeroes.
+The saturating behaviour of the extended shifts is useful for computing the crossing bits between two registers in a 64-bit integer shift. Shifting right by -32 is equivalent to shifting left by 32, which is all-zeroes. An arithmetic shift is used when the data originates from `a1`, which contains the original sign bit. Shifts originating from `a0` are logical because there is no reason to extend from bit `31`.
 
 ----
 .global __ashrdi3
@@ -1009,6 +1077,19 @@ __ashrdi3:
     h3.ssra a4, a1, a3
     h3.ssra a1, a1, a2
     h3.ssrl a0, a0, a2
+    or a0, a0, a4
+    ret
+----
+
+A sticky 64-bit shift can be synthesised by collecting sticky bits only in the bottom register. This is useful for shifting the product intermediate in a fused multiply-add where the addend has a greater exponent than the normalised product.
+
+----
+.global __ashrdi3_sticky
+__ashrdi3_sticky:
+    addi a3, a2, -32
+    h3.ssrasticky a4, a1, a3
+    h3.ssra a1, a1, a2
+    h3.ssrlsticky a0, a0, a2
     or a0, a0, a4
     ret
 ----
