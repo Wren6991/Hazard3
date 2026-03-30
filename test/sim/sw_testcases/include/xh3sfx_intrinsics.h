@@ -122,6 +122,24 @@
     __rd; \
 })
 
+#define __h3_ssrl(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x08, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+
+#define __h3_ssra(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x28, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+
 #else
 
 .macro h3.funpackq3.s rd, rs1
@@ -174,6 +192,14 @@
 
 .macro h3.ssla rd, rs1, rs2
 .insn r 0x0b, 0x1, 0x2c, \rd, \rs1, \rs2
+.endm
+
+.macro h3.ssrl rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x08, \rd, \rs1, \rs2
+.endm
+
+.macro h3.ssra rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x28, \rd, \rs1, \rs2
 .endm
 
 #endif

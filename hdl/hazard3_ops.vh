@@ -143,5 +143,7 @@ localparam SFX_OP_FEADJU3     = 7'h05;
 localparam SFX_OP_XORSIGN     = 7'h06;
 localparam SFX_OP_SSRLSTICKY  = 7'h0a;
 localparam SFX_OP_SSRASTICKY  = 7'h2a;
+localparam SFX_OP_SSRL        = 7'h08;
+localparam SFX_OP_SSRA        = 7'h28;
 localparam SFX_OP_SSLL        = 7'h0c;
 localparam SFX_OP_SSLA        = 7'h2c;

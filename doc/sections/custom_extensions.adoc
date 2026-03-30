@@ -997,3 +997,18 @@ __floatunsisf:
 1:
     ret
 ----
+
+===== 64-bit Arithmetic Right Shift
+
+The saturating behaviour of the extended shifts is useful for computing the crossing bits between two registers in a 64-bit integer shift. Shifting right by -32 is equivalent to shifting left by 32, which is all-zeroes.
+
+----
+.global __ashrdi3
+__ashrdi3:
+    addi a3, a2, -32
+    h3.ssra a4, a1, a3
+    h3.ssra a1, a1, a2
+    h3.ssrl a0, a0, a2
+    or a0, a0, a4
+    ret
+----

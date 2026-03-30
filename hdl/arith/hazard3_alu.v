@@ -240,6 +240,8 @@ always @ (*) begin
 		SFX_OP_SSRLSTICKY:  sfx_result = shift_dout_masked_sfx;
 		SFX_OP_SSLL:        sfx_result = shift_dout_masked_sfx;
 		SFX_OP_SSLA:        sfx_result = shift_dout_masked_sfx;
+		SFX_OP_SSRL:        sfx_result = shift_dout_masked_sfx;
+		SFX_OP_SSRA:        sfx_result = shift_dout_masked_sfx;
 		default:            sfx_result = 32'hxxxxxxxx;
 	endcase
 end

@@ -567,3 +567,33 @@ decl_func_with_section floatunsihf
 	h3.fpackrq3.h a0, a0, a1
 1:
 	ret
+
+
+// ----------------------------------------------------------------------------
+// i64 and u64
+
+// Yes it's floating point, the point just floats in one place
+
+decl_func_with_section lshldi3
+    addi a3, a2, -32
+    h3.ssll a4, a0, a3
+    h3.ssll a1, a1, a2
+    h3.ssll a0, a0, a2
+    or a1, a1, a4
+    ret
+
+decl_func_with_section lshrdi3
+    addi a3, a2, -32
+    h3.ssrl a4, a1, a3
+    h3.ssrl a1, a1, a2
+    h3.ssrl a0, a0, a2
+    or a0, a0, a4
+    ret
+
+decl_func_with_section ashrdi3
+    addi a3, a2, -32
+    h3.ssra a4, a1, a3
+    h3.ssra a1, a1, a2
+    h3.ssrl a0, a0, a2
+    or a0, a0, a4
+    ret

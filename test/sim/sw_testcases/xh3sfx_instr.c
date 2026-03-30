@@ -126,6 +126,40 @@ int main() {
 	check_equal(__h3_ssll(1u << 31, -32), 0);
 	check_equal(__h3_ssll(1u << 31, -256), 0);
 
+	check_equal(__h3_ssra(1, 0), 1);
+	check_equal(__h3_ssra(1, -1), 2);
+	check_equal(__h3_ssra(1, -31), 1 << 31);
+	check_equal(__h3_ssra(1, -255), 0);
+	check_equal(__h3_ssra(1, -256), 0);
+	check_equal(__h3_ssra(1, 1), 0);
+	check_equal(__h3_ssra(1, 31), 0);
+	check_equal(__h3_ssra(1, 255), 0);
+	check_equal(__h3_ssra(1u << 31, -30), 0);
+	check_equal(__h3_ssra(1u << 31, -31), 0);
+	check_equal(__h3_ssra(1u << 31, -32), 0);
+	check_equal(__h3_ssra(1u << 31, -255), 0);
+	check_equal(__h3_ssra(1u << 31, -256), 0);
+	check_equal(__h3_ssra(1u << 31, 30), -2);
+	check_equal(__h3_ssra(1u << 31, 31), -1);
+	check_equal(__h3_ssra(1u << 31, 32), -1);
+
+	check_equal(__h3_ssrl(1, 0), 1);
+	check_equal(__h3_ssrl(1, -1), 2);
+	check_equal(__h3_ssrl(1, -31), 1 << 31);
+	check_equal(__h3_ssrl(1, -255), 0);
+	check_equal(__h3_ssrl(1, -256), 0);
+	check_equal(__h3_ssrl(1, 1), 0);
+	check_equal(__h3_ssrl(1, 31), 0);
+	check_equal(__h3_ssrl(1, 255), 0);
+	check_equal(__h3_ssrl(1u << 31, -30), 0);
+	check_equal(__h3_ssrl(1u << 31, -31), 0);
+	check_equal(__h3_ssrl(1u << 31, -32), 0);
+	check_equal(__h3_ssrl(1u << 31, -255), 0);
+	check_equal(__h3_ssrl(1u << 31, -256), 0);
+	check_equal(__h3_ssrl(1u << 31, 30), 2);
+	check_equal(__h3_ssrl(1u << 31, 31), 1);
+	check_equal(__h3_ssrl(1u << 31, 32), 0);
+
 	check_equal(__h3_xorsign( 1,  1),  1);
 	check_equal(__h3_xorsign( 1, -1), -1);
 	check_equal(__h3_xorsign( -1, 1), -1);
