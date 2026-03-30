@@ -103,10 +103,14 @@ __addsf_both_inf:
 	li a0, -1                     // y is inf of different sign -> return nan
 	ret
 
+	// Edge case: adding zeroes is +0 in all cases except for -0 + -0.
+	// Difference of zeroes falls under exact cancellation rule, but summing
+	// negative zeroes does not.
 __addsf_return_y_flushed:
 	bnez a3, 1f
 	srli a1, a1, 23
 	slli a1, a1, 23
+	and a1, a1, a0
 1:
 __addsf_return_y:
 	mv a0, a1
@@ -172,6 +176,7 @@ __addhf_both_inf:
 __addhf_return_y_flushed:
 	bnez a3, 1f
 	andi a1, a1, -1 << 10
+	and a1, a1, a0
 1:
 __addhf_return_y:
 	mv a0, a1
