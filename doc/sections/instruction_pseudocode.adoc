@@ -55,7 +55,7 @@ Set if less than (unsigned).
 
 Syntax:
 
-    sltu rd, rs1, rs
+    sltu rd, rs1, rs2
 
 Operation:
 
@@ -80,7 +80,7 @@ Bitwise OR.
 
 Syntax:
 
-    or rd, rs1, rs2`
+    or rd, rs1, rs2
 
 Operation:
 
@@ -382,7 +382,7 @@ Operation:
 
 ==== bgeu
 
-Branch if less than or equal (unsigned).
+Branch if greater than or equal (unsigned).
 
 Syntax:
 
@@ -803,7 +803,7 @@ Syntax:
 Operation:
 
     if ($signed(rs1) < $signed(rs2))
-        rd = rd1;
+        rd = rs1;
     else
         rd = rs2;
 
@@ -993,7 +993,7 @@ reg [63:0] clmul_result;
 always @ (*) begin
     clmul_result = 0;
     for (i = 0; i < 32; i = i + 1) begin
-        if (rs2[i])) begin
+        if (rs2[i]) begin
             clmul_result = clmul_result ^ ({32'h0, rs1} << i);
         end
     end
@@ -1010,11 +1010,11 @@ Syntax:
 
 Operation:
 
-    rd = cmul_result[31:0];
+    rd = clmul_result[31:0];
 
 ==== clmulh
 
-Carry-les multiply, high half.
+Carry-less multiply, high half.
 
 Syntax:
 

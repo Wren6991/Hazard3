@@ -160,7 +160,7 @@ The table below lists the fields which are _not_ hardwired to 0:
 |Bits | Name | Description
 | 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-h3.meiea>>.
 | 7 | `mtie` | Timer interrupt enable. A timer interrupt is requested when `mie.mtie`, `mip.mtip` and `mstatus.mie` are all 1.
-| 3 | `msie` | Software interrupt enable. A software interrupt is requested when  `mie.msie`, `mip.mtip` and `mstatus.mie` are all 1.
+| 3 | `msie` | Software interrupt enable. A software interrupt is requested when  `mie.msie`, `mip.msip` and `mstatus.mie` are all 1.
 |===
 
 NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-h3.meiea>>, and keeps the upper half of `mie` reserved.
