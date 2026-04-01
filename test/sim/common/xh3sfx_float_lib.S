@@ -202,14 +202,14 @@ decl_func_with_section mulsf3
 	// Gather sticky bits from low fraction; a4 now effectively Q6.26
 	snez a1, a1
 	or a4, a4, a1
-	// Normalise (shift left by either 2 or 3)
-	h3.feadjq3 a0, a4
-	h3.ssrasticky a4, a4, a0
+	// Shift up to Q3; this may leave the product unnormalised, but it is < 4.
+	// For f32 inputs, exponent increase due to rounding only occurs when < 2,
+	// so fpackrq3.s's exponent increment range of 0..1 is sufficient.
+	slli a4, a4, 3
 	// Calculate new exponent;
-	// -127 is for redundant bias, +3 is for Q6 -> Q3 compensation
-	add a2, a2, a0
+	// -127 is for redundant bias.
 	add a2, a2, a3
-	addi a2, a2, -127 + 3
+	addi a2, a2, -127
 	h3.fpackrq3.s a0, a4, a2
 	ret
 #else
@@ -217,9 +217,10 @@ decl_func_with_section mulsf3
 	// Unpack sign separately from significand:
 	h3.funpacku3.s a4, a0
 	h3.funpacku3.s a5, a1
-	// Calculate sign and add exponents; free up a1/a2
+	// Calculate sign and exponent; free up a1/a2
 	xor a0, a0, a1
 	add a3, a3, a2
+	addi a3, a3, -127
 	// Multiply U3.29 x U3.29 -> U6.58
 	mul t0, a4, a5
 	srli a1, a4, 16
@@ -236,11 +237,8 @@ decl_func_with_section mulsf3
 	// Here: U6.58 in t1:t0. Collect low sticky bits.
 	snez t0, t0
 	or t1, t1, t0
-	// Normalise to U3.29, finish calculating exponent
-	h3.feadju3 t0, t1
-	h3.ssrlsticky t1, t1, t0
-	add a3, a3, t0
-	addi a3, a3, -127 + 3
+	// Scale to U3.29, 1 <= x < 4 (and the < still applies after rounding).
+	slli t1, t1, 3
 	// Apply sign before packing. Only upper U3.29 is relevant.
 	h3.xorsign t1, a0, t1
 	h3.fpackrq3.s a0, t1, a3
