@@ -246,6 +246,7 @@ decl_func_with_section mulsf3
 	h3.fpackrq3.s a0, t1, a3
 	ret
 #endif
+
 .p2align 2
 __mulsf_special_exponent:
 	// Force y to be positive (by possibly negating x) *before* unpacking.
@@ -321,17 +322,17 @@ decl_func_with_section mulhf3
 	bnez t0, __mulhf_special_exponent
 	h3.funpackq3.h a4, a0
 	h3.funpackq3.h a5, a1
-
-	mul a1, a4, a5
-	mulh a4, a4, a5
-	snez a1, a1
-	or a4, a4, a1
+	// Scale down to Q22.10 so the multiply fits in one word.
+	srai a4, a4, 19
+	srai a5, a5, 19
+	mul a4, a4, a5
+	// Result is Q12.20; renormalise to Q3.29
 	h3.feadjq3 a0, a4
-	h3.ssrasticky a4, a4, a0
-
+	h3.ssra a4, a4, a0
+	// Calculate exponent; +9 is for Q12 -> Q3 offset
 	add a2, a2, a0
 	add a2, a2, a3
-	addi a2, a2, -15 + 3
+	addi a2, a2, -15 + 9
 	h3.fpackrq3.h a0, a4, a2
 	ret
 
