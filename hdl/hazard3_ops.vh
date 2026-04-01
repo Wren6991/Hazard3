@@ -134,10 +134,12 @@ localparam M_OP_REMU   = 3'h7;
 // funct7 values for Xh3sfx extension
 localparam SFX_OP_FUNPACKQ3_H = 7'h00;
 localparam SFX_OP_FUNPACKQ3_S = 7'h40;
-localparam SFX_OP_FCHECK2E_H  = 7'h01;
-localparam SFX_OP_FCHECK2E_S  = 7'h41;
-localparam SFX_OP_FPACKRQ3_H  = 7'h02;
-localparam SFX_OP_FPACKRQ3_S  = 7'h42;
+localparam SFX_OP_FUNPACKU3_H = 7'h01;
+localparam SFX_OP_FUNPACKU3_S = 7'h41;
+localparam SFX_OP_FCHECK2E_H  = 7'h02;
+localparam SFX_OP_FCHECK2E_S  = 7'h42;
+localparam SFX_OP_FPACKRQ3_H  = 7'h03;
+localparam SFX_OP_FPACKRQ3_S  = 7'h43;
 localparam SFX_OP_FEADJQ3     = 7'h04;
 localparam SFX_OP_FEADJU3     = 7'h05;
 localparam SFX_OP_XORSIGN     = 7'h06;

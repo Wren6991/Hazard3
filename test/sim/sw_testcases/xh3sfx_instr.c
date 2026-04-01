@@ -25,6 +25,20 @@ int main() {
 	check_equal(__h3_funpackq3_h(0xffff), -(1u << 30) + (1u << 19));
 	check_equal(__h3_funpackq3_h(0x83ff), -(1u << 30) + (1u << 19));
 
+	check_equal(__h3_funpacku3_s(0x00000000), 1 << 29);
+	check_equal(__h3_funpacku3_s(0x7fffffff), (1 << 30) - (1 << 6));
+	check_equal(__h3_funpacku3_s(0x007fffff), (1 << 30) - (1 << 6));
+	check_equal(__h3_funpacku3_s(0x80000000), 1 << 29);
+	check_equal(__h3_funpacku3_s(0xffffffff), (1u << 30) - (1u << 6));
+	check_equal(__h3_funpacku3_s(0x807fffff), (1u << 30) - (1u << 6));
+
+	check_equal(__h3_funpacku3_h(0x0000), 1 << 29);
+	check_equal(__h3_funpacku3_h(0x7fff), (1 << 30) - (1 << 19));
+	check_equal(__h3_funpacku3_h(0x03ff), (1 << 30) - (1 << 19));
+	check_equal(__h3_funpacku3_h(0x8000), 1 << 29);
+	check_equal(__h3_funpacku3_h(0xffff), (1u << 30) - (1u << 19));
+	check_equal(__h3_funpacku3_h(0x83ff), (1u << 30) - (1u << 19));
+
 	check_equal(__h3_fcheck2e_s(0x00, 0x00), 1);
 	check_equal(__h3_fcheck2e_s(0x00, 0x01), 1);
 	check_equal(__h3_fcheck2e_s(0x01, 0x00), 1);

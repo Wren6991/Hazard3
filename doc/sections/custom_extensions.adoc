@@ -346,6 +346,86 @@ Example C macro (using GCC statement expressions):
 })
 ----
 
+==== h3.funpacku3.s
+
+Unpack significand from single-precision to U3.29. The result is in the range `0x00000000` through `0x3fffffc0` inclusive, which is approximately 0 through +2. This is equivalent to the following C code:
+
+----
+uint32_t h3_funpacku3_s(uint32_t rs1) {
+    uint32_t tmp0 = rs1 << 9;
+    uint32_t tmp1 = tmp0 >> 3;
+    return tmp1 | (1u << 29);
+}
+----
+
+The result is a function only of the significand bits of `rs1`. It does not depend on the exponent. Therefore the implicit one is set even if the exponent is all-zeroes.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b1000001`  | `h3.funpacku3.s`
+| 24:20 | -        | `0b00000`    | RES0
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_funpacku3_s(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x41, %0, %1, zero"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+----
+
+==== h3.funpacku3.h
+
+Unpack significand from half-precision to U3.29. The result is in the range `0x00000000` through `0x3ffc0000` inclusive, which is approximately 0 through +2. This is equivalent to the following C code:
+
+----
+uint32_t h3_funpacku3_h(uint32_t rs1) {
+    uint32_t tmp0 = rs1 << 22;
+    uint32_t tmp1 = tmp0 >> 3;
+    return tmp1 | (1u << 29);
+}
+----
+
+The result is a function only of the significand bits of `rs1`. It does not depend on the exponent. Therefore the implicit one is set even if the exponent is all-zeroes.
+
+Encoding (R-type):
+
+[cols="10h,20h,20h,~", options="header"]
+|===
+| Bits  | Name     | Value        | Description
+| 31:25 | `funct7` | `0b0000000`  | `h3.funpacku3.h`
+| 24:20 | -        | `0b00000`    | RES0
+| 19:15 | `rs1`    | -            | Source register 1
+| 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
+| 11:7  | `rd`     | -            | Destination register
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
+|===
+
+Example C macro (using GCC statement expressions):
+
+----
+#define __h3_funpacku3_h(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x01, %0, %1, zero"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+----
+
 ==== h3.fcheck2e.s
 
 Check two single-precision biased exponents for special cases. Returns `1` if either `rs1[7:0]` or `rs2[7:0]` is equal to either `0` or `255`. Otherwise returns `0`.
@@ -357,7 +437,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b1000001`  | `h3.fcheck2e.s`
+| 31:25 | `funct7` | `0b1000010`  | `h3.fcheck2e.s`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -370,7 +450,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fcheck2e_s(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x41, %0, %1, %2"\
+    asm (".insn r 0x0b, 0x1, 0x42, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -389,7 +469,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000001`  | `h3.fcheck2e.h`
+| 31:25 | `funct7` | `0b0000010`  | `h3.fcheck2e.h`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -402,7 +482,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fcheck2e_h(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x01, %0, %1, %2"\
+    asm (".insn r 0x0b, 0x1, 0x02, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -437,7 +517,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b1000010`  | `h3.fpackrq3.s`
+| 31:25 | `funct7` | `0b1000011`  | `h3.fpackrq3.s`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -450,7 +530,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fpackrq3_s(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x42, %0, %1, %2"\
+    asm (".insn r 0x0b, 0x1, 0x43, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -491,7 +571,7 @@ Encoding (R-type):
 [cols="10h,20h,20h,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000010`  | `h3.fpackrq3.h`
+| 31:25 | `funct7` | `0b0000011`  | `h3.fpackrq3.h`
 | 24:20 | `rs2`    | -            | Source register 2
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
@@ -504,7 +584,7 @@ Example C macro (using GCC statement expressions):
 ----
 #define __h3_fpackrq3_h(rs1, rs2) ({\
     uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x02, %0, %1, %2"\
+    asm (".insn r 0x0b, 0x1, 0x03, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -979,11 +1059,10 @@ This implementation chooses to return `INT_MIN` or `INT_MAX` for large exponents
 .global __fixsfsi
 __fixsfsi:
     h3.bextmi a1, a0, 23, 8
-    li t0, 127 + 31
-    bgeu a1, t0, __fixsfsi_large_exponent
-    h3.funpackq3.s a0, a0
+    sltiu a5, a1, 127 + 31
+    beqz a5, __fixsfsi_large_exponent
+    h3.funpacku3.s a2, a0
     addi a1, a1, -127 - 29
-    h3.xorsign a2, a0, a0
     h3.ssla a2, a2, a1
     h3.xorsign a0, a0, a2
     ret

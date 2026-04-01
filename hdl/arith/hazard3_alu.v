@@ -232,6 +232,8 @@ always @ (*) begin
 	case (funct7_32b)
 		SFX_OP_FUNPACKQ3_H: sfx_result = ({3'd1, op_a[9:0], 19'd0} ^ {32{op_a[15]}}) + {31'd0, op_a[15]};
 		SFX_OP_FUNPACKQ3_S: sfx_result = ({3'd1, op_a[22:0], 6'd0} ^ {32{op_a[31]}}) + {31'd0, op_a[31]};
+		SFX_OP_FUNPACKU3_H: sfx_result =  {3'd1, op_a[9:0], 19'd0};
+		SFX_OP_FUNPACKU3_S: sfx_result =  {3'd1, op_a[22:0], 6'd0};
 		SFX_OP_FCHECK2E_H:  sfx_result = {31'd0, &op_a[4:0] || ~|op_a[4:0] || &op_b[4:0] || ~|op_b[4:0]};
 		SFX_OP_FCHECK2E_S:  sfx_result = {31'd0, &op_a[7:0] || ~|op_a[7:0] || &op_b[7:0] || ~|op_b[7:0]};
 		SFX_OP_FPACKRQ3_H:  sfx_result = {{16{xh3sfx_fpackrq3_h[15]}}, xh3sfx_fpackrq3_h};

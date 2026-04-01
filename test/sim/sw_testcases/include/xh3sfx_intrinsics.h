@@ -23,25 +23,25 @@
     __rd; \
 })
 
+#define __h3_funpacku3_s(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x41, %0, %1, zero"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+
+#define __h3_funpacku3_h(rs1) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x01, %0, %1, zero"\
+        : "=r" (__rd) \
+        : "r" (rs1) \
+    ); \
+    __rd; \
+})
+
 #define __h3_fcheck2e_s(rs1, rs2) ({\
-    uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x41, %0, %1, %2"\
-        : "=r" (__rd) \
-        : "r" (rs1), "r" (rs2) \
-    ); \
-    __rd; \
-})
-
-#define __h3_fcheck2e_h(rs1, rs2) ({\
-    uint32_t __rd; \
-    asm (".insn r 0x0b, 0x1, 0x01, %0, %1, %2"\
-        : "=r" (__rd) \
-        : "r" (rs1), "r" (rs2) \
-    ); \
-    __rd; \
-})
-
-#define __h3_fpackrq3_s(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, 0x42, %0, %1, %2"\
         : "=r" (__rd) \
@@ -50,9 +50,27 @@
     __rd; \
 })
 
-#define __h3_fpackrq3_h(rs1, rs2) ({\
+#define __h3_fcheck2e_h(rs1, rs2) ({\
     uint32_t __rd; \
     asm (".insn r 0x0b, 0x1, 0x02, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+
+#define __h3_fpackrq3_s(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x43, %0, %1, %2"\
+        : "=r" (__rd) \
+        : "r" (rs1), "r" (rs2) \
+    ); \
+    __rd; \
+})
+
+#define __h3_fpackrq3_h(rs1, rs2) ({\
+    uint32_t __rd; \
+    asm (".insn r 0x0b, 0x1, 0x03, %0, %1, %2"\
         : "=r" (__rd) \
         : "r" (rs1), "r" (rs2) \
     ); \
@@ -150,20 +168,28 @@
 .insn r 0x0b, 0x1, 0x00, \rd, \rs1, zero
 .endm
 
+.macro h3.funpacku3.s rd, rs1
+.insn r 0x0b, 0x1, 0x41, \rd, \rs1, zero
+.endm
+
+.macro h3.funpacku3.h rd, rs1
+.insn r 0x0b, 0x1, 0x01, \rd, \rs1, zero
+.endm
+
 .macro h3.fcheck2e.s rd, rs1, rs2
-.insn r 0x0b, 0x1, 0x41, \rd, \rs1, \rs2
-.endm
-
-.macro h3.fcheck2e.h rd, rs1, rs2
-.insn r 0x0b, 0x1, 0x01, \rd, \rs1, \rs2
-.endm
-
-.macro h3.fpackrq3.s rd, rs1, rs2
 .insn r 0x0b, 0x1, 0x42, \rd, \rs1, \rs2
 .endm
 
-.macro h3.fpackrq3.h rd, rs1, rs2
+.macro h3.fcheck2e.h rd, rs1, rs2
 .insn r 0x0b, 0x1, 0x02, \rd, \rs1, \rs2
+.endm
+
+.macro h3.fpackrq3.s rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x43, \rd, \rs1, \rs2
+.endm
+
+.macro h3.fpackrq3.h rd, rs1, rs2
+.insn r 0x0b, 0x1, 0x03, \rd, \rs1, \rs2
 .endm
 
 .macro h3.feadjq3 rd, rs1

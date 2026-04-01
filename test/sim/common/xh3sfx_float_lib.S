@@ -445,9 +445,8 @@ decl_func_with_section fixsfsi
 	h3.bextmi a1, a0, 23, 8
 	sltiu a5, a1, 127 + 31
 	beqz a5, __fixsfsi_large_exponent
-	h3.funpackq3.s a0, a0
+	h3.funpacku3.s a2, a0
 	addi a1, a1, -127 - 29
-	h3.xorsign a2, a0, a0
 	h3.ssla a2, a2, a1
 	h3.xorsign a0, a0, a2
 	ret
@@ -509,21 +508,24 @@ decl_func_with_section fixsfdi
 	h3.bextmi a1, a0, 23, 8
 	sltiu a5, a1, 127 + 63
 	beqz a5, __fixsfdi_large_exponent
-	h3.funpackq3.s a2, a0
 	// It's tempting to use h3.ssla for the signed shift, but we need to do an
 	// unsigned shift of absolute value to get truncation towards zero.
-	h3.xorsign a3, a2, a2
+	h3.funpacku3.s a2, a0
 	addi a1, a1, -127 - 29
+	bltz a0, 1f
 	h3.ssll a0, a3, a1
 	addi a1, a1, -32
 	h3.ssll a1, a3, a1
-	// Re-apply sign; a0 carries out only if zero
-	bgez a2, 1f
+	ret
+1:
+	h3.ssll a0, a3, a1
+	addi a1, a1, -32
+	h3.ssll a1, a3, a1
+	// 64-bit negation; a0 carries out only if zero
 	seqz a2, a0
 	neg a0, a0
 	not a1, a1
 	add a1, a1, a2
-1:
 	ret
 __fixsfdi_large_exponent:
 	srai a0, a0, 31
@@ -539,7 +541,7 @@ decl_func_with_section fixunssfdi
 	h3.bextmi a1, a0, 23, 8
 	sltiu a5, a1, 127 + 64
 	beqz a5, __fixunssfdi_large_exponent
-	h3.funpackq3.s a2, a0
+	h3.funpacku3.s a2, a0
 	addi a1, a1, -127 - 29
 	h3.ssll a0, a2, a1
 	addi a1, a1, -32
