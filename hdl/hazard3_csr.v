@@ -550,7 +550,7 @@ localparam [127:0] h3misa_standard_extensions =
 	({127'd0, |EXTENSION_ZIBI    } << 77) |
 	128'd0;
 
-localparam [31:0]  h3misa_custom_len = 32'd5;
+localparam [31:0]  h3misa_custom_len = 32'd6;
 
 localparam [255:0] h3misa_custom_extensions = {
 	32'd0,                                       // Reserved
