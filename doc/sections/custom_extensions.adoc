@@ -1051,7 +1051,7 @@ __fcmpsf2:
 
 ===== Convert Single-precision to Signed Integer
 
-The double negation using `h3.xorsign` is used to implement round-to-zero semantics, as required by GCC.
+The significand is unpacked as U3.29, then later negated using `h3.xorsign`, to implement round-to-zero semantics as required by GCC.
 
 This implementation chooses to return `INT_MIN` or `INT_MAX` for large exponents, depending on sign. This includes NaNs and infinities.
 
