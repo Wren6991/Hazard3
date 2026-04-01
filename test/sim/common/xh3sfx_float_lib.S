@@ -192,9 +192,10 @@ decl_func_with_section mulsf3
 	h3.bextmi a3, a1, 23, 8
 	h3.fcheck2e.s t0, a2, a3
 	bnez t0, __mulsf_special_exponent
+#ifndef XH3SFX_AVOID_MULH
+	// Path for when mul and mulh are equally fast
 	h3.funpackq3.s a4, a0
 	h3.funpackq3.s a5, a1
-
 	// Multiply Q3.29 x Q3.29 -> Q6.58
 	mul a1, a4, a5
 	mulh a4, a4, a5
@@ -211,7 +212,40 @@ decl_func_with_section mulsf3
 	addi a2, a2, -127 + 3
 	h3.fpackrq3.s a0, a4, a2
 	ret
-
+#else
+	// Path for when mul (32 x 32 -> 32) is faster than mulh.
+	// Unpack sign separately from significand:
+	h3.funpacku3.s a4, a0
+	h3.funpacku3.s a5, a1
+	// Calculate sign and add exponents; free up a1/a2
+	xor a0, a0, a1
+	add a3, a3, a2
+	// Multiply U3.29 x U3.29 -> U6.58
+	mul t0, a4, a5
+	srli a1, a4, 16
+	srli a2, a5, 16
+	zext.h a4, a4
+	zext.h a5, a5
+	mul t1, a1, a2
+	mul t2, a1, a5
+	srli t2, t2, 16
+	add t1, t1, t2
+	mul t2, a2, a4
+	srli t2, t2, 16
+	add t1, t1, t2
+	// Here: U6.58 in t1:t0. Collect low sticky bits.
+	snez t0, t0
+	or t1, t1, t0
+	// Normalise to U3.29, finish calculating exponent
+	h3.feadju3 t0, t1
+	h3.ssrlsticky t1, t1, t0
+	add a3, a3, t0
+	addi a3, a3, -127 + 3
+	// Apply sign before packing. Only upper U3.29 is relevant.
+	h3.xorsign t1, a0, t1
+	h3.fpackrq3.s a0, t1, a3
+	ret
+#endif
 .p2align 2
 __mulsf_special_exponent:
 	// Force y to be positive (by possibly negating x) *before* unpacking.
