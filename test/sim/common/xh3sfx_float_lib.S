@@ -320,17 +320,16 @@ decl_func_with_section mulhf3
 	bnez t0, __mulhf_special_exponent
 	h3.funpackq3.h a4, a0
 	h3.funpackq3.h a5, a1
-	// Scale down to Q22.10 so the multiply fits in one word.
-	srai a4, a4, 19
-	srai a5, a5, 19
+	// Scale down so multiply result is Q3.29. Shift is exact as we're
+	// shifting zeroes.
+	srai a4, a4, 14
+	srai a5, a5, 15
 	mul a4, a4, a5
-	// Result is Q12.20; renormalise to Q3.29
-	h3.feadjq3 a0, a4
-	h3.ssra a4, a4, a0
-	// Calculate exponent; +9 is for Q12 -> Q3 offset
-	add a2, a2, a0
+	// Result is in range 1 <= |x| < 4. For f16 inputs it's guaranteed not to
+	// round up to 4 (both inputs all-ones -> ~2 ulps below). Therefore
+	// within normalisation range of fpackrq3.h (max shift >>1)
 	add a2, a2, a3
-	addi a2, a2, -15 + 9
+	addi a2, a2, -15
 	h3.fpackrq3.h a0, a4, a2
 	ret
 
