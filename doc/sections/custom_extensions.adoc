@@ -128,16 +128,15 @@ Encoding (R-type):
 
 [cols="10h,20h,20h,~", options="header"]
 |===
-| Bits  | Name          | Value    | Description
-| 31:29 | `funct7[6:4]` | `0b000`  | RES0
-| 28:26 | `size`        | -        | Number of ones in mask, values 0->7 encode 1->8 bits.
-| 25    | `funct7[0]`   | `0b0`    | RES0, because aligns with `shamt[5]` of potential RV64 version of `h3.bextmi`
-| 24:20 | `rs2`         | -        | Source register 2 (shift amount)
-| 19:15 | `rs1`         | -        | Source register 1
-| 14:12 | `funct3`      | `0b000`  | `h3.bextm`
-| 11:7  | `rd`          | -        | Destination register
-| 6:2   | `opc`         | `0b00010`| custom0 opcode
-| 1:0   | `size`        | `0b11`   | 32-bit instruction
+| Bits  | Name          | Value      | Description
+| 31:29 | `funct7[6:4]` | `0b000`    | RES0
+| 28:26 | `size`        | -          | Number of ones in mask, values 0->7 encode 1->8 bits.
+| 25    | `funct7[0]`   | `0b0`      | RES0, because aligns with `shamt[5]` of potential RV64 version of `h3.bextmi`
+| 24:20 | `rs2`         | -          | Source register 2 (shift amount)
+| 19:15 | `rs1`         | -          | Source register 1
+| 14:12 | `funct3`      | `0b000`    | `h3.bextm`
+| 11:7  | `rd`          | -          | Destination register
+| 6:0   | `opc`         | `0b0001011`| custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -180,16 +179,15 @@ Encoding (I-type):
 
 [cols="10h,20h,20h,~", options="header"]
 |===
-| Bits  | Name          | Value    | Description
-| 31:29 | `imm[11:9]`   | `0b000`  | RES0
-| 28:26 | `size`        | -        | Number of ones in mask, values 0->7 encode 1->8 bits.
-| 25    | `imm[5]`      | `0b0`    | RES0, for potential future RV64 version
-| 24:20 | `shamt`       | -        | Shift amount, 0 through 31
-| 19:15 | `rs1`         | -        | Source register 1
-| 14:12 | `funct3`      | `0b100`  | `h3.bextmi`
-| 11:7  | `rd`          | -        | Destination register
-| 6:2   | `opc`         | `0b00010`| custom0 opcode
-| 1:0   | `size`        | `0b11`   | 32-bit instruction
+| Bits  | Name          | Value      | Description
+| 31:29 | `imm[11:9]`   | `0b000`    | RES0
+| 28:26 | `size`        | -          | Number of ones in mask, values 0->7 encode 1->8 bits.
+| 25    | `imm[5]`      | `0b0`      | RES0, for potential future RV64 version
+| 24:20 | `shamt`       | -          | Shift amount, 0 through 31
+| 19:15 | `rs1`         | -          | Source register 1
+| 14:12 | `funct3`      | `0b100`    | `h3.bextmi`
+| 11:7  | `rd`          | -          | Destination register
+| 6:0   | `opc`         | `0b0001011`| custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -288,8 +286,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -333,8 +330,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -366,8 +362,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -399,8 +394,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -448,8 +442,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -503,8 +496,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -542,8 +534,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -581,8 +572,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -614,8 +604,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -650,8 +639,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -686,8 +674,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -722,8 +709,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -758,8 +744,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -797,8 +782,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -834,8 +818,7 @@ Encoding (R-type):
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
 | 11:7  | `rd`     | -            | Destination register
-| 6:2   | `opc`    | `0b00010`    | custom0 opcode
-| 1:0   | `size`   | `0b11`       | 32-bit instruction
+| 6:0   | `opc`    | `0b0001011`  | custom0 opcode
 |===
 
 Example C macro (using GCC statement expressions):
@@ -1004,7 +987,6 @@ __fixsfsi:
     h3.ssla a2, a2, a1
     h3.xorsign a0, a0, a2
     ret
-.p2align 2
 __fixsfsi_large_exponent:
     srai a0, a0, 31
     li a1, -1
@@ -1019,7 +1001,7 @@ To understand how the exponent is calculated, consider how the integer `1`
 will have been normalised. Its Q3 normalisation shift is -29, as the single
 set bit should end up in the first integer place in Q3 format. The unbiased
 exponent of floating-point `1.f` should be zero, since it's two to the power
-zero. The biased exponent is calculated by adding 127 to this values.
+zero. The biased exponent is calculated by adding 127 to this value.
 
 Larger values have smaller (i.e. more-positive) normalisation shifts, so
 increasing integer values have increasing exponents as we would hope.
