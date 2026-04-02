@@ -197,10 +197,14 @@ end
 wire xh3sfx_pack_is_s = funct7_32b[6];
 
 wire [31:0] xh3sfx_sig_abs = op_a[31] ? -op_a : op_a;
-wire [31:0] xh3sfx_rnd_bias = xh3sfx_pack_is_s ? 32'h0000001f : 32'h0003ffff;
+wire        xh3sfx_norm2 = xh3sfx_sig_abs[30];
+wire [31:0] xh3sfx_rnd_bias = xh3sfx_pack_is_s ?
+	{26'd0, xh3sfx_norm2, 5'h1f} : {13'd0, xh3sfx_norm2, 18'h3ffff};
 wire [31:0] xh3sfx_odd_bias = {
 	31'd0,
-	xh3sfx_pack_is_s ? xh3sfx_sig_abs[29 - 23] : xh3sfx_sig_abs[29 - 10]
+	xh3sfx_norm2 ?
+		(xh3sfx_pack_is_s ? xh3sfx_sig_abs[30 - 23] : xh3sfx_sig_abs[30 - 10]) :
+		(xh3sfx_pack_is_s ? xh3sfx_sig_abs[29 - 23] : xh3sfx_sig_abs[29 - 10])
 };
 wire [31:0] xh3sfx_sig_rnd = xh3sfx_sig_abs + xh3sfx_rnd_bias + xh3sfx_odd_bias;
 wire [9:0]  xh3sfx_exp_adj = op_b[9:0] + {9'd0, xh3sfx_sig_rnd[30]};
