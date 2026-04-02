@@ -213,35 +213,45 @@ decl_func_with_section mulsf3
 	h3.fpackrq3.s a0, a4, a2
 	ret
 #else
-	// Path for when mul (32 x 32 -> 32) is faster than mulh.
+	// Path for when mul is much faster than mulh. Only worth it when mulh is
+	// 32+ cycles and mul is 1 cycle (MULDIV_UNROLL=1 MUL_FAST=1 MULH_FAST=0).
 	// Unpack sign separately from significand:
 	h3.funpacku3.s a4, a0
 	h3.funpacku3.s a5, a1
-	// Calculate sign and exponent; free up a1/a2
+	// Calculate sign and exponent; free up a2/a3
 	xor a0, a0, a1
-	add a3, a3, a2
-	addi a3, a3, -127
-	// Multiply U3.29 x U3.29 -> U6.58
-	mul t0, a4, a5
-	srli a1, a4, 16
-	srli a2, a5, 16
+	add a1, a3, a2
+	addi a1, a1, -127
+	// Multiply U3.29 x U3.29 -> U6.58. (32 x 32 -> 64)
+	srli a2, a4, 16
+	srli a3, a5, 16
 	zext.h a4, a4
 	zext.h a5, a5
-	mul t1, a1, a2
-	mul t2, a1, a5
-	srli t2, t2, 16
-	add t1, t1, t2
-	mul t2, a2, a4
-	srli t2, t2, 16
-	add t1, t1, t2
-	// Here: U6.58 in t1:t0. Collect low sticky bits.
-	snez t0, t0
-	or t1, t1, t0
+	mul t0, a2, a3  // A_h * B_h
+	mul t1, a2, a5  // A_h * B_l
+	mul a2, a4, a3  // A_l * B_h
+	mul a4, a4, a5  // A_l * B_l
+	// Sum the crossed terms, save carry-in for hi[16]
+	add t1, a2, t1
+	sltu t2, t1, a2
+	// Add crossed terms to low word, save carry-in for hi[0]
+	slli a2, t1, 16
+	add a4, a4, a2
+	sltu a3, a4, a2
+	// Pack carries with correct significance
+	pack a3, a3, t2
+	// High word: A_h * B_h + (crossed terms >> 16) + ci0 + (ci1 << 16)
+	srli t1, t1, 16
+	add a5, t0, t1
+	add a5, a5, a3
+	// Final product complete: U6.58 in a5:a4. Collect low sticky bits.
+	snez a4, a4
+	or a5, a5, a4
 	// Scale to U3.29, 1 <= x < 4 (and the < still applies after rounding).
-	slli t1, t1, 3
+	slli a5, a5, 3
 	// Apply sign before packing. Only upper U3.29 is relevant.
-	h3.xorsign t1, a0, t1
-	h3.fpackrq3.s a0, t1, a3
+	h3.xorsign a5, a0, a5
+	h3.fpackrq3.s a0, a5, a1
 	ret
 #endif
 
