@@ -91,7 +91,7 @@ parameter EXTENSION_ZILSD     = 0,
 // ----------------------------------------------------------------------------
 // Custom RISC-V extensions
 
-// EXTENSION_XH3B: Custom bit-extract-multiple instructions for Hazard3
+// EXTENSION_XH3BEXTM: Custom bit-extract-multiple instructions for Hazard3
 parameter EXTENSION_XH3BEXTM  = 0,
 
 // EXTENSION_XH3IRQ: Custom preemptive, prioritised interrupt support. Can be
