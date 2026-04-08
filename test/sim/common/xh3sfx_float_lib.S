@@ -532,7 +532,8 @@ decl_func_with_section floatsisf
 	ret
 
 // Convert unsigned integer to single-precision
-decl_func_with_section floatunssisf
+// Note: for "float" functions the unsigned prefix is "un" instead of "uns"
+decl_func_with_section floatunsisf
 	beqz a0, 1f
 	// Normalise to U3.29
 	h3.feadju3 a1, a0
@@ -672,7 +673,7 @@ decl_func_with_section floatunsihf
 
 // Yes it's floating point, the point just floats in one place
 
-decl_func_with_section lshldi3
+decl_func_with_section ashldi3
     addi a3, a2, -32
     h3.ssll a4, a0, a3
     h3.ssll a1, a1, a2
