@@ -167,6 +167,7 @@ __addhf_return_y_flushed:
 __addhf_return_y:
 	mv a0, a1
 __addhf_return_x:
+	sext.h a0, a0
 	ret
 
 
