@@ -35,7 +35,7 @@ decl_func \name
 .endm
 
 // ----------------------------------------------------------------------------
-// Add and subtract
+// Add and subtract (f32 and f16)
 
 decl_func_with_section subsf3
 	binvi a1, a1, 31
@@ -172,7 +172,7 @@ __addhf_return_x:
 
 
 // ----------------------------------------------------------------------------
-// Multiply
+// Multiply (f32 and f16)
 
 decl_func_with_section mulsf3
 	h3.bextmi a2, a0, 23, 8
@@ -683,3 +683,221 @@ decl_func_with_section ashrdi3
     h3.ssrl a0, a0, a2
     or a0, a0, a4
     ret
+
+// ----------------------------------------------------------------------------
+// f64 arithmetic
+
+// Double on RV32E? Here's a nickel, kid. Go buy yourself a real computer.
+#ifdef __riscv_i
+
+decl_func_with_section subdf3
+	binvi a3, a3, 31
+decl_func adddf3
+	// Extract exponents
+	slli a4, a1, 1
+	srli a4, a4, 22
+	slli a5, a3, 1
+	srli a5, a5, 22
+	// Divert special-case exponents from main path; t0 is useful again later
+	li t0, 0x3ff
+	beqz a4, __adddf_return_y_flushed
+	beqz a5, __adddf_return_x
+	beq a4, t0, __adddf_x_nan_inf
+	beq a5, t0, __adddf_y_nan_inf
+	// Extract significand as U8.56 (need three extra fractional bits for rounding)
+	// x is a6:a0
+	slli a6, a1, 11
+	srli a6, a6, 8
+	bseti a6, a6, 24
+	srli t1, a0, 29
+	add a6, a6, t1
+	slli a0, a0, 3
+	// y is a7:a2
+	slli a7, a3, 11
+	srli a7, a7, 8
+	bseti a7, a7, 24
+	srli t1, a2, 29
+	add a7, a7, t1
+	slli a2, a2, 3
+	// Sign-magnitude conversion: U8.56 -> Q8.56
+	bgez a1, 1f
+	seqz t1, a0
+	neg a0, a0
+	not a6, a6
+	add a6, a6, t1
+1:
+	bgez a3, 1f
+	seqz t1, a2
+	neg a2, a2
+	not a7, a7
+	add a7, a7, t1
+1:
+	// a3, a1 now free.
+	// a4, a5 are exp.
+
+	// el >= er.
+.macro adddf_core ll, lh, rl, rh, el, er, l_is_x
+	// Exponent difference may be out of h3.* shift range, so need a branch.
+	// Since we already have the branch, also use it as early-out for addends
+	// too small to change the result:
+	sub \er, \el, \er
+	li t1, 55
+.if \l_is_x
+	bgeu \er, t1, __adddf_return_x
+.else
+	bgeu \er, t1, __adddf_return_y
+.endif
+	// Shift rhs by exponent difference
+	addi t2, \er, -32
+	h3.ssrasticky t1, \rh, t2
+	h3.ssrlsticky \rl, \rl, \er
+	h3.ssra \rh, \rh, \er
+	or \rl, \rl, t1
+	// Add significands; sum in lh:er
+	add \er, \ll, \rl
+	sltu \ll, \er, \ll
+	add \lh, \lh, \rh
+	add \lh, \lh, \ll
+	// Split sign/magnitude; keep sign in t3
+	srai t3, \lh, 31
+	bgez t3, 1f
+	seqz t1, \er
+	neg \er, \er
+	not \lh, \lh
+	add \lh, \lh, t1
+1:
+	// Renormalise as U1.63; case where upper U8.24 is all-zero is
+	// non-fallthrough as this amount of cancellation is uncommon. U1 makes
+	// it cheap to detect exponent increase on rounding.
+	beqz \lh, 3f
+	clz t1, \lh
+4:
+	// Take this opportunity to move back to lh:ll as it's confusing. Note
+	// this shift is always to-left due to the change from U8 to U1; this
+	// ensures it is exact and avoids calculating the H->L shift contribution.
+	addi t2, t1, -32
+	h3.ssll \ll, \er, t1
+	h3.ssll \lh, \lh, t1
+	h3.ssll \er, \er, t2
+	or \lh, \lh, \er
+	// Calculate new exponent
+	sub \el, \el, t1
+	addi \el, \el, 7
+	// Calculate rounding bias: U1.63 => 10 excess fractional bits.
+	li t2, 0x1ff
+	bexti t1, \ll, 10
+	add t2, t2, t1
+	// Add rounding bias. Rounded result is lh:er
+	add \er, \ll, t2
+	sltu \ll, \er, \ll
+	add \lh, \lh, \ll
+	// Check for exponent increase due to rounding
+	bgez \lh, 5f
+6:
+	// Check for exponent saturation; t0 = biased emax preserved since start
+	bgeu \el, t0, 7f
+	// Pack normal result
+	slli t3, t3, 10
+	add t3, t3, \el
+	slli t3, t3, 21 // {sign, exp, 21'd0}
+
+	srli t2, \er, 10
+	slli t1, \lh, 22
+	or a0, t1, t2
+
+	srli \lh, \lh, 10
+	bclri \lh, \lh, 21
+	or a1, t3, \lh
+	ret
+
+	// Special cases follow.
+3:
+	// Renormalisation case for upper word all-zeroes after absl(). If lower
+	// word is also all-zeroes, this is an exact cancellation. Prioritise the
+	// speed of non-exact cancellation.
+	clz t1, \er
+	addi t1, t1, 32
+	bnez \er, 4b
+	// Return +0 for exact cancellation
+	li a0, 0
+	li a1, 0
+	ret
+5:
+	// Handle exponent increase due to rounding
+	addi \el, \el, 1
+	slli t2, \lh, 31
+	srli \lh, \lh, 1
+	srli \er, \er, 1
+	add \er, \er, t2
+	j 6b
+7:
+	// Handle exponent saturation
+	li a0, 0
+	bgtz \el, 9f
+	// Return signed zero on subnormal or underflow
+	slli a1, t3, 31
+	ret
+9:
+	// Return signed infinity on overflow
+	slli a1, t3, 10
+	addi a1, a1, 0x3ff
+	slli a1, t3, 21
+	ret
+.endm
+
+	bltu a4, a5, __adddf_ye_gt_xe
+__adddf_xe_ge_ye:
+	adddf_core a0, a6, a2, a7, a4, a5, 1
+__adddf_ye_gt_xe:
+	adddf_core a2, a7, a0, a6, a5, a4, 0
+
+__adddf_x_nan_inf:
+	// x is nan -> propagate it
+	bnez a0, __adddf_return_x
+	slli a0, a1, 11
+	bnez a0, __adddf_return_x
+__adddf_x_inf:
+	// We know that x is +-inf, and y is nonzero. If y is normal, propagate inf.
+	bne  a5, t0, __adddf_return_x
+	// y is nan or inf. If nan, propagate y.
+	bnez a2, __adddf_return_y
+	slli a2, a3, 11
+	bnez a2, __adddf_return_y
+__adddf_both_inf:
+	// Adding same infinity -> same infinity.
+	beq a1, a3, __adddf_return_x
+	// Adding different infinities -> nan.
+	li a1, -1
+	li a0, -1
+	ret
+
+__adddf_y_nan_inf:
+	// y is nan -> propagate it.
+	bnez a2, __adddf_return_x
+	slli a2, a3, 11
+	bnez a2, __adddf_return_x
+__adddf_y_inf:
+	// We know that x is +-inf, and y is nonzero. If y is normal, propagate inf.
+	bne  a5, t0, __adddf_return_x
+	// y is nan or inf. If nan, propagate y.
+	bnez a2, __adddf_return_y
+	slli a2, a3, 11
+	bnez a2, __adddf_return_y
+	j __adddf_both_inf
+
+__adddf_return_y_flushed:
+	bnez a5, 1f
+	li a2, 0
+	srli a3, a3, 21
+	slli a3, a3, 21
+	// only -0 + -0 is -0; other +-0 combinations yield +0.
+	and a3, a3, a1
+1:
+__adddf_return_y:
+	mv a0, a2
+	mv a1, a3
+__adddf_return_x:
+	ret
+
+#endif // __riscv_i
+
