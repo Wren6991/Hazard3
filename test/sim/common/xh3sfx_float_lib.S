@@ -77,16 +77,11 @@ __addsf_special_exponent:
 	li t0, 255
 	slli a4, a0, 9
 	slli a5, a1, 9
-	beq a2, t0, __addsf_x_nan_inf
-	// fall through:
 
-__addsf_y_nan_inf:
-	// Mirror of __addsf_x_nan_inf
-	bnez a5, __addsf_return_y
-__addsf_y_inf:
-	bne  a2, t0, __addsf_return_y
-	bnez a4,     __addsf_return_x
-	j __addsf_both_inf
+	// This branch is taken when y is nan or inf, and x is normal. Correct
+	// answer is always y, either due to inf-absorption or nan-propagation.
+	bne a2, t0, __addsf_return_y
+	// fall through: x is nan or inf. y is nan, inf or normal.
 
 __addsf_x_nan_inf:
 	// When at least one operand is nan, we must propagate at least one of
@@ -98,8 +93,7 @@ __addsf_x_inf:
 	bne  a3, t0, __addsf_return_x // y is neither inf nor nan   -> return x (propagate inf)
 	bnez a5,     __addsf_return_y // y is nan:                  -> return y (propagate nan)
 __addsf_both_inf:
-	xor a1, a1, a0
-	bgez a1,     __addsf_return_x // y is inf of same sign      -> return either x or y (x is faster)
+	beq a0, a1,  __addsf_return_x // y is inf of same sign      -> return either x or y (x is faster)
 	li a0, -1                     // y is inf of different sign -> return nan
 	ret
 
@@ -153,14 +147,7 @@ __addhf_special_exponent:
 	li t0, 31
 	slli a4, a0, 22
 	slli a5, a1, 22
-	beq a2, t0, __addhf_x_nan_inf
-
-__addhf_y_nan_inf:
-	bnez a5, __addhf_return_y
-__addhf_y_inf:
-	bne  a2, t0, __addhf_return_y
-	bnez a4,     __addhf_return_x
-	j __addhf_both_inf
+	bne a2, t0, __addhf_return_y
 
 __addhf_x_nan_inf:
 	bnez a4, __addhf_return_x
@@ -168,8 +155,7 @@ __addhf_x_inf:
 	bne  a3, t0, __addhf_return_x
 	bnez a5,     __addhf_return_y
 __addhf_both_inf:
-	xor a1, a1, a0
-	bgez a1,     __addhf_return_x
+	beq a0, a1,  __addhf_return_x
 	li a0, -1
 	ret
 
