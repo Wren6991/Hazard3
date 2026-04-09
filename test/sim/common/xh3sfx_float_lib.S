@@ -694,117 +694,129 @@ decl_func_with_section subdf3
 	binvi a3, a3, 31
 decl_func adddf3
 	// Extract exponents
-	slli a4, a1, 1
-	srli a4, a4, 21
-	slli a5, a3, 1
-	srli a5, a5, 21
-	// Divert special-case exponents from main path; t0 is useful again later
-	li t0, 0x7ff
-	beqz a4, __adddf_return_y_flushed
-	beqz a5, __adddf_return_x
-	beq a4, t0, __adddf_x_nan_inf
-	beq a5, t0, __adddf_y_nan_inf
-	// Extract significand as U9.55 (need three extra fractional bits for rounding)
-	// x is a6:a0
-	slli a6, a1, 12
-	srli a6, a6, 9
-	bseti a6, a6, 23
-	srli t1, a0, 29
-	add a6, a6, t1
-	slli a0, a0, 3
-	// y is a7:a2
-	slli a7, a3, 12
-	srli a7, a7, 9
-	bseti a7, a7, 23
-	srli t1, a2, 29
-	add a7, a7, t1
-	slli a2, a2, 3
-	// Sign-magnitude conversion: U8.56 -> Q8.56
-	bgez a1, 1f
-	seqz t1, a0
-	neg a0, a0
-	not a6, a6
-	add a6, a6, t1
-1:
-	bgez a3, 1f
-	seqz t1, a2
-	neg a2, a2
-	not a7, a7
-	add a7, a7, t1
-1:
-	// a3, a1 now free.
-	// a4, a5 are exp.
+	slli t4, a1, 1
+	srli t4, t4, 21
+	slli t5, a3, 1
+	srli t5, t5, 21
+	// Divert special-case exponents from main path; t6 is useful again later
+	li t6, 0x7ff
+	beqz t4, __adddf_return_y_flushed
+	beqz t5, __adddf_return_x
+	beq t4, t6, __adddf_x_nan_inf
+	beq t5, t6, __adddf_y_nan_inf
+
+	// a1:a0 is packed x
+	// a3:a2 is packed y
+	// a4-a7, t0-t3 are scratch (a4, a5 preferred for code size)
+	// t4, t5 are exp.
+	// t6 is preserved biased emax
 
 	// el >= er.
 .macro adddf_core ll, lh, rl, rh, el, er, l_is_x
 	// Exponent difference may be out of h3.* shift range, so need a branch.
 	// Since we already have the branch, also use it as early-out for addends
-	// too small to change the result. This could be improved if we hadn't
-	// already trashed a0-a3.
+	// too small to change the result.
 	sub \er, \el, \er
-	li t1, 54
-	bgeu \er, t1, 11f
-	// Shift rhs by exponent difference
-	addi t2, \er, -32
-	h3.ssrasticky t1, \rh, t2
+	li a4, 54
+.if \l_is_x
+	bgeu \er, a4, __adddf_return_x
+.else
+	bgeu \er, a4, __adddf_return_y
+.endif
+	// Preserve: t2[31] is lhs sign, t3[31] is xor of signs
+	mv t2, \lh
+	xor t3, \lh, \rh
+	// No longer need to preserve packed x/y. Extract lhs in-place as U9.55
+	// (need three extra fractional bits for rounding)
+	slli \lh, \lh, 12
+	srli \lh, \lh, 9
+	bseti \lh, \lh, 23
+	srli a4, \ll, 29
+	add \lh, \lh, a4
+	slli \ll, \ll, 3
+	// Extract rhs significand as U9.55 (note: it might seem cheaper to
+	// extract as U12.52 to avoid shifting the low bits, but this would make
+	// the alignment shift bidirectional, which has additional cost at 64-bit.)
+	slli \rh, \rh, 12
+	srli \rh, \rh, 9
+	bseti \rh, \rh, 23
+	srli a4, \rl, 29
+	add \rh, \rh, a4
+	slli \rl, \rl, 3
+	// Shift rhs by (non-negative) exponent difference
+	addi t0, \er, -32
+	h3.ssrasticky a4, \rh, t0
 	h3.ssrlsticky \rl, \rl, \er
 	h3.ssra \rh, \rh, \er
-	or \rl, \rl, t1
-	// Add significands; sum in lh:er
-	add \er, \ll, \rl
-	sltu \ll, \er, \ll
-	add \lh, \lh, \rh
-	add \lh, \lh, \ll
-12:
-	// Split sign/magnitude; keep sign in t3
-	srai t3, \lh, 31
+	or \rl, \rl, a4
+	// Subtract lhs - rhs if signs different. Result in a5:a4
 	bgez t3, 1f
-	seqz t1, \er
-	neg \er, \er
-	not \lh, \lh
-	add \lh, \lh, t1
+	sub a5, \lh, \rh
+	sltu \rh, \ll, \rl
+	sub a5, a5, \rh
+	sub a4, \ll, \rl
+	j 2f
+.p2align 2
 1:
-	// Renormalise as U1.63; case where upper U9.23 is all-zero is
+	// Add lhs + rhs if signs same. Result in a5:a4
+	add a4, \ll, \rl
+	sltu \ll, a4, \ll
+	add a5, \lh, \rh
+.option push
+.option norvc // (maintain alignment of 2f without NOP)
+	add a5, a5, \ll
+.option pop
+2:
+	// Calculate final sign as XOR of sign of lhs with sign of sum/difference.
+	xor t3, t2, a5
+	// Split sign/magnitude of result
+	bgez a5, 1f
+	seqz t1, a4
+	neg a4, a4
+	not a5, a5
+	add a5, a5, t1
+1:
+	// Renormalise as U1.63; case where a5 is all-zero is
 	// non-fallthrough as this amount of cancellation is uncommon. U1 makes
 	// it cheap to detect exponent increase on rounding.
-	beqz \lh, 3f
-	clz t1, \lh
+	beqz a5, 3f
+	clz t0, a5
 4:
-	// Take this opportunity to move back to lh:ll as it's confusing. Note
-	// this shift is always to-left due to the change from U8 to U1; this
+	// This shift is always to-left due to the change from U9 to U1; this
 	// ensures it is exact and avoids calculating the H->L shift contribution.
-	addi t2, t1, -32
-	h3.ssll \ll, \er, t1
-	h3.ssll \lh, \lh, t1
-	h3.ssll \er, \er, t2
-	or \lh, \lh, \er
+	addi t1, t0, -32
+	h3.ssll t1, a4, t1
+	h3.ssll a5, a5, t0
+	h3.ssll a4, a4, t0
+	or a5, a5, t1
 	// Calculate new exponent
-	sub \el, \el, t1
+	sub \el, \el, t0
 	addi \el, \el, 8
 	// Calculate rounding bias: U1.63 => 11 excess fractional bits.
-	li t2, 0x3ff
-	bexti t1, \ll, 11
-	add t2, t2, t1
-	// Add rounding bias. Rounded result is lh:er
-	add \er, \ll, t2
-	sltu \ll, \er, \ll
-	add \lh, \lh, \ll
+	li t1, 0x3ff
+	bexti t0, a4, 11
+	add t1, t1, t0
+	// Add rounding bias. Rounded result is lh:ll
+	add \ll, a4, t1
+	sltu a4, \ll, a4
+	add \lh, a5, a4
 	// Check for exponent increase due to rounding
 	bgez \lh, 5f
 6:
-	// Check for exponent saturation; t0 = biased emax preserved since start
-	bgeu \el, t0, 7f
+	// Check for exponent saturation; t6 = biased emax preserved since start
+	bgeu \el, t6, 7f
 	// Pack normal result
+	srli t3, t3, 31
 	slli t3, t3, 11
 	add t3, t3, \el
 	slli t3, t3, 20 // {sign, exp, 20'd0}
 
-	srli t2, \er, 11
+	srli t2, \ll, 11
 	slli t1, \lh, 21
 	or a0, t1, t2
 
-	srli \lh, \lh, 11
-	bclri \lh, \lh, 20
+	slli \lh, \lh, 1
+	srli \lh, \lh, 12
 	or a1, t3, \lh
 	ret
 
@@ -813,9 +825,9 @@ decl_func adddf3
 	// Renormalisation case for upper word all-zeroes after absl(). If lower
 	// word is also all-zeroes, this is an exact cancellation. Prioritise the
 	// speed of non-exact cancellation.
-	clz t1, \er
-	addi t1, t1, 32
-	bnez \er, 4b
+	clz t0, a4
+	addi t0, t0, 32
+	bnez a4, 4b
 	// Return +0 for exact cancellation
 	li a0, 0
 	li a1, 0
@@ -823,14 +835,15 @@ decl_func adddf3
 5:
 	// Handle exponent increase due to rounding
 	addi \el, \el, 1
-	slli t2, \lh, 31
+	slli t0, \lh, 31
 	srli \lh, \lh, 1
-	srli \er, \er, 1
-	add \er, \er, t2
+	srli \ll, \ll, 1
+	add \er, \er, t0
 	j 6b
 7:
 	// Handle exponent saturation
 	li a0, 0
+	srli t3, t3, 31
 	bgtz \el, 9f
 	// Return signed zero on subnormal or underflow
 	slli a1, t3, 31
@@ -841,17 +854,13 @@ decl_func adddf3
 	addi a1, a1, 0x7ff
 	slli a1, a1, 20
 	ret
-11:
-	// Skip addition, fix up register allocation
-	mv \er, \ll
-	j 12b
 .endm
 
-	bltu a4, a5, __adddf_ye_gt_xe
+	bltu t4, t5, __adddf_ye_gt_xe
 __adddf_xe_ge_ye:
-	adddf_core a0, a6, a2, a7, a4, a5, 1
+	adddf_core a0, a1, a2, a3, t4, t5, 1
 __adddf_ye_gt_xe:
-	adddf_core a2, a7, a0, a6, a5, a4, 0
+	adddf_core a2, a3, a0, a1, t5, t4, 0
 
 __adddf_x_nan_inf:
 	// x is nan -> propagate it
@@ -860,7 +869,7 @@ __adddf_x_nan_inf:
 	bnez t3, __adddf_return_x
 __adddf_x_inf:
 	// We know that x is +-inf, and y is nonzero. If y is normal, propagate inf.
-	bne  a5, t0, __adddf_return_x
+	bne  t5, t6, __adddf_return_x
 	// y is nan or inf. If nan, propagate y.
 	bnez a2, __adddf_return_y
 	slli t3, a3, 12
@@ -880,7 +889,7 @@ __adddf_y_nan_inf:
 	bnez t3, __adddf_return_y
 __adddf_y_inf:
 	// We know that y is +-inf, and x is nonzero. If x is normal, propagate inf.
-	bne  a4, t0, __adddf_return_y
+	bne  t4, t6, __adddf_return_y
 	// x is nan or inf. If nan, propagate x.
 	bnez a0, __adddf_return_x
 	slli t3, a1, 12
@@ -888,7 +897,7 @@ __adddf_y_inf:
 	j __adddf_both_inf
 
 __adddf_return_y_flushed:
-	bnez a5, 1f
+	bnez t5, 1f
 	li a2, 0
 	srli a3, a3, 20
 	slli a3, a3, 20

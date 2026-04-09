@@ -11,8 +11,6 @@
 #define check_equal64(a, b) if ((a) != (b)) {asm ("ebreak");}
 #endif
 
-
-
 uint32_t __addsf3(uint32_t lhs, uint32_t rhs);
 uint32_t __addhf3(uint32_t lhs, uint32_t rhs);
 uint64_t __adddf3(uint64_t lhs, uint64_t rhs);
