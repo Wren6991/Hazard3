@@ -5,9 +5,13 @@
 // ebreak is easier to find in waves.
 #if 1
 #define check_equal(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %08x != %08x\n", __LINE__, (a), (b))
+#define check_equal64(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %016llx != %16llx\n", __LINE__, (a), (b))
 #else
 #define check_equal(a, b) if ((a) != (b)) {asm ("ebreak");}
+#define check_equal64(a, b) if ((a) != (b)) {asm ("ebreak");}
 #endif
+
+
 
 uint32_t __addsf3(uint32_t lhs, uint32_t rhs);
 uint32_t __addhf3(uint32_t lhs, uint32_t rhs);
@@ -262,6 +266,132 @@ int main() {
     check_equal(__addhf3(0x83ffu, 0x03ffu), 0x00000000u);
     // -subnormal + -subnormal = -0
     check_equal(__addhf3(0x83ffu, 0x83ffu), 0xffff8000u);
+
+    // f64
+
+    // +0 + +0 = +0
+    check_equal64(__adddf3(0x0000000000000000u, 0x0000000000000000u), 0x0000000000000000u);
+    // -0 + -0 = -0
+    check_equal64(__adddf3(0x8000000000000000u, 0x8000000000000000u), 0x8000000000000000u);
+    // +0 + -0 = +0 (RNE rule: opposite-sign exact-zero result is +0)
+    check_equal64(__adddf3(0x0000000000000000u, 0x8000000000000000u), 0x0000000000000000u);
+    // -0 + +0 = +0
+    check_equal64(__adddf3(0x8000000000000000u, 0x0000000000000000u), 0x0000000000000000u);
+    // 1 + +0 = 1
+    check_equal64(__adddf3(0x3ff0000000000000u, 0x0000000000000000u), 0x3ff0000000000000u);
+    // +0 + 1 = 1
+    check_equal64(__adddf3(0x0000000000000000u, 0x3ff0000000000000u), 0x3ff0000000000000u);
+    // -1 + +0 = -1 (zero identity preserves sign of non-zero operand)
+    check_equal64(__adddf3(0xbff0000000000000u, 0x0000000000000000u), 0xbff0000000000000u);
+    // +0 + -1 = -1
+    check_equal64(__adddf3(0x0000000000000000u, 0xbff0000000000000u), 0xbff0000000000000u);
+    // 1 + 1 = 2
+    check_equal64(__adddf3(0x3ff0000000000000u, 0x3ff0000000000000u), 0x4000000000000000u);
+    // 2 + 1 = 3
+    check_equal64(__adddf3(0x4000000000000000u, 0x3ff0000000000000u), 0x4008000000000000u);
+    // 1 + 2 = 3
+    check_equal64(__adddf3(0x3ff0000000000000u, 0x4000000000000000u), 0x4008000000000000u);
+    // 1 + -1 = +0 (exact cancellation)
+    check_equal64(__adddf3(0x3ff0000000000000u, 0xbff0000000000000u), 0x0000000000000000u);
+    // -1 + 1 = +0 (exact cancellation)
+    check_equal64(__adddf3(0xbff0000000000000u, 0x3ff0000000000000u), 0x0000000000000000u);
+    // 1 + <<1 ulp = 1
+    check_equal64(__adddf3(0x3ff0000000000000u, 0x2ff0000000000000u), 0x3ff0000000000000u);
+    // <<1 ulp + 1 = 1
+    check_equal64(__adddf3(0x2ff0000000000000u, 0x3ff0000000000000u), 0x3ff0000000000000u);
+    // -1 + 1.25 = 0.25
+    check_equal64(__adddf3(0xbff0000000000000u, 0x3ff4000000000000u), 0x3fd0000000000000u);
+    // -1.5 + 1.25 = -0.25
+    check_equal64(__adddf3(0xbff8000000000000u, 0x3ff4000000000000u), 0xbfd0000000000000u);
+    // max normal + 0.5 ulp = +inf
+    check_equal64(__adddf3(0x7fefffffffffffffu, 0x7c90000000000000u), 0x7ff0000000000000u);
+    // max normal + max normal = +inf
+    check_equal64(__adddf3(0x7fefffffffffffffu, 0x7fefffffffffffffu), 0x7ff0000000000000u);
+    // min normal - 0.5 ulp = -inf
+    check_equal64(__adddf3(0xffefffffffffffffu, 0xfc90000000000000u), 0xfff0000000000000u);
+    // min normal + min_normal = -inf
+    check_equal64(__adddf3(0xffefffffffffffffu, 0xffefffffffffffffu), 0xfff0000000000000u);
+    // max normal + 0.499... ulp = max normal
+    check_equal64(__adddf3(0x7fefffffffffffffu, 0x7c8fffffffffffffu), 0x7fefffffffffffffu);
+    // min normal - 0.499... ulp = min normal
+    check_equal64(__adddf3(0xffefffffffffffffu, 0xfc8fffffffffffffu), 0xffefffffffffffffu);
+    // nan + 0 = same nan
+    check_equal64(__adddf3(0xffff1234abcdabcdu, 0x0000000000000000u), 0xffff1234abcdabcdu);
+    // 0 + nan = same nan
+    check_equal64(__adddf3(0x0000000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    // nan + 1 = same nan
+    check_equal64(__adddf3(0xffff1234abcdabcdu, 0x3ff0000000000000u), 0xffff1234abcdabcdu);
+    // 1 + nan = same nan
+    check_equal64(__adddf3(0x3ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    // nan + inf = same nan
+    check_equal64(__adddf3(0xffff1234abcdabcdu, 0x7ff0000000000000u), 0xffff1234abcdabcdu);
+    // inf + nan = same nan
+    check_equal64(__adddf3(0x7ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    // nan + different nan = first nan's payload propagates (implementation detail of this library)
+    check_equal64(__adddf3(0x7ff01234abcdabcdu, 0x7ff05678def0def0u), 0x7ff01234abcdabcdu);
+    // inf + inf = inf
+    check_equal64(__adddf3(0x7ff0000000000000u, 0x7ff0000000000000u), 0x7ff0000000000000u);
+    // -inf + -inf = -inf
+    check_equal64(__adddf3(0xfff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
+    // inf + -inf = nan (all-ones is our canonical cheap nan)
+    check_equal64(__adddf3(0x7ff0000000000000u, 0xfff0000000000000u), 0xffffffffffffffffu);
+    // -inf + inf = nan
+    check_equal64(__adddf3(0xfff0000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
+    // inf + 1 = inf (infinity absorbs finite)
+    check_equal64(__adddf3(0x7ff0000000000000u, 0x3ff0000000000000u), 0x7ff0000000000000u);
+    // 1 + inf = inf
+    check_equal64(__adddf3(0x3ff0000000000000u, 0x7ff0000000000000u), 0x7ff0000000000000u);
+    // -inf + 1 = -inf
+    check_equal64(__adddf3(0xfff0000000000000u, 0x3ff0000000000000u), 0xfff0000000000000u);
+    // 1 + -inf = -inf
+    check_equal64(__adddf3(0x3ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
+    // inf + 0 = inf
+    check_equal64(__adddf3(0x7ff0000000000000u, 0x0000000000000000u), 0x7ff0000000000000u);
+    // 0 + inf = inf
+    check_equal64(__adddf3(0x0000000000000000u, 0x7ff0000000000000u), 0x7ff0000000000000u);
+    // subnormal + subnormal = exactly 0
+    check_equal64(__adddf3(0x000fffffffffffffu, 0x000fffffffffffffu), 0x0000000000000000u);
+    // -subnormal + -subnormal = exactly -0
+    check_equal64(__adddf3(0x800fffffffffffffu, 0x800fffffffffffffu), 0x8000000000000000u);
+    // Even + 0.5 ulp: tie, round down
+    check_equal64(__adddf3(0x3ff0000000000002u, 0x3ca0000000000000u), 0x3ff0000000000002u);
+    // Even + (0.5-eps) ulp: not a tie, round down
+    check_equal64(__adddf3(0x3ff0000000000002u, 0x3c9fffffffffffffu), 0x3ff0000000000002u);
+    // Even + (0.5+eps) ulp: not a tie, round up
+    check_equal64(__adddf3(0x3ff0000000000002u, 0x3ca0000000000001u), 0x3ff0000000000003u);
+    // Even - 0.5 ulp: round up
+    check_equal64(__adddf3(0x3ff0000000000002u, 0xbca0000000000000u), 0x3ff0000000000002u);
+    // Odd + 0.5 ulp: tie, round up
+    check_equal64(__adddf3(0x3ff0000000000001u, 0x3ca0000000000000u), 0x3ff0000000000002u);
+    // Odd + (0.5-eps) ulp: not a tie, round down
+    check_equal64(__adddf3(0x3ff0000000000001u, 0x3c9fffffffffffffu), 0x3ff0000000000001u);
+    // Odd + (0.5+eps) ulp: not a tie, round up
+    check_equal64(__adddf3(0x3ff0000000000001u, 0x3ca0000000000001u), 0x3ff0000000000002u);
+    // Odd - 0.5 ulp: round down
+    check_equal64(__adddf3(0x3ff0000000000001u, 0xbca0000000000000u), 0x3ff0000000000000u);
+    // 1.111...1 + 0.5 ulp = 2.0 (round-up carry propagates through all significand bits)
+    check_equal64(__adddf3(0x3fffffffffffffffu, 0x3ca0000000000000u), 0x4000000000000000u);
+    // All-zeroes significand - 0.5 ulp: no rounding (exact)
+    check_equal64(__adddf3(0x3ff0000000000000u, 0xbca0000000000000u), 0x3fefffffffffffffu);
+    // Very subnormal difference of normals: flushed to zero
+    check_equal64(__adddf3(0x0300000000000000u, 0x8300000000000001u), 0x8000000000000000u);
+    // Same with opposite sign on flushed result
+    check_equal64(__adddf3(0x8300000000000000u, 0x0300000000000001u), 0x0000000000000000u);
+    // Barely subnormal difference of normals: also flushed (unflushed result is 2^(emin-1))
+    check_equal64(__adddf3(0x0350000000000000u, 0x834fffffffffffffu), 0x0000000000000000u);
+    // Barely normal difference of normals: not flushed
+    check_equal64(__adddf3(0x0360000000000000u, 0x835fffffffffffffu), 0x0010000000000000u);
+    // subnormal + normal = same normal (subnormal input flushed to +0)
+    check_equal64(__adddf3(0x000fffffffffffffu, 0x3ff0000000000000u), 0x3ff0000000000000u);
+    // normal + subnormal = same normal
+    check_equal64(__adddf3(0x3ff0000000000000u, 0x000fffffffffffffu), 0x3ff0000000000000u);
+    // subnormal + (-subnormal) = +0 (both flushed, then +0 + -0 = +0)
+    check_equal64(__adddf3(0x000fffffffffffffu, 0x800fffffffffffffu), 0x0000000000000000u);
+    // -subnormal + subnormal = +0
+    check_equal64(__adddf3(0x800fffffffffffffu, 0x000fffffffffffffu), 0x0000000000000000u);
+    // -subnormal + -subnormal = -0
+    check_equal64(__adddf3(0x800fffffffffffffu, 0x800fffffffffffffu), 0x8000000000000000u);
+
 
 	return 0;
 }

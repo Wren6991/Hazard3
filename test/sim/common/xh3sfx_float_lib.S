@@ -695,27 +695,27 @@ decl_func_with_section subdf3
 decl_func adddf3
 	// Extract exponents
 	slli a4, a1, 1
-	srli a4, a4, 22
+	srli a4, a4, 21
 	slli a5, a3, 1
-	srli a5, a5, 22
+	srli a5, a5, 21
 	// Divert special-case exponents from main path; t0 is useful again later
-	li t0, 0x3ff
+	li t0, 0x7ff
 	beqz a4, __adddf_return_y_flushed
 	beqz a5, __adddf_return_x
 	beq a4, t0, __adddf_x_nan_inf
 	beq a5, t0, __adddf_y_nan_inf
-	// Extract significand as U8.56 (need three extra fractional bits for rounding)
+	// Extract significand as U9.55 (need three extra fractional bits for rounding)
 	// x is a6:a0
-	slli a6, a1, 11
-	srli a6, a6, 8
-	bseti a6, a6, 24
+	slli a6, a1, 12
+	srli a6, a6, 9
+	bseti a6, a6, 23
 	srli t1, a0, 29
 	add a6, a6, t1
 	slli a0, a0, 3
 	// y is a7:a2
-	slli a7, a3, 11
-	srli a7, a7, 8
-	bseti a7, a7, 24
+	slli a7, a3, 12
+	srli a7, a7, 9
+	bseti a7, a7, 23
 	srli t1, a2, 29
 	add a7, a7, t1
 	slli a2, a2, 3
@@ -739,14 +739,11 @@ decl_func adddf3
 .macro adddf_core ll, lh, rl, rh, el, er, l_is_x
 	// Exponent difference may be out of h3.* shift range, so need a branch.
 	// Since we already have the branch, also use it as early-out for addends
-	// too small to change the result:
+	// too small to change the result. This could be improved if we hadn't
+	// already trashed a0-a3.
 	sub \er, \el, \er
-	li t1, 55
-.if \l_is_x
-	bgeu \er, t1, __adddf_return_x
-.else
-	bgeu \er, t1, __adddf_return_y
-.endif
+	li t1, 54
+	bgeu \er, t1, 11f
 	// Shift rhs by exponent difference
 	addi t2, \er, -32
 	h3.ssrasticky t1, \rh, t2
@@ -758,6 +755,7 @@ decl_func adddf3
 	sltu \ll, \er, \ll
 	add \lh, \lh, \rh
 	add \lh, \lh, \ll
+12:
 	// Split sign/magnitude; keep sign in t3
 	srai t3, \lh, 31
 	bgez t3, 1f
@@ -766,7 +764,7 @@ decl_func adddf3
 	not \lh, \lh
 	add \lh, \lh, t1
 1:
-	// Renormalise as U1.63; case where upper U8.24 is all-zero is
+	// Renormalise as U1.63; case where upper U9.23 is all-zero is
 	// non-fallthrough as this amount of cancellation is uncommon. U1 makes
 	// it cheap to detect exponent increase on rounding.
 	beqz \lh, 3f
@@ -782,10 +780,10 @@ decl_func adddf3
 	or \lh, \lh, \er
 	// Calculate new exponent
 	sub \el, \el, t1
-	addi \el, \el, 7
-	// Calculate rounding bias: U1.63 => 10 excess fractional bits.
-	li t2, 0x1ff
-	bexti t1, \ll, 10
+	addi \el, \el, 8
+	// Calculate rounding bias: U1.63 => 11 excess fractional bits.
+	li t2, 0x3ff
+	bexti t1, \ll, 11
 	add t2, t2, t1
 	// Add rounding bias. Rounded result is lh:er
 	add \er, \ll, t2
@@ -797,16 +795,16 @@ decl_func adddf3
 	// Check for exponent saturation; t0 = biased emax preserved since start
 	bgeu \el, t0, 7f
 	// Pack normal result
-	slli t3, t3, 10
+	slli t3, t3, 11
 	add t3, t3, \el
-	slli t3, t3, 21 // {sign, exp, 21'd0}
+	slli t3, t3, 20 // {sign, exp, 20'd0}
 
-	srli t2, \er, 10
-	slli t1, \lh, 22
+	srli t2, \er, 11
+	slli t1, \lh, 21
 	or a0, t1, t2
 
-	srli \lh, \lh, 10
-	bclri \lh, \lh, 21
+	srli \lh, \lh, 11
+	bclri \lh, \lh, 20
 	or a1, t3, \lh
 	ret
 
@@ -839,10 +837,14 @@ decl_func adddf3
 	ret
 9:
 	// Return signed infinity on overflow
-	slli a1, t3, 10
-	addi a1, a1, 0x3ff
-	slli a1, t3, 21
+	slli a1, t3, 11
+	addi a1, a1, 0x7ff
+	slli a1, a1, 20
 	ret
+11:
+	// Skip addition, fix up register allocation
+	mv \er, \ll
+	j 12b
 .endm
 
 	bltu a4, a5, __adddf_ye_gt_xe
@@ -854,15 +856,15 @@ __adddf_ye_gt_xe:
 __adddf_x_nan_inf:
 	// x is nan -> propagate it
 	bnez a0, __adddf_return_x
-	slli a0, a1, 11
-	bnez a0, __adddf_return_x
+	slli t3, a1, 12
+	bnez t3, __adddf_return_x
 __adddf_x_inf:
 	// We know that x is +-inf, and y is nonzero. If y is normal, propagate inf.
 	bne  a5, t0, __adddf_return_x
 	// y is nan or inf. If nan, propagate y.
 	bnez a2, __adddf_return_y
-	slli a2, a3, 11
-	bnez a2, __adddf_return_y
+	slli t3, a3, 12
+	bnez t3, __adddf_return_y
 __adddf_both_inf:
 	// Adding same infinity -> same infinity.
 	beq a1, a3, __adddf_return_x
@@ -873,23 +875,23 @@ __adddf_both_inf:
 
 __adddf_y_nan_inf:
 	// y is nan -> propagate it.
-	bnez a2, __adddf_return_x
-	slli a2, a3, 11
-	bnez a2, __adddf_return_x
+	bnez a2, __adddf_return_y
+	slli t3, a3, 12
+	bnez t3, __adddf_return_y
 __adddf_y_inf:
-	// We know that x is +-inf, and y is nonzero. If y is normal, propagate inf.
-	bne  a5, t0, __adddf_return_x
-	// y is nan or inf. If nan, propagate y.
-	bnez a2, __adddf_return_y
-	slli a2, a3, 11
-	bnez a2, __adddf_return_y
+	// We know that y is +-inf, and x is nonzero. If x is normal, propagate inf.
+	bne  a4, t0, __adddf_return_y
+	// x is nan or inf. If nan, propagate x.
+	bnez a0, __adddf_return_x
+	slli t3, a1, 12
+	bnez t3, __adddf_return_x
 	j __adddf_both_inf
 
 __adddf_return_y_flushed:
 	bnez a5, 1f
 	li a2, 0
-	srli a3, a3, 21
-	slli a3, a3, 21
+	srli a3, a3, 20
+	slli a3, a3, 20
 	// only -0 + -0 is -0; other +-0 combinations yield +0.
 	and a3, a3, a1
 1:
