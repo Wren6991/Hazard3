@@ -650,6 +650,115 @@ void RVCore::step(bool trace) {
 		} else if (RVOPC_MATCH(instr, H3_BEXTMI)) {
 			uint size = GETBITS(instr, 28, 26) + 1;
 			rd_wdata = (rs1 >> regnum_rs2) & ~(-1u << size);
+		} else if (RVOPC_MATCH(instr, H3_FUNPACKQ3_H)) {
+			uint32_t tmp0 = rs1 << 22;
+			uint32_t tmp1 = tmp0 >> 3;
+			uint32_t tmp2 = tmp1 | (1u << 29);
+			rd_wdata = rs1 & (1u << 15) ? -tmp2 : tmp2;
+		} else if (RVOPC_MATCH(instr, H3_FUNPACKQ3_S)) {
+			uint32_t tmp0 = rs1 << 9;
+			uint32_t tmp1 = tmp0 >> 3;
+			uint32_t tmp2 = tmp1 | (1u << 29);
+			rd_wdata = rs1 & (1u << 31) ? -tmp2 : tmp2;
+		} else if (RVOPC_MATCH(instr, H3_FUNPACKU3_H)) {
+			uint32_t tmp0 = rs1 << 22;
+			uint32_t tmp1 = tmp0 >> 3;
+			rd_wdata = tmp1 | (1u << 29);
+		} else if (RVOPC_MATCH(instr, H3_FUNPACKU3_S)) {
+			uint32_t tmp0 = rs1 << 9;
+			uint32_t tmp1 = tmp0 >> 3;
+			rd_wdata = tmp1 | (1u << 29);
+		} else if (RVOPC_MATCH(instr, H3_FCHECK2E_S)) {
+			rd_wdata =
+				((rs1 & 0xff) == 0) || ((rs1 & 0xff) == 0xff) ||
+				((rs2 & 0xff) == 0) || ((rs2 & 0xff) == 0xff);
+		} else if (RVOPC_MATCH(instr, H3_FCHECK2E_H)) {
+			rd_wdata =
+				((rs1 & 0x1f) == 0) || ((rs1 & 0x1f) == 0x1f) ||
+				((rs2 & 0x1f) == 0) || ((rs2 & 0x1f) == 0x1f);
+		} else if (RVOPC_MATCH(instr, H3_FEADJQ3)) {
+			rd_wdata = 2 - __builtin_clz(rs1 & (1u << (XLEN - 1)) ? -rs1 : rs1);
+		} else if (RVOPC_MATCH(instr, H3_FEADJU3)) {
+			rd_wdata = 2 - __builtin_clz(rs1);
+		} else if (RVOPC_MATCH(instr, H3_FPACKRQ3_H) || RVOPC_MATCH(instr, H3_FPACKRQ3_S)) {
+			bool halfprecision = RVOPC_MATCH(instr, H3_FPACKRQ3_H);
+			int frac_bits = halfprecision ? 10 : 23;
+			int exp_bits = halfprecision ? 5 : 8;
+			int sign_bit = frac_bits + exp_bits;
+			sx_t exp = sext(rs2, 9);
+			ux_t result;
+			if ((rs1 & -(1u << (29 - frac_bits))) == 0u) {
+				// Exact cancellation, +0
+				result = 0;
+			} else {
+				// Convert to sign-magnitude
+				ux_t sign = (rs1 >> 31) & 0x1u;
+				ux_t magn = sign ? -rs1 : rs1;
+				// Add rounding bias
+				ux_t halfulp = (1u << (29 - frac_bits - 1)) - 1u;
+				ux_t oddbias = (magn >> (29 - frac_bits)) & 0x1u;
+				ux_t round = magn + halfulp + oddbias;
+				// Renormalise by up to 1 bit, to handle exponent increase on rounding
+				if (round & (1u << 30)) {
+					round >>= 1;
+					// Re-wrap after increment to match hardware
+					exp = sext(exp + 1, 9);
+				}
+				if (exp <= 0) {
+					// Underflow or flushed subnormal
+					result = sign << sign_bit;
+				} else if (exp >= ((1 << exp_bits) - 1)) {
+					// Overflow
+					result = (sign << sign_bit) | (((1u << exp_bits) - 1u) << frac_bits);
+				} else {
+					// Packed normal
+					result =
+						(sign << sign_bit) |
+						(((ux_t)exp & ((1u << exp_bits) - 1u)) << frac_bits) |
+						((round >> (29 - frac_bits)) & ((1u << frac_bits) - 1u));
+				}
+
+			}
+			rd_wdata = halfprecision ? sext(result, 15) : result;
+		} else if (RVOPC_MATCH(instr, H3_XORSIGN)) {
+			rd_wdata = rs1 & (1u << (XLEN - 1)) ? -rs2 : rs2;
+		} else if (
+				RVOPC_MATCH(instr, H3_SSRLSTICKY) ||
+				RVOPC_MATCH(instr, H3_SSRASTICKY) ||
+				RVOPC_MATCH(instr, H3_SSRL) ||
+				RVOPC_MATCH(instr, H3_SSRA) ||
+				RVOPC_MATCH(instr, H3_SSLL) ||
+				RVOPC_MATCH(instr, H3_SSLA)
+			) {
+			bool pos_left =
+				RVOPC_MATCH(instr, H3_SSLL) ||
+				RVOPC_MATCH(instr, H3_SSLA);
+			sx_t shamt = sext(rs2, 9);
+			if (pos_left) {
+				shamt = -shamt;
+			}
+			bool arithmetic = shamt >= 0 && (
+				RVOPC_MATCH(instr, H3_SSRASTICKY) ||
+				RVOPC_MATCH(instr, H3_SSRA) ||
+				RVOPC_MATCH(instr, H3_SSLA)
+			);
+			bool sticky = shamt >= 0 && (
+				RVOPC_MATCH(instr, H3_SSRLSTICKY) ||
+				RVOPC_MATCH(instr, H3_SSRASTICKY)
+			);
+			if (shamt < -(XLEN - 1)) {
+				rd_wdata = 0;
+			} else if (shamt < 0) {
+				rd_wdata = rs1 << -shamt;
+			} else if (shamt < XLEN) {
+				ux_t sticky_bit = sticky && ((rs1 >> shamt) << shamt) < rs1;
+				ux_t shift = arithmetic ? ((sx_t)rs1 >> shamt) : rs1 >> shamt;
+				rd_wdata = shift | sticky_bit;
+			} else {
+				ux_t sticky_bit = sticky && rs1 != 0;
+				ux_t shift = arithmetic ? -(rs1 >> (XLEN - 1)) : 0;
+				rd_wdata = sticky_bit | shift;
+			}
 		} else {
 			exception_cause = XCAUSE_INSTR_ILLEGAL;
 		}
