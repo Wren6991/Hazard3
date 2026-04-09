@@ -4,7 +4,11 @@
 \*****************************************************************************/
 
 // Soft float library for Hazard3, using custom Xh3sfx and Xh3bextm extensions.
-// Also uses the following standard ISA extensions: RV32EMZbbZbs
+// Also uses the following standard ISA extensions:
+//
+// * RV32EMZbbZbs (all routines)
+// * RV32I (double-precision add, sub, mul; these require full 31 GPRs)
+// * Zbkb (single-precision mul, if and only if XH3SFX_AVOID_MULH is defined)
 
 #include "xh3sfx_intrinsics.h"
 #include "xh3bextm_intrinsics.h"
@@ -685,11 +689,12 @@ decl_func_with_section ashrdi3
     ret
 
 // ----------------------------------------------------------------------------
-// f64 arithmetic
+// Add, subtract and multiply (f64)
 
 // Double on RV32E? Here's a nickel, kid. Go buy yourself a real computer.
 #ifdef __riscv_i
 
+// Double-precision add
 decl_func_with_section subdf3
 	binvi a3, a3, 31
 decl_func adddf3
@@ -805,6 +810,7 @@ decl_func adddf3
 6:
 	// Check for exponent saturation; t6 = biased emax preserved since start
 	bgeu \el, t6, 7f
+	beqz \el, 7f
 	// Pack normal result
 	srli t3, t3, 31
 	slli t3, t3, 11
@@ -908,6 +914,207 @@ __adddf_return_y:
 	mv a0, a2
 	mv a1, a3
 __adddf_return_x:
+	ret
+
+// Double-precision multiply
+decl_func_with_section muldf3
+	// Extract exponents
+	slli t4, a1, 1
+	srli t4, t4, 21
+	slli t5, a3, 1
+	srli t5, t5, 21
+	// Divert special-case exponents from main path; t6 is useful again later
+	li t6, 0x7ff
+	beqz t4, __muldf_x_0
+	beqz t5, __muldf_y_0
+	beq t4, t6, __muldf_x_nan_inf
+	beq t5, t6, __muldf_y_nan_inf
+	// Approximate final exponent:
+	add t4, t4, t5
+	addi t4, t4, -1023
+	// Final sign is XOR of input signs:
+	xor t5, a1, a3
+	// Extract significands as U12.52
+	slli a1, a1, 12
+	srli a1, a1, 12
+	bseti a1, a1, 20
+	slli a3, a3, 12
+	srli a3, a3, 12
+	bseti a3, a3, 20
+	// Compute exact product before rounding: 53x53->106-bit. Assuming mulhu
+	// is not drastically slower than mul, we can use 32x32->64-bit partial
+	// product multiplies, so there is no benefit to going smaller than a
+	// full 64x64->128-bit product. Product expansion is:
+	//
+	// 	* P.0 = (X.0 * Y.0).0
+	// 	* P.1 = (X.0 * Y.1).0 + (X.1 * Y.0).0 + (X.0 * Y.0).1
+	// 	* P.2 = (X.1 * Y.1).0 + (X.1 * Y.0).1 + (X.0 * Y.1).1 + P.1 carry-out
+	// 	* P.3 = (X.1 * Y.1).1 + P.2 carry-out
+
+	// P.1 = (X.0 * Y.1).0 + (X.1 * Y.0).0 + (X.0 * Y.0).1
+	mul t0, a0, a3
+	mul t1, a1, a2
+	mulhu t2, a0, a2
+	add t1, t0, t1
+	sltu t0, t1, t0
+	add a7, t1, t2
+	sltu t1, a7, t1
+	add a6, t0, t1
+	// Now: a7 = P.1, a6 = carry-out
+
+	// P.2 = (X.1 * Y.1).0 + (X.1 * Y.0).1 + (X.0 * Y.1).1 + P.1 carry-out
+	mul t0, a1, a3
+	mulhu t1, a1, a2
+	mulhu t2, a0, a3
+	add t1, t0, t1
+	sltu t0, t1, t0
+	add t2, t1, t2
+	sltu t1, t2, t1
+	add a5, a6, t2
+	sltu a6, a5, a6
+	add a6, a6, t0
+	add a6, a6, t1
+	// Now: a7 = P.1, a5 = P.2, a6 = carry-out
+
+	// P.3 = (X.1 * Y.1).1 + P.2 carry-out
+	mulhu a4, a1, a3
+	add a4, a4, a6
+	// P.0 = (X.0 * Y.0).0
+	mul a6, a0, a2
+	// Now:
+	// * Shape of P: U24.104
+	// * Range of P: 1 <= P < 4
+	// * a4 = P.3
+	// * a5 = P.2
+	// * a7 = P.1
+	// * a6 = P.0
+
+	// Change shape to U4.60 with sticky bits collected in LSB
+	slli a4, a4, 20
+	srli t0, a5, 12
+	or a4, a4, t0
+	slli a5, a5, 20
+	li t1, 12
+	h3.ssrlsticky t0, a7, t1
+	or a5, a5, t0
+	snez a6, a6
+	or a5, a5, a6
+	// Now: a4:a5 is U4.60
+
+	// Reduce range to 1 <= P < 2 prior to rounding
+	bexti t0, a4, 29
+	beqz t0, 1f
+	li t0, 1
+	h3.ssrlsticky a5, a5, t0
+	slli t0, a4, 31
+	or a5, a5, t0
+	srli a4, a4, 1
+	addi t4, t4, 1
+1:
+	// 8 excess fractional bits. Rounding bias is 2^7 - 1
+	bexti t0, a5, 8
+	addi t0, t0, 127
+	add a3, a5, t0
+	sltu a5, a3, a5
+	add a4, a4, a5
+	// Now: rounded U4.60 in a4:a3.
+	// Check exponent increase due to rounding (uncommon)
+	bexti t0, a4, 29
+	bnez t0, 2f
+3:
+	// Check exponent saturation
+	bgeu t4, t6, 4f
+	beqz t4, 4f
+	// Pack normal result
+	srli a3, a3, 8
+	slli t0, a4, 24
+	or a0, a3, t0
+	srli a4, a4, 8
+	slli a4, a4, 12
+	add a4, a4, t4
+	srli t5, t5, 31
+	slli t5, t5, 11
+	add a4, a4, t5
+	rori a1, a4, 12
+	ret
+2:
+	// Handle exponent increase due to rounding
+	li t0, 1
+	h3.ssrlsticky a3, a3, t0
+	slli t0, a4, 31
+	or a3, a3, t0
+	srli a4, a4, 1
+	addi t4, t4, 1
+	j 3b
+4:
+	// Handle subnormal, underflow or overflow: result is signed infinity for
+	// positive exponent, else signed zero.
+	li a0, 0
+	srli a1, t5, 31
+	slli a1, a1, 31
+	blez t4, 1f
+	lui a2, 0x7ff00
+	or a1, a1, a2
+1:
+	ret
+
+__muldf_x_0:
+	bne t5, t6, __muldf_return_flushed
+	bnez a2, __muldf_propagate_nan_y
+	slli t0, a3, 12
+	beqz t0, __muldf_generate_nan
+__muldf_propagate_nan_y:
+	mv a0, a2
+	mv a1, a3
+	ret
+
+__muldf_y_0:
+	bne t4, t6, __muldf_return_flushed
+	bnez a0, __muldf_propagate_nan_x
+	slli t0, a1, 12
+	beqz t0, __muldf_generate_nan
+__muldf_propagate_nan_x:
+	ret
+
+__muldf_generate_nan:
+	li a0, -1
+	li a1, -1
+	ret
+
+__muldf_return_flushed:
+	xor a1, a1, a3
+	srli a1, a1, 31
+	slli a1, a1, 31
+	li a0, 0
+	ret
+
+__muldf_x_nan_inf:
+	// Neither x nor y is zero. Therefore we can only propagate NaNs, not
+	// generate them. Propagate x if NaN:
+	bnez a0, __muldf_propagate_nan_x
+	slli t0, a1, 12
+	bnez t0, __muldf_propagate_nan_x
+	// Propagate y if NaN, else return infinity
+	bne t5, t6, __muldf_return_inf
+	bnez a2, __muldf_propagate_nan_y
+	slli t0, a3, 12
+	bnez t0, __muldf_propagate_nan_y
+	j __muldf_return_inf
+
+__muldf_y_nan_inf:
+	// x is normal, y is nan or infinity. Propagate y if NaN:
+	bnez a2, __muldf_propagate_nan_y
+	slli t0, a1, 12
+	bnez t0, __muldf_propagate_nan_y
+	// fall through
+
+__muldf_return_inf:
+	xor a1, a1, a3
+	srli a1, a1, 31
+	slli a1, a1, 11
+	addi a1, a1, 0x7ff
+	slli a1, a1, 20
+	li a0, 0
 	ret
 
 #endif // __riscv_i

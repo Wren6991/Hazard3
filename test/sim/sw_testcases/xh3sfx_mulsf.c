@@ -5,11 +5,16 @@
 // ebreak is easier to find in waves.
 #if 1
 #define check_equal(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %08x != %08x\n", __LINE__, (a), (b))
+#define check_equal64(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %016llx != %016llx\n", __LINE__, (a), (b))
 #else
 #define check_equal(a, b) if ((a) != (b)) {asm ("ebreak");}
+#define check_equal64(a, b) if ((a) != (b)) {asm ("ebreak");}
 #endif
 
+
 uint32_t __mulsf3(uint32_t lhs, uint32_t rhs);
+uint32_t __mulhf3(uint32_t lhs, uint32_t rhs);
+uint64_t __muldf3(uint64_t lhs, uint64_t rhs);
 
 struct {uint32_t lhs; uint32_t rhs; uint32_t expect;} random_tests[] = {
     {0xa8c36b34u, 0x420ac26bu, 0xab53d866u},
@@ -1126,6 +1131,118 @@ int main() {
             tb_exit(-1);
         }
     }
+
+    // 1 * 1 = 1
+    check_equal64(__muldf3(0x3ff0000000000000u, 0x3ff0000000000000u), 0x3ff0000000000000u);
+    // 1 * -1 = -1
+    check_equal64(__muldf3(0x3ff0000000000000u, 0xbff0000000000000u), 0xbff0000000000000u);
+    // -1 * 1 = -1
+    check_equal64(__muldf3(0xbff0000000000000u, 0x3ff0000000000000u), 0xbff0000000000000u);
+    // -1 * -1 = 1
+    check_equal64(__muldf3(0xbff0000000000000u, 0xbff0000000000000u), 0x3ff0000000000000u);
+    // -0 * 0 = -0
+    check_equal64(__muldf3(0x8000000000000000u, 0x0000000000000000u), 0x8000000000000000u);
+    // 0 * -0 = - 0
+    check_equal64(__muldf3(0x0000000000000000u, 0x8000000000000000u), 0x8000000000000000u);
+    // +0 * +0 = +0
+    check_equal64(__muldf3(0x0000000000000000u, 0x0000000000000000u), 0x0000000000000000u);
+    // -0 * -0 = +0 (sign XOR of two negatives)
+    check_equal64(__muldf3(0x8000000000000000u, 0x8000000000000000u), 0x0000000000000000u);
+    // 1 * 2 = 2
+    check_equal64(__muldf3(0x3ff0000000000000u, 0x4000000000000000u), 0x4000000000000000u);
+    // 2 * 1 = 2
+    check_equal64(__muldf3(0x4000000000000000u, 0x3ff0000000000000u), 0x4000000000000000u);
+    // inf * inf = inf
+    check_equal64(__muldf3(0x7ff0000000000000u, 0x7ff0000000000000u), 0x7ff0000000000000u);
+    // inf * -inf = -inf
+    check_equal64(__muldf3(0x7ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
+    // -inf * inf = -inf
+    check_equal64(__muldf3(0xfff0000000000000u, 0x7ff0000000000000u), 0xfff0000000000000u);
+    // -inf * -inf = inf
+    check_equal64(__muldf3(0xfff0000000000000u, 0xfff0000000000000u), 0x7ff0000000000000u);
+    // inf * 0 = nan
+    check_equal64(__muldf3(0x7ff0000000000000u, 0x0000000000000000u), 0xffffffffffffffffu);
+    // 0 * inf = nan
+    check_equal64(__muldf3(0x0000000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
+    // inf * -0 = nan
+    check_equal64(__muldf3(0x7ff0000000000000u, 0x8000000000000000u), 0xffffffffffffffffu);
+    // -0 * inf = nan
+    check_equal64(__muldf3(0x8000000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
+    // 1 * -inf = -inf
+    check_equal64(__muldf3(0x3ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
+    // -inf * 1 = -inf
+    check_equal64(__muldf3(0xfff0000000000000u, 0x3ff0000000000000u), 0xfff0000000000000u);
+    // -1 * inf = -inf
+    check_equal64(__muldf3(0xbff0000000000000u, 0x7ff0000000000000u), 0xfff0000000000000u);
+    // inf * -1 = -inf
+    check_equal64(__muldf3(0x7ff0000000000000u, 0xbff0000000000000u), 0xfff0000000000000u);
+    // 1 * nonzero subnormal = exactly 0
+    check_equal64(__muldf3(0x3ff0000000000000u, 0x000fffffffffffffu), 0x0000000000000000u);
+    // nonzero subnormal * -1 = exactly -0
+    check_equal64(__muldf3(0x000fffffffffffffu, 0xbff0000000000000u), 0x8000000000000000u);
+    // -subnormal * 1 = -0 (negative subnormal flushed to -0)
+    check_equal64(__muldf3(0x800fffffffffffffu, 0x3ff0000000000000u), 0x8000000000000000u);
+    // -subnormal * -1 = +0 (sign XOR of -0 and -1)
+    check_equal64(__muldf3(0x800fffffffffffffu, 0xbff0000000000000u), 0x0000000000000000u);
+    // nan * 0 = same nan
+    check_equal64(__muldf3(0xffff1234abcdabcdu, 0x0000000000000000u), 0xffff1234abcdabcdu);
+    // nan * nan = first nan (implementation detail)
+    check_equal64(__muldf3(0x7fff1234abcdabcdu, 0x7fff5678def0def0u), 0x7fff1234abcdabcdu);
+    // 0 * nan = same nan
+    check_equal64(__muldf3(0x0000000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    // nan * 1 = same nan
+    check_equal64(__muldf3(0xffff1234abcdabcdu, 0x3ff0000000000000u), 0xffff1234abcdabcdu);
+    // 1 * nan = same nan
+    check_equal64(__muldf3(0x3ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    // nan * inf = same nan
+    check_equal64(__muldf3(0xffff1234abcdabcdu, 0x7ff0000000000000u), 0xffff1234abcdabcdu);
+    // inf * nan = same nan
+    check_equal64(__muldf3(0x7ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    // (2 - 0.5 ulp) x (2 - 0.5 ulp) = 4 - 1 ulp
+    check_equal64(__muldf3(0x3fffffffffffffffu, 0x3fffffffffffffffu), 0x400ffffffffffffeu);
+    // -(2 - 0.5 ulp) x (1 + 1 ulp) = -2 exactly
+    check_equal64(__muldf3(0xbfffffffffffffffu, 0x3ff0000000000001u), 0xc000000000000000u);
+    // 1.666... * 1.333.. = 2.222...
+    check_equal64(__muldf3(0x3ffaaaaaaaaaaaaau, 0x3ff5555555555555u), 0x4001c71c71c71c71u);
+    // 1.25 x 2^-511 x 1.25 x 2^-512 = 0
+    // (normal inputs with subnormal output, and we claim to be FTZ)
+    check_equal64(__muldf3(0x2004000000000000u, 0x1ff4000000000000u), 0x0000000000000000u);
+    // 1.333333... x 1.5 = 2 exactly (exponent increases after rounding)
+    check_equal64(__muldf3(0x3ff5555555555555u, 0x3ff8000000000000u), 0x4000000000000000u);
+    // 1.333333... x (1.5 - 1 ulp) = 2 - 1 ulp
+    check_equal64(__muldf3(0x3ff5555555555555u, 0x3ff7ffffffffffffu), 0x3ffffffffffffffeu);
+    // (1.333333... - 1 ulp) x 1.5 = 2 - 1 ulp
+    check_equal64(__muldf3(0x3ff5555555555554u, 0x3ff8000000000000u), 0x3ffffffffffffffeu);
+    // (1.333333... - 1 ulp) x (1.5 + 1 ulp) = 2 - 0.5 ulp
+    check_equal64(__muldf3(0x3ff5555555555554u, 0x3ff8000000000001u), 0x3fffffffffffffffu);
+    // 1.333333... x (1.5 + 2 ulp) = 2 + 1 ulp
+    check_equal64(__muldf3(0x3ff5555555555555u, 0x3ff8000000000002u), 0x4000000000000001u);
+    // 1.25 x 0.8 = 1 exactly
+    check_equal64(__muldf3(0x3ff4000000000000u, 0x3fe999999999999au), 0x3ff0000000000000u);
+    // (1.25 - 1 ulp) x (0.8 + 1ulp) = 1 exactly (exponent increases before rounding)
+    check_equal64(__muldf3(0x3ff3ffffffffffffu, 0x3fe999999999999bu), 0x3ff0000000000000u);
+    // (1.333333... x 2^1022) x 1.5: rounds up to infinity
+    check_equal64(__muldf3(0x7fe5555555555555u, 0x3ff8000000000000u), 0x7ff0000000000000u);
+    // subtract 1 ulp from rhs -> largest normal - 1 ulp
+    check_equal64(__muldf3(0x7fe5555555555555u, 0x3ff7ffffffffffffu), 0x7feffffffffffffeu);
+    // Add 1 ulp to rhs -> still +inf (significand is cleared correctly)
+    check_equal64(__muldf3(0x7fe5555555555555u, 0x3ff8000000000001u), 0x7ff0000000000000u);
+    // Round up from subnormal to normal:
+    check_equal64(__muldf3(0x0015555555555555u, 0x3fe8000000000000u), 0x0010000000000000u);
+    // Pi ^ 2, why not
+    check_equal64(__muldf3(0x400921fb5441c55eu, 0x400921fb5441c55eu), 0x4023bd3cc9ba7eb0u);
+    // (1 + 2^-26) * (1 + 2^-27): exact tie, even LSB, rounds down
+    check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000002000000u), 0x3ff0000006000000u);
+    // (1 + 3 * 2^-26) * (1 + 2^-27): exact tie, odd LSB, rounds up
+    check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000002000000u), 0x3ff000000e000002u);
+    // (1 + 2^-26) * (1 + 2^-27 + ulp): odd LSB, above tie, rounds up
+    check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000002000001u), 0x3ff0000006000002u);
+    // (1 + 3 * 2^-26) * (1 + 2^-27 + ulp): even LSB, above tie, rounds up
+    check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000002000001u), 0x3ff000000e000003u);
+    // (1 + 3 * 2^-26) * (1 + 2^-27 - ulp): even LSB, below tie, rounds down
+    check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000001ffffffu), 0x3ff000000e000000u);
+    // (1 + 1 * 2^-26) * (1 + 2^-27 - ulp): even LSB, below tie, rounds down
+    check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000001ffffffu), 0x3ff0000005ffffffu);
 
 	return 0;
 }
