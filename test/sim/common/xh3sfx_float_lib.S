@@ -7,8 +7,11 @@
 // Also uses the following standard ISA extensions:
 //
 // * RV32EMZbbZbs (all routines)
+// * Zba (single-precision mul, if XH3SFX_AVOID_MULH is defined)
 // * RV32I (double-precision add, sub, mul; these require full 31 GPRs)
-// * Zbkb (single-precision mul, if and only if XH3SFX_AVOID_MULH is defined)
+//
+// When building for RV32E, the double-precision add/sub/mul are excluded from
+// the build, and the linker falls back to whatever your compiler provides.
 
 #include "xh3sfx_intrinsics.h"
 #include "xh3bextm_intrinsics.h"
@@ -204,47 +207,54 @@ decl_func_with_section mulsf3
 	h3.fpackrq3.s a0, a4, a2
 	ret
 #else
-	// Path for when mul is much faster than mulh. Only worth it when mulh is
-	// 32+ cycles and mul is 1 cycle (MULDIV_UNROLL=1 MUL_FAST=1 MULH_FAST=0).
-	// Unpack sign separately from significand:
-	h3.funpacku3.s a4, a0
-	h3.funpacku3.s a5, a1
-	// Calculate sign and exponent; free up a2/a3
-	xor a0, a0, a1
-	add a1, a3, a2
-	addi a1, a1, -127 + 3
-	// Multiply U3.29 x U3.29 -> U6.58. (32 x 32 -> 64)
-	srli a2, a4, 16
-	srli a3, a5, 16
-	zext.h a4, a4
-	zext.h a5, a5
-	mul t0, a2, a3  // A_h * B_h
-	mul t1, a2, a5  // A_h * B_l
-	mul a2, a4, a3  // A_l * B_h
-	mul a4, a4, a5  // A_l * B_l
-	// Sum the crossed terms, save carry-in for hi[16]
-	add t1, a2, t1
-	sltu t2, t1, a2
-	// Add crossed terms to low word, save carry-in for hi[0]
-	slli a2, t1, 16
-	add a4, a4, a2
-	sltu a3, a4, a2
-	// Pack carries with correct significance
-	pack a3, a3, t2
-	// High word: A_h * B_h + (crossed terms >> 16) + ci0 + (ci1 << 16)
-	srli t1, t1, 16
-	add a5, t0, t1
-	add a5, a5, a3
-	// Final product complete: U6.58 in a5:a4. Collect low sticky bits.
-	snez a4, a4
-	or a5, a5, a4
-	// Renormalise to Q3
-	h3.feadju3 a4, a5
-	h3.ssra a5, a5, a4
-	add a1, a1, a4
-	// Apply sign before packing. Only upper U3.29 is relevant.
-	h3.xorsign a5, a0, a5
-	h3.fpackrq3.s a0, a5, a1
+	// Path for when mul is faster than mulh. This uses a variant of Mark
+	// Owen's trick for calculating a 23 x 23 -> 46-bit product with two
+	// 32-bit multiplies.
+	li t2, -1 << 23
+	andn a4, a0, t2           // x - 1, U0.23
+	andn a5, a1, t2           // y - 1, U0.23
+	bseti t2, a4, 23
+	add t2, t2, a5            // x + y - 1, U2.23 (useful later)
+	xor a0, a0, a1            // sign
+	add a1, a3, a2            // a2/a3 now free
+	addi a1, a1, -127 + 3     // exponent
+	mul a2, a4, a5            // exact[31:0]
+	srli a4, a4, 7
+	srli a5, a5, 7
+	mul a4, a4, a5            // approx[45:14]
+	// Error on approx[45:0] is slightly better than -2^31 < err <= 0.
+	// Only two possibilities:
+	//
+	// * approx[45:31] is equal to exact[45:31]
+	//
+	// * approx[31] differs from exact[31]; adding 2^31 corrects bits 45:31
+	//
+	// Carry into approx[32] occurs when approx[31] is set and exact[31] is
+	// clear. So, adding !exact[31] to approx[31] corrects bits 45:32 (only).
+	srli a4, a4, 17
+	bltz a2, 1f
+	addi a4, a4, 1
+1:
+	srli a4, a4, 1
+	// Now: exact[45:32] in a4, exact[31:0] in a2. Pack U6.26 with sticky LSB.
+	slli a4, a4, 12
+	li a5, 20
+	h3.ssrlsticky a2, a2, a5
+	or a4, a4, a2
+	// Just got:     p = (x - 2^23)(y - 2^23)
+	//                 = xy - (x + y) * 2^23 + 2^46
+	// Already had:  s = x + y - 2^23
+	//
+	// Want:        xy = p + (s + 2^23) * 2^23 - 2^46
+	//                 = p + s * 2^23
+	sh3add a4, t2, a4
+	// Normalise to U3.29
+	h3.feadju3 a5, a4
+	h3.ssrlsticky a4, a4, a5
+	add a1, a1, a5
+	// Apply sign before packing.
+	h3.xorsign a4, a0, a4
+	h3.fpackrq3.s a0, a4, a1
 	ret
 #endif
 
