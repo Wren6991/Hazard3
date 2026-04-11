@@ -1075,7 +1075,7 @@ int main() {
     // nan * 0 = same nan
     check_equal(__mulsf3(0xffff1234u, 0x00000000u), 0xffff1234u);
     // nan * nan = first nan (implementation detail)
-    check_equal(__mulsf3(0x7fff1234u, 0x7fff5678), 0x7fff1234u);
+    check_equal(__mulsf3(0x7fff1234u, 0x7fff5678u), 0x7fff1234u);
     // 0 * nan = same nan
     check_equal(__mulsf3(0x00000000u, 0xffff1234u), 0xffff1234u);
     // nan * 1 = same nan
@@ -1086,7 +1086,7 @@ int main() {
     check_equal(__mulsf3(0xffff1234u, 0x7f800000u), 0xffff1234u);
     // inf * nan = same nan
     check_equal(__mulsf3(0x7f800000u, 0xffff1234u), 0xffff1234u);
-    // (2 - 0.5 ulp) x (2 - 0.5 ulp) = 4 - 0.5 ulp
+    // (2 - 0.5 ulp) x (2 - 0.5 ulp) = 4 - 1 ulp
     check_equal(__mulsf3(0x3fffffffu, 0x3fffffffu), 0x407ffffeu);
     // (2 - 0.5 ulp) x (1 + 1 ulp) = 2 exactly
     check_equal(__mulsf3(0xbfffffffu, 0x3f800001u), 0xc0000000u);
@@ -1120,6 +1120,8 @@ int main() {
     check_equal(__mulsf3(0x3f800001u, 0x3fc00001u), 0x3fc00003u);
     // Tricky rounding case that requires carries to propagate from low half
     check_equal(__mulsf3(0x3f8a2a80u, 0x3f9045deu), 0x3f9bbb3bu);
+    // Rounding tie between smallest normal and largest subnormal (rounds up)
+    check_equal(__mulsf3(0x00ffffffu, 0x3f000000u), 0x00800000u);
 
     // Random tests generated from host FPU
     for (int i = 0; i < sizeof(random_tests) / sizeof(random_tests[0]); ++i) {

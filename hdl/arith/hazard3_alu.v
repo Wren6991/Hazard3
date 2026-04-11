@@ -206,11 +206,15 @@ wire xh3sfx_pack_is_s = funct7_32b[6];
 
 wire [31:0] xh3sfx_sig_abs = op_a[31] ? -op_a : op_a;
 wire [31:0] xh3sfx_rnd_bias = xh3sfx_pack_is_s ? 32'h0000001f : 32'h0003ffff;
+// Double the rounding bias when the input exponent is exactly zero: gives
+// correct rounding for subnormals that round to normal. A full FPU would
+// clamp exp at 1 and shifted the significand down. This is the reverse.
+wire [31:0] xh3sfx_rnd_bias_tiny = ~(~xh3sfx_rnd_bias << ~|op_b[9:0]);
 wire [31:0] xh3sfx_odd_bias = {
 	31'd0,
 	xh3sfx_pack_is_s ? xh3sfx_sig_abs[29 - 23] : xh3sfx_sig_abs[29 - 10]
 };
-wire [31:0] xh3sfx_sig_rnd = xh3sfx_sig_abs + xh3sfx_rnd_bias + xh3sfx_odd_bias;
+wire [31:0] xh3sfx_sig_rnd = xh3sfx_sig_abs + xh3sfx_rnd_bias_tiny + xh3sfx_odd_bias;
 wire [9:0]  xh3sfx_exp_adj = op_b[9:0] + {9'd0, xh3sfx_sig_rnd[30]};
 wire [31:0] xh3sfx_sig_norm = xh3sfx_sig_rnd >> xh3sfx_sig_rnd[30];
 
