@@ -696,10 +696,6 @@ void RVCore::step(bool trace) {
 				ux_t magn = sign ? -rs1 : rs1;
 				// Add rounding bias
 				ux_t halfulp = (1u << (29 - frac_bits - 1)) - 1u;
-				if (exp == 0) {
-					// "tininess before rounding"
-					halfulp = (halfulp << 1) + 1u;
-				}
 				ux_t oddbias = (magn >> (29 - frac_bits)) & 0x1u;
 				ux_t round = magn + halfulp + oddbias;
 				// Renormalise by up to 1 bit, to handle exponent increase on rounding
@@ -721,7 +717,6 @@ void RVCore::step(bool trace) {
 						(((ux_t)exp & ((1u << exp_bits) - 1u)) << frac_bits) |
 						((round >> (29 - frac_bits)) & ((1u << frac_bits) - 1u));
 				}
-
 			}
 			rd_wdata = halfprecision ? sext(result, 15) : result;
 		} else if (RVOPC_MATCH(instr, H3_XORSIGN)) {

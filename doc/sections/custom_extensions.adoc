@@ -510,7 +510,7 @@ The exponent in `rs2` is a signed integer and must be in the range -512 ≤ _x_ 
 * If exponent ≥ 255, return `inf` with input sign
 * Pack sign, exponent and rounded significand, and return
 
-NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero.
+NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero, _unless_ they round up to normality when rounded with an unlimited exponent.
 
 Encoding (R-type):
 
@@ -564,7 +564,7 @@ The instruction applies the following steps in sequence:
 * If exponent ≥ 31, return `inf` with input sign
 * Pack sign, exponent and rounded significand, and return
 
-NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero.
+NOTE: The normalisation requirement on `rs1` and the exponent underflow rule have the net effect that subnormal results are flushed to zero, _unless_ they round up to normality when rounded with an unlimited exponent.
 
 Encoding (R-type):
 

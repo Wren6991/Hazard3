@@ -1120,8 +1120,12 @@ int main() {
     check_equal(__mulsf3(0x3f800001u, 0x3fc00001u), 0x3fc00003u);
     // Tricky rounding case that requires carries to propagate from low half
     check_equal(__mulsf3(0x3f8a2a80u, 0x3f9045deu), 0x3f9bbb3bu);
-    // Rounding tie between smallest normal and largest subnormal (rounds up)
-    check_equal(__mulsf3(0x00ffffffu, 0x3f000000u), 0x00800000u);
+    // Half-way between largest subnormal and smallest normal: does not round
+    // when exponent is unlimited as there are no sub-fractional 1s.
+    check_equal(__mulsf3(0x00ffffffu, 0x3f000000u), 0x00000000u);
+    // Subnormal result that rounds up to normal even when rounded with
+    // unlimited exponent:
+    check_equal(__mulsf3(0x00fe03f8u, 0x3f010000u), 0x00800000u);
 
     // Random tests generated from host FPU
     for (int i = 0; i < sizeof(random_tests) / sizeof(random_tests[0]); ++i) {
