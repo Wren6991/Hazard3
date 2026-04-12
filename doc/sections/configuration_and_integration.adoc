@@ -541,7 +541,7 @@ Default value: `0`
 
 Support the U (user) privilege level. In U-mode, the core performs unprivileged
 bus accesses, and software's access to CSRs is restricted. Additionally, if
-the PMP is included, the core may restrict U-mode software's access to
+the PMP is included (<<param-PMP_REGIONS>> is greater than `0`), the core may restrict U-mode software's access to
 memory.
 
 Requires: <<param-CSR_M_TRAP>> = `1`.
@@ -735,10 +735,17 @@ Default value: all-zeroes.
 [[param-REDUCED_BYPASS]]
 ===== REDUCED_BYPASS
 
-Remove all forwarding paths except X->X (so back-to-back ALU ops can still run
-at 1 CPI), to save area. This has a significant impact on per-clock
-performance, so should only be considered for extremely low-area
-implementations.
+Remove all forwarding paths except X->X, to save area. This has a significant impact on per-clock performance, so should only be considered for extremely low-area implementations.
+
+More specifically this eliminates the forwarding paths from stage 3 to stage 2 (M->X) and also the store data forwarding path within stage 3 (M->M). The consequences for ALU, multiplier and address operands are:
+
+* Dependency on a load result has a latency of three cycles (increased from two).
+* Dependency on an ALU or sequential multiply/divide result _not_ produced by the immediately prior instruction has a latency of three cycles (increased from one).
+* Dependency on an ALU or sequential multiply/divide result produced by the immediately prior instruction has a latency of one cycle (no change).
+* Dependency on a fast multiplier result when <<param-MUL_FASTER>> = `0`: same as a load result.
+* Dependency on a fast multiplier result when <<param-MUL_FASTER>> = `1`: same as an ALU or sequential multiply/divide result.
+
+The consequence for store data is a latency of two cycles (increased from one) no matter the source of the operand.
 
 Default value: `0`
 

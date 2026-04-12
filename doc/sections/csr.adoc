@@ -23,6 +23,7 @@ Vendor identifier. Read-only, configurable constant. Should contain either all-z
 | 6:0 | `offset` | Vendor ID within the specified bank. LSB (parity) is not stored.
 |===
 
+[[reg-marchid]]
 ==== marchid
 
 Address: `0xf12`
@@ -112,6 +113,7 @@ Read-only, constant. Value depends on which ISA extensions Hazard3 is configured
 
 === Standard M-mode Trap Handling CSRs
 
+[[reg-mstatus]]
 ==== mstatus
 
 Address: `0x300`
@@ -128,25 +130,28 @@ The below table lists the fields which are _not_ hardwired to 0:
 | 3 | `mie` | Interrupt enable. Readable and writable. Is set to 0 on trap entry. Is set to the current value of `mstatus.mpie` on trap return.
 |===
 
+[[reg-mstatush]]
 ==== mstatush
 
 Address: `0x310`
 
 Hardwired to `0`.
 
-
+[[reg-medeleg]]
 ==== medeleg
 
 Address: `0x302`
 
 Unimplemented, as neither U-mode traps nor S-mode are supported. Access will cause an illegal instruction exception.
 
+[[reg-mideleg]]
 ==== mideleg
 
 Address: `0x303`
 
 Unimplemented, as neither U-mode traps nor S-mode are supported. Access will cause an illegal instruction exception.
 
+[[reg-mie]]
 ==== mie
 
 Address: `0x304`
@@ -254,19 +259,29 @@ The following exception causes may be set by Hazard3 hardware:
 | 11 | Environment call from M-mode
 |===
 
+[[reg-mtval]]
 ==== mtval
 
 Address: `0x343`
 
-Hardwired to 0.
+Hardwired to 0. Hazard3 does not write trap information to the `mtval` register on any trap cause. Fault handlers and debuggers must reconstruct trap information by decoding the instruction at <<reg-mepc>> with reference to the trap cause in <<reg-mcause>>.
 
+[NOTE]
+====
+The main use for `mtval` would be recording bus fault addresses. AHB returns faults in a later pipe stage than the addresses are issued, so reporting the address would require the address of all load/stores to be _speculatively_ registered into the next stage, even though the pipeline has no other use for it. This would have significant energy cost as well as area.
+
+The other main use for `mtval` is recording the instruction bit pattern of illegal instructions; generally Hazard3 is deployed without I/D caches so the instruction can be re-fetched from `mepc` provided the address has both R and X PMP permissions, and the benefit of recording the instruction in `mtval` is marginal. Therefore Hazard3 elects to never record trap information.
+====
+
+
+[[reg-mcounteren]]
 ==== mcounteren
 
 Address: `0x306`
 
 Counter enable. Control access to counters from U-mode. Not to be confused with <<reg-mcountinhibit>>.
 
-This register only exists if U-mode is supported.
+This register only exists if <<param-U_MODE>> = `1`.
 
 [cols="10h,20h,~", options="header"]
 |===
@@ -279,6 +294,7 @@ This register only exists if U-mode is supported.
 
 === Standard Memory Protection CSRs
 
+[[reg-pmpcfg]]
 ==== pmpcfg0...3
 
 Address: `0x3a0` through `0x3a3`
@@ -300,6 +316,7 @@ Each `pmpcfg` register divides into four identical 8-bit chunks, each correspond
 | 0    | `R` | Read permission
 |===
 
+[[reg-pmpaddr]]
 ==== pmpaddr0...15
 
 Address: `0x3b0` through `0x3bf`
@@ -315,6 +332,7 @@ The interpretation of the `pmpaddr` bits depends on the `A` mode configured in t
 
 === Standard M-mode Performance Counters
 
+[[reg-mcycle]]
 ==== mcycle
 
 Address: `0xb00`
@@ -323,6 +341,9 @@ Lower half of the 64-bit cycle counter. Readable and writable by software. Incre
 
 If written with a value `n` and read on the very next cycle, the value read will be exactly `n`. The RISC-V spec says this about `mcycle`: "Any CSR write takes effect after the writing instruction has otherwise completed."
 
+NOTE: To save energy in the default state, the <<reg-mcountinhibit>> `cy` bit resets to `1`. This bit must be cleared before `mcycle` starts to count.
+
+[[reg-mcycleh]]
 ==== mcycleh
 
 Address: `0xb80`
@@ -331,6 +352,7 @@ Upper half of the 64-bit cycle counter. Readable and writable by software. Incre
 
 This includes when `mcycle` is written on that same cycle, since RISC-V specifies the CSR write takes place _after_ the increment for that cycle.
 
+[[reg-minstret]]
 ==== minstret
 
 Address: `0xb02`
@@ -339,6 +361,10 @@ Lower half of the 64-bit instruction retire counter. Readable and writable by so
 
 If some value `n` is written to `minstret`, and it is read back by the very next instruction, the value read will be exactly `n`. This is because the CSR write logically takes place after the instruction has otherwise completed.
 
+NOTE: To save energy in the default state, the <<reg-mcountinhibit>> `ir` bit resets to `1`. This bit must be cleared before `minstret` starts to count.
+
+
+[[reg-minstreth]]
 ==== minstreth
 
 Address: `0xb82`
@@ -577,12 +603,14 @@ Hazard3 may set the following `dcsr.cause` values on entry to Debug Mode:
 
 Cause `5` (`resethaltreq`) is never set by hardware. This event is reported as a normal halt, cause `3`.
 
+[[reg-dpc]]
 ==== dpc
 
 Address: `0x7b1`
 
 Debug program counter. When entering Debug Mode, `dpc` samples the current program counter, e.g. the address of an `ebreak` which caused Debug Mode entry. When leaving debug mode, the processor jumps to `dpc`. The host may read/write this register whilst in Debug Mode.
 
+[[reg-dscratch0]]
 ==== dscratch0
 
 Address: `0x7b2`
@@ -591,6 +619,7 @@ Not implemented. Access will cause an illegal instruction exception.
 
 To provide data exchange between the Debug Module and the core, the Debug Module's `data0` register is mapped into the core's CSR space at a read/write M-custom address -- see <<reg-dmdata0>>.
 
+[[reg-dscratch1]]
 ==== dscratch1
 
 Address: `0x7b3`
