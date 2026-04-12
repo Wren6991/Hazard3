@@ -42,6 +42,31 @@ Hazard3 does not order stores before instruction fetch except with an explicit `
 
 In system implementations which lack core-local caches it is usually sufficient to ignore the `fence_i_vld` and `fence_d_vld` signals, and tie `fence_rdy` high.
 
+
+[[section-exclusive-bus-transfers]]
+=== Atomic Instructions and Exclusive Transfers
+
+Hazard3 uses AHB5 exclusive transfers as the _mechanism_ to implement the RISC-V atomic instructions from the A extension. Exclusive transfers are described fully in the AHB5 specification, but briefly:
+
+* The core marks a read or write transfer as _exclusive_ by asserting the `HEXCL` signal high during the address phase.
+* The interconnect indicates success or failure of the exclusive transfer by driving the `HEXOKAY` signal during the data phase.
+
+See <<port-descriptions>> for a list of all Hazard3 top-level module ports including the `HEXCL` and `HEXOKAY` signals.
+
+AHB5 does not specify in all cases whether the interconnect should return success or failure; these details are usually furnished by architectural specifications like the https://developer.arm.com/documentation/ddi0553/latest/[Armv8-M Architecture Reference Manual] and its discussion of the Local Monitor and Global Monitor rules. There is no Arm document that directly describes the requirements imposed on the interconnect; these requirements must be extrapolated from the architecture rules.
+
+The idea is that an exclusive write by some hart (some _PE_ in Arm parlance) succeeds if and only if it is preceded by a successful exclusive read by the same hart, _and_ there were no other non-exclusive writes or successful exclusive writes to the same reservation granule by other harts since that successful read. This rule guarantees serialisation of read-modify-write sequences formed of exclusive read/write pairs.
+
+Hazard3 maps RISC-V `lr.w` instructions directly to exclusive reads. The `HEXOKAY` status is stored in a local state flag. This is a 1-bit flag which records whether the core believes it has an outstanding reservation on _all of memory_. The system-level interconnect usually tracks reservations with finer granularity to reduce spurious collisions between harts. It is not necessary for Hazard3 itself to track at any finer granularity: this flag represents its private belief about its reservation status, and determines whether it will _attempt_ an exclusive write on an `sc.w`. The ultimate success or failure for all harts is determined by the tracking logic in the interconnect.
+
+RISC-V `sc.w` instructions map to exclusive writes, with a caveat: if the exclusive read success flag is clear, the `sc.w` does not issue to the bus and immediately returns a failure status in register `rd`. If an exclusive write _is_ issued, the `HEXOKAY` status is reported as success or failure in register `rd`. Finally, executing an `sc.w` instruction unconditionally clears the exclusive read success flag. This prevents issuing multiple exclusive writes following a single successful exclusive read.
+
+The exclusive read success flag is also cleared when executing an `mret` instruction. This ensures that successful read-write pairs are atomic with respect to interrupts, and also prevents the switched-to context in a context switch from retiring a reservation belonging to the switched-from context.
+
+RISC-V `amo*.w` instructions do not translate to any single AHB5 bus message, since AHB5 transfers have either read or write direction, not both. Instead, the core issues an exclusive read followed by an exclusive write, implementing the required read-modify-write operation for the given AMO instruction. If the exclusive write fails, the entire sequence is retried. This has the potential for an infinite loop, so if an exclusive _read_ fails (indicating access to an address that does not support exclusives) then the core abandons the sequence and returns a store/AMO access fault exception (`mcause` = `7`).
+
+Connecting Hazard3 to a Global Monitor designed for a Cortex-M system upholds most RISC-V architecture rules. This is a straightforward approach to integrating Hazard3 into existing interconnects, and also allows interoperability between Arm and RISC-V cores sharing the same atomic variables. The sole exception is the RISC-V eventual success guarantee, also known as the _RsrvEventual_ PMA. Cortex-M Global Monitor rules guarantee _global_ progress, i.e. every race has a winner. RISC-V eventuality requires _local_ progress, i.e. each hart cannot be starved forever. One possibility is to bend the Arm architecture rules and add priority boosting after a hart has tried a certain number of times. The other possibility is to simply accept this limitation and document your system as supporting the _RsrvNonEventual_ PMA.
+
 === Cacheable and Bufferable Attributes
 
 Hazard3 marks all transfers as non-cacheable and non-bufferable using `HPROT[3:2]`. These signals are tied off to constants and are not controllable by software.
@@ -68,6 +93,7 @@ This limitation does not apply to load/store; Hazard3 checks load/store addresse
 
 An interrupt occurring mid-instruction terminates its execution immediately. When returning from the interrupt, the instruction restarts from the beginning, as there is no provision in RISC-V for saving and restoring the execution progress. Therefore each individual read or write may execute multiple times before the instruction eventually completes uninterrupted. This can cause lost or duplicated data when accessing IO regions. For this reason these instructions should be avoided when accessing non-idempotent memory.
 
+[[section-64-bit-bus-access]]
 === 64-bit Accesses
 
 Hazard3 implements the Zilsd and Zclsd extensions, which perform 64-bit loads and stores to and from pairs of registers. The register pair is always an even register plus the consecutively next higher-numbered register.
@@ -75,3 +101,4 @@ Hazard3 implements the Zilsd and Zclsd extensions, which perform 64-bit loads an
 64-bit loads and stores are implemented as pairs of 32-bit AHB5 transfers. Since these accesses only require 4-byte alignment, the load/store address can also be 4-byte-aligned, even though it is notionally an 8-byte transfer.
 
 The RISC-V specification does not guarantee the order in which these two writes are issued, and Hazard3 takes advantage of this to simplify fault handling. When the base address register `rs1` is an even-numbered register, the odd-numbered register in the `rd` or `rs2` pair is transferred first. Conversely, when `rs1` is an odd-numbered register, the even register in the pair is transferred first. This ensures that a fault occurring on the second half of an `ld` instruction does not modify `rs1`. It also means that a consecutively-addressed sequence of 64-bit load/stores is not necessarily consecutively addressed on the AHB5 port. When using `ld` and `sd` instructions for IO, ensure that the peripheral is not sensitive to the order of transfers.
+
