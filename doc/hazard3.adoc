@@ -7,6 +7,7 @@
 ifdef::HTMLBUILD[]
 :data-uri:
 :toc: left
+:sectanchors:
 endif::[]
 :times: ×
 

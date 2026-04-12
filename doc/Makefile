@@ -34,3 +34,6 @@ $(TOP).pdf: $(DEPS) rev
 # small, means the whole doc is one file.
 $(TOP).html: $(DEPS) rev
 	asciidoctor --section-numbers -a HTMLBUILD $(TOP).adoc
+
+$(TOP).txt: $(DEPS) rev
+	asciidoctor-reducer -o $@ -a HTMLBUILD $(TOP).adoc
