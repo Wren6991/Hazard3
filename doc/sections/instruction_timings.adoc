@@ -1,7 +1,8 @@
 == Instruction Cycle Counts
 
-All timings are given assuming perfect bus behaviour (no downstream bus stalls), and that the core is configured with `MULDIV_UNROLL = 2` and all other configuration options set for maximum performance.
+All timings are given assuming perfect bus behaviour (no downstream bus stalls).
 
+[[section-timings-rv32i]]
 === Base Instruction Set (RV32I)
 
 [%autowidth.stretch, options="header"]
@@ -41,20 +42,20 @@ All timings are given assuming perfect bus behaviour (no downstream bus stalls),
 | `bltu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
 | `bgeu rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
 3+| Load and Store
-| `lw rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[If an instruction in stage 2 (e.g. an `add`) uses data from stage 3 (e.g. a `lw` result), a 1-cycle bubble is inserted between the pair. A load data -> store data dependency is _not_ an example of this, because data is produced and consumed in stage 3. However, load data -> load address _would_ qualify, as would e.g. `sc.w` -> `beqz`.]
-| `lh rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
-| `lhu rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
-| `lb rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
-| `lbu rd, imm(rs1)` | 1 or 2 | 1 if next instruction is independent, 2 if dependent.footnote:data_dependency[]
+| `lw rd, imm(rs1)` | 1 or 2 | 1-cycle throughput, 2-cycle latency.footnote:data_dependency[If an instruction in stage 2 (e.g. an `add`) uses data from stage 3 (e.g. a `lw` result), a 1-cycle bubble is inserted between the pair. A load data -> store data dependency is _not_ an example of this, because data is produced and consumed in stage 3. However, load data -> load address _would_ qualify, as would e.g. `sc.w` -> `beqz`.]
+| `lh rd, imm(rs1)` | 1 or 2 | 1-cycle throughput, 2-cycle latency.footnote:data_dependency[]
+| `lhu rd, imm(rs1)` | 1 or 2 | 1-cycle throughput, 2-cycle latency.footnote:data_dependency[]
+| `lb rd, imm(rs1)` | 1 or 2 | 1-cycle throughput, 2-cycle latency.footnote:data_dependency[]
+| `lbu rd, imm(rs1)` | 1 or 2 | 1-cycle throughput, 2-cycle latency.footnote:data_dependency[]
 | `sw rs2, imm(rs1)` | 1 |
 | `sh rs2, imm(rs1)` | 1 |
 | `sb rs2, imm(rs1)` | 1 |
 |===
 
+[[section-timings-m]]
 === Integer Multiply and Divide (M)
 
-Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1`. I.e. the sequential multiply/divide circuit processes two bits per cycle, and a separate dedicated multiplier is present for the `mul` instruction.
-
+This table assumes the core is configured with: <<param-MULDIV_UNROLL>> = `2`, <<param-MUL_FAST>> = `1`, <<param-MUL_FASTER>> = `1` and <<param-MULH_FAST>> = `1`.
 
 [%autowidth.stretch, options="header"]
 |===
@@ -66,12 +67,21 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 | `mulhsu rd, rs1, rs2` | 1 |
 | `mulhu rd, rs1, rs2` | 1 |
 3+| Divide and Remainder
-| `div rd, rs1, rs2` | 18 or 19 | Depending on sign correction
-| `divu rd, rs1, rs2` | 18 |
-| `rem rd, rs1, rs2` | 18 or 19 | Depending on sign correction
-| `remu rd, rs1, rs2` | 18 |
+| `div rd, rs1, rs2` | 17 to 19 | Depending on sign correction
+| `divu rd, rs1, rs2` | 17 |
+| `rem rd, rs1, rs2` | 17 to 19 | Depending on sign correction
+| `remu rd, rs1, rs2` | 17 |
 |===
 
+Changing these configuration parameters has the following effects on execution timings:
+
+* <<param-MUL_FASTER>> = `0`: Fast multiplier latency increases from 1 to 2. Throughput remains at 1/cycle.
+* <<param-MULH_FAST>> = `0`: High multiplies execute on the sequential multiply/divide circuit instead of the fast multiplier. `mulhu` has the same timings as `divu`. `mulh` and `mulhsu` have the same timings as `div`, plus one additional sign correction cycle when all 32 low-word bits are zero and the overall result is negative.
+* <<param-MUL_FAST>> = `0`: All multiplies execute on the sequential multiply/divide circuit. `mul` has the same timings as `divu`.
+* <<param-MULDIV_UNROLL>> = `1`: All instructions on the sequential multiply/divide circuit execute 16 cycles slower.
+* <<param-MULDIV_UNROLL>> = `4`: All instructions on the sequential multiply/divide circuit execute 8 cycles faster.
+
+[[section-timings-a]]
 === Atomics (A)
 
 [%autowidth.stretch, options="header"]
@@ -81,7 +91,7 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 | `lr.w rd, (rs1)` | 1 or 2 | 2 if next instruction is dependentfootnote:data_dependency[], an `lr.w`, `sc.w` or `amo*.w`.footnote:exclusive_pipelining[A pipeline bubble is inserted between `lr.w`/`sc.w` and an immediately-following `lr.w`/`sc.w`/`amo*`, because the AHB5 bus standard does not permit pipelined exclusive accesses. A stall would be inserted between `lr.w` and `sc.w` anyhow, so the local monitor can be updated based on the `lr.w` data phase in time to suppress the `sc.w` address phase.]
 | `sc.w rd, rs2, (rs1)` | 1 or 2 | 2 if next instruction is dependentfootnote:data_dependency[], an `lr.w`, `sc.w` or `amo*.w`.footnote:exclusive_pipelining[]
 3+| Atomic Memory Operations
-|`amoswap.w rd, rs2, (rs1)` | 4+ | 4 per attempt. Multiple attempts if reservation is lost.footnote:amo_timing[AMOs are issued as a paired exclusive read and exclusive write on the bus, at the maximum speed of 2 cycles per access, since the bus does not permit pipelining of exclusive reads/writes. If the write phase fails due to the global monitor reporting a lost reservation, the instruction loops at a rate of 4 cycles per loop, until success. If the read reservation is refused by the global monitor, the instruction generates a Store/AMO Fault exception, to avoid an infinite loop.]
+|`amoswap.w rd, rs2, (rs1)` | 4+ | 4 per attempt. Multiple attempts if reservation is lost.footnote:amo_timing[AMOs are issued as a paired exclusive read and exclusive write on the bus, at the maximum speed of 2 cycles per access, since the AHB5 specification forbids pipelining of exclusive reads/writes from the same PE. If the write phase fails due to the global monitor reporting a lost reservation, the instruction loops at a rate of 4 cycles per loop, until success. If the read reservation is refused by the global monitor, the instruction generates a Store/AMO Fault exception, to avoid an infinite loop.]
 |`amoadd.w rd, rs2, (rs1)`  | 4+ | 4 per attempt. Multiple attempts if reservation is lost.footnote:amo_timing[]
 |`amoxor.w rd, rs2, (rs1)`  | 4+ | 4 per attempt. Multiple attempts if reservation is lost.footnote:amo_timing[]
 |`amoand.w rd, rs2, (rs1)`  | 4+ | 4 per attempt. Multiple attempts if reservation is lost.footnote:amo_timing[]
@@ -92,12 +102,14 @@ Timings assume the core is configured with `MULDIV_UNROLL = 2` and `MUL_FAST = 1
 |`amomaxu.w rd, rs2, (rs1)` | 4+ | 4 per attempt. Multiple attempts if reservation is lost.footnote:amo_timing[]
 |===
 
+[[section-timings-c]]
 === Compressed Instructions (C or Zca)
 
 All C extension 16-bit instructions are aliases of base RV32I instructions. On Hazard3, they perform identically to their 32-bit counterparts.
 
-A consequence of the C extension is that 32-bit instructions can be non-naturally-aligned. This has no penalty during sequential execution, but branching to a 32-bit instruction that is not 32-bit-aligned carries a 1 cycle penalty, because the instruction fetch is cracked into two naturally-aligned bus accesses.
+A consequence of the C extension is that 32-bit instructions can be non-naturally-aligned. This has no penalty during sequential execution, but branching to a 32-bit instruction that is not 32-bit-aligned carries a 1-cycle penalty, because the instruction fetch is cracked into two naturally-aligned bus accesses.
 
+[[section-timings-priv]]
 === Privileged Instructions (including Zicsr)
 
 [%autowidth.stretch, options="header"]
@@ -115,6 +127,7 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 | `ebreak` | 3 | Time given is for jumping to `mtvec`
 |===
 
+[[section-timings-zibi]]
 === Branch with Immediate (Zibi)
 
 [%autowidth.stretch, options="header"]
@@ -124,16 +137,20 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 | `bnei rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
 |===
 
+[[section-timings-zilsd]]
 === Load/Store Pair (Zilsd)
 
 [%autowidth.stretch, options="header"]
 |===
 | Instruction | Cycles | Note
 3+| Load/Store Pair
-| `ld rd, imm(rs1)` | 2 | Issues as two `lw`
-| `sd rs2, imm(rs1)` | 2 | Issues as two `sw`
+| `ld rd, imm(rs1)` | 2 | Issues as two `lw`.
+| `sd rs2, imm(rs1)` | 2 | Issues as two `sw`.
 |===
 
+To avoid stalls, you should conservatively schedule `ld` as though it always has a 1-cycle load-use delayfootnote:data_dependency[]. Whether this delay actually occurs depends on which register in the pair is loaded last. If the base register `rs1` is an odd-numbered register, the odd register in the `rd` pair is loaded last. Conversely if `rs1` is an even-numbered register, the even register in the `rd` pair is loaded last. This parity rule ensures a trap on the second load in the pair can determine the load address even when `rd` aliases `rs1`. The load-use delay occurs only when the next instruction depends on the last-loaded register. See also <<section-64-bit-bus-access>>.
+
+[[section-timings-b]]
 === Bit Manipulation (Zba, Zbb, Zbc, Zbs)
 
 [%autowidth.stretch, options="header"]
@@ -184,6 +201,7 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 |`unzip rd, rs1`       | 1 |
 |===
 
+[[section-timings-zcb]]
 === Additional Basic Compressed Instructions (Zcb)
 
 Similarly to the C extension, this extension contains 16-bit variants of common 32-bit instructions:
@@ -194,6 +212,7 @@ Similarly to the C extension, this extension contains 16-bit variants of common 
 
 They perform identically to their 32-bit counterparts.
 
+[[section-timings-zclsd]]
 === Compressed Load/Store Pair (Zclsd)
 
 These 16-bit instructions behave identically to their 32-bit counterparts, namely:
@@ -203,6 +222,7 @@ These 16-bit instructions behave identically to their 32-bit counterparts, namel
 * `c.sd` expands to Zilsd `sd`
 * `c.sdsp` expands to Zilsd `sd`
 
+[[section-timings-zcmp]]
 === Push, Pop and Double Move (Zcmp)
 
 [%autowidth.stretch, options="header"]
@@ -218,6 +238,7 @@ These 16-bit instructions behave identically to their 32-bit counterparts, namel
 
 // __ magic comment to reset sublime text asciidoc lexer
 
+[[section-timings-custom]]
 === Hazard3 Custom Extensions
 
 [%autowidth.stretch, options="header"]
@@ -227,8 +248,10 @@ These 16-bit instructions behave identically to their 32-bit counterparts, namel
 |`h3.bextm rd, rs1, rs2, immw`  | 1 |
 |`h3.bextmi rd, rs1, imm, immw` | 1 |
 3+| Xh3sfx (soft float acceleration)
-|`h3.funpackrq3.s rd, rs1`      | 1 |
-|`h3.funpackrq3.h rd, rs1`      | 1 |
+|`h3.funpackq3.s rd, rs1`       | 1 |
+|`h3.funpackq3.h rd, rs1`       | 1 |
+|`h3.funpacku3.s rd, rs1`       | 1 |
+|`h3.funpacku3.h rd, rs1`       | 1 |
 |`h3.fpackrq3.s rd, rs1, rs2`   | 1 |
 |`h3.fpackrq3.h rd, rs1, rs2`   | 1 |
 |`h3.fcheck2e.s rd, rs1, rs2`   | 1 |

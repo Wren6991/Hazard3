@@ -41,7 +41,7 @@ Hazard3 has two top-level modules:
 
 These are both thin wrappers around the https://github.com/Wren6991/Hazard3/blob/stable/hdl/hazard3_core.v[hazard3_core] module. `hazard3_cpu_1port` has a single AHB5 bus port which is shared for instruction fetch, loads, stores and AMOs. `hazard3_cpu_2port` has two AHB5 bus ports, one for instruction fetch, and the other for loads, stores and AMOs. The 2-port wrapper has higher potential for performance, but the 1-port wrapper may be simpler to integrate, since there is no need to arbitrate multiple bus managers externally.
 
-The core module `hazard3_core` can also be instantiated directly, which may be more efficient if support for some other bus standard is desired. However, the interface of `hazard3_core` will not be documented and is not guaranteed to be stable. By instantiating this module directly you are taking on the risk that future Hazard3 releases may be incompatible with your integration.
+The core module `hazard3_core` can also be instantiated directly, which may be more efficient if support for some other bus standard is desired. However, the interface of `hazard3_core` will not be documented and is not guaranteed to be stable. By instantiating this module directly you are taking on the risk that future Hazard3 releases may be incompatible with your integration. The core bus interface is closely aligned with AHB but is less complex to arbitrate inside the 1-port wrapper thanks to more granular stall signals.
 
 === FPGA Synthesis
 
@@ -348,7 +348,7 @@ Default value: `0`
 
 Support for the M extension: hardware multiply/divide/modulo. `0` for disable, `1` for enable.
 
-The exact circuit used to implement these instructions, and the resulting area and performance, depends on the following parameters: <<param-MULDIV_UNROLL>>, <<param-MUL_FAST>>, <<param-MUL_FASTER>>, and <<param-MULH_FAST>>.
+The exact circuit used to implement these instructions, and the resulting area and performance, depends on the following parameters: <<param-MULDIV_UNROLL>>, <<param-MUL_FAST>>, <<param-MUL_FASTER>>, and <<param-MULH_FAST>>. See also the instruction timing listings in <<section-timings-m>>.
 
 Default value: `1`
 
@@ -747,22 +747,28 @@ Default value: `0`
 
 Configure bits-per-clock for the sequential multiply/divide circuit, if present. Must be a power of 2.
 
+The sequential multiply/divide circuit has a base cost of 1 + 32 / `MULDIV_UNROLL` cycles, plus up to two sign correction cycles for `div`/`rem` and up to three sign correction cycles for `mulh`/`mulhsu`.
+
+The value of `MULDIV_UNROLL` does not affect interrupt entry latency, because the core kills in-progress sequential multiply/divide operations when it needs to enter an interrupt handler or take an exception.
+
 Default value: `1`
 
 [[param-MUL_FAST]]
 ===== MUL_FAST
 
-Use a single-cycle multiply circuit for `MUL` instructions, retiring to stage 3 by default (one throughput cycle, two latency cycles).
+Use a single-cycle multiply circuit for `mul` instructions. By default the fast muliplier produces a result in stage 3 (see <<param-MUL_FASTER>>), and the sequential multiply/divide circuit is still used for `mulh`, `mulhu` and `mulhsu` (see <<param-MULH_FAST>>).
 
-The sequential multiply/divide circuit is still used for `mulh`, `mulhu` and `mulhsu`.
+Requires: <<param-EXTENSION_M>> = `1`.
 
 Default value: `0`
 
 [[param-MUL_FASTER]]
 ===== MUL_FASTER
 
-Retire fast multiply results to stage 2 instead of stage 3.
-The throughput is the same, but latency is reduced from 2 cycles to 1 cycle.
+Produce fast multiply results in stage 2 instead of stage 3.
+The throughput is the same at 1/cycle, but latency is reduced from 2 cycles to 1 cycle.
+
+This generally improves per-cycle performance, but reduces the portion of the clock period available for multiplier delay, which may affect overall timing.
 
 Requires: <<param-MUL_FAST>> = `1`.
 
@@ -771,7 +777,7 @@ Default value: `0`
 [[param-MULH_FAST]]
 ===== MULH_FAST
 
-Extend the fast multiply circuit to also cover `mulh`, `mulhu` and `mulhsu`. Removethe multiply functionality from the sequential multiply/divide circuit.
+Extend the fast multiply circuit to also cover `mulh`, `mulhu` and `mulhsu`. When this configuration is enabled, these instructions execute with the same timings as `mul`. This increases both the area and delay of the fast multiplier. The unnecessary multiply functionality is removed from the sequential multiply/divide circuit.
 
 Requires: <<param-MUL_FAST>> = `1`.
 
