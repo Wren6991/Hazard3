@@ -763,7 +763,7 @@ Default value: `1`
 [[param-MUL_FAST]]
 ===== MUL_FAST
 
-Use a single-cycle multiply circuit for `mul` instructions. By default the fast muliplier produces a result in stage 3 (see <<param-MUL_FASTER>>), and the sequential multiply/divide circuit is still used for `mulh`, `mulhu` and `mulhsu` (see <<param-MULH_FAST>>).
+Use a single-cycle multiply circuit for `mul` instructions. By default the fast multiplier produces a result in stage 3 (see <<param-MUL_FASTER>>), and the sequential multiply/divide circuit is still used for `mulh`, `mulhu` and `mulhsu` (see <<param-MULH_FAST>>).
 
 Requires: <<param-EXTENSION_M>> = `1`.
 

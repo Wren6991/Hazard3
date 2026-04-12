@@ -1,9 +1,15 @@
 TOP=hazard3
 DEPS=$(shell find -name "*.adoc" | grep -v rev.adoc) diagrams/* *.yml
 
-.PHONY: all clean view spell rev
+.PHONY: all clean view spell rev pdf html txt
 
-all: spell $(TOP).pdf $(TOP).html
+all: spell $(TOP).pdf $(TOP).html $(TOP).txt
+
+pdf: $(TOP).pdf
+
+html: $(TOP).html
+
+txt: $(TOP).txt
 
 # `xdg-open` for Ubuntu and friends; `open` for MacOS
 view: all

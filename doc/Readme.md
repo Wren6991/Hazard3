@@ -6,6 +6,7 @@ Building
 ```bash
 # Get tools
 sudo apt install ruby-asciidoctor-pdf codespell
+gem install asciidoctor-reducer
 # Build
 make
 ```
@@ -15,5 +16,6 @@ make
 
 ```bash
 brew install asciidoctor codespell
+gem install asciidoctor-reducer
 make
 ```
