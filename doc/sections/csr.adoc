@@ -652,7 +652,7 @@ External interrupt enable array. Contains a read-write bit for each external int
 
 If enabled, an external interrupt can cause assertion of the standard RISC-V machine external interrupt pending flag (`mip.meip`), and therefore cause the processor to enter the external interrupt vector. See <<reg-h3.meipa>>.
 
-There are up to 512 external interrupts. The upper half of this register contains a 16-bit window into the full 512-bit vector. The window is indexed by the 5 LSBs of the write data. For example:
+There are up to 512 external interrupts. When <<param-NUM_IRQS>> is less than 512, controls for IRQ numbers greater than or equal to <<param-NUM_IRQS>> are hardwired to zero. The upper half of this register contains a 16-bit window into the full 512-bit vector. The window is indexed by the 5 LSBs of the write data. For example:
 
 ----
 csrrs a0, meiea, a0 // Read IRQ enables from the window selected by a0
@@ -665,7 +665,7 @@ The purpose of this scheme is to allow software to _index_ an array of interrupt
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name   | Description
-| 31:16 | `window` | 16-bit read/write window into the external interrupt enable array
+| 31:16 | `window` | 16-bit read/write window into the external interrupt enable array.
 | 15:5  | -        | RES0
 | 4:0   | `index`  | Write-only self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
@@ -677,20 +677,24 @@ Address: `0xbe1`
 
 External interrupt pending array. Contains a read-only bit for each external interrupt request. Similarly to `h3.meiea`, this register is a window into an array of up to 512 external interrupt flags. The status appears in the upper 16 bits of the value read from `h3.meipa`, and the lower 5 bits of the value _written_ by the same CSR instruction (or 0 if no write takes place) select a 16-bit window of the full interrupt pending array.
 
-A `1` bit indicates that interrupt is currently asserted. IRQs are assumed to be level-sensitive, and the relevant `h3.meipa` bit is cleared by servicing the requester so that it deasserts its interrupt request.
+A `1` bit indicates that interrupt is currently asserted. The value is the OR of each external IRQ signal with the corresponding force bit from <<reg-h3.meifa>>. IRQs are assumed to be level-sensitive, and in normal use the relevant `h3.meipa` bit is cleared by servicing the requester so that it deasserts its interrupt request. The interrupt force applied by `h3.meifa` clears automatically when the corresponding IRQ index is read from <<reg-h3.meinext>>, so the `h3.meipa` bit _also_ clears automatically if it was forced high by `h3.meifa`.
 
-When any interrupt of sufficient priority is both set in `h3.meipa` and enabled in `h3.meiea`, the standard RISC-V external interrupt pending bit `mip.meip` is asserted. In other words, `h3.meipa` is filtered by `h3.meiea` to generate the standard `mip.meip` flag. So, an external interrupt is taken when _all_ of the following are true:
+When any interrupt of sufficient priority is both set in `h3.meipa` and enabled in `h3.meiea`, the standard RISC-V external interrupt pending bit `mip.meip` is asserted. In other words, `h3.meipa` is filtered by `h3.meiea` to generate the standard `mip.meip` flag.
 
-* An interrupt is currently asserted in `h3.meipa`
-* The matching interrupt enable bit is set in `h3.meiea`
-* The interrupt priority is greater than or equal to the preemption priority in `h3.meicontext`
-* The standard M-mode interrupt enable `mstatus.mie` is set
-* The standard M-mode global external interrupt enable `mie.meie` is set
+An external interrupt is taken when _all_ of the following are true:
+
+* An interrupt is currently asserted in <<reg-h3.meipa>> (either due to the external interrupt signal being asserted high, or due to the corresponding bit in <<reg-h3.meifa>> being set).
+* The matching interrupt enable bit is set in <<reg-h3.meiea>>.
+* The interrupt priority is greater than or equal to the preemption priority, <<reg-h3.meicontext>>.`preempt`.
+* The standard M-mode interrupt enable <<reg-mstatus>>.`mie` is set.
+* The standard M-mode global external interrupt enable <<reg-mie>>.`meie` is set
 
 In this case, the processor jumps to either:
 
 * `mtvec` directly, if vectoring is disabled (`mtvec[0]` is 0)
 * `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1)
+
+The value `0x2c` here comes from the standard RISC-V vectoring logic for <<reg-mtvec>> with an IRQ cause of `meip`.
 
 [cols="10h,20h,~", options="header"]
 |===
@@ -709,14 +713,16 @@ External interrupt force array. Contains a read-write bit for every interrupt re
 
 There are no restrictions on using `h3.meifa` inside of an interrupt. The more useful case here is to schedule some lower-priority handler from within a high-priority interrupt, so that it will execute before the core returns to the foreground code. Implementers may wish to reserve some external IRQs with their external inputs tied to 0 for this purpose.
 
-Bits can be cleared by software, and are cleared automatically by hardware upon a read of `h3.meinext` which returns the corresponding IRQ number in `h3.meinext.irq` (no matter whether `h3.meinext.update` is written).
+Bits can be cleared by software, and are cleared automatically by hardware upon a read of `h3.meinext` which returns the corresponding IRQ number in `h3.meinext.irq` (no matter whether `h3.meinext.update` is written). Each bit read from `h3.meipa` is the logical OR of the external interrupt signal and the corresponding `h3.meifa` bit.
+
+The array resets to all-zeroes, meaning no interrupts are forced at reset.
 
 `h3.meifa` implements the same array window indexing scheme as `h3.meiea` and `h3.meipa`. 
 
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name   | Description
-| 31:16 | `window` | 16-bit read/write window into the external interrupt force array
+| 31:16 | `window` | 16-bit read/write window into the external interrupt force array.
 | 15:5  | -        | RES0
 | 4:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
 |===
@@ -726,7 +732,9 @@ Bits can be cleared by software, and are cleared automatically by hardware upon 
 
 Address: `0xbe3`
 
-External interrupt priority array. Each interrupt has an (up to) 4-bit priority value associated with it, and each access to this register reads and/or writes a 16-bit window containing four such priority values. When less than 16 priority levels are available, the LSBs of the priority fields are hardwired to 0.
+External interrupt priority array. Each interrupt has an (up to) 4-bit priority value associated with it, and each access to this register reads and/or writes a 16-bit window containing four such priority values. When less than 16 priority levels are available, the LSBs of the priority fields are hardwired to 0. So for example, when <<param-IRQ_PRIORITY_BITS>> = `1`, the possible priority values are `0` and `8`.
+
+Numerically higher values have higher priority. For example, an interrupt with priority `8` is taken before an interrupt with priority `0`. The interrupt priority array resets to all-zeroes, meaning all interrupts have the lowest priority by default.
 
 When an interrupt's priority is lower than the current preemption priority `h3.meicontext.preempt`, it is treated as not being pending. The pending bit in `h3.meipa` will still assert, but the machine external interrupt pending bit `mip.meip` will not, so the processor will ignore this interrupt. See <<reg-h3.meicontext>>.
 
@@ -735,7 +743,7 @@ When an interrupt's priority is lower than the current preemption priority `h3.m
 | Bits  | Name   | Description
 | 31:16 | `window` | 16-bit read/write window into the external interrupt priority array, containing four 4-bit priority values.
 | 15:7  | -        | RES0
-| 6:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. 
+| 6:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. This is wider than the `index` fields on e.g. <<reg-h3.meiea>> because this register stores four times as many bits.
 |===
 
 [[reg-h3.meinext]]
@@ -743,9 +751,23 @@ When an interrupt's priority is lower than the current preemption priority `h3.m
 
 Address: `0xbe4`
 
-Get next interrupt. Contains the index of the highest-priority external interrupt which is both asserted in `h3.meipa` and enabled in `h3.meiea`, left-shifted by 2 so that it can be used to index an array of 32-bit function pointers. If there is no such interrupt, the MSB is set.
+Get next interrupt. Contains the index of the highest-priority external interrupt which meets all three of the following conditions:
 
-When multiple interrupts of the same priority are both pending and enabled, the lowest-numbered wins. Interrupts with priority less than `h3.meicontext.ppreempt` -- the _previous_ preemption priority -- are treated as though they are not pending. This is to ensure that a preempting interrupt frame does not service interrupts which may be in progress in the frame that was preempted.
+* Is pending in `h3.meipa`.
+* Is enabled in `h3.meiea`.
+* Has priority greater than or equal to <<reg-h3.meicontext>>.`ppreempt`, the previous pre-emption level.
+
+The returned interrupt index is left-shifted by 2 so that it can be used to index an array of 32-bit function pointers. If there is no such interrupt, the MSB is set, which can be checked efficiently using a `bltz` instruction.
+
+When multiple interrupts of the same priority are both pending and enabled, the lowest-numbered wins. Interrupts with priority less than `h3.meicontext.ppreempt` -- the _previous_ preemption priority -- are treated as though they are not pending. This ensures that a preempting interrupt frame does not service interrupts which may be in progress in the frame that was preempted. More explicitly, an interrupt priority can fall into one of three possible ranges:
+
+* Interrupt priorities _p_ in the range 0 ≤ _p_ < `ppreempt` are ineligible for processing at the current interrupt nesting level, and will not be processed until after the current interrupt stack frame is popped.
+* Interrupt priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt` are eligible for processing at the current interrupt nesting level. They appear in `h3.meinext` and do not cause the core to take an interrupt.
+* Interrupt priorities _p_ in the range `preempt` ≤ _p_ ≤ 15 (max priority) are eligible for processing at a higher interrupt nesting level, and will cause the core to take an interrupt if interrupts are enabled. They also appear in `h3.meinext`.
+
+One subtle detail is that, since the `h3.meinext.update` bit sets the <<reg-h3.meicontext>>.`preempt` level to the interrupt priority plus one, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via <<reg-mstatus>>.`mie` will _never_ cause the core to take the same interrupt that was just read from `h3.meinext`.
+
+A useful implication of this is that if the core takes some low-priority interrupt, and a higher-priority interrupt arrives while the interrupt dispatch routine is still saving registers to the stack, it is the _higher_-priority interrupt that will be processed first, and both interrupts are processed at the same level of nesting. This is sometimes referred to as _late arrival_.
 
 [cols="10h,20h,~", options="header"]
 |===
@@ -768,26 +790,28 @@ A three-level stack of preemption priorities is maintained in the `preempt`, `pp
 
 The top entry of the priority stack, `preempt`, is used by hardware to ensure that only higher-priority interrupts can preempt the current interrupt. The next entry, `ppreempt`, is used to avoid servicing interrupts which may already be in progress in a frame that was preempted. The third entry, `pppreempt`, has no hardware effect, but ensures that `preempt` and `ppreempt` can be correctly saved/restored across arbitrary levels of preemption.
 
+`ppreempt` and `preempt` together define the range of interrupt priorities eligible for processing at the current level of interrupt nesting. Specifically this range is priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt`. See <<reg-h3.meinext>> for more discussion on the relationship between preemption levels and interrupt nesting levels.
+
 [cols="10h,20h,~", options="header"]
 |===
 | Bits  | Name        | Description
-| 31:28 | `pppreempt` | Previous `ppreempt`. Set to `ppreempt` on priority save, set to zero on priority restore.  Has no hardware effect, but ensures that when `h3.meicontext` is saved/restored correctly, `preempt` and `ppreempt` stack correctly through arbitrarily many preemption frames.
-| 27:24 | `ppreempt`  | Previous `preempt`. Set to `preempt` on priority save, restored to to `pppreempt` on priority restore.
+| 31:28 | `pppreempt` | Previous `ppreempt`. Set to `ppreempt` on priority save, set to zero on priority restore.  Has no hardware effect, but ensures that when `h3.meicontext` is saved/restored correctly, `preempt` and `ppreempt` stack correctly through arbitrarily many preemption frames. Resets to `0`.
+| 27:24 | `ppreempt`  | Previous `preempt`. Set to `preempt` on priority save, restored to to `pppreempt` on priority restore. Resets to `0`.
 
 IRQs of lower priority than `ppreempt` are not visible in `h3.meinext`, so that a preemptee is not re-taken in the preempting frame.
 | 23:21 | -           | RES0
-| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when when `h3.meinext.update` is written, or when hardware enters the external interrupt vector.
+| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when when `h3.meinext.update` is written, or when hardware enters the external interrupt vector. Resets to `0`.
 
 If an interrupt is present in `h3.meinext`, then `preempt` is set to one level greater than that interrupt's priority. Otherwise, `preempt` is set to one level greater than the maximum interrupt priority, disabling preemption.
 | 15    | `noirq`     | Not in interrupt (read/write). Set to 1 at reset. Set to `h3.meinext.noirq` when `h3.meinext.update` is written. No hardware effect.
 | 14:13  | -           | RES0
-| 12:4   | `irq`       | Current IRQ number (read/write). Set to `h3.meinext.irq` when `h3.meinext.update` is written.
+| 12:4   | `irq`       | Current IRQ number (read/write). Set to `h3.meinext.irq` when `h3.meinext.update` is written. Resets to `0`.
 | 3      | `mtiesave`  | Reads as the current value of `mie.mtie`, if `clearts` is set. Otherwise reads as 0. Writes are ORed into `mie.mtie`.
 | 2      | `msiesave`  | Reads as the current value of `mie.msie`, if `clearts` is set. Otherwise reads as 0. Writes are ORed into `mie.msie`.
 | 1      | `clearts`   | Write-1 self-clearing field. Writing 1 will clear `mie.mtie` and `mie.msie`, and present their prior values in the `mtiesave` and `msiesave` of this register. This makes it safe to re-enable IRQs (via `mstatus.mie`) without the possibility of being preempted by the standard timer and soft interrupt handlers, which may not be aware of Hazard3's interrupt hardware.
 
 The clear due to `clearts` takes precedence over the set due to `mtiesave`/`msiesave`, although it would be unusual for software to write both on the same cycle.
-| 0      | `mreteirq` | Enable restore of the preemption priority stack on `mret`. This bit is set on entering the external interrupt vector, cleared by `mret`, and cleared upon taking any trap other than an external interrupt.
+| 0      | `mreteirq` | Enable restore of the preemption priority stack on `mret`. This bit is set on entering the external interrupt vector, cleared by `mret`, and cleared upon taking any trap other than an external interrupt. Resets to `0`.
 
 Provided `h3.meicontext` is saved on entry to the external interrupt vector (before enabling preemption), is restored before exiting, and the standard software/timer IRQs are prevented from preempting (e.g. by using `clearts`), this flag allows the hardware to safely manage the preemption priority stack even when an external interrupt handler may take exceptions.
 |===
