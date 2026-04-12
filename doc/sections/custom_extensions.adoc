@@ -26,7 +26,7 @@ This document describes Xh3irq version: 1.0
 
 This extension is enabled by: <<param-EXTENSION_XH3IRQ>>
 
-This lightweight extension controls up to 512 external interrupts, with up to 16 levels of preemption. It adds no new instructions, but several CSRs:
+This lightweight extension controls up to 512 external interrupts, with configurable per-interrupt priority and up to 16 levels of preemption. It adds no new instructions, but several CSRs:
 
 * <<reg-h3.meiea>>
 * <<reg-h3.meipa>>
@@ -37,7 +37,7 @@ This lightweight extension controls up to 512 external interrupts, with up to 16
 
 If this extension is disabled then Hazard3 supports a single external interrupt input (or multiple inputs that it simply ORs together in an uncontrolled fashion), so an external PLIC can be used for standard interrupt support.
 
-Note that, besides the additional CSRs, this extension is effectively a slightly more complicated way of driving the standard `mip.meip` flag (<<reg-mip>>). The RISC-V trap handling CSRs themselves are always completely standard.
+This extension is effectively a slightly more complicated way of driving the standard `mip.meip` flag (<<reg-mip>>). The RISC-V trap handling CSRs themselves are always completely standard.
 
 [[extension-xh3pmpm-section]]
 === Xh3pmpm: M-mode PMP regions
@@ -255,7 +255,7 @@ Unpacked significands are represented with the Q3.29 format (or simply `q3`), wh
 * 3 integer bits (including sign), stored in bits `31` to `29`.
 * 29 fractional bits, stored in bits `28` to `0`.
 
-This fixed-point format represents real numbers in the interval -4 ≤ _x_ < 4, which is sufficient for addition of IEEE 754 significands normalised to the interval -2 < _x_ < 2. It also has sufficient fractional bits that a 32 × 32 -> 64-bit multiply (`mul; mulh`) leaves the guard and round bits, plus space for the sticky bit, in the upper half of the result.
+This fixed-point format represents real numbers in the interval -4 ≤ _x_ < 4, which is sufficient for addition of IEEE 754 significands normalised to the interval 1 ≤ |_x_| < 2. It also has sufficient fractional bits that a 32 × 32 -> 64-bit multiply (`mul; mulh`) leaves the guard and round bits, plus space for the sticky bit, in the upper half of the result.
 
 In some cases, such as converting unsigned integers to floating point numbers, it can be useful to interpret integer registers as U3.29 format (or simply `u3`). This is the same as Q3.29, except it is unsigned. It represents real numbers in the interval 0 ≤ _x_ < 8.
 
