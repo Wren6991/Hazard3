@@ -36,6 +36,7 @@ If a core A executes a `fence` and core B also executes a `fence` at a later tim
 
 The core is guaranteed not to issue any load or store accesses while `fence_d_vld` is asserted. For a two-ported implementation this is a good opportunity for system hardware to manipulate any logic such as cache controllers attached to the core's load/store port. No such guarantee is made for instruction fetch, so in a single-ported implementation you cannot assume based on `fence_d_vld` that the AHB5 port is idle.
 
+[[section-memory-ordering-fetch]]
 === Memory Ordering for Instruction Fetch
 
 Hazard3 does not order stores before instruction fetch except with an explicit `fence.i` instruction. This instruction waits for in-progress stores to complete, asserts `fence_i_vld`, waits for `fence_rdy`, and then flushes the prefetch buffer to ensure the next instruction data to be executed is fetched after the instruction fence was observed by the system. It is up to the system designer to ensure that the instruction fetch AHB5 port observes earlier writes from the load/store AHB5 port; this may require flushing of external caches.

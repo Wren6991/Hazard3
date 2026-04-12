@@ -247,16 +247,16 @@ The following exception causes may be set by Hazard3 hardware:
 [cols="10h,~", options="header"]
 |===
 | Cause | Description
-| 0 | Instruction address misaligned
-| 1 | Instruction access fault
-| 2 | Illegal instruction
-| 3 | Breakpoint
-| 4 | Load address misaligned
-| 5 | Load access fault
-| 6 | Store/AMO address misaligned
-| 7 | Store/AMO access fault
-| 8 | Environment call from U-mode
-| 11 | Environment call from M-mode
+| 0 | Instruction address misaligned: fires when bit `1` of a branch target is set and <<param-EXTENSION_C>> is `0`. Note that bit `0` of a branch target is always implicitly masked in RISC-V, so this exception never fires when <<param-EXTENSION_C>> = `1`.
+| 1 | Instruction access fault: fires when instruction fetch encounters an AHB error response. Instruction fetch faults are speculative, and a fault encountered in the prefetch of an instruction that is not subsequently executed is harmlessly flushed. Also fires on an attempt to execute an instruction which overlaps a PMP region that lacks execute permissions in the current privilege mode.
+| 2 | Illegal instruction: fires when executing an instruction bit pattern that is not supported on this Hazard3 implementation, or when accessing a CSR that is unimplemented or inaccessible in the current privilege mode. Also fires when executing a `wfi` or `h3.block` in U-mode when <<reg-mstatus>>.`tw` = `1`.
+| 3 | Breakpoint: fires when executing an `ebreak` instruction, or as a result of a trigger (see <<section-trigger-module>>) that target M-mode (i.e. <<reg-tdata1>>.`action` = `0`).
+| 4 | Load address misaligned: fires when load address modulo load size is not equal to zero. Zilsd loads are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
+| 5 | Load access fault: fires when a load instruction encounters an AHB error response. Also fires when loading from an address that lacks PMP read permissions in the current privilege mode.
+| 6 | Store/AMO address misaligned: fires when store address modulo store size is not equal to zero. Zilsd stores are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
+| 7 | Store/AMO access fault: fires when a store or AMO encounters an AHB error response. Also fires when storing to an address that lacks PMP write permissions in the current privilege mode, or an AMO attempts to access an address that lacks PMP read _or_ write permissions in the current privilege mode. Finally, an AMO will raise this exception if it issues an exclusive read that returns a negative `HEXOKAY` response (see <<section-exclusive-bus-transfers>>).
+| 8 | Environment call from U-mode: fires when executing an `ecall` instruction if the current privilege mode is U-mode.
+| 11 | Environment call from M-mode: fires when executing an `ecall` instruction if the current privilege mode is M-mode.
 |===
 
 [[reg-mtval]]
