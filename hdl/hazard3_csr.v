@@ -522,6 +522,8 @@ localparam [0:0]   EXTENSION_ZCA   = |EXTENSION_C;
 localparam [0:0]   EXTENSION_ZKT   = !(|EXTENSION_M && !(|MUL_FAST && |MULH_FAST));
 // Zmmul is (instructions-wise) a subset of M:
 localparam [0:0]   EXTENSION_ZMMUL = |EXTENSION_M;
+// We never take advantage of weak memory ordering:
+localparam [0:0]   EXTENSION_ZTSO  = 1'b1;
 
 localparam [31:0]  h3misa_standard_len = 32'd78;
 
@@ -540,6 +542,7 @@ localparam [127:0] h3misa_standard_extensions =
 	({127'd0, |EXTENSION_ZBKX    } << 32) |
 	({127'd0, |EXTENSION_ZBS     } << 33) |
 	({127'd0, |EXTENSION_ZKT     } << 46) |
+	({127'd0, |EXTENSION_ZTSO    } << 47) |
 	({127'd0, |EXTENSION_C       } << 66) |
 	({127'd0, |EXTENSION_ZCB     } << 67) |
 	({127'd0, |EXTENSION_ZILSD   } << 72) |
