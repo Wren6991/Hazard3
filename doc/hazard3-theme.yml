@@ -8,4 +8,8 @@ title-page:
     top: 25%
 
 codespan:
-  font-color: "#00509E"
+  font-color: '#000000'
+
+table:
+  head:
+    background-color: '#F8F8F8'

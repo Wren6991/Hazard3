@@ -21,13 +21,13 @@ For more information on the Verilog 2005 language, refer to standard IEEE 1364-2
 
 Files ending with `.vh` are preprocessor include files used by the Hazard3 source. The following two are particularly noteworthy:
 
-* https://github.com/Wren6991/Hazard3/blob/stable/hdl/hazard3_config.vh[hazard3_config.vh]: the main Hazard3 configuration header. Lists and describes Hazard3's global configuration parameters, such as ISA extension support
-* https://github.com/Wren6991/Hazard3/blob/stable/hdl/hazard3_config_inst.vh[hazard3_config_inst.vh]: a file which propagates configuration parameters through module instantiations, all the way down from Hazard3's top-level modules through the internals
+* https://github.com/Wren6991/Hazard3/blob/stable/hdl/hazard3_config.vh[hazard3_config.vh]: the main Hazard3 configuration header. Lists and describes Hazard3's global configuration parameters, such as ISA extension support.
+* https://github.com/Wren6991/Hazard3/blob/stable/hdl/hazard3_config_inst.vh[hazard3_config_inst.vh]: a file which propagates configuration parameters through module instantiations, all the way down from Hazard3's top-level modules through the internals.
 
 There are two ways to configure Hazard3 using these two files:
 
-* Directly edit the parameter defaults in `hazard3_config.vh` in your local Hazard3 checkout (and then let the top-level parameters default when instantiating Hazard3)
-* Set all configuration parameters in your Hazard3 instantiation, and let the parameters propagate down through the hierarchy
+* Directly edit the parameter defaults in `hazard3_config.vh` in your local Hazard3 checkout (and then let the top-level parameters default when instantiating Hazard3).
+* Set all configuration parameters in your Hazard3 instantiation, and let the parameters propagate down through the hierarchy.
 
 The latter method is recommended for mature projects because it supports multiple distinct configurations of Hazard3 in the same system (for instance, a high-performance applications core and a low-area control-plane core). You may find the former method more convenient for quick hacking on the configuration.
 
@@ -745,7 +745,7 @@ More specifically this eliminates the forwarding paths from stage 3 to stage 2 (
 * Dependency on a fast multiplier result when <<param-MUL_FASTER>> = `0`: same as a load result.
 * Dependency on a fast multiplier result when <<param-MUL_FASTER>> = `1`: same as an ALU or sequential multiply/divide result.
 
-The consequence for store data is a latency of two cycles (increased from one) no matter the source of the operand.
+Any result used for a store data operand (`rs2`) has a latency of three cycles (increased from one), no matter its source.
 
 Default value: `0`
 
@@ -756,7 +756,7 @@ Configure bits-per-clock for the sequential multiply/divide circuit, if present.
 
 The sequential multiply/divide circuit has a base cost of 1 + 32 / `MULDIV_UNROLL` cycles, plus up to two sign correction cycles for `div`/`rem` and up to three sign correction cycles for `mulh`/`mulhsu`.
 
-The value of `MULDIV_UNROLL` does not affect interrupt entry latency, because the core kills in-progress sequential multiply/divide operations when it needs to enter an interrupt handler or take an exception.
+The value of `MULDIV_UNROLL` does not affect interrupt entry latency, because the core abandons in-progress sequential multiply/divide operations when it needs to enter an interrupt handler or take an exception.
 
 Default value: `1`
 

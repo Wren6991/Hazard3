@@ -126,7 +126,7 @@ This is a small extension with multi-bit versions of the "bit extract" instructi
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name          | Value      | Description
 | 31:29 | `funct7[6:4]` | `0b000`    | RES0
@@ -177,7 +177,7 @@ Immediate variant of `h3.bextm`.
 
 Encoding (I-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name          | Value      | Description
 | 31:29 | `imm[11:9]`   | `0b000`    | RES0
@@ -278,7 +278,7 @@ NOTE: The expectation is that zero exponents are checked with `h3.fcheck2e.s` an
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b1000000`  | `h3.funpackq3.s`
@@ -322,7 +322,7 @@ NOTE: The expectation is that zero exponents are checked with `h3.fcheck2e.h` an
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000000`  | `h3.funpackq3.h`
@@ -362,7 +362,7 @@ The result is a function only of the significand bits of `rs1`. It does not depe
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b1000001`  | `h3.funpacku3.s`
@@ -402,7 +402,7 @@ The result is a function only of the significand bits of `rs1`. It does not depe
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000000`  | `h3.funpacku3.h`
@@ -434,7 +434,7 @@ Operand bits `31:8` are not checked.
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b1000010`  | `h3.fcheck2e.s`
@@ -466,7 +466,7 @@ Operand bits `31:5` are not checked.
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000010`  | `h3.fcheck2e.h`
@@ -514,7 +514,7 @@ NOTE: The normalisation requirement on `rs1` and the exponent underflow rule hav
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b1000011`  | `h3.fpackrq3.s`
@@ -568,7 +568,7 @@ NOTE: The normalisation requirement on `rs1` and the exponent underflow rule hav
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000011`  | `h3.fpackrq3.h`
@@ -606,7 +606,7 @@ This value can be passed into `h3.ssrasticky` in `rs2` to re-normalise a Q3.29 v
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000100`  | `h3.feadjq3`
@@ -644,7 +644,7 @@ This value can be passed into `h3.ssrlsticky` in `rs2` to re-normalise a U3.29 v
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000101`  | `h3.feadju3`
@@ -676,7 +676,7 @@ This conditional negation is useful for making integer right-shifts truncate tow
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0000110`  | `h3.xorsign`
@@ -711,7 +711,7 @@ Shift signed-left, arithmetic. `rs2` is a signed integer wrapped to the range -5
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0101100`  | `h3.ssla`
@@ -746,7 +746,7 @@ Shift signed-left, logical. `rs2` is a signed integer wrapped to the range -512 
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0001100`  | `h3.ssll`
@@ -781,7 +781,7 @@ Shift signed-right, arithmetic. `rs2` is a signed integer wrapped to the range -
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0101000`  | `h3.ssra`
@@ -816,7 +816,7 @@ Shift signed-right, logical. `rs2` is a signed integer wrapped to the range -512
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0001000`  | `h3.ssrl`
@@ -854,7 +854,7 @@ Shifts outside of the range ±31 are handled as follows:
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0101010`  | `h3.ssrasticky`
@@ -890,7 +890,7 @@ Shifts outside of the range ±31 are handled as follows:
 
 Encoding (R-type):
 
-[cols="10h,20h,20h,~", options="header"]
+[cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
 | 31:25 | `funct7` | `0b0001010`  | `h3.ssrlsticky`

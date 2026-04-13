@@ -16,7 +16,7 @@ Address: `0xf11`
 
 Vendor identifier. Read-only, configurable constant. Should contain either all-zeroes, or a valid JEDEC JEP106 vendor ID using the encoding in the RISC-V specification. The <<param-MVENDORID_VAL>> parameter sets the value.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:7 | `bank` | The number of continuation codes in the vendor JEP106 ID. _One less than the JEP106 bank number._
@@ -30,7 +30,7 @@ Address: `0xf12`
 
 Architecture identifier for Hazard3. Read-only, constant.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31 | - | 0: Open-source implementation
@@ -44,7 +44,7 @@ Address: `0xf13`
 
 Implementation identifier. Most of this register is hardwired to indicate the release version of the Hazard3 RTL.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits   | Name       | Description
 | 31     | `prerelease` | Value of 1 indicates this Hazard3 instance was synthesised from RTL not yet released to the `stable` branch.
@@ -71,7 +71,7 @@ Hart identification register. Read-only.
 
 The value of this register is configured by the `mhartid_val` input port (see <<identification-signals>>). In a correctly configured system, the value of `mhartid` is unique on each hart, and one hart has an ID of all-zeroes. There is no strict requirement to assign hart IDs consecutively, but there may be performance or memory usage advantages to doing so on certain operating systems.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:0 | - | Hazard3 cores possess only one hardware thread, so this is a unique per-core identifier.
@@ -84,7 +84,7 @@ Address: `0xf15`
 
 Pointer to configuration data structure. Read-only, configurable constant.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:0 | - | Either pointer to configuration data structure, containing information about the harts and system, or all-zeroes. At least 4-byte-aligned.
@@ -97,18 +97,18 @@ Address: `0x301`
 
 Read-only, constant. Value depends on which ISA extensions Hazard3 is configured with. The table below lists the fields which are _not_ always hardwired to 0:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:30 | `mxl` | Always `0x1`. Indicates this is a 32-bit processor.
 | 23 | `x` | Always 1 to indicate presence of <<extension-xh3misa-section>>, and possibly other custom extensions.
 | 20 | `u` | 1 if User mode is supported, otherwise 0.
-| 12 | `m` | 1 if the M extension is present (<<param-EXTENSION_M>> is `1`)
-| 8 | `i` | 1 if the base ISA is RV32I (<<param-EXTENSION_E>> is `0`)
-| 4 | `e` | 1 if the base ISA is RV32E (<<param-EXTENSION_E>> is `1`)
-| 2 | `c` | 1 if the C extension is present (<<param-EXTENSION_C>> is `1`)
-| 1 | `b` | 1 if Zba, Zbb and Zbs are all present (<<param-EXTENSION_ZBA>>, <<param-EXTENSION_ZBB>> and <<param-EXTENSION_ZBS>> are `1`)
-| 0 | `a` | 1 if the A extension is present (<<param-EXTENSION_A>> is `1`)
+| 12 | `m` | 1 if the M extension is present (<<param-EXTENSION_M>> is `1`).
+| 8 | `i` | 1 if the base ISA is RV32I (<<param-EXTENSION_E>> is `0`).
+| 4 | `e` | 1 if the base ISA is RV32E (<<param-EXTENSION_E>> is `1`).
+| 2 | `c` | 1 if the C extension is present (<<param-EXTENSION_C>> is `1`).
+| 1 | `b` | 1 if Zba, Zbb and Zbs are all present (<<param-EXTENSION_ZBA>>, <<param-EXTENSION_ZBB>> and <<param-EXTENSION_ZBS>> are `1`).
+| 0 | `a` | 1 if the A extension is present (<<param-EXTENSION_A>> is `1`).
 |===
 
 === Standard M-mode Trap Handling CSRs
@@ -120,7 +120,7 @@ Address: `0x300`
 
 The below table lists the fields which are _not_ hardwired to 0:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 21    | `tw`  | Timeout wait. Only present if U-mode is supported. When 1, attempting to execute a WFI instruction in U-mode will instantly cause an illegal instruction exception.
@@ -160,7 +160,7 @@ Interrupt enable register. This is not to be confused with `mstatus.mie`, which 
 
 The table below lists the fields which are _not_ hardwired to 0:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
 | 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-h3.meiea>>.
@@ -181,7 +181,7 @@ NOTE: The RISC-V specification lists `mip` as a read-write register, but the bit
 
 The table below lists the fields which are _not_ hardwired to 0:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
 | 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-h3.meipa>>) and enabled in <<reg-h3.meiea>>.
@@ -196,7 +196,7 @@ Address: `0x305`
 
 Trap vector base address. Read-write. Exactly which bits of `mtvec` can be modified (possibly none) is configurable when instantiating the processor, but by default the entire register is writable. The reset value of `mtvec` is also configurable.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
 | 31:2 | `base` | Base address for trap entry. In Vectored mode, this is _OR'd_ with the trap offset to calculate the trap entry address, so the table must be aligned to its total size, rounded up to a power of 2. In Direct mode, `base` is word-aligned.
@@ -250,7 +250,7 @@ The following exception causes may be set by Hazard3 hardware:
 | 0 | Instruction address misaligned: fires when bit `1` of a branch target is set and <<param-EXTENSION_C>> is `0`. Note that bit `0` of a branch target is always implicitly masked in RISC-V, so this exception never fires when <<param-EXTENSION_C>> = `1`.
 | 1 | Instruction access fault: fires when instruction fetch encounters an AHB error response. Instruction fetch faults are speculative, and a fault encountered in the prefetch of an instruction that is not subsequently executed is harmlessly flushed. Also fires on an attempt to execute an instruction which overlaps a PMP region that lacks execute permissions in the current privilege mode.
 | 2 | Illegal instruction: fires when executing an instruction bit pattern that is not supported on this Hazard3 implementation, or when accessing a CSR that is unimplemented or inaccessible in the current privilege mode. Also fires when executing a `wfi` or `h3.block` in U-mode when <<reg-mstatus>>.`tw` = `1`.
-| 3 | Breakpoint: fires when executing an `ebreak` instruction, or as a result of a trigger (see <<section-trigger-module>>) that target M-mode (i.e. <<reg-tdata1>>.`action` = `0`).
+| 3 | Breakpoint: fires when executing an `ebreak` instruction, or as a result of a trigger (see <<section-trigger-module>>) that targets M-mode (i.e. <<reg-tdata1>>.`action` = `0`).
 | 4 | Load address misaligned: fires when load address modulo load size is not equal to zero. Zilsd loads are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
 | 5 | Load access fault: fires when a load instruction encounters an AHB error response. Also fires when loading from an address that lacks PMP read permissions in the current privilege mode.
 | 6 | Store/AMO address misaligned: fires when store address modulo store size is not equal to zero. Zilsd stores are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
@@ -283,7 +283,7 @@ Counter enable. Control access to counters from U-mode. Not to be confused with 
 
 This register only exists if <<param-U_MODE>> = `1`.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
 | 31:3 | -    | RES0
@@ -305,7 +305,7 @@ By default, M-mode has full permissions (RWX) on all of memory, and U-mode has n
 
 Each `pmpcfg` register divides into four identical 8-bit chunks, each corresponding to one region, and laid out as below:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
 | 7   | `L` | Lock region, and additionally enforce its permissions on M-mode as well as U-mode.
@@ -391,7 +391,7 @@ Address: `0x320`
 
 Counter inhibit. Read-write. The table below lists the fields which are _not_ hardwired to 0:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 2 | `ir` | When 1, inhibit counting of `minstret`/`minstreth`. Resets to 1.
@@ -424,7 +424,7 @@ Address: `0x7a1`
 
 Configure the trigger selected by <<reg-tselect>>.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:28 | `type` a| On Hazard3 this field is hardwired for a given value of <<reg-tselect>>:
@@ -447,7 +447,7 @@ The layout of bits `26:0` of this register depends on the value of `type`.
 
 `mcontrol` is the alias for `tdata1` when `type` is `2` (address/data match trigger). Hazard3 implements only exact instruction address match (breakpoints).
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 26:21 | `maskmax` | Hardwired to zero; only exact matches are supported
@@ -472,7 +472,7 @@ An `action` of `0` is ignored when `tcontrol.mte` is `0`. An `action` of `1` is 
 
 `icount` is the alias for `tdata1` when `type` is `3` (instruction count trigger).
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 24 | `hit` | Hardwired to zero; this feature is not implemented
@@ -489,7 +489,7 @@ See <<section-icount-trigger>> for more information about this trigger's behavio
 
 `itrigger` is the alias for `tdata1` when `type` is `4` (interrupt trigger).
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 24 | `hit` | Hardwired to zero; this feature is not implemented
@@ -505,7 +505,7 @@ See <<section-interrupt-trigger>> for more information about this trigger's beha
 
 `etrigger` is the alias for `tdata1` when `type` is `5` (exception trigger).
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 24 | `hit` | Hardwired to zero; this feature is not implemented
@@ -574,7 +574,7 @@ Address: `0x7b0`
 
 Debug control and status register. Access outside of Debug Mode will cause an illegal instruction exception. Relevant fields are implemented as follows:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:28 | `xdebugver` | Hardwired to 4: external debug support as per RISC-V 0.13.2 debug specification.
@@ -662,7 +662,7 @@ csrr a0, meiea      // Read from window 0 (edge case)
 
 The purpose of this scheme is to allow software to _index_ an array of interrupt enables (something not usually possible in the CSR space) without introducing a stateful CSR index register which may have to be saved/restored around IRQs.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name   | Description
 | 31:16 | `window` | 16-bit read/write window into the external interrupt enable array.
@@ -696,7 +696,7 @@ In this case, the processor jumps to either:
 
 The value `0x2c` here comes from the standard RISC-V vectoring logic for <<reg-mtvec>> with an IRQ cause of `meip`.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name   | Description
 | 31:16 | `window` | 16-bit read-only window into the external interrupt pending array
@@ -719,7 +719,7 @@ The array resets to all-zeroes, meaning no interrupts are forced at reset.
 
 `h3.meifa` implements the same array window indexing scheme as `h3.meiea` and `h3.meipa`. 
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name   | Description
 | 31:16 | `window` | 16-bit read/write window into the external interrupt force array.
@@ -738,7 +738,7 @@ Numerically higher values have higher priority. For example, an interrupt with p
 
 When an interrupt's priority is lower than the current preemption priority `h3.meicontext.preempt`, it is treated as not being pending. The pending bit in `h3.meipa` will still assert, but the machine external interrupt pending bit `mip.meip` will not, so the processor will ignore this interrupt. See <<reg-h3.meicontext>>.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name   | Description
 | 31:16 | `window` | 16-bit read/write window into the external interrupt priority array, containing four 4-bit priority values.
@@ -769,7 +769,7 @@ One subtle detail is that, since the `h3.meinext.update` bit sets the <<reg-h3.m
 
 A useful implication of this is that if the core takes some low-priority interrupt, and a higher-priority interrupt arrives while the interrupt dispatch routine is still saving registers to the stack, it is the _higher_-priority interrupt that will be processed first, and both interrupts are processed at the same level of nesting. This is sometimes referred to as _late arrival_.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name     | Description
 | 31    | `noirq`  | Set when there is no external interrupt which is enabled, pending, and has sufficient priority. Can be efficiently tested with a `bltz` or `bgez` instruction.
@@ -792,7 +792,7 @@ The top entry of the priority stack, `preempt`, is used by hardware to ensure th
 
 `ppreempt` and `preempt` together define the range of interrupt priorities eligible for processing at the current level of interrupt nesting. Specifically this range is priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt`. See <<reg-h3.meinext>> for more discussion on the relationship between preemption levels and interrupt nesting levels.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name        | Description
 | 31:28 | `pppreempt` | Previous `ppreempt`. Set to `ppreempt` on priority save, set to zero on priority restore.  Has no hardware effect, but ensures that when `h3.meicontext` is saved/restored correctly, `preempt` and `ppreempt` stack correctly through arbitrarily many preemption frames. Resets to `0`.
@@ -851,8 +851,8 @@ dispatch_irq:
 
 get_next_irq:
 	// Sample the current highest-priority active IRQ (left-shifted by 2) from
-	// h3.meinext, and write 1 to the LSB to tell hardware to tell hw to update
-	// h3.meicontext with the preemption priority (and IRQ number) of this IRQ
+	// h3.meinext, and write 1 to the LSB to tell hw to update h3.meicontext
+	// with the preemption priority (and IRQ number) of this IRQ
 	csrrsi a0, h3.meinext, 0x1
 	// MSB will be set if there is no active IRQ at the current priority level
 	bgez a0, dispatch_irq
@@ -888,7 +888,7 @@ Note that this does not grant any new capabilities to M-mode, since in the base 
 
 Note also that this is not the same as the "rule locking bypass" bit in the ePMP extension, which does not permit locked and unlocked M-mode regions to coexist.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits  | Name     | Description
 | 31:16 | -        | RES0
@@ -904,7 +904,7 @@ Address: `0xbf0`
 
 M-mode sleep control register. Resets to all-zeroes.
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
 | 31:3 | - | RES0
@@ -1007,7 +1007,7 @@ Indices `0x500` onward contain versions of custom Hazard3 extensions:
 
 The custom extension entries have the same `major.minor` bitfields as <<reg-mimpid>>:
 
-[cols="10h,20h,~", options="header"]
+[cols="10h,20,~", options="header"]
 |===
 | Bits   | Name       | Description
 | 31:28  | -          | RES0
