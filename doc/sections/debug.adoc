@@ -41,7 +41,7 @@ It is possible to instantiate multiple DMs, one per core, and attach them to a s
 [[section-trigger-module]]
 === Trigger Module
 
-Hazard3's Trigger Module generates synchronous traps to either Debug Mode or M-mode when certain pre-programmed conditions are met. It support four types of trigger: instruction address (breakpoint), interrupt, exception, and instruction count. The number of instruction address match triggers is configurable, and the remaining trigger types have one instance each.
+Hazard3's Trigger Module generates synchronous traps to either Debug Mode or M-mode when certain pre-programmed conditions are met. It supports four types of trigger: instruction address (breakpoint), interrupt, exception, and instruction count. The number of instruction address match triggers is configurable, and the remaining trigger types have one instance each.
 
 Use the following CSRs to configure individual triggers:
 
@@ -101,7 +101,7 @@ IMPORTANT: As a deliberate departure from the 0.13.2 specification, the trigger 
 
 To single-step a U-mode context from M-mode, set `icount.u` before returning to U-mode via `mret.` The U-mode context will trap back out after executing one instruction.
 
-To single-step an M-mode target, clear `tcontrol.mte`, then set `tcontrol.mpte` and `icount.m` before returning to an M-mode context via `mret`. The trigger is enabled after the return completes (via `mpte` shifting to `mte`), and the core traps back to the M-mode handler after executing one instruction in the M-mode returnee. The handler executes normally, because `mte` is cleared by the trap, and `icount.m` is cleared by the trigger match.
+To single-step an M-mode target, clear `<<reg-tcontrol>>.mte`, then set `tcontrol.mpte` and `icount.m` before returning to an M-mode context via `mret`. The trigger is enabled after the return completes (via `mpte` shifting to `mte`), and the core traps back to the M-mode handler after executing one instruction in the M-mode returnee. The handler executes normally, because `mte` is cleared by the trap, and `icount.m` is cleared by the trigger match.
 
 To support the above behaviour, hardware does not clear `icount.m` or `icount.u` while `tcontrol.mte` is clear. See discussion https://github.com/riscv/riscv-debug-spec/pull/829#issuecomment-1492260861[here].
 

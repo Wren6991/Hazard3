@@ -457,7 +457,7 @@ The layout of bits `26:0` of this register depends on the value of `type`.
 | 17:16 | `sizelo` | Hardwired to zero; all instruction sizes are matched
 | 15:12 | `action` | Supports the values `0` (break to M-mode `ebreak` exception handler) and `1` (break to Debug Mode). Bits 15:13 are hardwired to zero.
 
-An `action` of `0` is ignored when `tcontrol.mte` is `0`. An `action` of `1` is ignored when `tdata1.dmode` is `0`.
+An `action` of `0` is ignored when <<reg-tcontrol>>.`mte` is `0`. An `action` of `1` is ignored when `tdata1.dmode` is `0`.
 | 11 | `chain` | Hardwired to zero; chaining is not supported
 | 10:7 | `match` | Hardwired to zero; match is always on the exact address
 | 6 | `m` | Write 1 to enable matching during M-mode execution
@@ -477,7 +477,7 @@ An `action` of `0` is ignored when `tcontrol.mte` is `0`. An `action` of `1` is 
 | Bits | Name | Description
 | 24 | `hit` | Hardwired to zero; this feature is not implemented
 | 23:10 | `count` | Hardwired to `1`; only single-stepping is supported
-| 9 | `m` | Write 1 to enable matching during M-mode execution, if `tcontrol.mte` is also set. Self-clears when this trigger fires (in any privilege mode).
+| 9 | `m` | Write 1 to enable matching during M-mode execution, if <<reg-tcontrol>>.`mte` is also set. Self-clears when this trigger fires (in any privilege mode).
 | 6 | `u` | Write 1 to enable matching during U-mode execution. Hardwired to zero if <<param-U_MODE>> = `0`. Self-clears when this trigger fires (in any privilege mode).
 | 5:0 | `action` | Hardwired to `0`; this trigger only supports breaking to M-mode with an exception cause of `3` (`ebreak`). The corresponding Debug Mode functionality is already provided by `dcsr.step`.
 |===
@@ -493,7 +493,7 @@ See <<section-icount-trigger>> for more information about this trigger's behavio
 |===
 | Bits | Name | Description
 | 24 | `hit` | Hardwired to zero; this feature is not implemented
-| 9 | `m` | Write 1 to enable matching during M-mode execution, if `tcontrol.mte` is also set.
+| 9 | `m` | Write 1 to enable matching during M-mode execution, if <<reg-tcontrol>>.`mte` is also set.
 | 6 | `u` | Write 1 to enable matching during U-mode execution. Hardwired to zero if <<param-U_MODE>> = `0`.
 | 5:0 | `action` | Hardwired to `1`; this trigger only supports breaking to Debug Mode (as an M-mode breakpoint exception triggered immediately after M-mode interrupt entry would be unrecoverable).
 |===
@@ -559,6 +559,24 @@ Lists the capabilities of the trigger currently selected by <<reg-tselect>>. Thi
 Hazard3 triggers support only a single `type` each. Therefore `tinfo` always has exactly one bit set, and the `tdata1.type` field is read-only.
 
 If bit `0` is set, and no other bit is set, there is no trigger corresponding to the current value of `tselect`. There are also no triggers at higher values of `tselect`; trigger enumeration terminates at this point.
+
+[[reg-tcontrol]]
+==== tcontrol
+
+Address: `0x7a5`
+
+Implements a two-level enable stack for triggers (<<section-trigger-module>>) which both trap into and originate from M-mode. Trapping into an M-mode trap handler disables M-mode triggers; the original enable state is restored on return from the handler. One example of where this is necessary is an M-mode trap handler single-stepping M-mode foreground code using the `icount` trigger: the trigger must remain disabled until after the core returns from the handler.
+
+Since there are only two stack levels implemented in hardware, nested traps clear both bits. When using native M-mode triggers in combination with nested traps (for example, nested interrupts) you must save and restore `tcontrol` at each level of nesting.
+
+[cols="10h,20,~", options="header"]
+|===
+| Bits | Name | Description
+| 7 | `mpte` | M-mode previous trigger enable. When a trap into M-mode is taken, `mpte` is set to the value of `mte`.
+| 3 | `mte` | M-mode trigger enable field. Setting `mte` = `0` inhibits triggers with <<reg-tdata1>>.`action` = `0` when the core is in M-mode.
+
+When a trap into M-mode is taken, `mte` is set to `0`. When `mret` is executed, `mte` is restored from `mpte`.
+|===
 
 [[debug-csr-section]]
 === Standard Debug Mode CSRs
