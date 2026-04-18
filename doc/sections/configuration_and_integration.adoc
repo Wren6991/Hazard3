@@ -100,7 +100,7 @@ When <<param-RESET_REGFILE>> is one, this input also resets the register file. Y
 
 ==== Power Control Signals
 
-These signals are used in the implementation of internal sleep states as configured by the <<reg-h3.msleep>> csr. They are used only when the Xh3power extension is enabled.
+These signals are used in the implementation of internal sleep states as configured by the `<<reg-h3.msleep>>` csr. They are used only when the Xh3power extension is enabled.
 
 [options="header",cols="1,1,3,4"]
 |===
@@ -201,12 +201,12 @@ If Xh3irq is configured, this is a vector of level-sensitive active-high system 
 [options="header",cols="1,1,3,4"]
 |===
 | Width | In/Out | Name | Description
-| 32         | In  | `mhartid_val`                | Set the value of the <<reg-mhartid>> CSR, which software uses to determine on which hart it is running. Hazard3 implements one hart per core, so this is effectively a per-core identification value.
+| 32         | In  | `mhartid_val`                | Set the value of the `<<reg-mhartid>>` CSR, which software uses to determine on which hart it is running. Hazard3 implements one hart per core, so this is effectively a per-core identification value.
 
 At least one hart must have the value of all-zeroes.
 
-Generally you should tie this off to a unique constant value per core. Dynamic <<reg-mhartid>> is useful in scenarios such as dual-core lockstep: cores must execute identically when lockstep is engaged so their `mhartid_val` should be driven to the same value.
-| 4          | In  | `eco_version`                | Set the value of the `eco` version number in <<reg-mimpid>>.
+Generally you should tie this off to a unique constant value per core. Dynamic `<<reg-mhartid>>` is useful in scenarios such as dual-core lockstep: cores must execute identically when lockstep is engaged so their `mhartid_val` should be driven to the same value.
+| 4          | In  | `eco_version`                | Set the value of the `eco` version number in `<<reg-mimpid>>`.
 
 On ASIC this should be connected to metal-programmable tie cells so that it can be incremented with metal changes. The initial value should be all-zeroes. On FPGA this should be tied to all-zeroes.
 
@@ -309,7 +309,7 @@ Default value: all-zeroes.
 [[param-MTVEC_INIT]]
 ===== MTVEC_INIT
 
-Initial value of the machine trap vector base CSR (<<reg-mtvec>>).
+Initial value of the machine trap vector base CSR (`<<reg-mtvec>>`).
 
 Bits clear in <<param-MTVEC_WMASK>> will never change from this initial value.
 Bits set in <<param-MTVEC_WMASK>> can be written/set/cleared as normal.
@@ -489,7 +489,7 @@ Default value: `0`
 [[param-EXTENSION_XH3POWER]]
 ===== EXTENSION_XH3POWER
 
-Custom power management controls for Hazard3. This adds the <<reg-h3.msleep>> CSR, and the `h3.block` and `h3.unblock` hint instructions. See <<extension-xh3power-section>>
+Custom power management controls for Hazard3. This adds the `<<reg-h3.msleep>>` CSR, and the `h3.block` and `h3.unblock` hint instructions. See <<extension-xh3power-section>>
 
 Default value: `0`
 
@@ -512,7 +512,7 @@ NOTE: the Zicsr extension is implied by any of <<param-CSR_M_MANDATORY>>, <<para
 [[param-CSR_M_MANDATORY]]
 ===== CSR_M_MANDATORY
 
-Bare minimum CSR support e.g. <<reg-misa>>. This flag is an absolute
+Bare minimum CSR support e.g. `<<reg-misa>>`. This flag is an absolute
 requirement for compliance with the RISC-V privileged specification. However,
 the privileged specification itself is an optional extension. Hazard3 allows
 the mandatory CSRs to be disabled to save a small amount of area in
@@ -678,7 +678,7 @@ Default value: `1`
 
 IRQ_PRIORITY_BITS: Number of priority bits implemented for each interrupt in
 the internal interrupt controller described in <<extension-xh3irq-section>>.
-The <<reg-h3.meipra>> array CSR configures the individual priorities.
+The `<<reg-h3.meipra>>` array CSR configures the individual priorities.
 
 The number of distinct levels is `(1 << IRQ_PRIORITY_BITS)`. The minimum value
 is `0` (1 level), and the maximum value is `4` (16 levels).  Note that
@@ -703,7 +703,7 @@ Default value: all-zeroes (not bypassed).
 [[param-MVENDORID_VAL]]
 ===== MVENDORID_VAL
 
-Value of the <<reg-mvendorid>> CSR. Should be either a JEDEC JEP-106-compliant vendor ID, or
+Value of the `<<reg-mvendorid>>` CSR. Should be either a JEDEC JEP-106-compliant vendor ID, or
 all-zeroes.
 
 Bits `31:7` store the continuation code count, and bits `6:0` are the ID. The
@@ -723,7 +723,7 @@ Default value: all-zeroes.
 [[param-MCONFIGPTR_VAL]]
 ===== MCONFIGPTR_VAL
 
-Value of the <<reg-mconfigptr>> CSR. Pointer to configuration structure blob,
+Value of the `<<reg-mconfigptr>>` CSR. Pointer to configuration structure blob,
 or all-zeroes. Must be at least 4-byte-aligned.
 
 Requires: <<param-CSR_M_MANDATORY>> = `1`.

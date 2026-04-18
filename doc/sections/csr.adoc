@@ -163,12 +163,12 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see <<reg-h3.meiea>>.
+| 11 | `meie` | External interrupt enable. Hazard3 has internal custom CSRs to further filter external interrupts, see `<<reg-h3.meiea>>`.
 | 7 | `mtie` | Timer interrupt enable. A timer interrupt is requested when `mie.mtie`, `mip.mtip` and `mstatus.mie` are all 1.
 | 3 | `msie` | Software interrupt enable. A software interrupt is requested when  `mie.msie`, `mip.msip` and `mstatus.mie` are all 1.
 |===
 
-NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at <<reg-h3.meiea>>, and keeps the upper half of `mie` reserved.
+NOTE: RISC-V reserves bits 16+ of `mie`/`mip` for platform use, which Hazard3 could use for external interrupt control. On RV32I this could only control 16 external interrupts, so Hazard3 instead adds nonstandard interrupt enable registers starting at `<<reg-h3.meiea>>`, and keeps the upper half of `mie` reserved.
 
 [[reg-mip]]
 ==== mip
@@ -184,7 +184,7 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in <<reg-h3.meipa>>) and enabled in <<reg-h3.meiea>>.
+| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in `<<reg-h3.meipa>>`) and enabled in `<<reg-h3.meiea>>`.
 | 7 | `mtip` | Timer interrupt pending. Level-sensitive interrupt signal from outside the core. Connected to a standard, external RISC-V 64-bit timer.
 | 3 | `msip` | Software interrupt pending. In spite of the name, this is not triggered by an instruction on this core, rather it is wired to an external memory-mapped register to provide a cross-hart level-sensitive doorbell interrupt.
 |===
@@ -249,8 +249,8 @@ The following exception causes may be set by Hazard3 hardware:
 | Cause | Description
 | 0 | Instruction address misaligned: fires when bit `1` of a branch target is set and <<param-EXTENSION_C>> is `0`. Note that bit `0` of a branch target is always implicitly masked in RISC-V, so this exception never fires when <<param-EXTENSION_C>> = `1`.
 | 1 | Instruction access fault: fires when instruction fetch encounters an AHB error response. Instruction fetch faults are speculative, and a fault encountered in the prefetch of an instruction that is not subsequently executed is harmlessly flushed. Also fires on an attempt to execute an instruction which overlaps a PMP region that lacks execute permissions in the current privilege mode.
-| 2 | Illegal instruction: fires when executing an instruction bit pattern that is not supported on this Hazard3 implementation, or when accessing a CSR that is unimplemented or inaccessible in the current privilege mode. Also fires when executing a `wfi` or `h3.block` in U-mode when <<reg-mstatus>>.`tw` = `1`.
-| 3 | Breakpoint: fires when executing an `ebreak` instruction, or as a result of a trigger (see <<section-trigger-module>>) that targets M-mode (i.e. <<reg-tdata1>>.`action` = `0`).
+| 2 | Illegal instruction: fires when executing an instruction bit pattern that is not supported on this Hazard3 implementation, or when accessing a CSR that is unimplemented or inaccessible in the current privilege mode. Also fires when executing a `wfi` or `h3.block` in U-mode when `<<reg-mstatus>>.tw` = `1`.
+| 3 | Breakpoint: fires when executing an `ebreak` instruction, or as a result of a trigger (see <<section-trigger-module>>) that targets M-mode (i.e. `<<reg-tdata1>>.action` = `0`).
 | 4 | Load address misaligned: fires when load address modulo load size is not equal to zero. Zilsd loads are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
 | 5 | Load access fault: fires when a load instruction encounters an AHB error response. Also fires when loading from an address that lacks PMP read permissions in the current privilege mode.
 | 6 | Store/AMO address misaligned: fires when store address modulo store size is not equal to zero. Zilsd stores are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
@@ -264,7 +264,7 @@ The following exception causes may be set by Hazard3 hardware:
 
 Address: `0x343`
 
-Hardwired to 0. Hazard3 does not write trap information to the `mtval` register on any trap cause. Fault handlers and debuggers must reconstruct trap information by decoding the instruction at <<reg-mepc>> with reference to the trap cause in <<reg-mcause>>.
+Hardwired to 0. Hazard3 does not write trap information to the `mtval` register on any trap cause. Fault handlers and debuggers must reconstruct trap information by decoding the instruction at `<<reg-mepc>>` with reference to the trap cause in `<<reg-mcause>>`.
 
 [NOTE]
 ====
@@ -279,7 +279,7 @@ The other main use for `mtval` is recording the instruction bit pattern of illeg
 
 Address: `0x306`
 
-Counter enable. Control access to counters from U-mode. Not to be confused with <<reg-mcountinhibit>>.
+Counter enable. Control access to counters from U-mode. Not to be confused with `<<reg-mcountinhibit>>`.
 
 This register only exists if <<param-U_MODE>> = `1`.
 
@@ -337,11 +337,11 @@ The interpretation of the `pmpaddr` bits depends on the `A` mode configured in t
 
 Address: `0xb00`
 
-Lower half of the 64-bit cycle counter. Readable and writable by software. Increments every cycle, unless `mcountinhibit.cy` is 1, or the processor is in Debug Mode (as <<reg-dcsr>>.`stopcount` is hardwired to 1).
+Lower half of the 64-bit cycle counter. Readable and writable by software. Increments every cycle, unless `mcountinhibit.cy` is 1, or the processor is in Debug Mode (as `<<reg-dcsr>>.stopcount` is hardwired to 1).
 
 If written with a value `n` and read on the very next cycle, the value read will be exactly `n`. The RISC-V spec says this about `mcycle`: "Any CSR write takes effect after the writing instruction has otherwise completed."
 
-NOTE: To save energy in the default state, the <<reg-mcountinhibit>> `cy` bit resets to `1`. This bit must be cleared before `mcycle` starts to count.
+NOTE: To save energy in the default state, the `<<reg-mcountinhibit>>` `cy` bit resets to `1`. This bit must be cleared before `mcycle` starts to count.
 
 [[reg-mcycleh]]
 ==== mcycleh
@@ -357,11 +357,11 @@ This includes when `mcycle` is written on that same cycle, since RISC-V specifie
 
 Address: `0xb02`
 
-Lower half of the 64-bit instruction retire counter. Readable and writable by software. Increments with every instruction executed, unless `mcountinhibit.ir` is 1, or the processor is in Debug Mode (as <<reg-dcsr>>.`stopcount` is hardwired to 1).
+Lower half of the 64-bit instruction retire counter. Readable and writable by software. Increments with every instruction executed, unless `mcountinhibit.ir` is 1, or the processor is in Debug Mode (as `<<reg-dcsr>>.stopcount` is hardwired to 1).
 
 If some value `n` is written to `minstret`, and it is read back by the very next instruction, the value read will be exactly `n`. This is because the CSR write logically takes place after the instruction has otherwise completed.
 
-NOTE: To save energy in the default state, the <<reg-mcountinhibit>> `ir` bit resets to `1`. This bit must be cleared before `minstret` starts to count.
+NOTE: To save energy in the default state, the `<<reg-mcountinhibit>>` `ir` bit resets to `1`. This bit must be cleared before `minstret` starts to count.
 
 
 [[reg-minstreth]]
@@ -413,7 +413,7 @@ Trigger CSRs control Hazard3's trigger module, described in <<section-trigger-mo
 
 Address: `0x7a0`
 
-Select a trigger for configuration. The selected trigger is described in <<reg-tinfo>> and can be configured through <<reg-tdata1>> and <<reg-tdata2>>. See <<section-trigger-module>> for an overview of Hazard3's trigger capabilities.
+Select a trigger for configuration. The selected trigger is described in `<<reg-tinfo>>` and can be configured through `<<reg-tdata1>>` and `<<reg-tdata2>>`. See <<section-trigger-module>> for an overview of Hazard3's trigger capabilities.
 
 This register implements exactly enough bits to index the configured number of triggers. Remaining bits are hardwired to zero.
 
@@ -422,12 +422,12 @@ This register implements exactly enough bits to index the configured number of t
 
 Address: `0x7a1`
 
-Configure the trigger selected by <<reg-tselect>>.
+Configure the trigger selected by `<<reg-tselect>>`.
 
 [cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
-| 31:28 | `type` a| On Hazard3 this field is hardwired for a given value of <<reg-tselect>>:
+| 31:28 | `type` a| On Hazard3 this field is hardwired for a given value of `<<reg-tselect>>`:
 
 * `0`: no trigger
 * `2`: address/data match
@@ -521,7 +521,7 @@ See <<section-exception-trigger>> for more information about this trigger's beha
 
 Address: `0x7a2`
 
-The interpretation of this CSR depends on the `type` field of <<reg-tdata1>>:
+The interpretation of this CSR depends on the `type` field of `<<reg-tdata1>>`:
 
 [horizontal]
 `type` = `2`:: Address/data trigger: `tdata2` contains the address/data to be matched. On Hazard3 this is always an instruction address, and `tdata2` only implemenents enough bits to store any valid program counter (multiple of IALIGN).
@@ -544,7 +544,7 @@ Hardwired to zero.
 
 Address: `0x7a4`
 
-Lists the capabilities of the trigger currently selected by <<reg-tselect>>. This takes the form of a bitmap of values supported by `tdata1.type`. For example, bit `2` being set (a value of `0x4`) indicates the trigger supports `type` = `2`, "address/data match".
+Lists the capabilities of the trigger currently selected by `<<reg-tselect>>`. This takes the form of a bitmap of values supported by `tdata1.type`. For example, bit `2` being set (a value of `0x4`) indicates the trigger supports `type` = `2`, "address/data match".
 
 [cols="10h,~", options="header"]
 |===
@@ -635,7 +635,7 @@ Address: `0x7b2`
 
 Not implemented. Access will cause an illegal instruction exception.
 
-To provide data exchange between the Debug Module and the core, the Debug Module's `data0` register is mapped into the core's CSR space at a read/write M-custom address -- see <<reg-dmdata0>>.
+To provide data exchange between the Debug Module and the core, the Debug Module's `data0` register is mapped into the core's CSR space at a read/write M-custom address -- see `<<reg-dmdata0>>`.
 
 [[reg-dscratch1]]
 ==== dscratch1
@@ -668,7 +668,7 @@ Address: `0xbe0`
 
 External interrupt enable array. Contains a read-write bit for each external interrupt request: a `1` bit indicates that interrupt is currently enabled. At reset, all external interrupts are disabled.
 
-If enabled, an external interrupt can cause assertion of the standard RISC-V machine external interrupt pending flag (`mip.meip`), and therefore cause the processor to enter the external interrupt vector. See <<reg-h3.meipa>>.
+If enabled, an external interrupt can cause assertion of the standard RISC-V machine external interrupt pending flag (`mip.meip`), and therefore cause the processor to enter the external interrupt vector. See `<<reg-h3.meipa>>`.
 
 There are up to 512 external interrupts. When <<param-NUM_IRQS>> is less than 512, controls for IRQ numbers greater than or equal to <<param-NUM_IRQS>> are hardwired to zero. The upper half of this register contains a 16-bit window into the full 512-bit vector. The window is indexed by the 5 LSBs of the write data. For example:
 
@@ -695,24 +695,24 @@ Address: `0xbe1`
 
 External interrupt pending array. Contains a read-only bit for each external interrupt request. Similarly to `h3.meiea`, this register is a window into an array of up to 512 external interrupt flags. The status appears in the upper 16 bits of the value read from `h3.meipa`, and the lower 5 bits of the value _written_ by the same CSR instruction (or 0 if no write takes place) select a 16-bit window of the full interrupt pending array.
 
-A `1` bit indicates that interrupt is currently asserted. The value is the OR of each external IRQ signal with the corresponding force bit from <<reg-h3.meifa>>. IRQs are assumed to be level-sensitive, and in normal use the relevant `h3.meipa` bit is cleared by servicing the requester so that it deasserts its interrupt request. The interrupt force applied by `h3.meifa` clears automatically when the corresponding IRQ index is read from <<reg-h3.meinext>>, so the `h3.meipa` bit _also_ clears automatically if it was forced high by `h3.meifa`.
+A `1` bit indicates that interrupt is currently asserted. The value is the OR of each external IRQ signal with the corresponding force bit from `<<reg-h3.meifa>>`. IRQs are assumed to be level-sensitive, and in normal use the relevant `h3.meipa` bit is cleared by servicing the requester so that it deasserts its interrupt request. The interrupt force applied by `h3.meifa` clears automatically when the corresponding IRQ index is read from `<<reg-h3.meinext>>`, so the `h3.meipa` bit _also_ clears automatically if it was forced high by `h3.meifa`.
 
 When any interrupt of sufficient priority is both set in `h3.meipa` and enabled in `h3.meiea`, the standard RISC-V external interrupt pending bit `mip.meip` is asserted. In other words, `h3.meipa` is filtered by `h3.meiea` to generate the standard `mip.meip` flag.
 
 An external interrupt is taken when _all_ of the following are true:
 
-* An interrupt is currently asserted in <<reg-h3.meipa>> (either due to the external interrupt signal being asserted high, or due to the corresponding bit in <<reg-h3.meifa>> being set).
-* The matching interrupt enable bit is set in <<reg-h3.meiea>>.
-* The interrupt priority is greater than or equal to the preemption priority, <<reg-h3.meicontext>>.`preempt`.
-* The standard M-mode interrupt enable <<reg-mstatus>>.`mie` is set.
-* The standard M-mode global external interrupt enable <<reg-mie>>.`meie` is set
+* An interrupt is currently asserted in `<<reg-h3.meipa>>` (either due to the external interrupt signal being asserted high, or due to the corresponding bit in `<<reg-h3.meifa>>` being set).
+* The matching interrupt enable bit is set in `<<reg-h3.meiea>>`.
+* The interrupt priority is greater than or equal to the preemption priority, `<<reg-h3.meicontext>>.preempt`.
+* The standard M-mode interrupt enable `<<reg-mstatus>>.mie` is set.
+* The standard M-mode global external interrupt enable `<<reg-mie>>.meie` is set
 
 In this case, the processor jumps to either:
 
 * `mtvec` directly, if vectoring is disabled (`mtvec[0]` is 0)
 * `mtvec + 0x2c`, if vectoring is enabled (`mtvec[0]` is 1)
 
-The value `0x2c` here comes from the standard RISC-V vectoring logic for <<reg-mtvec>> with an IRQ cause of `meip`.
+The value `0x2c` here comes from the standard RISC-V vectoring logic for `<<reg-mtvec>>` with an IRQ cause of `meip`.
 
 [cols="10h,20,~", options="header"]
 |===
@@ -754,14 +754,14 @@ External interrupt priority array. Each interrupt has an (up to) 4-bit priority 
 
 Numerically higher values have higher priority. For example, an interrupt with priority `8` is taken before an interrupt with priority `0`. The interrupt priority array resets to all-zeroes, meaning all interrupts have the lowest priority by default.
 
-When an interrupt's priority is lower than the current preemption priority `h3.meicontext.preempt`, it is treated as not being pending. The pending bit in `h3.meipa` will still assert, but the machine external interrupt pending bit `mip.meip` will not, so the processor will ignore this interrupt. See <<reg-h3.meicontext>>.
+When an interrupt's priority is lower than the current preemption priority `h3.meicontext.preempt`, it is treated as not being pending. The pending bit in `h3.meipa` will still assert, but the machine external interrupt pending bit `mip.meip` will not, so the processor will ignore this interrupt. See `<<reg-h3.meicontext>>`.
 
 [cols="10h,20,~", options="header"]
 |===
 | Bits  | Name   | Description
 | 31:16 | `window` | 16-bit read/write window into the external interrupt priority array, containing four 4-bit priority values.
 | 15:7  | -        | RES0
-| 6:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. This is wider than the `index` fields on e.g. <<reg-h3.meiea>> because this register stores four times as many bits.
+| 6:0   | `index`  | Write-only, self-clearing field (no value is stored) used to control which window of the array appears in `window`. This is wider than the `index` fields on e.g. `<<reg-h3.meiea>>` because this register stores four times as many bits.
 |===
 
 [[reg-h3.meinext]]
@@ -773,7 +773,7 @@ Get next interrupt. Contains the index of the highest-priority external interrup
 
 * Is pending in `h3.meipa`.
 * Is enabled in `h3.meiea`.
-* Has priority greater than or equal to <<reg-h3.meicontext>>.`ppreempt`, the previous pre-emption level.
+* Has priority greater than or equal to `<<reg-h3.meicontext>>.ppreempt`, the previous pre-emption level.
 
 The returned interrupt index is left-shifted by 2 so that it can be used to index an array of 32-bit function pointers. If there is no such interrupt, the MSB is set, which can be checked efficiently using a `bltz` instruction.
 
@@ -783,7 +783,7 @@ When multiple interrupts of the same priority are both pending and enabled, the 
 * Interrupt priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt` are eligible for processing at the current interrupt nesting level. They appear in `h3.meinext` and do not cause the core to take an interrupt.
 * Interrupt priorities _p_ in the range `preempt` ≤ _p_ ≤ 15 (max priority) are eligible for processing at a higher interrupt nesting level, and will cause the core to take an interrupt if interrupts are enabled. They also appear in `h3.meinext`.
 
-One subtle detail is that, since the `h3.meinext.update` bit sets the <<reg-h3.meicontext>>.`preempt` level to the interrupt priority plus one, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via <<reg-mstatus>>.`mie` will _never_ cause the core to take the same interrupt that was just read from `h3.meinext`.
+One subtle detail is that, since the `h3.meinext.update` bit sets the `<<reg-h3.meicontext>>.preempt` level to the interrupt priority plus one, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via `<<reg-mstatus>>.mie` will _never_ cause the core to take the same interrupt that was just read from `h3.meinext`.
 
 A useful implication of this is that if the core takes some low-priority interrupt, and a higher-priority interrupt arrives while the interrupt dispatch routine is still saving registers to the stack, it is the _higher_-priority interrupt that will be processed first, and both interrupts are processed at the same level of nesting. This is sometimes referred to as _late arrival_.
 
@@ -808,7 +808,7 @@ A three-level stack of preemption priorities is maintained in the `preempt`, `pp
 
 The top entry of the priority stack, `preempt`, is used by hardware to ensure that only higher-priority interrupts can preempt the current interrupt. The next entry, `ppreempt`, is used to avoid servicing interrupts which may already be in progress in a frame that was preempted. The third entry, `pppreempt`, has no hardware effect, but ensures that `preempt` and `ppreempt` can be correctly saved/restored across arbitrary levels of preemption.
 
-`ppreempt` and `preempt` together define the range of interrupt priorities eligible for processing at the current level of interrupt nesting. Specifically this range is priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt`. See <<reg-h3.meinext>> for more discussion on the relationship between preemption levels and interrupt nesting levels.
+`ppreempt` and `preempt` together define the range of interrupt priorities eligible for processing at the current level of interrupt nesting. Specifically this range is priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt`. See `<<reg-h3.meinext>>` for more discussion on the relationship between preemption levels and interrupt nesting levels.
 
 [cols="10h,20,~", options="header"]
 |===
@@ -942,7 +942,7 @@ Address: `0xbf1`
 
 M-mode ISA identification register.
 
-The `h3.misa` register provides a simple list of which standard RISC-V ISA extensions are supported. It is conceptually similar to the standard <<reg-misa>> register, but stores a larger bit array, sufficient to enumerate all standard extensions. This register comprises the entirety of the Xh3misa extension, as described in <<extension-xh3misa-section>>.
+The `h3.misa` register provides a simple list of which standard RISC-V ISA extensions are supported. It is conceptually similar to the standard `<<reg-misa>>` register, but stores a larger bit array, sufficient to enumerate all standard extensions. This register comprises the entirety of the Xh3misa extension, as described in <<extension-xh3misa-section>>.
 
 The bit assignment is provided by the RISC-V C API documentation here: https://github.com/riscv-non-isa/riscv-c-api-doc/blob/main/src/c-api.adoc#extension-bitmask-definitions[https://github.com/riscv-non-isa/riscv-c-api-doc/blob/main/src/c-api.adoc#extension-bitmask-definitions]. The latest assignment can always be found in the upstream documentation. These are the bits that may be set to `1` by Hazard3:
 
@@ -974,7 +974,7 @@ The bit assignment is provided by the RISC-V C API documentation here: https://g
 | Zibi | 1 | 13
 |====
 
-The bit index within the `h3.misa` bitmap can be calculated as `64 * groupid + bit position`. A read from <<reg-h3.misa>> returns a 32-bit slice of the bitmap, indexed by the write data of the same CSR instruction. For example, Zcmp is at bit index 74, which is bit 10 of word 2.
+The bit index within the `h3.misa` bitmap can be calculated as `64 * groupid + bit position`. A read from `<<reg-h3.misa>>` returns a 32-bit slice of the bitmap, indexed by the write data of the same CSR instruction. For example, Zcmp is at bit index 74, which is bit 10 of word 2.
 
 ----
 // Get bits 95:64 of the ISA bitmap:
@@ -1023,7 +1023,7 @@ Indices `0x500` onward contain versions of custom Hazard3 extensions:
 | `0x505` | <<extension-xh3sfx-section,Xh3sfx>>
 |===
 
-The custom extension entries have the same `major.minor` bitfields as <<reg-mimpid>>:
+The custom extension entries have the same `major.minor` bitfields as `<<reg-mimpid>>`:
 
 [cols="10h,20,~", options="header"]
 |===

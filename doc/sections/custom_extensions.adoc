@@ -2,7 +2,7 @@
 
 Hazard3 implements a small number of custom extensions. Xh3misa is always included; the remaining custom extensions are only included if the relevant feature flags are set to `1` when instantiating the processor (<<config-parameters-section>>).
 
-The `x` bit in <<reg-misa>> is always set, to indicate (at least) the presence of the Xh3misa extension.
+The `x` bit in `<<reg-misa>>` is always set, to indicate (at least) the presence of the Xh3misa extension.
 
 [[extension-xh3misa-section]]
 === Xh3misa: Hazard3 ISA identification register
@@ -11,13 +11,13 @@ This document describes Xh3misa version: 1.0
 
 This extension is enabled by: <<param-CSR_M_MANDATORY>>.
 
-This extension adds the <<reg-h3.misa>> CSR. This is an extended version of the standard <<reg-misa>> register, capable of enumerating all standard RISC-V extensions (not just the single-letter ones).
+This extension adds the `<<reg-h3.misa>>` CSR. This is an extended version of the standard `<<reg-misa>>` register, capable of enumerating all standard RISC-V extensions (not just the single-letter ones).
 
 It describes presence and absence of extensions using the bitmap format described in the RISC-V C API documentation:
 
 https://github.com/riscv-non-isa/riscv-c-api-doc/blob/main/src/c-api.adoc#extension-bitmask-definitions[https://github.com/riscv-non-isa/riscv-c-api-doc/blob/main/src/c-api.adoc#extension-bitmask-definitions]
 
-This register also lists the versions of any custom Hazard3 extensions which may be present, including Xh3misa itself. For more details see the description of the <<reg-h3.misa>> register.
+This register also lists the versions of any custom Hazard3 extensions which may be present, including Xh3misa itself. For more details see the description of the `<<reg-h3.misa>>` register.
 
 [[extension-xh3irq-section]]
 === Xh3irq: Hazard3 interrupt controller
@@ -28,16 +28,16 @@ This extension is enabled by: <<param-EXTENSION_XH3IRQ>>
 
 This lightweight extension controls up to 512 external interrupts, with configurable per-interrupt priority and up to 16 levels of preemption. It adds no new instructions, but several CSRs:
 
-* <<reg-h3.meiea>>
-* <<reg-h3.meipa>>
-* <<reg-h3.meifa>>
-* <<reg-h3.meipra>>
-* <<reg-h3.meinext>>
-* <<reg-h3.meicontext>>
+* `<<reg-h3.meiea>>`
+* `<<reg-h3.meipa>>`
+* `<<reg-h3.meifa>>`
+* `<<reg-h3.meipra>>`
+* `<<reg-h3.meinext>>`
+* `<<reg-h3.meicontext>>`
 
 If this extension is disabled then Hazard3 supports a single external interrupt input (or multiple inputs that it simply ORs together in an uncontrolled fashion), so an external PLIC can be used for standard interrupt support.
 
-This extension is effectively a slightly more complicated way of driving the standard `mip.meip` flag (<<reg-mip>>). The RISC-V trap handling CSRs themselves are always completely standard.
+This extension is effectively a slightly more complicated way of driving the standard `mip.meip` flag (`<<reg-mip>>`). The RISC-V trap handling CSRs themselves are always completely standard.
 
 [[extension-xh3pmpm-section]]
 === Xh3pmpm: M-mode PMP regions
@@ -46,7 +46,7 @@ This document describes Xh3pmpm version: 1.0
 
 This extension is enabled by: <<param-EXTENSION_XH3PMPM>>
 
-This extension adds a new M-mode CSR, <<reg-h3.pmpcfgm0>>, which allows a PMP region to be enforced in M-mode without locking the region.
+This extension adds a new M-mode CSR, `<<reg-h3.pmpcfgm0>>`, which allows a PMP region to be enforced in M-mode without locking the region.
 
 This is useful when the PMP is used for non-security-related purposes such as stack guarding, or trapping and emulation of peripheral accesses.
 
@@ -57,7 +57,7 @@ This document describes Xh3power version: 1.0
 
 This extension is enabled by: <<param-EXTENSION_XH3POWER>>
 
-This extension adds a new M-mode CSR (<<reg-h3.msleep>>), and two new hint instructions, `h3.block` and `h3.unblock`, in the `slt` nop-compatible custom hint space.
+This extension adds a new M-mode CSR (`<<reg-h3.msleep>>`), and two new hint instructions, `h3.block` and `h3.unblock`, in the `slt` nop-compatible custom hint space.
 
 The `h3.msleep` CSR controls how deeply the processor sleeps in the WFI sleep state. By default, a WFI is implemented as a normal pipeline stall. By configuring `h3.msleep` appropriately, the processor can gate its own clock when asleep or, with a simple 4-phase req/ack handshake, negotiate with an external power controller for power up/down of external hardware. These options can improve the sleep current at the cost of greater wakeup latency.
 

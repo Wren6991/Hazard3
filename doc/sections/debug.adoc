@@ -45,11 +45,11 @@ Hazard3's Trigger Module generates synchronous traps to either Debug Mode or M-m
 
 Use the following CSRs to configure individual triggers:
 
-* <<reg-tselect>>: Choose a trigger to configure. Implements exactly enough bits to index all implemented triggers; remaining bits are hardwired to 0
-* <<reg-tinfo>>: List the capabilities of the currently selected trigger (the supported values for `tdata1.type`)
-* <<reg-tdata1>>: Configure the trigger. Layout changes based on the value of `tdata1.type`
-* <<reg-tdata2>>: Further configuration, or address/data to match on
-* <<reg-tdata3>>: Supports filtering of triggers based on context -- not implemented on Hazard3, so hardwired to zero
+* `<<reg-tselect>>`: Choose a trigger to configure. Implements exactly enough bits to index all implemented triggers; remaining bits are hardwired to 0
+* `<<reg-tinfo>>`: List the capabilities of the currently selected trigger (the supported values for `tdata1.type`)
+* `<<reg-tdata1>>`: Configure the trigger. Layout changes based on the value of `tdata1.type`
+* `<<reg-tdata2>>`: Further configuration, or address/data to match on
+* `<<reg-tdata3>>`: Supports filtering of triggers based on context -- not implemented on Hazard3, so hardwired to zero
 
 A compliant debugger can enumerate the triggers on a particular Hazard3 implementation using the standard method: incrementing `tselect` from 0, checking `tinfo` for each `tselect` index, and terminating when `tinfo` is 0 or `tselect` wraps.
 
@@ -65,9 +65,9 @@ An `action` of `1` is ignored when that trigger's `tdata1.dmode` bit is clear. O
 
 ==== Instruction Address Triggers
 
-The <<param-BREAKPOINT_TRIGGERS>> parameter configures the trigger unit with 0 or more hardware breakpoint comparators, assigned <<reg-tselect>> indices `0` through `BREAKPOINT_TRIGGERS - 1`. Each comparator continuously monitors the program counter for an exact match for its programmed address. When the comparator matches, the core takes a trap with `dpc` or `mepc` equal to the programmed breakpoint address.
+The <<param-BREAKPOINT_TRIGGERS>> parameter configures the trigger unit with 0 or more hardware breakpoint comparators, assigned `<<reg-tselect>>` indices `0` through `BREAKPOINT_TRIGGERS - 1`. Each comparator continuously monitors the program counter for an exact match for its programmed address. When the comparator matches, the core takes a trap with `dpc` or `mepc` equal to the programmed breakpoint address.
 
-In standard RISC-V terms, these are instruction address match triggers, with the following characteristics as described by hardwired fields in `mcontrol` (aka <<reg-tdata1>>):
+In standard RISC-V terms, these are instruction address match triggers, with the following characteristics as described by hardwired fields in `mcontrol` (aka `<<reg-tdata1>>`):
 
 * `tdata1.type` = `2`: address/data match
 * `mcontrol.timing` = `0`: trigger fires before the instruction executes
@@ -86,11 +86,11 @@ The `mcontrol.execute` flag enables and disables the trigger (1/0).
 [[section-icount-trigger]]
 ==== Instruction Count Trigger
 
-Hazard3 implements a single instruction count trigger, assigned <<reg-tselect>> index `BREAKPOINT_TRIGGERS`. For example, if no breakpoint triggers are configured, it is accessed at `tselect` = `0`.
+Hazard3 implements a single instruction count trigger, assigned `<<reg-tselect>>` index `BREAKPOINT_TRIGGERS`. For example, if no breakpoint triggers are configured, it is accessed at `tselect` = `0`.
 
 This trigger is hardwired with a `count` of `1`, and is intended to be a lightweight feature to support self-hosted M-mode single-stepping. Debug Mode already has this capability in the form of the `dcsr.step` flag, so the instruction count trigger supports `action` = `0` only (break to M-mode).
 
-The following configuration bits in <<reg-tdata1>> are _not_ hardwired:
+The following configuration bits in `<<reg-tdata1>>` are _not_ hardwired:
 
 * `icount.m`: if `1`, enable the trigger in M-mode
 * `icount.u`: if `1`, enable the trigger in U-mode (only available when the <<param-U_MODE>> parameter is `1`)
@@ -108,9 +108,9 @@ To support the above behaviour, hardware does not clear `icount.m` or `icount.u`
 [[section-interrupt-trigger]]
 ==== Interrupt Trigger
 
-Hazard3 implements a single interrupt trigger, assigned <<reg-tselect>> index `BREAKPOINT_TRIGGERS + 1`. For example, if no breakpoint triggers are configured, it is accessed at `tselect` = `1`.
+Hazard3 implements a single interrupt trigger, assigned `<<reg-tselect>>` index `BREAKPOINT_TRIGGERS + 1`. For example, if no breakpoint triggers are configured, it is accessed at `tselect` = `1`.
 
-This trigger fires on a configurable subset of the interrupt cause values listed in the <<reg-mcause>> register description. `tdata2` contains a bitmap with one bit per cause value. The break is taken after the hardware interrupt entry sequence has taken place (e.g. the setting of `mcause`), but before the first instruction in the interrupt handler executes. `dpc` points to the first instruction in the interrupt handler.
+This trigger fires on a configurable subset of the interrupt cause values listed in the `<<reg-mcause>>` register description. `tdata2` contains a bitmap with one bit per cause value. The break is taken after the hardware interrupt entry sequence has taken place (e.g. the setting of `mcause`), but before the first instruction in the interrupt handler executes. `dpc` points to the first instruction in the interrupt handler.
 
 `action` is hardwired to `1` (Debug Mode entry), because all interrupts on Hazard3 target M-mode, so a breakpoint exception triggered by interrupt entry would make it impossible to return from the interrupt.
 
@@ -119,9 +119,9 @@ The implemented bits are `11`, `7` and `3`, corresponding to `mip.meip`, `mip.mt
 [[section-exception-trigger]]
 ==== Exception Trigger
 
-Hazard3 implements a single exception trigger, assigned <<reg-tselect>> index `BREAKPOINT_TRIGGERS + 2`. For example, if no breakpoint triggers are configured, it is accessed at `tselect` = `2`.
+Hazard3 implements a single exception trigger, assigned `<<reg-tselect>>` index `BREAKPOINT_TRIGGERS + 2`. For example, if no breakpoint triggers are configured, it is accessed at `tselect` = `2`.
 
-This trigger fires on a configurable subset of the exception cause values listed in the <<reg-mcause>> register description. `tdata2` contains a bitmap with one bit per cause value. The break is taken after the hardware exception entry sequence has taken place (e.g. the setting of `mcause`) but before the first instruction in the exception handler executes. `dpc` points to the first instruction in the exception handler.
+This trigger fires on a configurable subset of the exception cause values listed in the `<<reg-mcause>>` register description. `tdata2` contains a bitmap with one bit per cause value. The break is taken after the hardware exception entry sequence has taken place (e.g. the setting of `mcause`) but before the first instruction in the exception handler executes. `dpc` points to the first instruction in the exception handler.
 
 `action` is hardwired to `1` (Debug Mode entry) because all exceptions on Hazard3 target M-mode, so a breakpoint exception triggered by another exception would always make the original exception unrecoverable.
 
@@ -152,7 +152,7 @@ The core behaves as follows:
 * Branch, `jal`, `jalr` and `auipc` are illegal in debug mode, because they observe PC: attempting to execute will halt Program Buffer execution and report an exception in `abstractcs.cmderr`
 * The `dret` instruction is not implemented (a special purpose DM-to-core signal is used to signal resume)
 * The `dscratch` CSRs are not implemented
-* The DM's `data0` register is mapped into the core as a CSR, <<reg-h3.dmdata0>>, address `0xbff`.
+* The DM's `data0` register is mapped into the core as a CSR, `<<reg-h3.dmdata0>>`, address `0xbff`.
 ** Raises an illegal instruction exception when accessed outside of Debug Mode
 ** The DM ignores attempted core writes to the CSR, unless the DM is currently executing an abstract command on that core
 ** Used by the DM to implement abstract GPR access, by injecting CSR read/write instructions

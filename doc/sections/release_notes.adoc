@@ -23,13 +23,13 @@ Incompatible changes:
 
 * The `MHARTID_VAL` parameter has been removed, and replaced with the `mhartid_val` port.
 * The `MIMPID_VAL` parameter has been removed.
-* The <<reg-mimpid>> CSR has been redefined to contain the hardcoded Hazard3 release version.
+* The `<<reg-mimpid>>` CSR has been redefined to contain the hardcoded Hazard3 release version.
 
 New signals:
 
 * `fence_i_vld`, `fence_d_vld` and `fence_rdy` allow external hardware to enforce memory orderings or trigger cache flushes (see <<memory-ordering-signals,Memory Ordering Signals>>).
 * `mhartid_val` allows a dynamic `mhartid` CSR value.
-* `eco_version` allows modifying part of the processor's reported version number (see <<reg-mimpid>>).
+* `eco_version` allows modifying part of the processor's reported version number (see `<<reg-mimpid>>`).
 
 New features:
 

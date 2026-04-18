@@ -110,7 +110,7 @@ The source of data-dependent timing is conditional sign correction in the `mulh`
 
 Constant-time here refers to **data-independent timing**. Execution time can still be affected by other factors such as instruction alignment and external bus stalls.
 
-Software can read the `Zkt` bit in <<reg-h3.misa>> to check whether a given implementation has constant execution time for the `Zkt` instruction list.
+Software can read the `Zkt` bit in `<<reg-h3.misa>>` to check whether a given implementation has constant execution time for the `Zkt` instruction list.
 
 === List of RISC-V Specifications
 
