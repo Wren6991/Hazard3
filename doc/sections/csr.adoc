@@ -635,7 +635,7 @@ Address: `0x7b2`
 
 Not implemented. Access will cause an illegal instruction exception.
 
-To provide data exchange between the Debug Module and the core, the Debug Module's `data0` register is mapped into the core's CSR space at a read/write M-custom address -- see `<<reg-dmdata0>>`.
+To provide data exchange between the Debug Module and the core, the Debug Module's `data0` register is mapped into the core's CSR space at a read/write M-custom address -- see `<<reg-h3.dmdata0>>`.
 
 [[reg-dscratch1]]
 ==== dscratch1
