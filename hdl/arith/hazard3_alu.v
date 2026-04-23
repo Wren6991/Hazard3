@@ -215,14 +215,14 @@ wire [9:0]  xh3sfx_exp_adj = op_b[9:0] + {9'd0, xh3sfx_sig_rnd[30]};
 wire [31:0] xh3sfx_sig_norm = xh3sfx_sig_rnd >> xh3sfx_sig_rnd[30];
 
 wire [31:0] xh3sfx_fpackrq3_s =
-	~|op_a[31:6]                  ? 32'd0                      :  // Exact cancellation
+	~|op_a[31:5]                  ? 32'd0                      :  // Exact cancellation
 	xh3sfx_exp_adj[9]             ? {op_a[31], 31'd0}          :  // Underflow
 	xh3sfx_exp_adj[8:0] == 9'h000 ? {op_a[31], 31'd0}          :  // Flushed subnormal
 	xh3sfx_exp_adj[8:0] >= 9'h0ff ? {op_a[31], 8'hff, 23'd0}   :  // Overflow
 	                                {op_a[31], xh3sfx_exp_adj[7:0], xh3sfx_sig_norm[28:6]};
 
 wire [15:0] xh3sfx_fpackrq3_h =
-	~|op_a[31:19]                 ? 16'd0                      :  // Exact cancellation
+	~|op_a[31:18]                 ? 16'd0                      :  // Exact cancellation
 	xh3sfx_exp_adj[9]             ? {op_a[31], 15'd0}          :  // Underflow
 	xh3sfx_exp_adj[8:0] == 9'h000 ? {op_a[31], 15'd0}          :  // Flushed subnormal
 	xh3sfx_exp_adj[8:0] >= 9'h01f ? {op_a[31], 5'h1f, 10'd0}   :  // Overflow
