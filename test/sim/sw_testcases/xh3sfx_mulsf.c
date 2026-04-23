@@ -1138,6 +1138,8 @@ int main() {
         }
     }
 
+    // f64 (excluded on RVE)
+#ifdef __riscv_i
     // 1 * 1 = 1
     check_equal64(__muldf3(0x3ff0000000000000u, 0x3ff0000000000000u), 0x3ff0000000000000u);
     // 1 * -1 = -1
@@ -1249,6 +1251,7 @@ int main() {
     check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000001ffffffu), 0x3ff000000e000000u);
     // (1 + 1 * 2^-26) * (1 + 2^-27 - ulp): even LSB, below tie, rounds down
     check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000001ffffffu), 0x3ff0000005ffffffu);
+#endif
 
 	return 0;
 }

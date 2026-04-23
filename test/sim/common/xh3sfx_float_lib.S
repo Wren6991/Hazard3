@@ -559,14 +559,14 @@ decl_func_with_section fixsfdi
 	h3.funpacku3.s a2, a0
 	addi a1, a1, -127 - 29
 	bltz a0, 1f
-	h3.ssll a0, a3, a1
+	h3.ssll a0, a2, a1
 	addi a1, a1, -32
-	h3.ssll a1, a3, a1
+	h3.ssll a1, a2, a1
 	ret
 1:
-	h3.ssll a0, a3, a1
+	h3.ssll a0, a2, a1
 	addi a1, a1, -32
-	h3.ssll a1, a3, a1
+	h3.ssll a1, a2, a1
 	// 64-bit negation; a0 carries out only if zero
 	seqz a2, a0
 	neg a0, a0

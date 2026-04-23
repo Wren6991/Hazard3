@@ -265,8 +265,8 @@ int main() {
     // -subnormal + -subnormal = -0
     check_equal(__addhf3(0x83ffu, 0x83ffu), 0xffff8000u);
 
-    // f64
-
+    // f64 (excluded on RVE)
+#ifdef __riscv_i
     // +0 + +0 = +0
     check_equal64(__adddf3(0x0000000000000000u, 0x0000000000000000u), 0x0000000000000000u);
     // -0 + -0 = -0
@@ -389,7 +389,7 @@ int main() {
     check_equal64(__adddf3(0x800fffffffffffffu, 0x000fffffffffffffu), 0x0000000000000000u);
     // -subnormal + -subnormal = -0
     check_equal64(__adddf3(0x800fffffffffffffu, 0x800fffffffffffffu), 0x8000000000000000u);
-
+#endif
 
 	return 0;
 }
