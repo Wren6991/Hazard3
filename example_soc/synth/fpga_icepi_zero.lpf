@@ -1,0 +1,13 @@
+# Reference: https://github.com/cheyao/icepi-zero/blob/main/firmware/v1.3/icepi-zero-v1_3.lpf
+
+LOCATE COMP "clk_osc" SITE "M1";
+IOBUF PORT "clk_osc" PULLMODE=NONE IO_TYPE=LVCMOS33;
+FREQUENCY PORT "clk_osc" 50 MHZ;
+
+# UART TX/RX (from FPGA's point of view, i.e. TX is an output)
+
+LOCATE COMP "uart_tx" SITE "K15"; # FPGA transmits to ftdi
+LOCATE COMP "uart_rx" SITE "K16"; # FPGA receives from ftdi
+IOBUF  PORT "uart_tx" PULLMODE=UP IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF  PORT "uart_rx" PULLMODE=UP IO_TYPE=LVCMOS33;
+
