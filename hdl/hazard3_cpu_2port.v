@@ -226,7 +226,7 @@ always @ (posedge clk) if (!rst_n) assert(clk_en || !(core_aph_req_i || dphase_a
 
 assign core_aph_ready_i = i_hready && core_aph_req_i;
 assign core_dph_ready_i = i_hready && dphase_active_i;
-assign core_dph_err_i   = i_hready && dphase_active_i && i_hresp;
+assign core_dph_err_i   = i_hresp  && dphase_active_i;
 
 assign core_rdata_i = i_hrdata;
 
