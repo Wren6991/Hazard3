@@ -128,16 +128,18 @@ Adjust the `--with-arch` line as necessary for your Hazard3 configuration. You m
 These are my hacks to build the latest `riscv-gnu-toolchain` on MacOS Sequoia on M4 (Arm).
 
 ```bash
-brew install python3 gawk gnu-sed make gmp mpfr libmpc isl zlib expat texinfo flock libslirp
+brew install python3 gawk gnu-sed make gmp mpfr libmpc isl zlib expat texinfo flock libslirp pkgconf
 git clone https://github.com/riscv/riscv-gnu-toolchain
 cd riscv-gnu-toolchain
 git submodule update --init -- binutils gdb
 # HACK for a macro definition which conflicts with a system header:
 gsed -i 's,#        define fdopen,//#define fdopen,' binutils/zlib/zutil.h gdb/zlib/zutil.h
 
+# pkgconf is required because gdb's configure script is unable to find these
+# two libraries without help (a mystery).
 export PATH="/opt/homebrew/bin:$PATH"
-export LDFLAGS="-L/opt/homebrew/lib"
-export CPPFLAGS="-I/opt/homebrew/include"
+export LDFLAGS="-L/opt/homebrew/lib  $(pkgconf --libs-only-L gmp mpfr)"
+export CPPFLAGS="-I/opt/homebrew/include $(pkgconf --cflags-only-I gmp mpfr)"
 ./configure --prefix=/opt/riscv/gcc15 --with-arch=rv32imac_zicsr_zifencei_zba_zbb_zbkb_zbs --with-abi=ilp32
 gmake -j10
 ```
