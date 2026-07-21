@@ -142,7 +142,7 @@ if (N_HARTS > 1) begin: has_hartsel
 	assign hartsel_next = dmi_write && dmi_regaddr == ADDR_DMCONTROL ?
 		dmi_pwdata[16 +: W_HARTSEL] : hartsel;
 
-end else begin: has_no_hartsel
+end else begin: no_hartsel
 
 	assign hartsel_next = 1'b0;
 
@@ -173,7 +173,7 @@ if (N_HARTS > 1) begin: has_array_mask
 	assign hasel_next = dmi_write && dmi_regaddr == ADDR_DMCONTROL ?
 		dmi_pwdata[26] : hasel;
 
-end else begin: has_no_array_mask
+end else begin: no_array_mask
 
 	assign hart_array_mask_next = 1'b0;
 	assign hasel_next = 1'b0;

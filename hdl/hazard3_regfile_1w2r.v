@@ -37,8 +37,8 @@ if (RESET_REGFILE) begin: real_dualport_reset
 	// This will presumably always be implemented with flops
 	reg [W_DATA-1:0] mem [0:N_REGS-1];
 
-	integer i;
-	always @ (posedge clk or negedge rst_n) begin
+	always @ (posedge clk or negedge rst_n) begin: reg_ports
+		integer i;
 		if (!rst_n) begin
 			for (i = 0; i < N_REGS; i = i + 1) begin
 				mem[i] <= {W_DATA{1'b0}};
