@@ -405,7 +405,7 @@ Encoding (R-type):
 [cols="10h,20,20,~", options="header"]
 |===
 | Bits  | Name     | Value        | Description
-| 31:25 | `funct7` | `0b0000000`  | `h3.funpacku3.h`
+| 31:25 | `funct7` | `0b0000001`  | `h3.funpacku3.h`
 | 24:20 | -        | `0b00000`    | RES0
 | 19:15 | `rs1`    | -            | Source register 1
 | 14:12 | `funct3` | `0b001`      | Xh3sfx R-type space
