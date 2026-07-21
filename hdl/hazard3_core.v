@@ -1400,7 +1400,9 @@ assign m_exception_return_addr = d_pc - (
 	prev_instr_was_32_bit ? 32'd4 : 32'd2
 );
 
-hazard3_power_ctrl power_ctrl (
+hazard3_power_ctrl #(
+`include "hazard3_config_inst.vh"
+) power_ctrl (
 	.clk_always_on          (clk_always_on),
 	.rst_n                  (rst_n),
 
