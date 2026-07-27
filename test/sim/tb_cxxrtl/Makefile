@@ -23,9 +23,7 @@ CPPINCDIR += $(shell yosys-config --datdir)/include/backends/cxxrtl/runtime
 CPPINCDIR += $(BUILD_DIR)
 CPPINCDIR += ../tb_common/include
 
-# Note: clang++-18 has a >20x compile time regression, even at low
-# optimisation levels. I have tried clang++-16 and clang++-17, both fine.
-CLANGXX   := clang++-16
+CLANGXX   := clang++
 
 .PHONY: clean all lint
 
@@ -43,7 +41,7 @@ clean::
 	rm -rf $(BUILD_DIR) $(TBEXEC)
 
 $(TBEXEC): $(BUILD_DIR)/dut.cpp $(CPPFILES)
-	$(CLANGXX) -O3 -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) $(addprefix -I ,$(CPPINCDIR)) $(CPPFILES) -o $(TBEXEC)
+	$(CLANGXX) -Oz -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) $(addprefix -I ,$(CPPINCDIR)) $(CPPFILES) -o $(TBEXEC)
 
 lint:
 	verilator --lint-only --top-module $(TOP) $(addprefix -I,$(VINCDIR)) -DCONFIG_HEADER="\"config_$(CONFIG).vh\"" $(FILE_LIST)

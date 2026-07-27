@@ -61,9 +61,7 @@ You will need:
 
 * A recent Yosys build to process the Verilog (these instructions were last tested with `a0e94e506`)
 * A `riscv32-unknown-elf-` toolchain to build software for the core
-* A native `clang-16` to build the simulator
-
-`clang-17` is also known to work fine. `clang-18` does work, but has a serious compile time regression with CXXRTL output, which is why the `tb_cxxrtl` Makefile explicitly selects `clang-16`.
+* A native `clang` to build the simulator
 
 ## Yosys
 
