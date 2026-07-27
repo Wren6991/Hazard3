@@ -90,9 +90,9 @@ static inline void tb_enable_global_monitor(bool en) {
 
 // Set an address to generate faults on any access
 static inline void tb_set_poison_addr(uint32_t addr) {
-	asm volatile ("fence" : : : "memory");
+	__asm__ volatile ("fence" : : : "memory");
 	mm_io->poison_addr = addr;
-	asm volatile ("fence" : : : "memory");
+	__asm__ volatile ("fence" : : : "memory");
 }
 
 static inline void tb_set_irq_masked(uint32_t mask) {
