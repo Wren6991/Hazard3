@@ -139,6 +139,8 @@ bus_response tb_mem_access(tb_top &tb, mem_io_state &memio, bus_request req) {
 				memio.mem[req.addr + 1] << 8 |
 				memio.mem[req.addr + 2] << 16 |
 				memio.mem[req.addr + 3] << 24;
+		} else if (req.addr == IO_BASE + IO_PRINT_CHAR) {
+			resp.rdata = (uint32_t)getchar();
 		} else if (req.addr == IO_BASE + IO_SET_SOFTIRQ || req.addr == IO_BASE + IO_CLR_SOFTIRQ) {
 			resp.rdata = memio.soft_irq_state;
 		} else if (req.addr == IO_BASE + IO_SET_IRQ || req.addr == IO_BASE + IO_CLR_IRQ) {

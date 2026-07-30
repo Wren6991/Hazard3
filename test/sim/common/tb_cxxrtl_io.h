@@ -44,6 +44,10 @@ static inline void tb_putc(char c) {
 	mm_io->print_char = (uint32_t)c;
 }
 
+static inline char tb_getc(void) {
+	return (char)mm_io->print_char;
+}
+
 static inline void tb_puts(const char *s) {
 	while (*s)
 		tb_putc(*s++);
