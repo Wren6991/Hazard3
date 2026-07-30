@@ -16,3 +16,6 @@
 [submodule "test/sim/embench/embench-iot"]
 	path = test/sim/embench/embench-iot
 	url = https://github.com/Wren6991/embench-iot.git
+[submodule "test/sim/micropython/micropython"]
+	path = test/sim/micropython/micropython
+	url = https://github.com/Wren6991/micropython-hazard3-tests.git
