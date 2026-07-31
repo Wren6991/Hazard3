@@ -57,6 +57,7 @@ public:
 			logfile = fopen(args.log_path.c_str(), "wb");
 		} else {
 			logfile = stdout;
+			setvbuf(logfile, NULL, _IONBF, 0);
 		}
 	}
 
