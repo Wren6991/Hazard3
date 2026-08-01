@@ -28,7 +28,12 @@ module example_soc #(
 
 	// IO
 	output wire              uart_tx,
-	input  wire              uart_rx
+	input  wire              uart_rx,
+
+	// USB differential pair (exposed directly)
+	inout  wire              usb_dp,
+	inout  wire              usb_dn,
+	output wire              usb_dp_pu
 );
 
 // ----------------------------------------------------------------------------
@@ -379,6 +384,7 @@ hazard3_cpu_1port #(
 // - 128 kB SRAM at... 0x0000_0000
 // - System timer at.. 0x4000_0000
 // - UART at.......... 0x4000_4000
+// - USB_CDC at....... 0x4000_8000
 
 // AHBL layer
 
@@ -454,6 +460,16 @@ wire [31:0] bridge_prdata;
 wire        bridge_pready;
 wire        bridge_pslverr;
 
+// usb_cdc APB signals
+wire        usb_cdc_psel;
+wire        usb_cdc_penable;
+wire        usb_cdc_pwrite;
+wire [15:0] usb_cdc_paddr;
+wire [31:0] usb_cdc_pwdata;
+wire [31:0] usb_cdc_prdata;
+wire        usb_cdc_pready;
+wire        usb_cdc_pslverr;
+
 wire        uart_psel;
 wire        uart_penable;
 wire        uart_pwrite;
@@ -500,9 +516,9 @@ ahbl_to_apb apb_bridge_u (
 );
 
 apb_splitter #(
-	.N_SLAVES   (2),
-	.ADDR_MAP   (32'h4000_0000),
-	.ADDR_MASK  (32'hc000_c000)
+	.N_SLAVES   (3),
+	.ADDR_MAP   (48'h8000_4000_0000),
+	.ADDR_MASK  (48'hc000_c000_c000)
 ) inst_apb_splitter (
 	.apbs_paddr   (bridge_paddr),
 	.apbs_psel    (bridge_psel),
@@ -513,14 +529,14 @@ apb_splitter #(
 	.apbs_prdata  (bridge_prdata),
 	.apbs_pslverr (bridge_pslverr),
 
-	.apbm_paddr   ({uart_paddr   , timer_paddr  }),
-	.apbm_psel    ({uart_psel    , timer_psel   }),
-	.apbm_penable ({uart_penable , timer_penable}),
-	.apbm_pwrite  ({uart_pwrite  , timer_pwrite }),
-	.apbm_pwdata  ({uart_pwdata  , timer_pwdata }),
-	.apbm_pready  ({uart_pready  , timer_pready }),
-	.apbm_prdata  ({uart_prdata  , timer_prdata }),
-	.apbm_pslverr ({uart_pslverr , timer_pslverr})
+	.apbm_paddr   ({usb_cdc_paddr   , uart_paddr   , timer_paddr  }),
+	.apbm_psel    ({usb_cdc_psel    , uart_psel    , timer_psel   }),
+	.apbm_penable ({usb_cdc_penable , uart_penable , timer_penable}),
+	.apbm_pwrite  ({usb_cdc_pwrite  , uart_pwrite  , timer_pwrite }),
+	.apbm_pwdata  ({usb_cdc_pwdata  , uart_pwdata  , timer_pwdata }),
+	.apbm_pready  ({usb_cdc_pready  , uart_pready  , timer_pready }),
+	.apbm_prdata  ({usb_cdc_prdata  , uart_prdata  , timer_prdata }),
+	.apbm_pslverr ({usb_cdc_pslverr , uart_pslverr , timer_pslverr})
 );
 
 // ----------------------------------------------------------------------------
@@ -550,6 +566,42 @@ ahb_sync_sram #(
 	.ahbls_hrdata      (sram0_hrdata)
 );
 
+// usb_cdc wires and instantiation
+wire usb_dp_pu;
+wire usb_tx_en;
+wire usb_dp_tx;
+wire usb_dn_tx;
+wire [10:0] usb_frame;
+wire usb_configured;
+
+usb_cdc_apb usb_cdc_u (
+	.clk           (clk),
+	.rst_n         (rst_n),
+
+	.apbs_psel     (usb_cdc_psel),
+	.apbs_penable  (usb_cdc_penable),
+	.apbs_pwrite   (usb_cdc_pwrite),
+	.apbs_paddr    (usb_cdc_paddr),
+	.apbs_pwdata   (usb_cdc_pwdata),
+	.apbs_prdata   (usb_cdc_prdata),
+	.apbs_pready   (usb_cdc_pready),
+	.apbs_pslverr  (usb_cdc_pslverr),
+
+	.dp_rx_i       (usb_dp),
+	.dn_rx_i       (usb_dn),
+	.dp_pu_o       (usb_dp_pu),
+	.tx_en_o       (usb_tx_en),
+	.dp_tx_o       (usb_dp_tx),
+	.dn_tx_o       (usb_dn_tx),
+
+	.frame_o       (usb_frame),
+	.configured_o  (usb_configured)
+);
+
+// Tri-state top-level USB pins: drive when tx_en asserted, otherwise hi-Z
+assign usb_dp = usb_tx_en ? usb_dp_tx : 1'bz;
+assign usb_dn = usb_tx_en ? usb_dn_tx : 1'bz;
+
 uart_mini uart_u (
 	.clk          (clk),
 	.rst_n        (rst_n),
@@ -569,7 +621,7 @@ uart_mini uart_u (
 	.rts          (/* unused */),
 	.irq          (uart_irq),
 	.dreq         (/* unused */)
-);
+ );
 
 // Microsecond timebase for timer
 

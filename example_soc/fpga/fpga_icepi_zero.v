@@ -9,14 +9,19 @@ module fpga_icepi_zero (
 	input  wire       clk_osc,
 
 	output wire       uart_tx,
-	input  wire       uart_rx
+	input  wire       uart_rx,
+
+	// Expose USB differential pair directly
+	inout  wire       usb_dp,
+	inout  wire       usb_dn,
+	output wire       usb_dp_pu
 );
 
 wire clk_sys;
 wire pll_sys_locked;
 wire rst_n_sys;
 
-pll_50_40 pll_sys (
+pll_50_48 pll_sys (
 	.clkin   (clk_osc),
 	.clkout0 (clk_sys),
 	.locked  (pll_sys_locked)
@@ -33,7 +38,7 @@ fpga_reset #(
 example_soc #(
 	.DTM_TYPE           ("ECP5"),
 	.SRAM_DEPTH         (1<<14),
-	.CLK_MHZ            (40),
+	.CLK_MHZ            (48),
 
 	.EXTENSION_M         (1),
 	.EXTENSION_A         (1),
@@ -66,7 +71,12 @@ example_soc #(
 	.tdo     (/* unused */),
 
 	.uart_tx (uart_tx),
-	.uart_rx (uart_rx)
+	.uart_rx (uart_rx),
+
+	// USB I/O passed through
+	.usb_dp  (usb_dp),
+	.usb_dn  (usb_dn),
+	.usb_dp_pu (usb_dp_pu)
 );
 
 endmodule

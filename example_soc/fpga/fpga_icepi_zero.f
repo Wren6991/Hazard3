@@ -1,5 +1,5 @@
 file fpga_icepi_zero.v
-file pll_50_40.v
+file pll_50_48.v
 file ../libfpga/common/reset_sync.v
 file ../libfpga/common/fpga_reset.v
 
