@@ -38,7 +38,7 @@ const char *help_str =
 "    --cpuret         : Testbench's return code is the return code written to\n"
 "                       IO_EXIT by the CPU, or -1 if timed out.\n"
 "    --memsize n      : Memory size in units of 1024 bytes, default is 16 MiB\n"
-"    --trace          : Print out execution tracing info\n"
+"    --trace          : Print out execution tracing info to stderr\n"
 ;
 
 void exit_help(std::string errtext = "") {
@@ -66,14 +66,12 @@ int main(int argc, char **argv) {
 			load_bin = true;
 			bin_path = argv[i + 1];
 			i += 1;
-		}
-		else if (s == "--vcd") {
+		} else if (s == "--vcd") {
 			if (argc - i < 2)
 				exit_help("Option --vcd requires an argument\n");
 			// (We ignore this argument, it's supported for compatibility with CXXRTL tb)
 			i += 1;
-		}
-		else if (s == "--dump") {
+		} else if (s == "--dump") {
 			if (argc - i < 3)
 				exit_help("Option --dump requires 2 arguments\n");
 			dump_ranges.push_back(std::make_tuple(
@@ -81,26 +79,21 @@ int main(int argc, char **argv) {
 				std::stoul(argv[i + 2], 0, 0)
 			));
 			i += 2;
-		}
-		else if (s == "--cycles") {
+		} else if (s == "--cycles") {
 			if (argc - i < 2)
 				exit_help("Option --cycles requires an argument\n");
 			max_cycles = std::stol(argv[i + 1], 0, 0);
 			i += 1;
-		}
-		else if (s == "--memsize") {
+		} else if (s == "--memsize") {
 			if (argc - i < 2)
 				exit_help("Option --memsize requires an argument\n");
 			ram_size = 1024 * std::stol(argv[i + 1], 0, 0);
 			i += 1;
-		}
-		else if (s == "--trace") {
+		} else if (s == "--trace") {
 			trace_execution = true;
-		}
-		else if (s == "--cpuret") {
+		} else if (s == "--cpuret") {
 			propagate_return_code = true;
-		}
-		else {
+		} else {
 			std::cerr << "Unrecognised argument " << s << "\n";
 			exit_help("");
 		}

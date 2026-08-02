@@ -110,18 +110,17 @@ struct TBMemIO: MemBase32 {
 	virtual bool w32(ux_t addr, uint32_t data) {
 		switch (addr) {
 		case IO_PRINT_CHAR:
-			if (trace)
-				printf("IO_PRINT_CHAR: %c\n", (char)data);
-			else {
-				fprintf(stdout, "%c", (char)data);
-				fflush(stdout);
+			if (trace) {
+				fprintf(stderr, "IO_PRINT_CHAR: %c\n", (char)data);
 			}
+			fprintf(stdout, "%c", (char)data);
+			fflush(stdout);
 			return true;
 		case IO_PRINT_U32:
-			if (trace)
-				printf("IO_PRINT_U32: %08x\n", data);
-			else
-				printf("%08x\n", data);
+			if (trace) {
+				fprintf(stderr, "IO_PRINT_U32: %08x\n", data);
+			}
+			printf("%08x\n", data);
 			return true;
 		case IO_EXIT:
 			throw TBExitException(data);

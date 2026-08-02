@@ -1136,45 +1136,45 @@ void RVCore::step(bool trace) {
 	csr.step(cycle_cost);
 
 	if (trace && !irq_target_pc) {
-		printf("%08x: ", pc);
+		fprintf(stderr, "%08x: ", pc);
 		if ((instr & 0x3) == 0x3) {
-			printf("%08x : ", instr);
+			fprintf(stderr, "%08x : ", instr);
 		} else {
-			printf("    %04x : ", instr & 0xffffu);
+			fprintf(stderr, "    %04x : ", instr & 0xffffu);
 		}
 		bool gpr_writeback = regnum_rd != 0 && rd_wdata;
 		if (gpr_writeback) {
-			printf("%-3s   <- %08x :\n", friendly_reg_names[regnum_rd], *rd_wdata);
+			fprintf(stderr, "%-3s   <- %08x :\n", friendly_reg_names[regnum_rd], *rd_wdata);
 		} else if (pc_wdata) {
-			printf("pc    <- %08x <\n", *pc_wdata);
+			fprintf(stderr, "pc    <- %08x <\n", *pc_wdata);
 		} else {
-			printf("                  :\n");
+			fprintf(stderr, "                  :\n");
 		}
 		if (pc_wdata && gpr_writeback) {
-			printf("                   : pc    <- %08x <\n", *pc_wdata);
+			fprintf(stderr, "                   : pc    <- %08x <\n", *pc_wdata);
 		}
 		if (trace_csr_addr) {
-			printf("                   : #%03x  <- %08x :\n", *trace_csr_addr, *csr.read(*trace_csr_addr, false));
+			fprintf(stderr, "                   : #%03x  <- %08x :\n", *trace_csr_addr, *csr.read(*trace_csr_addr, false));
 		}
 	}
 
 	if (exception_cause) {
 		pc_wdata = csr.trap_enter_exception(*exception_cause, pc);
 		if (trace) {
-			printf("^^^ Trap           : cause <- %-2u       :\n", *exception_cause);
-			printf("|||                : pc    <- %08x <\n", *pc_wdata);
+			fprintf(stderr, "^^^ Trap           : cause <- %-2u       :\n", *exception_cause);
+			fprintf(stderr, "|||                : pc    <- %08x <\n", *pc_wdata);
 			trace_priv = csr.get_true_priv();
 		}
 	} else if (irq_target_pc) {
 		pc_wdata = irq_target_pc;
 		if (trace) {
-			printf("^^^ IRQ            : cause <- IRQ + %-2u :\n", csr.get_xcause() & ((1u << 31) - 1));
-			printf("|||                : pc    <- %08x <\n", *pc_wdata);
+			fprintf(stderr, "^^^ IRQ            : cause <- IRQ + %-2u :\n", csr.get_xcause() & ((1u << 31) - 1));
+			fprintf(stderr, "|||                : pc    <- %08x <\n", *pc_wdata);
 			trace_priv = csr.get_true_priv();
 		}
 	}
 	if (trace && trace_priv) {
-		printf("|||                : priv  <- %c        :\n", "US.M"[*trace_priv & 0x3]);
+		fprintf(stderr, "|||                : priv  <- %c        :\n", "US.M"[*trace_priv & 0x3]);
 	}
 
 	if (pc_wdata)

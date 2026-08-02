@@ -32,7 +32,7 @@ for dispath in args.dis:
 			label_text = l.split("<")[-1].strip("\n>:")
 			label_dict[label_addr] = label_text
 
-ifile = open(args.logfile)
+ifile = open(args.logfile, errors="replace")
 if args.out == "-":
 	ofile = sys.stdout
 else:
