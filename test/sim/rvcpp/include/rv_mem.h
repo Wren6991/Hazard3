@@ -6,6 +6,7 @@
 #include <cassert>
 #include <vector>
 #include <cstdio>
+#include <unistd.h>
 
 struct MemBase32 {
 	virtual std::optional<uint8_t> r8(__attribute__((unused)) ux_t addr) {return std::nullopt;}
@@ -111,8 +112,10 @@ struct TBMemIO: MemBase32 {
 		case IO_PRINT_CHAR:
 			if (trace)
 				printf("IO_PRINT_CHAR: %c\n", (char)data);
-			else
-				printf("%c", (char)data);
+			else {
+				fprintf(stdout, "%c", (char)data);
+				fflush(stdout);
+			}
 			return true;
 		case IO_PRINT_U32:
 			if (trace)
@@ -148,6 +151,14 @@ struct TBMemIO: MemBase32 {
 
 	virtual std::optional<uint32_t> r32(ux_t addr) {
 		switch(addr) {
+		case IO_PRINT_CHAR: {
+			uint8_t c;
+			ssize_t n;
+			do {
+				n = read(STDIN_FILENO, &c, 1);
+			} while (n < 0 && errno == EINTR);
+			return n == 1 ? c : 0xffffffffu;
+		}
 		case IO_MTIME:
 			return mtime & 0xffffffffull;
 		case IO_MTIMEH:
