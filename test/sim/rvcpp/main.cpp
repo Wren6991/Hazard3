@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 		exit_help();
 
 	std::vector<std::tuple<uint32_t, uint32_t>> dump_ranges;
-	int64_t max_cycles = 100000;
+	int64_t max_cycles = 0;
 	uint32_t ram_size = RAM_SIZE_DEFAULT;
 	bool load_bin = false;
 	std::string bin_path;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
 	int64_t cyc;
 	int rc = 0;
 	try {
-		for (cyc = 0; cyc < max_cycles; ++cyc) {
+		for (cyc = 0; cyc < max_cycles || max_cycles == 0; ++cyc) {
 			core.step(trace_execution);
 			io.step();
 			core.csr.set_irq_t(io.timer_irq_pending());
