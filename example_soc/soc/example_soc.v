@@ -11,6 +11,7 @@
 module example_soc #(
 	parameter DTM_TYPE   = "JTAG",  // Can be "JTAG", "ECP5" or "XILINX7"
 	parameter SRAM_DEPTH = 1 << 15, // Default 32 kwords -> 128 kB
+	parameter PRELOAD_FILE = "",    // Optional hex file to preload into SRAM at power-up
 	parameter CLK_MHZ    = 12,      // For timer timebase
 
 	`include "hazard3_config.vh"
@@ -547,7 +548,8 @@ apb_splitter #(
 // zero-initialised so don't leave the little guy hanging too long)
 
 ahb_sync_sram #(
-	.DEPTH (SRAM_DEPTH)
+	.DEPTH (SRAM_DEPTH),
+	.PRELOAD_FILE(PRELOAD_FILE)
 ) sram0 (
 	.clk               (clk),
 	.rst_n             (rst_n),
