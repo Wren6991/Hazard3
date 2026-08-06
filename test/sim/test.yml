@@ -35,6 +35,7 @@ simulators:
       - zcmp_pop
       - zcmp_push
       - zcmp_pop_bus_fault
+      - zcmp_popret_breakpoint
       - zcmp_popret_bus_fault
       - zcmp_popretz_bus_fault
       - zcmp_popret_pmp_fault
