@@ -6,7 +6,7 @@
 // and mcause
 
 int main() {
-	uint32_t *bad_addr = (uint32_t*)0xc0000000;
+	uint32_t *bad_addr = (uint32_t*)0xe0000000;
 	uint32_t tmp = 0;
 
 	tb_puts("amoswap.w\n");
