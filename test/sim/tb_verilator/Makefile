@@ -30,7 +30,7 @@ vlib: $(BUILD_DIR)/vlib.touch
 
 $(BUILD_DIR)/vcc.touch: $(FILE_LIST) $(wildcard *.vh)
 	mkdir -p $(VOBJ_DIR)
-	$(VERILATOR) --Mdir $(VOBJ_DIR) --cc --top-module $(TOP) $(addprefix -I,$(VINCDIR))  -DCONFIG_HEADER="\"config_$(CONFIG).vh\"" $(FILE_LIST)
+	$(VERILATOR) --Mdir $(VOBJ_DIR) --cc --trace --top-module $(TOP) $(addprefix -I,$(VINCDIR))  -DCONFIG_HEADER="\"config_$(CONFIG).vh\"" $(FILE_LIST)
 	touch $@
 
 # CFG_GCH_IF_CLANG is set as a workaround for a verilator issue with newer GCC

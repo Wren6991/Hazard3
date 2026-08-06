@@ -1,5 +1,6 @@
 #include "Vtb.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
 
 #include <iostream>
 #include <cstdint>
@@ -13,16 +14,18 @@
 class tb_verilator_top: public tb_top {
 	VerilatedContext *contextp;
 	Vtb *top;
+	VerilatedVcdC *vcd = nullptr;
 
 	// Loop-carried address-phase requests
 	bus_request req_i;
 	bus_request req_d;
 	bool req_i_vld = false;
 	bool req_d_vld = false;
+	uint64_t cycle = 0;
 
 public:
 	tb_verilator_top(const tb_cli_args &parsed_args, int argc, char **argv);
-	~tb_verilator_top() {delete top; delete contextp;}
+	~tb_verilator_top() {if (vcd) {vcd->close(); delete vcd;} delete top; delete contextp;}
 
 	void step(const tb_cli_args &args, mem_io_state &memio) override;
 
@@ -43,6 +46,13 @@ tb_verilator_top::tb_verilator_top(const tb_cli_args &parsed_args, int argc, cha
 	// argument prefixed with "+verilator+" is ignored by our tb arg parsing.
 	contextp->commandArgs(argc, argv);
 	top = new Vtb{contextp};
+
+	if (parsed_args.dump_waves) {
+		contextp->traceEverOn(true);
+		vcd = new VerilatedVcdC;
+		top->trace(vcd, 99);
+		vcd->open(parsed_args.waves_path.c_str());
+	}
 
 	req_i_vld = false;
 	req_d_vld = false;
@@ -68,8 +78,14 @@ tb_verilator_top::tb_verilator_top(const tb_cli_args &parsed_args, int argc, cha
 void tb_verilator_top::step(const tb_cli_args &args, mem_io_state &memio) {
 	top->clk = false;
 	top->eval();
+	if (vcd) {
+		vcd->dump(2ull * cycle);
+	}
 	top->clk = true;
 	top->eval();
+	if (vcd) {
+		vcd->dump(2ull * cycle + 1);
+	}
 
 	// The two bus ports are handled identically. This enables swapping out of
 	// various `tb.v` hardware integration files containing:
@@ -151,6 +167,8 @@ void tb_verilator_top::step(const tb_cli_args &args, mem_io_state &memio) {
 		req_i.addr = top->i_haddr;
 		req_i.excl = top->i_hexcl;
 	}
+
+	++cycle;
 }
 
 int main(int argc, char **argv) {
