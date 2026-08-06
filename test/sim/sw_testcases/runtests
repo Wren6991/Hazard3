@@ -11,7 +11,7 @@ args = sys.argv[1:]
 parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("tests", nargs="*", help="List of tests to run. Empty to run all tests. Each test corresponds to one C file.")
 parser.add_argument("--vcd", action="store_true", help="Pass --vcd flag to simulator, to generate waveform dumps.")
-parser.add_argument("--tb", default="../tb_cxxrtl/tb", help="Pass tb executable to run tests.")
+parser.add_argument("--tb", default="../tb_verilator/tb", help="Pass tb executable to run tests.")
 parser.add_argument("--tbarg", action="append", default=[], help="Extra argument to pass to tb executable. Can pass --tbarg=xxx multiple times to pass multiple arguments.")
 parser.add_argument("--postcmd", action="append", default=[], help="Add a command to run post-simulation, e.g. log file processing. The string TEST is expanded to the test result file name, minus any file extensions.")
 parser.add_argument("--build-dir", help="Add a suffix to the build directory name, e.g. for different ISA variants")
