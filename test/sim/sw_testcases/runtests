@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 args = sys.argv[1:]
 
@@ -15,6 +16,7 @@ parser.add_argument("--tb", default="../tb_verilator/tb", help="Pass tb executab
 parser.add_argument("--tbarg", action="append", default=[], help="Extra argument to pass to tb executable. Can pass --tbarg=xxx multiple times to pass multiple arguments.")
 parser.add_argument("--postcmd", action="append", default=[], help="Add a command to run post-simulation, e.g. log file processing. The string TEST is expanded to the test result file name, minus any file extensions.")
 parser.add_argument("--build-dir", help="Add a suffix to the build directory name, e.g. for different ISA variants")
+parser.add_argument("-j", type=int, default=None, help="Number of parallel jobs (default = CPU count).")
 parser.add_argument("--march", default="rv32imac_zicsr_zifencei_zba_zbb_zbkb_zbs")
 parser.add_argument("--no-tb-build", action="store_true")
 parser.epilog = """
@@ -65,16 +67,18 @@ if args.build_dir is None:
 else:
 	build_dir = f"tmp-{args.build_dir}"
 
-passed_test_count = 0
-for test in testlist:
-	sys.stdout.write(f"{test:<30}")
+# Returns: (build stderr, status message, pass bool).
+def run_test(test):
 	failed = False
+	build_err = ""
 	test_build_ret = subprocess.run(
 		["make", f"APP={test}", f"TMP_PREFIX={build_dir}/", f"MARCH={args.march}", f"{build_dir}/{test}.bin"],
-		stdout=subprocess.DEVNULL
+		stdout=subprocess.DEVNULL,
+		stderr=subprocess.PIPE
 	)
 	if test_build_ret.returncode != 0:
-		print("\033[33m[MK ERR]\033[39m")
+		build_err = test_build_ret.stderr.decode("utf-8", errors="replace").strip()
+		status = "\033[33m[MK ERR]\033[39m"
 		failed = True
 
 	if not failed:
@@ -90,22 +94,14 @@ for test in testlist:
 				timeout = 10
 			)
 		except subprocess.TimeoutExpired:
-			print("\033[31m[TIMOUT]\033[39m")
+			status = "\033[31m[TIMOUT]\033[39m"
 			failed = True
 
 	# Testbench itself should always exit successfully.
 	if not failed:
 		if test_run_ret.returncode != 0:
-			print("Negative return code from testbench!")
+			status = "Negative return code from testbench!"
 			failed = True
-
-	# Link last-run test as "waves.vcd" for use with generic .gtkw wave config
-	if args.vcd:
-		try:
-			os.system(f"ln -sf tmp/{test}.vcd waves.vcd")
-		except:
-			# Don't care, not a critical part of the test run
-			pass
 
 	# Pass if the program under test has zero exit code AND its output matches
 	# the expected output (if there is an expected_output file)
@@ -121,7 +117,7 @@ for test in testlist:
 				except:
 					pass
 		if returncode != 0:
-			print("\033[31m[BADRET]\033[39m")
+			status = "\033[31m[BADRET]\033[39m"
 			failed = True
 
 	if not failed:
@@ -156,18 +152,37 @@ for test in testlist:
 			except:
 				good_output = False
 			if not good_output:
-				print("\033[31m[BADOUT]\033[39m")
+				status = "\033[31m[BADOUT]\033[39m"
 				failed = True
 
 	if not failed:
-		print("\033[32m[PASSED]\033[39m")
-		passed_test_count += 1
+		status = "\033[32m[PASSED]\033[39m"
 
 	# Post-processing commands are run regardless of success. Their return
 	# codes are ignored.
 	for postcmd in args.postcmd:
 		postcmd = postcmd.replace("TEST", f"{build_dir}/{test}")
 		subprocess.run(shlex.split(postcmd))
+
+	return build_err, status, not failed
+
+passed_test_count = 0
+njobs = os.cpu_count() if args.j is None else max(1, args.j)
+with ThreadPoolExecutor(max_workers=njobs) as pool:
+	futures = [pool.submit(run_test, test) for test in testlist]
+	# Await and print results in launch order
+	for test, future in zip(testlist, futures):
+		build_err, status, passed = future.result()
+		if build_err: print(build_err)
+		print(f"{test:<30}{status}")
+		if passed:
+			passed_test_count += 1
+		else:
+			all_passed = False
+
+# When re-running a single test, link VCD as "waves.vcd" for use with generic .gtkw config.
+if args.vcd and len(testlist) == 1:
+	subprocess.run(f"ln -sf {build_dir}/{testlist[0]}.vcd waves.vcd", shell=True)
 
 print(f"\nPassed: {passed_test_count} out of {len(testlist)}")
 
