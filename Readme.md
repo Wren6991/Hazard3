@@ -316,7 +316,7 @@ info reg a0
 
 # Simulating with Verilator
 
-There is a Verilator harness with the same features and interface as the CXXRTL harness, except it does not support VCD dumping. First build Verilator:
+There is a Verilator harness with the same features and interface as the CXXRTL harness. First build Verilator:
 
 ```
 git clone https://github.com/verilator/verilator.git
