@@ -24,5 +24,8 @@ make -C micropython/ports/hazard3-tests -j$(nproc)
 
 cd micropython/tests
 MICROPY_TEST_TIMEOUT=1200 ./run-internalbench.py \
-	-t "exec:../../../tb_verilator/tb --cpuret --bin ../ports/hazard3-tests/build/firmware.bin"
+	-t "exec:../../../tb_verilator/tb --cpuret --bin ../ports/hazard3-tests/build/firmware.bin" \
+	| tee ../../bench.log
 
+cd -
+./cmp_bench.py bench_baseline.log bench.log
