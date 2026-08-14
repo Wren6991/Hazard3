@@ -41,7 +41,7 @@ clean::
 	rm -rf $(BUILD_DIR) $(TBEXEC)
 
 $(TBEXEC): $(BUILD_DIR)/dut.cpp $(CPPFILES)
-	$(CLANGXX) -Oz -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) $(addprefix -I ,$(CPPINCDIR)) $(CPPFILES) -o $(TBEXEC)
+	$(CLANGXX) -O3 -std=c++14 $(addprefix -D,$(CDEFINES) $(CDEFINES_$(DOTF))) $(addprefix -I ,$(CPPINCDIR)) $(CPPFILES) -o $(TBEXEC)
 
 lint:
 	verilator --lint-only --top-module $(TOP) $(addprefix -I,$(VINCDIR)) -DCONFIG_HEADER="\"config_$(CONFIG).vh\"" $(FILE_LIST)

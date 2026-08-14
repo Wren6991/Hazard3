@@ -59,7 +59,7 @@ These instructions are for Ubuntu 24.04. If you are running on Windows you may h
 
 You will need:
 
-* A recent Yosys build to process the Verilog (these instructions were last tested with `a0e94e506`)
+* A recent Yosys build to process the Verilog (these instructions were last tested with `81b04d30`)
 * A `riscv32-unknown-elf-` toolchain to build software for the core
 * A native `clang` to build the simulator
 
@@ -67,7 +67,7 @@ You will need:
 
 The [Yosys GitHub repo](https://github.com/YosysHQ/yosys) has instructions for building Yosys from source.
 
-The following steps work for me on Ubuntu 24.04 using version `a0e94e506` mentioned above.
+The following steps work for me on Ubuntu 26.04 using version `81b04d30` mentioned above.
 
 ```bash
 sudo apt install build-essential clang lld bison flex libreadline-dev gawk tcl-dev libffi-dev git graphviz xdot pkg-config python3 libboost-system-dev libboost-python-dev libboost-filesystem-dev zlib1g-dev
@@ -75,8 +75,9 @@ sudo apt install build-essential clang lld bison flex libreadline-dev gawk tcl-d
 git clone https://github.com/YosysHQ/yosys.git
 cd yosys
 git submodule update --init
-make -j$(nproc)
-sudo make install
+cmake -B build . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel $(nproc)
+sudo cmake --install build --strip
 ```
 
 On MacOS the dependencies can be installed with:
