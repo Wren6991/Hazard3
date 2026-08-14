@@ -4,7 +4,7 @@
 // - Foreground code pends the top-half handler, at maximum priority
 // - Each time the top-half handler is called, it installs a bottom half at
 //   the next descending priority
-// - Each bottom half hander re-pends the top half handler (which immediately
+// - Each bottom half handler re-pends the top half handler (which immediately
 //   preempts it) to set the next lower-numbered bottom handler
 // - Then top returns to bottom, and that bottom returns to the *next* bottom,
 //   which re-pends the top

@@ -524,7 +524,7 @@ Address: `0x7a2`
 The interpretation of this CSR depends on the `type` field of `<<reg-tdata1>>`:
 
 [horizontal]
-`type` = `2`:: Address/data trigger: `tdata2` contains the address/data to be matched. On Hazard3 this is always an instruction address, and `tdata2` only implemenents enough bits to store any valid program counter (multiple of IALIGN).
+`type` = `2`:: Address/data trigger: `tdata2` contains the address/data to be matched. On Hazard3 this is always an instruction address, and `tdata2` only implements enough bits to store any valid program counter (multiple of IALIGN).
 
 `type` = `3`:: Instruction count trigger: `tdata2` is hardwired to zero.
 

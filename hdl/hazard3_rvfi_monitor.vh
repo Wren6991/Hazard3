@@ -388,7 +388,7 @@ end
 // ----------------------------------------------------------------------------
 // Tie-offs
 
-// Note: Hazard3 does not have any instructions which irrversibly halt
+// Note: Hazard3 does not have any instructions which irreversibly halt
 // execution. For the liveness check (RISCV_FORMAL_FAIRNESS is defined),
 // length of stalls is constrained and WFI is assumed to wake immediately
 // after going to sleep.

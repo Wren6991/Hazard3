@@ -239,7 +239,7 @@ parameter RESET_REGFILE       = 0,
 // BRANCH_PREDICTOR: enable branch prediction. The branch predictor consists
 // of a single BTB entry which is allocated on a taken backward branch, and
 // cleared on a mispredicted nontaken branch, a fence.i or a trap. Successful
-// prediction eliminates the 1-cyle fetch bubble on a taken branch, usually
+// prediction eliminates the 1-cycle fetch bubble on a taken branch, usually
 // making tight loops faster.
 parameter BRANCH_PREDICTOR    = 0,
 

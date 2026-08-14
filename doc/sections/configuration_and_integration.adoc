@@ -806,7 +806,7 @@ Default value: `1`
 
 Enable branch prediction. The branch predictor consists of a single BTB entry which is allocated on a taken backward branch, and cleared on a mispredicted non-taken branch, a `fence.i` or a trap.
 
-Successful prediction eliminates the 1-cyle fetch bubble on a taken branch, so tight loops execute faster. See <<instruction-timings-branch-predictor>> for more information on this feature.
+Successful prediction eliminates the 1-cycle fetch bubble on a taken branch, so tight loops execute faster. See <<instruction-timings-branch-predictor>> for more information on this feature.
 
 Requires: <<param-EXTENSION_ZIFENCEI>> = `1`.
 
