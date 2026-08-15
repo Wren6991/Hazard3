@@ -7,7 +7,7 @@
 // Also uses the following standard ISA extensions:
 //
 // * RV32EMZbbZbs (all routines)
-// * Zba (single-precision mul, if XH3SFX_AVOID_MULH is defined)
+// * Zba (single-precision mul, if XH3SFX_AVOID_HIGH_IMUL is defined)
 // * RV32I (double-precision add, sub, mul; these require full 31 GPRs)
 //
 // When building for RV32E, the double-precision add/sub/mul are excluded from
@@ -16,9 +16,12 @@
 #include "xh3sfx_intrinsics.h"
 #include "xh3bextm_intrinsics.h"
 
-// Redefine XH3SFX_LIB_SECTION move library functions to a different section,
-// e.g. RAM vs flash. Functions are still put in individual sections, with
-// the function name applied as a suffix on the section name.
+// ----------------------------------------------------------------------------
+// Library configuration
+
+// Redefine XH3SFX_LIB_SECTION to move library functions to a different
+// section, e.g. RAM vs flash. Functions are still put in individual sections,
+// with the function name applied as a suffix on the section name.
 #ifndef XH3SFX_LIB_SECTION
 #define XH3SFX_LIB_SECTION .text
 #endif
@@ -28,6 +31,11 @@
 // which replace the libgcc functions.
 #ifndef XH3SFX_LIB_PREFIX
 #define XH3SFX_LIB_PREFIX __
+#endif
+
+// Prefer multi-mul sequences over mulh/mulhu/mulhsu:
+#ifndef XH3SFX_AVOID_HIGH_IMUL
+#define XH3SFX_AVOID_HIGH_IMUL 0
 #endif
 
 .macro decl_func name
@@ -42,8 +50,90 @@ decl_func \name
 .endm
 
 // ----------------------------------------------------------------------------
+// Feature configuration
+
+// A feature is enabled if its feature macro is undefined, or defined to 1.
+// A feature is disabled if its feature macro is defined to 0.
+//
+// To disable individual features:
+//
+//    -DXH3SFX_FEAT_xxx=0
+//
+// To disable all features, then re-enable individual ones:
+//
+//    -DXH3SFX_FEAT_OPT_IN
+//    -DXH3SFX_FEAT_xxx=1
+//
+// The "opt-in" flag defines all undefined feature macros to 0. Note that,
+// since each function is emitted in its own section (except for those like
+// addsf3/subsf3 that share a lot of code), your linker should be able to drop
+// unused functions if you pass -Wl,--gc-sections or similar. The main reason
+// to disable a feature is if it does something you disagree with, not to
+// reduce your binary size.
+
+#ifdef XH3SFX_FEAT_OPT_IN
+// Single-precision add and subtract:
+#ifndef XH3SFX_FEAT_ADDS
+#define XH3SFX_FEAT_ADDS 0
+#endif
+// Half-precision add and subtract:
+#ifndef XH3SFX_FEAT_ADDH
+#define XH3SFX_FEAT_ADDH 0
+#endif
+// Single-precision multiply:
+#ifndef XH3SFX_FEAT_MULS
+#define XH3SFX_FEAT_MULS 0
+#endif
+// Half-precision multiply:
+#ifndef XH3SFX_FEAT_MULH
+#define XH3SFX_FEAT_MULH 0
+#endif
+// Single-precision negate:
+#ifndef XH3SFX_FEAT_NEGS
+#define XH3SFX_FEAT_NEGS 0
+#endif
+// Half-precision negate:
+#ifndef XH3SFX_FEAT_NEGH
+#define XH3SFX_FEAT_NEGH 0
+#endif
+// Single-precision compare (orders NaN > inf):
+#ifndef XH3SFX_FEAT_FCMPS
+#define XH3SFX_FEAT_FCMPS 0
+#endif
+// Half-precision compare (orders NaN > inf):
+#ifndef XH3SFX_FEAT_FCMPH
+#define XH3SFX_FEAT_FCMPH 0
+#endif
+// Conversions between single- and half-precision:
+#ifndef XH3SFX_FEAT_S2H_H2S
+#define XH3SFX_FEAT_S2H_H2S 0
+#endif
+// Single-precision float-to-int and int-to-float conversions:
+#ifndef XH3SFX_FEAT_F2I_I2F
+#define XH3SFX_FEAT_F2I_I2F 0
+#endif
+// Half-precision float-to-int and int-to-float conversions:
+#ifndef XH3SFX_FEAT_H2I_I2H
+#define XH3SFX_FEAT_H2I_I2H 0
+#endif
+// 64-bit integer shifts
+#ifndef XH3SFX_FEAT_LONGSHIFT
+#define XH3SFX_FEAT_LONGSHIFT 0
+#endif
+// Double-precision add and subtract (non-RVE):
+#ifndef XH3SFX_FEAT_ADDD
+#define XH3SFX_FEAT_ADDD 0
+#endif
+// Double-precision mul (non-RVE):
+#ifndef XH3SFX_FEAT_MULD
+#define XH3SFX_FEAT_MULD 0
+#endif
+#endif
+
+// ----------------------------------------------------------------------------
 // Add and subtract (f32 and f16)
 
+#if !defined(XH3SFX_FEAT_ADDS) || XH3SFX_FEAT_ADDS
 decl_func_with_section subsf3
 	binvi a1, a1, 31
 decl_func addsf3
@@ -117,8 +207,10 @@ __addsf_return_y:
 	mv a0, a1
 __addsf_return_x:
 	ret
+#endif // XH3SFX_FEAT_ADDS
 
 // Half-precision: essentially the same as single-precision
+#if !defined(XH3SFX_FEAT_ADDH) || XH3SFX_FEAT_ADDH
 decl_func_with_section subhf3
 	binvi a1, a1, 31
 decl_func addhf3
@@ -176,17 +268,19 @@ __addhf_return_y:
 __addhf_return_x:
 	sext.h a0, a0
 	ret
+#endif // XH3SFX_FEAT_ADDH
 
 
 // ----------------------------------------------------------------------------
 // Multiply (f32 and f16)
 
+#if !defined(XH3SFX_FEAT_MULS) || XH3SFX_FEAT_MULS
 decl_func_with_section mulsf3
 	h3.bextmi a2, a0, 23, 8
 	h3.bextmi a3, a1, 23, 8
 	h3.fcheck2e.s t0, a2, a3
 	bnez t0, __mulsf_special_exponent
-#ifndef XH3SFX_AVOID_MULH
+#ifndef XH3SFX_AVOID_HIGH_IMUL
 	// Path for when mul and mulh are equally fast
 	h3.funpackq3.s a4, a0
 	h3.funpackq3.s a5, a1
@@ -323,9 +417,10 @@ __mulsf_x_nan_inf:
 	bne a3, t0, __mulsf_return_x
 	bnez a5, __mulsf_return_y
 	ret // return x
-
+#endif // XH3SFX_FEAT_MULS
 
 // Half-precision: essentially the same as single-precision
+#if !defined(XH3SFX_FEAT_MULH) || XH3SFX_FEAT_MULH
 decl_func_with_section mulhf3
 	h3.bextmi a2, a0, 10, 5
 	h3.bextmi a3, a1, 10, 5
@@ -389,23 +484,29 @@ __mulhf_x_nan_inf:
 	bne a3, t0, __mulhf_return_x
 	bnez a5, __mulhf_return_y
 	ret
+#endif // XH3SFX_FEAT_MULH
 
 // ----------------------------------------------------------------------------
 // Other arithmetic
 
+#if !defined(XH3SFX_FEAT_NEGS) || XH3SFX_FEAT_NEGS
 decl_func_with_section negsf2
 	binvi a0, a0, 31
 	ret
+#endif
 
+#if !defined(XH3SFX_FEAT_NEGH) || XH3SFX_FEAT_NEGH
 decl_func_with_section neghf2
 	binvi a0, a0, 15
 	ret
+#endif
 
 // Concatenation of exponent and significand is correctly ordered with respect
 // to magnitude. This is a 31-bit value; convert sign-magnitude to two's
 // complement to get a fully correctly ordered 32-bit integer. This doesn't
 // handle NaNs gracefully but, quote libgcc docs, "you should not rely on
 // this".
+#if !defined(XH3SFX_FEAT_FCMPS) || XH3SFX_FEAT_FCMPS
 decl_func_with_section fcmpsf2
 decl_func lesf2
 decl_func ltsf2
@@ -419,7 +520,9 @@ decl_func gtsf2
 	slt a0, a3, a2
 	sub a0, a0, a1
 	ret
+#endif
 
+#if !defined(XH3SFX_FEAT_FCMPH) || XH3SFX_FEAT_FCMPH
 decl_func_with_section fcmphf2
 decl_func lehf2
 decl_func lthf2
@@ -435,10 +538,12 @@ decl_func gthf2
 	slt a0, a3, a2
 	sub a0, a0, a1
 	ret
+#endif
 
 // ----------------------------------------------------------------------------
 // Conversions: f32 <-> f16
 
+#if !defined(XH3SFX_FEAT_S2H_H2S) || XH3SFX_FEAT_S2H_H2S
 // Convert single-precision to half-precision
 decl_func_with_section truncsfhf2
 	h3.funpackq3.s a1, a0
@@ -481,10 +586,12 @@ decl_func_with_section extendhfsf2
 	// Force exponent overflow to generate signed infinity:
 	slli a2, a2, 4
 	j 1b
+#endif
 
 // ----------------------------------------------------------------------------
 // Conversions: f32 <-> i32, u32
 
+#if !defined(XH3SFX_FEAT_F2I_I2F) || XH3SFX_FEAT_F2I_I2F
 // Convert single-precision to signed integer
 decl_func_with_section fixsfsi
 	h3.bextmi a1, a0, 23, 8
@@ -545,10 +652,12 @@ decl_func_with_section floatunsisf
 	h3.fpackrq3.s a0, a0, a1
 1:
 	ret
+#endif
 
 // ----------------------------------------------------------------------------
 // Conversions: f32 <-> i64, u64
 
+#if !defined(XH3SFX_FEAT_F2I_I2F) || XH3SFX_FEAT_F2I_I2F
 // Convert single-precision to signed 64-bit integer
 decl_func_with_section fixsfdi
 	h3.bextmi a1, a0, 23, 8
@@ -601,10 +710,12 @@ __fixunssfdi_neg:
 	li a0, 0
 	li a1, 0
 	ret
+#endif
 
 // ----------------------------------------------------------------------------
 // Conversions: f16 <-> i32, u32
 
+#if !defined(XH3SFX_FEAT_H2I_I2H) || XH3SFX_FEAT_H2I_I2H
 // Convert half-precision to signed integer
 decl_func_with_section fixhfsi
 	h3.bextmi a1, a0, 10, 5
@@ -667,13 +778,13 @@ decl_func_with_section floatunsihf
 	h3.fpackrq3.h a0, a0, a1
 1:
 	ret
-
+#endif
 
 // ----------------------------------------------------------------------------
 // i64 and u64
 
 // Yes it's floating point, the point just floats in one place
-
+#if !defined(XH3SFX_FEAT_LONGSHIFT) || XH3SFX_FEAT_LONGSHIFT
 decl_func_with_section ashldi3
     addi a3, a2, -32
     h3.ssll a4, a0, a3
@@ -697,14 +808,27 @@ decl_func_with_section ashrdi3
     h3.ssrl a0, a0, a2
     or a0, a0, a4
     ret
+#endif
 
 // ----------------------------------------------------------------------------
 // Add, subtract and multiply (f64)
 
 // Double on RV32E? Here's a nickel, kid. Go buy yourself a real computer.
-#ifdef __riscv_i
+#ifndef __riscv_i
+#if defined(XH3SFX_FEAT_ADDD) && XH3SFX_FEAT_ADDD
+#error "Requested feature XH3SFX_FEAT_ADDD is incompatible with RVE"
+#elif !defined(XH3SFX_FEAT_ADDD)
+#define XH3SFX_FEAT_ADDD 0
+#endif
+#if defined(XH3SFX_FEAT_MULD) && XH3SFX_FEAT_MULD
+#error "Requested feature XH3SFX_FEAT_MULD is incompatible with RVE"
+#elif !defined(XH3SFX_FEAT_MULD)
+#define XH3SFX_FEAT_MULD 0
+#endif
+#endif // !__riscv_i
 
 // Double-precision add
+#if !defined(XH3SFX_FEAT_ADDD) || XH3SFX_FEAT_ADDD
 decl_func_with_section subdf3
 	binvi a3, a3, 31
 decl_func adddf3
@@ -925,8 +1049,10 @@ __adddf_return_y:
 	mv a1, a3
 __adddf_return_x:
 	ret
+#endif
 
 // Double-precision multiply
+#if !defined(XH3SFX_FEAT_MULD) || XH3SFX_FEAT_MULD
 decl_func_with_section muldf3
 	// Extract exponents
 	slli t4, a1, 1
@@ -1126,6 +1252,4 @@ __muldf_return_inf:
 	slli a1, a1, 20
 	li a0, 0
 	ret
-
-#endif // __riscv_i
-
+#endif
