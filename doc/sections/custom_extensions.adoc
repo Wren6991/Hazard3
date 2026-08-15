@@ -4,6 +4,18 @@ Hazard3 implements a small number of custom extensions. Xh3misa is always includ
 
 The `x` bit in `<<reg-misa>>` is always set, to indicate (at least) the presence of the Xh3misa extension.
 
+[[custom-extension-list-section]]
+=== List of Custom Extensions
+
+The complete list of custom extensions is:
+
+* <<extension-xh3misa-section>>: Enumerates all standard and custom extensions implemented by a given Hazard3 core. Includes standard extensions not listed in `<<reg-misa>>`.
+* <<extension-xh3irq-section>>: Adds a lightweight, integrated interrupt controller supporting efficient nested interrupt preemption with dynamically configured interrupt priority. Supports up to 512 IRQ inputs. Composable with external controllers like PLIC.
+* <<extension-xh3pmpm-section>>: Allows enforcing unlocked PMP regions in M-mode.
+* <<extension-xh3power-section>>: Adds a CSR for controlling low-power sleep states, and hint instructions for cooperative sleep in simple SMP systems.
+* <<extension-xh3bextm-section>>: Adds two instructions for extracting small contiguous unsigned bitfields.
+* <<extension-xh3sfx-section>>: Adds 17 instructions for accelerating single- and half-precision floating point operations with minimal hardware cost.
+
 [[extension-xh3misa-section]]
 === Xh3misa: Hazard3 ISA identification register
 
