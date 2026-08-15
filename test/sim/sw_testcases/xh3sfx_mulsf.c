@@ -11,10 +11,11 @@
 #define check_equal64(a, b) if ((a) != (b)) {asm ("ebreak");}
 #endif
 
-
-uint32_t __mulsf3(uint32_t lhs, uint32_t rhs);
-uint32_t __mulhf3(uint32_t lhs, uint32_t rhs);
-uint64_t __muldf3(uint64_t lhs, uint64_t rhs);
+// Note: tests are built with -DXH3SFX_LIB_PREFIX=__h3_ to avoid shadowing the
+// libgcc implementations.
+uint32_t __h3_mulsf3(uint32_t lhs, uint32_t rhs);
+uint32_t __h3_mulhf3(uint32_t lhs, uint32_t rhs);
+uint64_t __h3_muldf3(uint64_t lhs, uint64_t rhs);
 
 struct {uint32_t lhs; uint32_t rhs; uint32_t expect;} random_tests[] = {
     {0xa8c36b34u, 0x420ac26bu, 0xab53d866u},
@@ -1021,118 +1022,118 @@ struct {uint32_t lhs; uint32_t rhs; uint32_t expect;} random_tests[] = {
 
 int main() {
     // 1 * 1 = 1
-    check_equal(__mulsf3(0x3f800000u, 0x3f800000u), 0x3f800000u);
+    check_equal(__h3_mulsf3(0x3f800000u, 0x3f800000u), 0x3f800000u);
     // 1 * -1 = -1
-    check_equal(__mulsf3(0x3f800000u, 0xbf800000u), 0xbf800000u);
+    check_equal(__h3_mulsf3(0x3f800000u, 0xbf800000u), 0xbf800000u);
     // -1 * 1 = -1
-    check_equal(__mulsf3(0xbf800000u, 0x3f800000u), 0xbf800000u);
+    check_equal(__h3_mulsf3(0xbf800000u, 0x3f800000u), 0xbf800000u);
     // -1 * -1 = 1
-    check_equal(__mulsf3(0xbf800000u, 0xbf800000u), 0x3f800000u);
+    check_equal(__h3_mulsf3(0xbf800000u, 0xbf800000u), 0x3f800000u);
     // -0 * 0 = -0
-    check_equal(__mulsf3(0x80000000u, 0x00000000u), 0x80000000u);
+    check_equal(__h3_mulsf3(0x80000000u, 0x00000000u), 0x80000000u);
     // 0 * -0 = - 0
-    check_equal(__mulsf3(0x00000000u, 0x80000000u), 0x80000000u);
+    check_equal(__h3_mulsf3(0x00000000u, 0x80000000u), 0x80000000u);
     // +0 * +0 = +0
-    check_equal(__mulsf3(0x00000000u, 0x00000000u), 0x00000000u);
+    check_equal(__h3_mulsf3(0x00000000u, 0x00000000u), 0x00000000u);
     // -0 * -0 = +0 (sign XOR of two negatives)
-    check_equal(__mulsf3(0x80000000u, 0x80000000u), 0x00000000u);
+    check_equal(__h3_mulsf3(0x80000000u, 0x80000000u), 0x00000000u);
     // 1 * 2 = 2
-    check_equal(__mulsf3(0x3f800000u, 0x40000000u), 0x40000000u);
+    check_equal(__h3_mulsf3(0x3f800000u, 0x40000000u), 0x40000000u);
     // 2 * 1 = 2
-    check_equal(__mulsf3(0x40000000u, 0x3f800000u), 0x40000000u);
+    check_equal(__h3_mulsf3(0x40000000u, 0x3f800000u), 0x40000000u);
     // inf * inf = inf
-    check_equal(__mulsf3(0x7f800000u, 0x7f800000u), 0x7f800000u);
+    check_equal(__h3_mulsf3(0x7f800000u, 0x7f800000u), 0x7f800000u);
     // inf * -inf = -inf
-    check_equal(__mulsf3(0x7f800000u, 0xff800000u), 0xff800000u);
+    check_equal(__h3_mulsf3(0x7f800000u, 0xff800000u), 0xff800000u);
     // -inf * inf = -inf
-    check_equal(__mulsf3(0xff800000u, 0x7f800000u), 0xff800000u);
+    check_equal(__h3_mulsf3(0xff800000u, 0x7f800000u), 0xff800000u);
     // -inf * -inf = inf
-    check_equal(__mulsf3(0xff800000u, 0xff800000u), 0x7f800000u);
+    check_equal(__h3_mulsf3(0xff800000u, 0xff800000u), 0x7f800000u);
     // inf * 0 = nan
-    check_equal(__mulsf3(0x7f800000u, 0x00000000u), 0xffffffffu);
+    check_equal(__h3_mulsf3(0x7f800000u, 0x00000000u), 0xffffffffu);
     // 0 * inf = nan
-    check_equal(__mulsf3(0x00000000u, 0x7f800000u), 0xffffffffu);
+    check_equal(__h3_mulsf3(0x00000000u, 0x7f800000u), 0xffffffffu);
     // inf * -0 = nan
-    check_equal(__mulsf3(0x7f800000u, 0x80000000u), 0xffffffffu);
+    check_equal(__h3_mulsf3(0x7f800000u, 0x80000000u), 0xffffffffu);
     // -0 * inf = nan
-    check_equal(__mulsf3(0x80000000u, 0x7f800000u), 0xffffffffu);
+    check_equal(__h3_mulsf3(0x80000000u, 0x7f800000u), 0xffffffffu);
     // 1 * -inf = -inf
-    check_equal(__mulsf3(0x3f800000u, 0xff800000u), 0xff800000u);
+    check_equal(__h3_mulsf3(0x3f800000u, 0xff800000u), 0xff800000u);
     // -inf * 1 = -inf
-    check_equal(__mulsf3(0xff800000u, 0x3f800000u), 0xff800000u);
+    check_equal(__h3_mulsf3(0xff800000u, 0x3f800000u), 0xff800000u);
     // -1 * inf = -inf
-    check_equal(__mulsf3(0xbf800000u, 0x7f800000u), 0xff800000u);
+    check_equal(__h3_mulsf3(0xbf800000u, 0x7f800000u), 0xff800000u);
     // inf * -1 = -inf
-    check_equal(__mulsf3(0x7f800000u, 0xbf800000u), 0xff800000u);
+    check_equal(__h3_mulsf3(0x7f800000u, 0xbf800000u), 0xff800000u);
     // 1 * nonzero subnormal = exactly 0
-    check_equal(__mulsf3(0x3f800000u, 0x007fffffu), 0x00000000u);
+    check_equal(__h3_mulsf3(0x3f800000u, 0x007fffffu), 0x00000000u);
     // nonzero subnormal * -1 = exactly -0
-    check_equal(__mulsf3(0x007fffffu, 0xbf800000u), 0x80000000u);
+    check_equal(__h3_mulsf3(0x007fffffu, 0xbf800000u), 0x80000000u);
     // -subnormal * 1 = -0 (negative subnormal flushed to -0)
-    check_equal(__mulsf3(0x807fffffu, 0x3f800000u), 0x80000000u);
+    check_equal(__h3_mulsf3(0x807fffffu, 0x3f800000u), 0x80000000u);
     // -subnormal * -1 = +0 (sign XOR of -0 and -1)
-    check_equal(__mulsf3(0x807fffffu, 0xbf800000u), 0x00000000u);
+    check_equal(__h3_mulsf3(0x807fffffu, 0xbf800000u), 0x00000000u);
     // nan * 0 = same nan
-    check_equal(__mulsf3(0xffff1234u, 0x00000000u), 0xffff1234u);
+    check_equal(__h3_mulsf3(0xffff1234u, 0x00000000u), 0xffff1234u);
     // nan * nan = first nan (implementation detail)
-    check_equal(__mulsf3(0x7fff1234u, 0x7fff5678u), 0x7fff1234u);
+    check_equal(__h3_mulsf3(0x7fff1234u, 0x7fff5678u), 0x7fff1234u);
     // 0 * nan = same nan
-    check_equal(__mulsf3(0x00000000u, 0xffff1234u), 0xffff1234u);
+    check_equal(__h3_mulsf3(0x00000000u, 0xffff1234u), 0xffff1234u);
     // nan * 1 = same nan
-    check_equal(__mulsf3(0xffff1234u, 0x3f800000u), 0xffff1234u);
+    check_equal(__h3_mulsf3(0xffff1234u, 0x3f800000u), 0xffff1234u);
     // 1 * nan = same nan
-    check_equal(__mulsf3(0x3f800000u, 0xffff1234u), 0xffff1234u);
+    check_equal(__h3_mulsf3(0x3f800000u, 0xffff1234u), 0xffff1234u);
     // nan * inf = same nan
-    check_equal(__mulsf3(0xffff1234u, 0x7f800000u), 0xffff1234u);
+    check_equal(__h3_mulsf3(0xffff1234u, 0x7f800000u), 0xffff1234u);
     // inf * nan = same nan
-    check_equal(__mulsf3(0x7f800000u, 0xffff1234u), 0xffff1234u);
+    check_equal(__h3_mulsf3(0x7f800000u, 0xffff1234u), 0xffff1234u);
     // (2 - 0.5 ulp) x (2 - 0.5 ulp) = 4 - 1 ulp
-    check_equal(__mulsf3(0x3fffffffu, 0x3fffffffu), 0x407ffffeu);
+    check_equal(__h3_mulsf3(0x3fffffffu, 0x3fffffffu), 0x407ffffeu);
     // (2 - 0.5 ulp) x (1 + 1 ulp) = 2 exactly
-    check_equal(__mulsf3(0xbfffffffu, 0x3f800001u), 0xc0000000u);
+    check_equal(__h3_mulsf3(0xbfffffffu, 0x3f800001u), 0xc0000000u);
     // 1.666... * 1.333.. = 2.222...
-    check_equal(__mulsf3(0x3fd55555u, 0x3faaaaaau), 0x400e38e3u);
+    check_equal(__h3_mulsf3(0x3fd55555u, 0x3faaaaaau), 0x400e38e3u);
     // 1.25 x 2^-63 x 1.25 x 2^-64 = 0
     // (normal inputs with subnormal output, and we claim to be FTZ)
-    check_equal(__mulsf3(0x20200000u, 0x1fa00000u), 0x00000000u);
+    check_equal(__h3_mulsf3(0x20200000u, 0x1fa00000u), 0x00000000u);
     // 1.333333 (rounded down) x 1.5 = 2 - 1 ulp
-    check_equal(__mulsf3(0x3faaaaaau, 0x3fc00000u), 0x3fffffffu);
+    check_equal(__h3_mulsf3(0x3faaaaaau, 0x3fc00000u), 0x3fffffffu);
     // 1.333333 (rounded down) x (1.5 + 1 ulp) = 2 exactly
-    check_equal(__mulsf3(0x3faaaaaau, 0x3fc00001u), 0x40000000u);
+    check_equal(__h3_mulsf3(0x3faaaaaau, 0x3fc00001u), 0x40000000u);
     // (1.333333 (rounded down) + 1 ulp) x 1.5 = 2 exactly
-    check_equal(__mulsf3(0x3faaaaabu, 0x3fc00000u), 0x40000000u);
+    check_equal(__h3_mulsf3(0x3faaaaabu, 0x3fc00000u), 0x40000000u);
     // (1.25 - 1 ulp) x (0.8 + 1 ulp) = 1 exactly (exponent increases after rounding)
-    check_equal(__mulsf3(0x3f9fffffu, 0x3f4cccceu), 0x3f800000u);
+    check_equal(__h3_mulsf3(0x3f9fffffu, 0x3f4cccceu), 0x3f800000u);
     // as above, but overflow on exponent increase -> +inf
-    check_equal(__mulsf3(0x3f9fffffu, 0x7f4cccceu), 0x7f800000u);
+    check_equal(__h3_mulsf3(0x3f9fffffu, 0x7f4cccceu), 0x7f800000u);
     // subtract 1 ulp from rhs -> largest normal
-    check_equal(__mulsf3(0x3f9fffffu, 0x7f4ccccdu), 0x7f7fffffu);
+    check_equal(__h3_mulsf3(0x3f9fffffu, 0x7f4ccccdu), 0x7f7fffffu);
     // Round up from subnormal with tricky sign correction:
-    check_equal(__mulsf3(0x0ffffffeu, 0x30000001u), 0x00800000u);
-    check_equal(__mulsf3(0x0ffffffeu, 0xb0000001u), 0x80800000u);
-    check_equal(__mulsf3(0x8ffffffeu, 0x30000001u), 0x80800000u);
-    check_equal(__mulsf3(0x8ffffffeu, 0xb0000001u), 0x00800000u);
+    check_equal(__h3_mulsf3(0x0ffffffeu, 0x30000001u), 0x00800000u);
+    check_equal(__h3_mulsf3(0x0ffffffeu, 0xb0000001u), 0x80800000u);
+    check_equal(__h3_mulsf3(0x8ffffffeu, 0x30000001u), 0x80800000u);
+    check_equal(__h3_mulsf3(0x8ffffffeu, 0xb0000001u), 0x00800000u);
     // (1 + 2^-12)^2: exact tie, even LSB, rounds down
-    check_equal(__mulsf3(0x3f800800u, 0x3f800800u), 0x3f801000u);
+    check_equal(__h3_mulsf3(0x3f800800u, 0x3f800800u), 0x3f801000u);
     // (1 + 2^-23) * 1.5: exact tie, odd LSB, rounds up
-    check_equal(__mulsf3(0x3f800001u, 0x3fc00000u), 0x3fc00002u);
+    check_equal(__h3_mulsf3(0x3f800001u, 0x3fc00000u), 0x3fc00002u);
     // (1 + 2^-23) * (1.5 + 2^-23): guard=1, sticky set only at lowest product bit
-    check_equal(__mulsf3(0x3f800001u, 0x3fc00001u), 0x3fc00003u);
+    check_equal(__h3_mulsf3(0x3f800001u, 0x3fc00001u), 0x3fc00003u);
     // Tricky rounding case that requires carries to propagate from low half
-    check_equal(__mulsf3(0x3f8a2a80u, 0x3f9045deu), 0x3f9bbb3bu);
+    check_equal(__h3_mulsf3(0x3f8a2a80u, 0x3f9045deu), 0x3f9bbb3bu);
     // Half-way between largest subnormal and smallest normal: does not round
     // when exponent is unlimited as there are no sub-fractional 1s.
-    check_equal(__mulsf3(0x00ffffffu, 0x3f000000u), 0x00000000u);
+    check_equal(__h3_mulsf3(0x00ffffffu, 0x3f000000u), 0x00000000u);
     // Subnormal result that rounds up to normal even when rounded with
     // unlimited exponent:
-    check_equal(__mulsf3(0x00fe03f8u, 0x3f010000u), 0x00800000u);
+    check_equal(__h3_mulsf3(0x00fe03f8u, 0x3f010000u), 0x00800000u);
 
     // Random tests generated from host FPU
     for (int i = 0; i < sizeof(random_tests) / sizeof(random_tests[0]); ++i) {
-        if (__mulsf3(random_tests[i].lhs, random_tests[i].rhs) != random_tests[i].expect) {
+        if (__h3_mulsf3(random_tests[i].lhs, random_tests[i].rhs) != random_tests[i].expect) {
             tb_printf("%08x, %08x -> expected %08x, got %08x\n",
                 random_tests[i].lhs, random_tests[i].rhs, random_tests[i].expect,
-                __mulsf3(random_tests[i].lhs, random_tests[i].rhs)
+                __h3_mulsf3(random_tests[i].lhs, random_tests[i].rhs)
             );
             tb_exit(-1);
         }
@@ -1141,116 +1142,116 @@ int main() {
     // f64 (excluded on RVE)
 #ifdef __riscv_i
     // 1 * 1 = 1
-    check_equal64(__muldf3(0x3ff0000000000000u, 0x3ff0000000000000u), 0x3ff0000000000000u);
+    check_equal64(__h3_muldf3(0x3ff0000000000000u, 0x3ff0000000000000u), 0x3ff0000000000000u);
     // 1 * -1 = -1
-    check_equal64(__muldf3(0x3ff0000000000000u, 0xbff0000000000000u), 0xbff0000000000000u);
+    check_equal64(__h3_muldf3(0x3ff0000000000000u, 0xbff0000000000000u), 0xbff0000000000000u);
     // -1 * 1 = -1
-    check_equal64(__muldf3(0xbff0000000000000u, 0x3ff0000000000000u), 0xbff0000000000000u);
+    check_equal64(__h3_muldf3(0xbff0000000000000u, 0x3ff0000000000000u), 0xbff0000000000000u);
     // -1 * -1 = 1
-    check_equal64(__muldf3(0xbff0000000000000u, 0xbff0000000000000u), 0x3ff0000000000000u);
+    check_equal64(__h3_muldf3(0xbff0000000000000u, 0xbff0000000000000u), 0x3ff0000000000000u);
     // -0 * 0 = -0
-    check_equal64(__muldf3(0x8000000000000000u, 0x0000000000000000u), 0x8000000000000000u);
+    check_equal64(__h3_muldf3(0x8000000000000000u, 0x0000000000000000u), 0x8000000000000000u);
     // 0 * -0 = - 0
-    check_equal64(__muldf3(0x0000000000000000u, 0x8000000000000000u), 0x8000000000000000u);
+    check_equal64(__h3_muldf3(0x0000000000000000u, 0x8000000000000000u), 0x8000000000000000u);
     // +0 * +0 = +0
-    check_equal64(__muldf3(0x0000000000000000u, 0x0000000000000000u), 0x0000000000000000u);
+    check_equal64(__h3_muldf3(0x0000000000000000u, 0x0000000000000000u), 0x0000000000000000u);
     // -0 * -0 = +0 (sign XOR of two negatives)
-    check_equal64(__muldf3(0x8000000000000000u, 0x8000000000000000u), 0x0000000000000000u);
+    check_equal64(__h3_muldf3(0x8000000000000000u, 0x8000000000000000u), 0x0000000000000000u);
     // 1 * 2 = 2
-    check_equal64(__muldf3(0x3ff0000000000000u, 0x4000000000000000u), 0x4000000000000000u);
+    check_equal64(__h3_muldf3(0x3ff0000000000000u, 0x4000000000000000u), 0x4000000000000000u);
     // 2 * 1 = 2
-    check_equal64(__muldf3(0x4000000000000000u, 0x3ff0000000000000u), 0x4000000000000000u);
+    check_equal64(__h3_muldf3(0x4000000000000000u, 0x3ff0000000000000u), 0x4000000000000000u);
     // inf * inf = inf
-    check_equal64(__muldf3(0x7ff0000000000000u, 0x7ff0000000000000u), 0x7ff0000000000000u);
+    check_equal64(__h3_muldf3(0x7ff0000000000000u, 0x7ff0000000000000u), 0x7ff0000000000000u);
     // inf * -inf = -inf
-    check_equal64(__muldf3(0x7ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
+    check_equal64(__h3_muldf3(0x7ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
     // -inf * inf = -inf
-    check_equal64(__muldf3(0xfff0000000000000u, 0x7ff0000000000000u), 0xfff0000000000000u);
+    check_equal64(__h3_muldf3(0xfff0000000000000u, 0x7ff0000000000000u), 0xfff0000000000000u);
     // -inf * -inf = inf
-    check_equal64(__muldf3(0xfff0000000000000u, 0xfff0000000000000u), 0x7ff0000000000000u);
+    check_equal64(__h3_muldf3(0xfff0000000000000u, 0xfff0000000000000u), 0x7ff0000000000000u);
     // inf * 0 = nan
-    check_equal64(__muldf3(0x7ff0000000000000u, 0x0000000000000000u), 0xffffffffffffffffu);
+    check_equal64(__h3_muldf3(0x7ff0000000000000u, 0x0000000000000000u), 0xffffffffffffffffu);
     // 0 * inf = nan
-    check_equal64(__muldf3(0x0000000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
+    check_equal64(__h3_muldf3(0x0000000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
     // inf * -0 = nan
-    check_equal64(__muldf3(0x7ff0000000000000u, 0x8000000000000000u), 0xffffffffffffffffu);
+    check_equal64(__h3_muldf3(0x7ff0000000000000u, 0x8000000000000000u), 0xffffffffffffffffu);
     // -0 * inf = nan
-    check_equal64(__muldf3(0x8000000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
+    check_equal64(__h3_muldf3(0x8000000000000000u, 0x7ff0000000000000u), 0xffffffffffffffffu);
     // 1 * -inf = -inf
-    check_equal64(__muldf3(0x3ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
+    check_equal64(__h3_muldf3(0x3ff0000000000000u, 0xfff0000000000000u), 0xfff0000000000000u);
     // -inf * 1 = -inf
-    check_equal64(__muldf3(0xfff0000000000000u, 0x3ff0000000000000u), 0xfff0000000000000u);
+    check_equal64(__h3_muldf3(0xfff0000000000000u, 0x3ff0000000000000u), 0xfff0000000000000u);
     // -1 * inf = -inf
-    check_equal64(__muldf3(0xbff0000000000000u, 0x7ff0000000000000u), 0xfff0000000000000u);
+    check_equal64(__h3_muldf3(0xbff0000000000000u, 0x7ff0000000000000u), 0xfff0000000000000u);
     // inf * -1 = -inf
-    check_equal64(__muldf3(0x7ff0000000000000u, 0xbff0000000000000u), 0xfff0000000000000u);
+    check_equal64(__h3_muldf3(0x7ff0000000000000u, 0xbff0000000000000u), 0xfff0000000000000u);
     // 1 * nonzero subnormal = exactly 0
-    check_equal64(__muldf3(0x3ff0000000000000u, 0x000fffffffffffffu), 0x0000000000000000u);
+    check_equal64(__h3_muldf3(0x3ff0000000000000u, 0x000fffffffffffffu), 0x0000000000000000u);
     // nonzero subnormal * -1 = exactly -0
-    check_equal64(__muldf3(0x000fffffffffffffu, 0xbff0000000000000u), 0x8000000000000000u);
+    check_equal64(__h3_muldf3(0x000fffffffffffffu, 0xbff0000000000000u), 0x8000000000000000u);
     // -subnormal * 1 = -0 (negative subnormal flushed to -0)
-    check_equal64(__muldf3(0x800fffffffffffffu, 0x3ff0000000000000u), 0x8000000000000000u);
+    check_equal64(__h3_muldf3(0x800fffffffffffffu, 0x3ff0000000000000u), 0x8000000000000000u);
     // -subnormal * -1 = +0 (sign XOR of -0 and -1)
-    check_equal64(__muldf3(0x800fffffffffffffu, 0xbff0000000000000u), 0x0000000000000000u);
+    check_equal64(__h3_muldf3(0x800fffffffffffffu, 0xbff0000000000000u), 0x0000000000000000u);
     // nan * 0 = same nan
-    check_equal64(__muldf3(0xffff1234abcdabcdu, 0x0000000000000000u), 0xffff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0xffff1234abcdabcdu, 0x0000000000000000u), 0xffff1234abcdabcdu);
     // nan * nan = first nan (implementation detail)
-    check_equal64(__muldf3(0x7fff1234abcdabcdu, 0x7fff5678def0def0u), 0x7fff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0x7fff1234abcdabcdu, 0x7fff5678def0def0u), 0x7fff1234abcdabcdu);
     // 0 * nan = same nan
-    check_equal64(__muldf3(0x0000000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0x0000000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
     // nan * 1 = same nan
-    check_equal64(__muldf3(0xffff1234abcdabcdu, 0x3ff0000000000000u), 0xffff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0xffff1234abcdabcdu, 0x3ff0000000000000u), 0xffff1234abcdabcdu);
     // 1 * nan = same nan
-    check_equal64(__muldf3(0x3ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0x3ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
     // nan * inf = same nan
-    check_equal64(__muldf3(0xffff1234abcdabcdu, 0x7ff0000000000000u), 0xffff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0xffff1234abcdabcdu, 0x7ff0000000000000u), 0xffff1234abcdabcdu);
     // inf * nan = same nan
-    check_equal64(__muldf3(0x7ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
+    check_equal64(__h3_muldf3(0x7ff0000000000000u, 0xffff1234abcdabcdu), 0xffff1234abcdabcdu);
     // (2 - 0.5 ulp) x (2 - 0.5 ulp) = 4 - 1 ulp
-    check_equal64(__muldf3(0x3fffffffffffffffu, 0x3fffffffffffffffu), 0x400ffffffffffffeu);
+    check_equal64(__h3_muldf3(0x3fffffffffffffffu, 0x3fffffffffffffffu), 0x400ffffffffffffeu);
     // -(2 - 0.5 ulp) x (1 + 1 ulp) = -2 exactly
-    check_equal64(__muldf3(0xbfffffffffffffffu, 0x3ff0000000000001u), 0xc000000000000000u);
+    check_equal64(__h3_muldf3(0xbfffffffffffffffu, 0x3ff0000000000001u), 0xc000000000000000u);
     // 1.666... * 1.333.. = 2.222...
-    check_equal64(__muldf3(0x3ffaaaaaaaaaaaaau, 0x3ff5555555555555u), 0x4001c71c71c71c71u);
+    check_equal64(__h3_muldf3(0x3ffaaaaaaaaaaaaau, 0x3ff5555555555555u), 0x4001c71c71c71c71u);
     // 1.25 x 2^-511 x 1.25 x 2^-512 = 0
     // (normal inputs with subnormal output, and we claim to be FTZ)
-    check_equal64(__muldf3(0x2004000000000000u, 0x1ff4000000000000u), 0x0000000000000000u);
+    check_equal64(__h3_muldf3(0x2004000000000000u, 0x1ff4000000000000u), 0x0000000000000000u);
     // 1.333333... x 1.5 = 2 exactly (exponent increases after rounding)
-    check_equal64(__muldf3(0x3ff5555555555555u, 0x3ff8000000000000u), 0x4000000000000000u);
+    check_equal64(__h3_muldf3(0x3ff5555555555555u, 0x3ff8000000000000u), 0x4000000000000000u);
     // 1.333333... x (1.5 - 1 ulp) = 2 - 1 ulp
-    check_equal64(__muldf3(0x3ff5555555555555u, 0x3ff7ffffffffffffu), 0x3ffffffffffffffeu);
+    check_equal64(__h3_muldf3(0x3ff5555555555555u, 0x3ff7ffffffffffffu), 0x3ffffffffffffffeu);
     // (1.333333... - 1 ulp) x 1.5 = 2 - 1 ulp
-    check_equal64(__muldf3(0x3ff5555555555554u, 0x3ff8000000000000u), 0x3ffffffffffffffeu);
+    check_equal64(__h3_muldf3(0x3ff5555555555554u, 0x3ff8000000000000u), 0x3ffffffffffffffeu);
     // (1.333333... - 1 ulp) x (1.5 + 1 ulp) = 2 - 0.5 ulp
-    check_equal64(__muldf3(0x3ff5555555555554u, 0x3ff8000000000001u), 0x3fffffffffffffffu);
+    check_equal64(__h3_muldf3(0x3ff5555555555554u, 0x3ff8000000000001u), 0x3fffffffffffffffu);
     // 1.333333... x (1.5 + 2 ulp) = 2 + 1 ulp
-    check_equal64(__muldf3(0x3ff5555555555555u, 0x3ff8000000000002u), 0x4000000000000001u);
+    check_equal64(__h3_muldf3(0x3ff5555555555555u, 0x3ff8000000000002u), 0x4000000000000001u);
     // 1.25 x 0.8 = 1 exactly
-    check_equal64(__muldf3(0x3ff4000000000000u, 0x3fe999999999999au), 0x3ff0000000000000u);
+    check_equal64(__h3_muldf3(0x3ff4000000000000u, 0x3fe999999999999au), 0x3ff0000000000000u);
     // (1.25 - 1 ulp) x (0.8 + 1ulp) = 1 exactly (exponent increases before rounding)
-    check_equal64(__muldf3(0x3ff3ffffffffffffu, 0x3fe999999999999bu), 0x3ff0000000000000u);
+    check_equal64(__h3_muldf3(0x3ff3ffffffffffffu, 0x3fe999999999999bu), 0x3ff0000000000000u);
     // (1.333333... x 2^1022) x 1.5: rounds up to infinity
-    check_equal64(__muldf3(0x7fe5555555555555u, 0x3ff8000000000000u), 0x7ff0000000000000u);
+    check_equal64(__h3_muldf3(0x7fe5555555555555u, 0x3ff8000000000000u), 0x7ff0000000000000u);
     // subtract 1 ulp from rhs -> largest normal - 1 ulp
-    check_equal64(__muldf3(0x7fe5555555555555u, 0x3ff7ffffffffffffu), 0x7feffffffffffffeu);
+    check_equal64(__h3_muldf3(0x7fe5555555555555u, 0x3ff7ffffffffffffu), 0x7feffffffffffffeu);
     // Add 1 ulp to rhs -> still +inf (significand is cleared correctly)
-    check_equal64(__muldf3(0x7fe5555555555555u, 0x3ff8000000000001u), 0x7ff0000000000000u);
+    check_equal64(__h3_muldf3(0x7fe5555555555555u, 0x3ff8000000000001u), 0x7ff0000000000000u);
     // Round up from subnormal to normal:
-    check_equal64(__muldf3(0x0015555555555555u, 0x3fe8000000000000u), 0x0010000000000000u);
+    check_equal64(__h3_muldf3(0x0015555555555555u, 0x3fe8000000000000u), 0x0010000000000000u);
     // Pi ^ 2, why not
-    check_equal64(__muldf3(0x400921fb5441c55eu, 0x400921fb5441c55eu), 0x4023bd3cc9ba7eb0u);
+    check_equal64(__h3_muldf3(0x400921fb5441c55eu, 0x400921fb5441c55eu), 0x4023bd3cc9ba7eb0u);
     // (1 + 2^-26) * (1 + 2^-27): exact tie, even LSB, rounds down
-    check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000002000000u), 0x3ff0000006000000u);
+    check_equal64(__h3_muldf3(0x3ff0000004000000u, 0x3ff0000002000000u), 0x3ff0000006000000u);
     // (1 + 3 * 2^-26) * (1 + 2^-27): exact tie, odd LSB, rounds up
-    check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000002000000u), 0x3ff000000e000002u);
+    check_equal64(__h3_muldf3(0x3ff000000c000000u, 0x3ff0000002000000u), 0x3ff000000e000002u);
     // (1 + 2^-26) * (1 + 2^-27 + ulp): odd LSB, above tie, rounds up
-    check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000002000001u), 0x3ff0000006000002u);
+    check_equal64(__h3_muldf3(0x3ff0000004000000u, 0x3ff0000002000001u), 0x3ff0000006000002u);
     // (1 + 3 * 2^-26) * (1 + 2^-27 + ulp): even LSB, above tie, rounds up
-    check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000002000001u), 0x3ff000000e000003u);
+    check_equal64(__h3_muldf3(0x3ff000000c000000u, 0x3ff0000002000001u), 0x3ff000000e000003u);
     // (1 + 3 * 2^-26) * (1 + 2^-27 - ulp): even LSB, below tie, rounds down
-    check_equal64(__muldf3(0x3ff000000c000000u, 0x3ff0000001ffffffu), 0x3ff000000e000000u);
+    check_equal64(__h3_muldf3(0x3ff000000c000000u, 0x3ff0000001ffffffu), 0x3ff000000e000000u);
     // (1 + 1 * 2^-26) * (1 + 2^-27 - ulp): even LSB, below tie, rounds down
-    check_equal64(__muldf3(0x3ff0000004000000u, 0x3ff0000001ffffffu), 0x3ff0000005ffffffu);
+    check_equal64(__h3_muldf3(0x3ff0000004000000u, 0x3ff0000001ffffffu), 0x3ff0000005ffffffu);
 #endif
 
 	return 0;

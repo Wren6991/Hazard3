@@ -7,9 +7,13 @@ else
     MABI := ilp32e
 endif
 
+# Avoid shadowing libgcc implementations of float functions (e.g. if we want
+# to test Xh3sfx versions against the upstream default soft float lib):
+DEFINES    := XH3SFX_LIB_PREFIX=__h3_
+
 APP        := hellow
 SRCS        = ../common/init.S $(APP).c $(EXTRA_SRCS_$(APP))
-CCFLAGS    := -march=$(MARCH) -mabi=$(MABI) -Os
+CCFLAGS    := -march=$(MARCH) -mabi=$(MABI) -Os $(addprefix -D,$(DEFINES))
 MAX_CYCLES := 1000000
 INCDIR     := include ../common
 
