@@ -429,14 +429,14 @@ decl_func_with_section mulhf3
 	h3.funpackq3.h a4, a0
 	h3.funpackq3.h a5, a1
 	// Scale down so multiply result is Q3.29. Shift is exact as we're
-	// shifting zeroes.
+	// shifting zeroes (19 trailing zeroes on unpacked f16).
 	srai a4, a4, 14
 	srai a5, a5, 15
 	mul a4, a4, a5
-	// Result is in range 1 <= |x| < 4. For f16 inputs it's guaranteed not to
-	// round up to 4 (both inputs all-ones -> ~2 ulps below). Therefore
-	// within normalisation range of fpackrq3.h (max shift >>1)
+	h3.feadjq3 a5, a4
+	h3.ssra a4, a4, a5
 	add a2, a2, a3
+	add a2, a2, a5
 	addi a2, a2, -15
 	h3.fpackrq3.h a0, a4, a2
 	ret
