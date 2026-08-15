@@ -419,7 +419,7 @@ __mulsf_x_nan_inf:
 	ret // return x
 #endif // XH3SFX_FEAT_MULS
 
-// Half-precision: essentially the same as single-precision
+// Half-precision: essentially the same as single-precision.
 #if !defined(XH3SFX_FEAT_MULH) || XH3SFX_FEAT_MULH
 decl_func_with_section mulhf3
 	h3.bextmi a2, a0, 10, 5
@@ -459,30 +459,44 @@ __mulhf_y_nan_inf:
 	ret
 
 __mulhf_x_0:
+	// Return signed 0 for 0 * 0 and 0 * norm
 	bne a3, t0, __mulhf_return_flushed_x
+	// Generate nan for 0 * inf
 	beqz a5, 1f
+	// Propagate nan for 0 * nan
 __mulhf_return_y:
-	mv a0, a1
+	sext.h a0, a1
 	ret
 
 __mulhf_y_0:
+	// Return signed 0 for norm * 0
 	bne a2, t0, __mulhf_return_flushed_x
+	// Propagate nan for nan * 0
 	bnez a4, 2f
+	// Generate nan for inf * 0
 1:
 	li a0, -1
 2:
+	sext.h a0, a0
 	ret
 
 __mulhf_return_flushed_x:
+	// Return +-0 (always sign-extended from 15 to match Zhinx)
 	srli a0, a0, 15
 	slli a0, a0, 15
 __mulhf_return_x:
+	sext.h a0, a0
 	ret
 
 __mulhf_x_nan_inf:
+	// Propagate first nan for nan * norm, nan * nan, nan * inf
 	bnez a4, __mulhf_return_x
+	// Propagate inf for inf * norm
 	bne a3, t0, __mulhf_return_x
+	// Propagate nan for inf * nan
 	bnez a5, __mulhf_return_y
+	// Propagate inf for inf * inf
+	sext.h a0, a0
 	ret
 #endif // XH3SFX_FEAT_MULH
 
