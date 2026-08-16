@@ -783,6 +783,10 @@ always @ (*) begin
 		MEMOP_SB:  bus_hsize_d = HSIZE_BYTE;
 		default:   bus_hsize_d = HSIZE_WORD;
 	endcase
+end
+
+// Separate to avoid scheduling feedback on bus_hsize_d -> x_unaligned_addr
+always @ (*) begin
 	bus_aph_req_d = x_memop_vld && !(
 		x_stall_on_raw ||
 		x_stall_on_exclusive_overlap ||
