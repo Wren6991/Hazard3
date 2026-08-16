@@ -38,17 +38,6 @@
 #define XH3SFX_AVOID_HIGH_IMUL 0
 #endif
 
-.macro decl_func name
-.p2align 2
-.global XH3SFX_LIB_PREFIX\name
-XH3SFX_LIB_PREFIX\name:
-.endm
-
-.macro decl_func_with_section name
-.section XH3SFX_LIB_SECTION.xh3sfxlib.\name
-decl_func \name
-.endm
-
 // ----------------------------------------------------------------------------
 // Feature configuration
 
@@ -129,6 +118,26 @@ decl_func \name
 #define XH3SFX_FEAT_MULD 0
 #endif
 #endif
+
+// ----------------------------------------------------------------------------
+// Helper macros
+
+.macro decl_func name
+.p2align 2
+.global XH3SFX_LIB_PREFIX\name
+XH3SFX_LIB_PREFIX\name:
+.endm
+
+.macro decl_func_with_section name
+.section XH3SFX_LIB_SECTION.xh3sfxlib.\name
+decl_func \name
+.endm
+
+// Helper macro to get symbol name for intra-library calls (note middle CATX
+// layer is required for expansion of literal XH3SFX_LIB_PREFIX):
+#define _XH3SFX_CAT(a, b) a ## b
+#define _XH3SFX_CATX(a, b) _XH3SFX_CAT(a, b)
+#define XH3SFX_FUNCNAME(name) _XH3SFX_CATX(XH3SFX_LIB_PREFIX, name)
 
 // ----------------------------------------------------------------------------
 // Add and subtract (f32 and f16)
@@ -280,7 +289,7 @@ decl_func_with_section mulsf3
 	h3.bextmi a3, a1, 23, 8
 	h3.fcheck2e.s t0, a2, a3
 	bnez t0, __mulsf_special_exponent
-#ifndef XH3SFX_AVOID_HIGH_IMUL
+#if !XH3SFX_AVOID_HIGH_IMUL
 	// Path for when mul and mulh are equally fast
 	h3.funpackq3.s a4, a0
 	h3.funpackq3.s a5, a1
@@ -724,6 +733,45 @@ __fixunssfdi_neg:
 	li a0, 0
 	li a1, 0
 	ret
+
+// Convert signed 64-bit integer to single-precision float
+decl_func_with_section floatdisf
+	// Convert to sign-magnitude (sign in a5)
+	srai a5, a1, 31
+	bgez a5, 1f
+	seqz t0, a0
+	neg a0, a0
+	not a1, a1
+	add a1, a1, t0
+1:
+	// Perform unsigned conversion, then re-apply sign
+	mv t0, ra
+	jal XH3SFX_FUNCNAME(floatundisf)
+	bgez a5, 1f
+	binvi a0, a0, 31
+1:
+	jr t0
+
+// Convert unsigned 64-bit integer to single-precision float
+decl_func_with_section floatundisf
+	beqz a1, __floatundisf_small
+	h3.feadju3 a2, a1
+	h3.ssrlsticky a1, a1, a2
+	addi a2, a2, 32
+	h3.ssrlsticky a0, a0, a2
+	or a1, a1, a0
+	addi a2, a2, 127 + 29
+	h3.fpackrq3.s a0, a1, a2
+	ret
+__floatundisf_small:
+	// This is really the same thing as floatunsisf, but it's small, so put a
+	// copy in the same section to avoid branch relaxation on the beqz
+	h3.feadju3 a1, a0
+	h3.ssrlsticky a0, a0, a1
+	addi a1, a1, 127 + 29
+	h3.fpackrq3.s a0, a0, a1
+	ret
+
 #endif
 
 // ----------------------------------------------------------------------------

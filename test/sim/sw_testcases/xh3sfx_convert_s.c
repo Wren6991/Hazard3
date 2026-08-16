@@ -21,12 +21,13 @@ uint32_t __h3_truncsfhf2(uint32_t x);  // f32 -> f16
 
 uint32_t __h3_fixsfsi(uint32_t x);     // f32 -> i32
 uint32_t __h3_fixunssfsi(uint32_t x);  // f32 -> u32
-
 uint32_t __h3_floatsisf(uint32_t x);   // i32 -> f32
 uint32_t __h3_floatunsisf(uint32_t x); // u32 -> f32
 
 uint64_t __h3_fixsfdi(uint32_t x);     // f32 -> i64
 uint64_t __h3_fixunssfdi(uint32_t x);  // f32 -> u64
+uint32_t __h3_floatdisf(uint64_t x);   // i64 -> f32
+uint32_t __h3_floatundisf(uint64_t x); // u64 -> f32
 
 int main() {
     // ------------------------------------------------------------------------
@@ -163,7 +164,7 @@ int main() {
     check_equal(__h3_floatunsisf(UINT_MAX               ), 0x4f800000); // max exponent
 
     // ------------------------------------------------------------------------
-    // f32 <-> i64
+    // f32 -> i64
 
     check_equal64(__h3_fixsfdi(0x00000000u), 0x0000000000000000u); // +-0
     check_equal64(__h3_fixsfdi(0x80000000u), 0x0000000000000000u);
@@ -177,11 +178,21 @@ int main() {
         check_equal64(__h3_fixsfdi(0x3f800001u + (i << 23)), i < 23 ?   0x800001ll >> (23 - i)  :   0x800001ll << (i - 23) );
         check_equal64(__h3_fixsfdi(0xbf800001u + (i << 23)), i < 23 ? -(0x800001ll >> (23 - i)) : -(0x800001ll << (i - 23)));
     }
-    check_equal64(__h3_fixsfdi(0x3f800001u + (64 << 23)), 0x7fffffffffffffffu);
-    check_equal64(__h3_fixsfdi(0xbf800001u + (64 << 23)), 0x8000000000000000u);
+    check_equal64(__h3_fixsfdi(0x3f800001u + (63 << 23)), 0x7fffffffffffffffu);
+    check_equal64(__h3_fixsfdi(0xbf800001u + (63 << 23)), 0x8000000000000000u);
 
     // ------------------------------------------------------------------------
-    // f32 <-> u64
+    // i64 -> f32
+
+    for (unsigned int i = 0; i < 63; ++i) {
+        check_equal(__h3_floatdisf(1ull << i), 0x3f800000u + (i << 23));
+        check_equal(__h3_floatdisf(0xffffffffffffffffull << i), 0xbf800000u + (i << 23));
+    }
+    check_equal(__h3_floatdisf(0x7fffffffffffffffull), 0x3f800000u + (63u << 23));
+    check_equal(__h3_floatdisf(0x8000000000000000ull), 0xbf800000u + (63u << 23));
+
+    // ------------------------------------------------------------------------
+    // f32 -> u64
 
     check_equal64(__h3_fixunssfdi(0x00000000u), 0x0000000000000000u); // +-0
     check_equal64(__h3_fixunssfdi(0x80000000u), 0x0000000000000000u);
@@ -194,8 +205,17 @@ int main() {
     for (unsigned int i = 0; i < 64u; ++i) {
         check_equal64(__h3_fixunssfdi(0x3f800001u + (i << 23)), i < 23 ? 0x800001ull >> (23 - i) : 0x800001ull << (i - 23));
     }
+    check_equal64(__h3_fixunssfdi(0x3f800001u + (64 << 23)), 0xffffffffffffffffu);
 
+    // ------------------------------------------------------------------------
+    // u64 -> f32
 
+    for (unsigned int i = 0; i < 64; ++i) {
+        check_equal(__h3_floatundisf(1ull << i), 0x3f800000u + (i << 23));
+    }
+    check_equal(__h3_floatundisf(0xffffffffffffffffull), 0x3f800000u + (64u << 23));
+    check_equal(__h3_floatundisf(0xffffff8000000000ull), 0x3f800000u + (64u << 23));
+    check_equal(__h3_floatundisf(0xffffff0000000000ull), 0x3fffffffu + (63u << 23));
 
 	return 0;
 }
