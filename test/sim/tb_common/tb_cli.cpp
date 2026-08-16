@@ -22,6 +22,9 @@ static const char *help_str =
 "    --logfile path   : File to write testbench stdout\n"
 "    --sigfile path   : File to write only the data from --dump commands\n"
 "                       (hex, 32 bits per line, same as riscv-arch-test)\n"
+#ifdef COVERAGE
+"    --coverage path  : File to write RTL coverage data to\n"
+#endif
 #ifdef CXXRTL_DEBUG_AGENT
 "    --debug          : Run CXXRTL debugger\n"
 #endif
@@ -62,6 +65,13 @@ void tb_parse_args(int argc, char **argv, tb_cli_args &args) {
 			if (argc - i < 2)
 				exit_help("Option --sigfile requires an argument\n");
 			args.sig_path = argv[i + 1];
+			i += 1;
+		} else if (s == "--coverage") {
+			// Still parse this when COVERAGE is not defined, so it's
+			// swallowed as a no-op.
+			if (argc - i < 2)
+				exit_help("Option --coverage requires an argument\n");
+			args.coverage_path = argv[i + 1];
 			i += 1;
 		} else if (s == "--jtagdump") {
 			if (argc - i < 2)

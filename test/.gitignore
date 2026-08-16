@@ -5,3 +5,4 @@
 *.elf
 *.dis
 *.log
+*.cov

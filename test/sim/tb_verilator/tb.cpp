@@ -1,6 +1,9 @@
 #include "Vtb.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
+#ifdef COVERAGE
+#include "verilated_cov.h"
+#endif
 
 #include <iostream>
 #include <cstdint>
@@ -28,6 +31,14 @@ public:
 	~tb_verilator_top() {if (vcd) {vcd->close(); delete vcd;} delete top; delete contextp;}
 
 	void step(const tb_cli_args &args, mem_io_state &memio) override;
+
+	void dump_coverage(const std::string &path) {
+#ifdef COVERAGE
+		if (!path.empty()) {
+			contextp->coveragep()->write(path);
+		}
+#endif
+	}
 
 	void set_trst_n(bool trst_n)     override {top->trst_n = trst_n;}
 	void set_tck(bool tck)           override {top->tck = tck;}
@@ -73,6 +84,10 @@ tb_verilator_top::tb_verilator_top(const tb_cli_args &parsed_args, int argc, cha
 	top->trst_n = true;
 	top->rst_n = true;
 	top->eval();
+
+#ifdef COVERAGE
+	contextp->coveragep()->zero();
+#endif
 }
 
 void tb_verilator_top::step(const tb_cli_args &args, mem_io_state &memio) {
@@ -175,9 +190,6 @@ int main(int argc, char **argv) {
 	tb_cli_args args;
 	tb_parse_args(argc, argv, args);
 
-	VerilatedContext *contextp = new VerilatedContext;
-	contextp->commandArgs(argc, argv);
-
 	tb_jtag_state jtag(args);
 	mem_io_state memio(args);
 	tb_verilator_top tb(args, argc, argv);
@@ -226,6 +238,8 @@ int main(int argc, char **argv) {
 		}
 		fclose(sigfile);
 	}
+
+	tb.dump_coverage(args.coverage_path);
 
 	if (args.propagate_return_code && timed_out) {
 		return -1;
