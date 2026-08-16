@@ -4,22 +4,29 @@
 #include <stddef.h>
 #include <limits.h>
 
-// Test for Xh3sfx conversion routines
+// Test for Xh3sfx conversion from f32 to/from other types (including f32 <-> f16).
 
 // ebreak is easier to find in waves.
 #if 1
 #define check_equal(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %08x != %08x\n", __LINE__, (a), (b))
+#define check_equal64(a, b) tb_assert((a) == (b), "Line %d: " #a " == " #b "\nGot: %016llx != %16llx\n", __LINE__, (a), (b))
 #else
 #define check_equal(a, b) if ((a) != (b)) {asm ("ebreak");}
+#define check_equal64(a, b) if ((a) != (b)) {asm ("ebreak");}
 #endif
 
 // Data types other than unsigned bit vector are not real and cannot hurt you
-uint32_t __h3_extendhfsf2(uint16_t x);
-uint32_t __h3_truncsfhf2(uint32_t x);
-uint32_t __h3_fixsfsi(uint32_t x);
-uint32_t __h3_fixunssfsi(uint32_t x);
-uint32_t __h3_floatsisf(uint32_t x);
-uint32_t __h3_floatunsisf(uint32_t x);
+uint32_t __h3_extendhfsf2(uint16_t x); // f16 -> f32
+uint32_t __h3_truncsfhf2(uint32_t x);  // f32 -> f16
+
+uint32_t __h3_fixsfsi(uint32_t x);     // f32 -> i32
+uint32_t __h3_fixunssfsi(uint32_t x);  // f32 -> u32
+
+uint32_t __h3_floatsisf(uint32_t x);   // i32 -> f32
+uint32_t __h3_floatunsisf(uint32_t x); // u32 -> f32
+
+uint64_t __h3_fixsfdi(uint32_t x);     // f32 -> i64
+uint64_t __h3_fixunssfdi(uint32_t x);  // f32 -> u64
 
 int main() {
     // ------------------------------------------------------------------------
@@ -154,6 +161,41 @@ int main() {
     check_equal(__h3_floatunsisf(UINT_MAX - (1 << 8) + 1), 0x4f7fffff); // largest non-saturated
     check_equal(__h3_floatunsisf((UINT_MAX >> 1) + 1    ), 0x4f000000); // one less than max exponent
     check_equal(__h3_floatunsisf(UINT_MAX               ), 0x4f800000); // max exponent
+
+    // ------------------------------------------------------------------------
+    // f32 <-> i64
+
+    check_equal64(__h3_fixsfdi(0x00000000u), 0x0000000000000000u); // +-0
+    check_equal64(__h3_fixsfdi(0x80000000u), 0x0000000000000000u);
+    check_equal64(__h3_fixsfdi(0x3f800000u), 0x0000000000000001u); // +- 1 (note all negatives should be clamped to 0)
+    check_equal64(__h3_fixsfdi(0xbf800000u), 0xffffffffffffffffu);
+    check_equal64(__h3_fixsfdi(0x3f000000u), 0x0000000000000000u); // +- 1/2
+    check_equal64(__h3_fixsfdi(0xbf000000u), 0x0000000000000000u);
+    check_equal64(__h3_fixsfdi(0x7f800000u), 0x7fffffffffffffffu); // +- inf
+    check_equal64(__h3_fixsfdi(0xff800000u), 0x8000000000000000u);
+    for (unsigned int i = 0; i < 63u; ++i) {
+        check_equal64(__h3_fixsfdi(0x3f800001u + (i << 23)), i < 23 ?   0x800001ll >> (23 - i)  :   0x800001ll << (i - 23) );
+        check_equal64(__h3_fixsfdi(0xbf800001u + (i << 23)), i < 23 ? -(0x800001ll >> (23 - i)) : -(0x800001ll << (i - 23)));
+    }
+    check_equal64(__h3_fixsfdi(0x3f800001u + (64 << 23)), 0x7fffffffffffffffu);
+    check_equal64(__h3_fixsfdi(0xbf800001u + (64 << 23)), 0x8000000000000000u);
+
+    // ------------------------------------------------------------------------
+    // f32 <-> u64
+
+    check_equal64(__h3_fixunssfdi(0x00000000u), 0x0000000000000000u); // +-0
+    check_equal64(__h3_fixunssfdi(0x80000000u), 0x0000000000000000u);
+    check_equal64(__h3_fixunssfdi(0x3f800000u), 0x0000000000000001u); // +- 1 (note all negatives should be clamped to 0)
+    check_equal64(__h3_fixunssfdi(0xbf800000u), 0x0000000000000000u);
+    check_equal64(__h3_fixunssfdi(0x3f000000u), 0x0000000000000000u); // +- 1/2
+    check_equal64(__h3_fixunssfdi(0xbf000000u), 0x0000000000000000u);
+    check_equal64(__h3_fixunssfdi(0x7f800000u), 0xffffffffffffffffu); // +- inf
+    check_equal64(__h3_fixunssfdi(0xff800000u), 0x0000000000000000u);
+    for (unsigned int i = 0; i < 64u; ++i) {
+        check_equal64(__h3_fixunssfdi(0x3f800001u + (i << 23)), i < 23 ? 0x800001ull >> (23 - i) : 0x800001ull << (i - 23));
+    }
+
+
 
 	return 0;
 }
