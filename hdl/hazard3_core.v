@@ -1404,6 +1404,11 @@ assign m_exception_return_addr = d_pc - (
 	prev_instr_was_32_bit ? 32'd4 : 32'd2
 );
 
+wire m_unblock_signal_received =
+	unblock_in ||
+	unblock_out ||
+	xm_except == EXCEPT_MRET;
+
 hazard3_power_ctrl #(
 `include "hazard3_config_inst.vh"
 ) power_ctrl (
@@ -1423,7 +1428,7 @@ hazard3_power_ctrl #(
 	.sleeping_on_wfi        (xm_sleep_wfi),
 	.wfi_wakeup_req         (m_wfi_wakeup_req),
 	.sleeping_on_block      (xm_sleep_block),
-	.block_wakeup_req_pulse (unblock_in),
+	.block_wakeup_req_pulse (m_unblock_signal_received),
 	.stall_release          (m_sleep_stall_release)
 );
 

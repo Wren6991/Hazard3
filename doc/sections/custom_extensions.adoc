@@ -65,7 +65,7 @@ This is useful when the PMP is used for non-security-related purposes such as st
 [[extension-xh3power-section]]
 === Xh3power: Hazard3 power management
 
-This document describes Xh3power version: 1.0
+This document describes Xh3power version: 1.1
 
 This extension is enabled by: <<param-EXTENSION_XH3POWER>>
 
@@ -75,15 +75,36 @@ The `h3.msleep` CSR controls how deeply the processor sleeps in the WFI sleep st
 
 The hints allow processors to sleep until woken by other processors in a multiprocessor environment. They are implemented on top of the standard WFI state, which means they interact in the same way with external debug, and benefit from the same deep sleep states in `h3.msleep`.
 
+==== Revisions
+
+Version 1.1 of Xh3power is implemented on Hazard3 stable versions v1.2 onwards. It adds two new conditions for unblock signals:
+
+* The current hart executes an `mret` or `sret` instruction.
+* The current hart executes an `h3.unblock` instruction.
+
+In Xh3power 1.0, unblock signals were only produced by neighbouring harts (which may or may not include the current hart, depending on platform implementation) and any additional platform-specified sources of unblock signals.
+
+The two new conditions in Xh3power 1.1 are intended to make `h3.unblock` and `h3.block` easier to reason about when implementing cooperative sleep in SMP systems, because they avoid failure modes where:
+
+* An interrupt or interrupt-initiated context switch accidentally swallows an unblock signal.
+* Code behaves differently when the producer and consumer of the unblock signal migrate between cores.
+
+Code written against version 1.0 of this extension is generally compatible with version 1.1, because `h3.block` is a NOP-compatible hint for the hart to sleep, and is usually used inside polling loops that detect early wake-up. However, code relying on the new conditions introduced in Xh3power 1.1 may be prone to unbounded sleep (lockup) on Xh3power 1.0.
+
 ==== h3.block
 
 Enter a WFI sleep state until either an unblock signal is received, or an interrupt is asserted that would cause a WFI to exit.
 
+If an unblock signal has been received in the time since the last `h3.block`, this instruction executes as a `nop`, and the hart does not enter the sleep state. Conceptually, the sleep state falls through immediately because the corresponding unblock signal has already been received.
+
 If `mstatus.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
 
-If an unblock signal has been received in the time since the last `h3.block`, this instruction executes as a `nop`, and the processor does not enter the sleep state. Conceptually, the sleep state falls through immediately because the corresponding unblock signal has already been received.
+An unblock signal is received when:
 
-An unblock signal is received when a neighbouring processor (the exact definition of "neighbouring" being left to the implementer) executes an `h3.unblock` instruction, or for some other platform-defined reason.
+* A neighbouring hart (the exact definition of "neighbouring" being left to the implementer) executes an `h3.unblock` instruction.
+* (Xh3power 1.1 onwards) the hart executes an `mret` or `sret` instruction.
+* (Xh3power 1.1 onwards) the current hart executes an `h3.unblock` instruction.
+* Any other platform-defined reason.
 
 This instruction is encoded as `slt x0, x0, x0`, which is part of the custom nop-compatible hint encoding space.
 
@@ -103,7 +124,7 @@ Example assembly macro:
 
 ==== h3.unblock
 
-Post an unblock signal to other processors in the system. For example, to notify another processor that a work queue is now nonempty.
+Post an unblock signal to other harts in the system. For example, to notify another processor that a work queue is now nonempty. Also post an unblock signal to the current hart.
 
 If `mstatus.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
 
@@ -122,6 +143,28 @@ Example assembly macro:
     slt x0, x0, x1
 .endm
 ----
+
+==== Latching Behaviour
+
+An unblock signal sets an internal state bit. `h3.block` sleeps until this state bit is set, then atomically wakes and clears the state bit. To understand why this latching behaviour is necessary, consider this program executing on two harts:
+
+----
+    // Push message to other core
+    sw a0, FIFO_TX_OFFSET(a1)
+    // Notify other core of message
+    h3.unblock
+
+    // Wait for new messages in receiving FIFO
+1:
+    h3.block
+    lw a0, FIFO_RX_VALID_OFFSET(a1)
+    beqz a0, 1b
+
+    // Read message
+    lw a0, FIFO_RX_OFFSET(a1)
+----
+
+Suppose the latching behaviour was not implemented, and `h3.block` was specified as: "sleep until an unblock signal is received". Both cores would send a signal, and then both cores would wait for a signal. No such signal would arrive, because the two cores would both already be asleep, so the system would lock up.
 
 [[extension-xh3bextm-section]]
 === Xh3bextm: Hazard3 Bit Extract Multiple
