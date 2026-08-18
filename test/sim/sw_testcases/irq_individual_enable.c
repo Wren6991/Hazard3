@@ -24,7 +24,7 @@ void __attribute__((interrupt)) isr_external_irq() {
 	tb_puts("-> external irq handler\n");
 	tb_assert(read_csr(mcause) == 0x8000000bu, "mcause should indicate external IRQ\n");
 	// The external IRQ pending bit should immediately clear due to the
-	// premption priority being boosted above the IRQ we took.
+	// preemption priority being boosted above the IRQ we took.
 	tb_assert(read_csr(mip) == 0x080u, "mip should indicate timer IRQ only\n");
 
 	// meinext updates dynamically, should be read exactly once at the start of an

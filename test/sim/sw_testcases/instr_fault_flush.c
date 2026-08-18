@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Test intent: check edge cases for instruction faults, particularly the
-// flushing of speculative faults casued by fetching linearly past a jump
+// flushing of speculative faults caused by fetching linearly past a jump
 // instruction at the edge of a faulting region.
 
 /*EXPECTED-OUTPUT***************************************************************

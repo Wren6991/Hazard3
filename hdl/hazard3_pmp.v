@@ -82,7 +82,7 @@ reg  [W_ADDR-3:0]      pmpaddr  [0:PMP_REGIONS-1];
 
 // Hazard3 extension for applying PMP regions to M-mode without locking.
 // Different from ePMP mseccfg.rlb: low-numbered regions may be locked for
-// security reasons, but higher-numbered regions should stll be available for
+// security reasons, but higher-numbered regions should still be available for
 // other purposes e.g. stack guarding, peripheral emulation
 reg  [PMP_REGIONS-1:0] pmpcfg_m;
 
