@@ -91,20 +91,23 @@ The two new conditions in Xh3power 1.1 are intended to make `h3.unblock` and `h3
 
 Code written against version 1.0 of this extension is generally compatible with version 1.1, because `h3.block` is a NOP-compatible hint for the hart to sleep, and is usually used inside polling loops that detect early wake-up. However, code relying on the new conditions introduced in Xh3power 1.1 may be prone to unbounded sleep (lockup) on Xh3power 1.0.
 
+[[h3.block-instruction]]
 ==== h3.block
 
 Enter a WFI sleep state until either an unblock signal is received, or an interrupt is asserted that would cause a WFI to exit.
 
 If an unblock signal has been received in the time since the last `h3.block`, this instruction executes as a `nop`, and the hart does not enter the sleep state. Conceptually, the sleep state falls through immediately because the corresponding unblock signal has already been received.
 
-If `mstatus.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
+If `<<reg-mstatus>>.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
 
 An unblock signal is received when:
 
-* A neighbouring hart (the exact definition of "neighbouring" being left to the implementer) executes an `h3.unblock` instruction.
-* (Xh3power 1.1 onwards) the hart executes an `mret` or `sret` instruction.
-* (Xh3power 1.1 onwards) the current hart executes an `h3.unblock` instruction.
-* Any other platform-defined reason.
+* A neighbouring hart (the exact definition of _neighbouring_ being left to the implementer) executes an `h3.unblock` instruction. This is signalled by a pulse on the `unblock_in` input (<<power-control-signals>>).
+* Any other platform-defined event, signalled by a pulse on the `unblock_in` input.
+* (Xh3power 1.1 and later) The current hart executes an `mret` or `sret` instruction.
+* (Xh3power 1.1 and later) The current hart executes an `h3.unblock` instruction.
+
+`h3.block` allows the core to remain mostly idle in what would otherwise be a busy wait loop. The unblock conditions are designed to be overly broad (causing additional wakeups) rather than overly narrow (causing permanent sleep). When the core wakes, you must check whether the expected wakeup condition is met, and loop if it isn't. As a rule of thumb: write your code in a way that would still be correct if `h3.block` was replaced with a NOP.
 
 This instruction is encoded as `slt x0, x0, x0`, which is part of the custom nop-compatible hint encoding space.
 
@@ -122,11 +125,12 @@ Example assembly macro:
 .endm
 ----
 
+[[h3.unblock-instruction]]
 ==== h3.unblock
 
 Post an unblock signal to other harts in the system. For example, to notify another processor that a work queue is now nonempty. Also post an unblock signal to the current hart.
 
-If `mstatus.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
+If `<<reg-mstatus>>.tw` is set, attempting to execute this instruction in privilege modes lower than M-mode will generate an illegal instruction exception.
 
 This instruction is encoded as `slt x0, x0, x1`, which is part of the custom nop-compatible hint encoding space.
 

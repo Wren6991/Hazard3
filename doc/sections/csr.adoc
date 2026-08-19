@@ -123,7 +123,7 @@ The below table lists the fields which are _not_ hardwired to 0:
 [cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
-| 21    | `tw`  | Timeout wait. Only present if U-mode is supported. When 1, attempting to execute a WFI instruction in U-mode will instantly cause an illegal instruction exception.
+| 21    | `tw`  | Timeout wait. Only present if U-mode is supported. When 1, attempting to execute a WFI instruction in U-mode will instantly cause an illegal instruction exception. This also applies to the `<<h3.block-instruction>>` and `<<h3.unblock-instruction>>` instructions if the Xh3power extension is implemented.
 | 17    | `mprv` | Modify privilege. Only present if U-mode is supported. If 1, loads and stores behave as though the current privilege level were `mpp`. This includes physical memory protection checks, and the privilege level asserted on the system bus alongside the load/store address.
 | 12:11 | `mpp` | Previous privilege level. If U-mode is supported, this register can store the values 3 (M-mode) or 0 (U-mode). Otherwise, only 3 (M-mode). If another value is written, hardware rounds to the nearest supported mode.
 | 7 | `mpie` | Previous interrupt enable. Readable and writable. Is set to the current value of `mstatus.mie` on trap entry. Is set to 1 on trap return.
