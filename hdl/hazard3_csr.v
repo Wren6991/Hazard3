@@ -560,7 +560,7 @@ localparam [255:0] h3misa_custom_extensions = {
 	32'd0,                                       // Reserved
 	32'h10_00_00_00 & {32{|EXTENSION_XH3SFX}},   // Xh3sfx
 	32'h01_00_00_00 & {32{|EXTENSION_XH3BEXTM}}, // Xh3bextm
-	32'h01_00_00_00 & {32{|EXTENSION_XH3POWER}}, // Xh3power
+	32'h01_01_00_00 & {32{|EXTENSION_XH3POWER}}, // Xh3power
 	32'h01_00_00_00 & {32{|EXTENSION_XH3PMPM}},  // Xh3pmpm
 	32'h01_00_00_00 & {32{|EXTENSION_XH3IRQ}},   // Xh3irq
 	32'h01_00_00_00 & {32{|CSR_M_MANDATORY}}     // Xh3misa
