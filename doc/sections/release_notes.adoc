@@ -2,6 +2,35 @@
 == Release Notes
 :sectnums!:
 
+=== Version 1.2-dev
+
+Incompatible changes:
+
+* Remove the `FAST_BRANCHCMP` configuration parameter (now included unconditionally).
+
+New features:
+
+* Implement the Zibi extension (branch with immediate), enabled by <<param-EXTENSION_ZIBI>>.
+* Implement the <<extension-xh3sfx-section,Xh3sfx>> extension (soft float acceleration), enabled by <<param-EXTENSION_XH3SFX>>.
+
+Fixed errata:
+
+* Fix incorrect `minstret` increment on exception entry.
+* Fix `fence` and `fence.i` not decoding reserved variants with nonzero `rd`, `rs1` and immediate fields.
+// fixed by 7b5f99f0:
+* Fix lockup under complex conditions involving simultaneous AMO, IRQ and System Bus Access.
+
+General improvements:
+
+* Add MicroPython regression tests to test suite.
+* Update to latest versions of `riscv-arch-test` and `riscv-tests`.
+* Coding style changes to avoid feedback arcs when building Verilator model with coverage enabled.
+
+Other changes:
+
+* Update <<extension-xh3power-section>> to version 1.1: add two new conditions for unblock signals caused by instruction execution on the local hart.
+** This is a generally backward-compatible change which avoids some pitfalls with `h3.block`/`h3.unblock` in SMP RTOS implementations.
+
 === Version 1.1.1
 
 Fixed errata:
