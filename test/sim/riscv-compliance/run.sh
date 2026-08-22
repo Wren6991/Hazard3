@@ -1,10 +1,25 @@
 #!/bin/bash
+
 set -e
+
+CLEAN=0
+for arg in "$@"; do
+	case ${arg} in
+	--clean)
+		CLEAN=1
+		;;
+	*)
+		echo "Unrecognised arg '${arg}'"
+		exit 1
+		;;
+	esac
+done
 
 echo "Rebuilding simulator..."
 make -C ../tb_cxxrtl CONFIG=archtest
-echo "Cleaning up previous run..."
-cd riscv-arch-test/riscof-plugins/rv32
-rm -rf riscof_work
+if [[ ${CLEAN} == 1 ]]; then
+	echo "Cleaning..."
+	make -C riscv-arch-test clean
+fi
 echo "Starting..."
-riscof run --config config.ini --suite ../../riscv-test-suite/ --env ../../riscv-test-suite/env
+make -C riscv-arch-test hazard3
