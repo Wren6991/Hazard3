@@ -1,4 +1,11 @@
-// Default Hazard3 config for testbench: all ISA features
+// Configuration used for riscv-arch-test. Generally same as default config but:
+//
+// * Enable all PMP regions (tests don't like the hardwired ones)
+//
+// * Disable internal IRQ controller (InterruptsU test does not like that
+//   mip.meip is clear after taking an external IRQ; the internal controller
+//   clears the pending flag because the interrupt we just took is not of
+//   sufficient priority to preempt itself.)
 
 localparam RESET_VECTOR        = 32'h80000040;
 localparam MTVEC_INIT          = 32'h80000000;
@@ -19,7 +26,7 @@ localparam EXTENSION_ZIBI      = 1;
 localparam EXTENSION_ZIFENCEI  = 1;
 localparam EXTENSION_ZILSD     = 1;
 localparam EXTENSION_XH3BEXTM  = 1;
-localparam EXTENSION_XH3IRQ    = 1;
+localparam EXTENSION_XH3IRQ    = 0;
 localparam EXTENSION_XH3PMPM   = 1;
 localparam EXTENSION_XH3POWER  = 1;
 localparam EXTENSION_XH3SFX    = 1;

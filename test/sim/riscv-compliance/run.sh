@@ -2,7 +2,7 @@
 set -e
 
 echo "Rebuilding simulator..."
-make -C ../tb_cxxrtl CONFIG=pmpfull
+make -C ../tb_cxxrtl CONFIG=archtest
 echo "Cleaning up previous run..."
 cd riscv-arch-test/riscof-plugins/rv32
 rm -rf riscof_work
