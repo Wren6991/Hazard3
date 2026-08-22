@@ -9,7 +9,8 @@
 #define MEM_BASE 0x80000000
 #define MEM_SIZE (16 * 1024 * 1024)
 #define N_RESERVATIONS (2)
-#define RESERVATION_ADDR_MASK (0xfffffff8u)
+// 64-byte granule: matches smallest configurable in SAIL sim.
+#define RESERVATION_ADDR_MASK (0xffffffc0u)
 
 static const unsigned int IO_BASE = 0xc0000000;
 enum {
