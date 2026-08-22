@@ -1124,15 +1124,18 @@ wire [W_EXCEPT-1:0] x_except =
 	x_loadstore_pmp_fail                                     ? EXCEPT_LOAD_FAULT     :
 	x_csr_write_is_fetch_ordered                             ? EXCEPT_REFETCH        : d_except;
 
-// If an instruction causes an exceptional condition we do not consider it to have retired.
+// If an instruction traps, we do not consider it to have retired. This includes EBREAK and ECALL,
+// which are explicitly called out in the spec as not incrementing minstret. Still need to exclude
+// dummy exceptions used for our own purposes (as opposed to architectural faults):
 wire x_except_counts_as_retire =
-	x_except == EXCEPT_EBREAK  ||
 	x_except == EXCEPT_REFETCH ||
-	x_except == EXCEPT_MRET    ||
-	x_except == EXCEPT_ECALL_M ||
-	x_except == EXCEPT_ECALL_U;
+	x_except == EXCEPT_MRET;
 
-assign x_instr_ret = |df_cir_use && (x_except == EXCEPT_NONE || x_except_counts_as_retire);
+// Exclude excepting instructions, and instructions that are in the shadow of a stage-3 exception:
+assign x_instr_ret =
+	|df_cir_use &&
+	(x_except == EXCEPT_NONE || x_except_counts_as_retire) &&
+	!m_trap_enter_soon;
 
 assign m_dphase_in_flight = xm_memop != MEMOP_NONE && xm_memop != MEMOP_AMO;
 
