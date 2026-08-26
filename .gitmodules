@@ -19,3 +19,6 @@
 [submodule "test/sim/micropython/micropython"]
 	path = test/sim/micropython/micropython
 	url = https://github.com/Wren6991/micropython-hazard3-tests.git
+[submodule "test/sim/riscv-compliance/riscv-unified-db"]
+	path = test/sim/riscv-compliance/riscv-unified-db
+	url = https://github.com/riscv/riscv-unified-db.git

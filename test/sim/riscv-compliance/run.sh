@@ -16,7 +16,7 @@ for arg in "$@"; do
 done
 
 echo "Rebuilding simulator..."
-make -C ../tb_cxxrtl CONFIG=archtest
+make -C ../tb_verilator CONFIG=archtest -j $(nproc)
 if [[ ${CLEAN} == 1 ]]; then
 	echo "Cleaning..."
 	make -C riscv-arch-test clean

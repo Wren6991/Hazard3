@@ -54,7 +54,7 @@ testlist = sorted(testlist)
 if not args.no_tb_build:
 	tb_dir = os.path.join(*os.path.split(os.path.abspath(args.tb))[:-1])
 	tb_build_ret = subprocess.run(
-		["make", "-C", tb_dir, "all"],
+		["make", "-C", tb_dir, "all", "-j", str(os.cpu_count())],
 		timeout=300
 	)
 	if tb_build_ret.returncode != 0:

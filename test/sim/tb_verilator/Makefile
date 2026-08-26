@@ -17,7 +17,7 @@ endif
 
 FILE_LIST := $(shell HDL=$(HDL) $(SCRIPTS)/listfiles ../tb_common/hdl/$(DOTF))
 VINCDIR   := $(shell HDL=$(HDL) $(SCRIPTS)/listfiles -f flati ../tb_common/hdl/$(DOTF))
-BUILD_DIR := build-$(patsubst %.f,%,$(DOTF))
+BUILD_DIR := build-$(TBEXEC)
 ifeq ($(COVERAGE),1)
   BUILD_DIR := $(BUILD_DIR)-cov
   CDEFINES  += COVERAGE
