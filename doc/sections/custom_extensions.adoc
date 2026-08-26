@@ -1,6 +1,6 @@
 == Custom Extensions
 
-Hazard3 implements a small number of custom extensions. Xh3misa is always included; the remaining custom extensions are only included if the relevant feature flags are set to `1` when instantiating the processor (<<config-parameters-section>>).
+Hazard3 implements a small number of custom extensions. Xh3misa is implied by the <<param-CSR_M_MANDATORY>> configuration, as it contains low-level ISA feature information that should be available to M-mode software on all but the most area-sensitive implementations. The remaining custom extensions are completely optional, each having its own dedicated configuration parameter.
 
 The `x` bit in `<<reg-misa>>` is always set, to indicate (at least) the presence of the Xh3misa extension.
 
@@ -407,7 +407,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.funpacku3.s
 
-Unpack significand from single-precision to U3.29. The result is in the range `0x00000000` through `0x3fffffc0` inclusive, which is approximately 0 through +2. This is equivalent to the following C code:
+Unpack significand from single-precision to U3.29. The result is in the range `0x20000000` through `0x3fffffc0` inclusive, which is approximately 1 through +2. This is equivalent to the following C code:
 
 ----
 uint32_t h3_funpacku3_s(uint32_t rs1) {
@@ -447,7 +447,7 @@ Example C macro (using GCC statement expressions):
 
 ==== h3.funpacku3.h
 
-Unpack significand from half-precision to U3.29. The result is in the range `0x00000000` through `0x3ffc0000` inclusive, which is approximately 0 through +2. This is equivalent to the following C code:
+Unpack significand from half-precision to U3.29. The result is in the range `0x20000000` through `0x3ffc0000` inclusive, which is approximately 1 through +2. This is equivalent to the following C code:
 
 ----
 uint32_t h3_funpacku3_h(uint32_t rs1) {

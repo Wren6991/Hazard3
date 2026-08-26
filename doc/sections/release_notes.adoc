@@ -6,7 +6,7 @@
 
 Incompatible changes:
 
-* Remove the `FAST_BRANCHCMP` configuration parameter (now included unconditionally).
+* Remove the `FAST_BRANCHCMP` configuration parameter (now enabled unconditionally).
 
 New features:
 
@@ -22,14 +22,11 @@ Fixed errata:
 
 General improvements:
 
+* Update <<extension-xh3power-section>> to version 1.1: add two new conditions for unblock signals caused by instruction execution on the local hart.
+** This is a generally backward-compatible change which avoids some pitfalls with `h3.block`/`h3.unblock` in SMP RTOS implementations.
 * Add MicroPython regression tests to test suite.
 * Update to latest versions of `riscv-arch-test` and `riscv-tests`.
 * Coding style changes to avoid feedback arcs when building Verilator model with coverage enabled.
-
-Other changes:
-
-* Update <<extension-xh3power-section>> to version 1.1: add two new conditions for unblock signals caused by instruction execution on the local hart.
-** This is a generally backward-compatible change which avoids some pitfalls with `h3.block`/`h3.unblock` in SMP RTOS implementations.
 
 === Version 1.1.1
 

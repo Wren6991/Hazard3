@@ -2,7 +2,7 @@
 
 The RISC-V privileged specification affords flexibility as to which CSRs are implemented, and how they behave. This section documents the concrete behaviour of Hazard3's standard and nonstandard M-mode CSRs, as implemented.
 
-All CSRs are 32-bit; MXLEN is fixed at 32 bits on Hazard3. All CSR addresses not listed in this section are unimplemented. Accessing an unimplemented CSR will cause an illegal instruction exception (`mcause` = 2). This includes all U-mode and S-mode CSRs.
+All CSRs are 32-bit; MXLEN is fixed at 32 bits on Hazard3. All CSR addresses not listed in this section are unimplemented. Accessing an unimplemented CSR will cause an illegal instruction exception (`mcause` = 2). This includes all S-mode CSRs.
 
 
 IMPORTANT: The https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf[RISC-V Privileged Specification] should be your primary reference for writing software to run on Hazard3. This section specifies those details which are left implementation-defined by the RISC-V Privileged Specification, for sake of completeness, but portable RISC-V software should not rely on these details.
@@ -177,7 +177,7 @@ Address: `0x344`
 
 Interrupt pending register. Read-only.
 
-NOTE: The RISC-V specification lists `mip` as a read-write register, but the bits which are writable correspond to lower privilege modes (S- and U-mode) which are not implemented on Hazard3, so it is documented here as read-only.
+NOTE: The RISC-V specification lists `mip` as a read-write register, but the bits which are writable belong to S-mode, which is not implemented on Hazard3.
 
 The table below lists the fields which are _not_ hardwired to 0:
 
@@ -204,6 +204,20 @@ Trap vector base address. Read-write. Exactly which bits of `mtvec` can be modif
 |===
 
 NOTE: In the RISC-V specification, `mode` is a 2-bit write-any read-legal field in bits 1:0. Hazard3 implements this by hardwiring bit 1 to 0.
+
+[[reg-menvcfg]]
+==== menvcfg
+
+Address: `0x30a`
+
+Hardwired to 0, if <<param-U_MODE>> = `1`. Otherwise unimplemented.
+
+[[reg-menvcfgh]]
+==== menvcfgh
+
+Address: `0x31a`
+
+Hardwired to 0, if <<param-U_MODE>> = `1`. Otherwise unimplemented.
 
 [[reg-mscratch]]
 ==== mscratch
@@ -249,7 +263,7 @@ The following exception causes may be set by Hazard3 hardware:
 | Cause | Description
 | 0 | Instruction address misaligned: fires when bit `1` of a branch target is set and <<param-EXTENSION_C>> is `0`. Note that bit `0` of a branch target is always implicitly masked in RISC-V, so this exception never fires when <<param-EXTENSION_C>> = `1`.
 | 1 | Instruction access fault: fires when instruction fetch encounters an AHB error response. Instruction fetch faults are speculative, and a fault encountered in the prefetch of an instruction that is not subsequently executed is harmlessly flushed. Also fires on an attempt to execute an instruction which overlaps a PMP region that lacks execute permissions in the current privilege mode.
-| 2 | Illegal instruction: fires when executing an instruction bit pattern that is not supported on this Hazard3 implementation, or when accessing a CSR that is unimplemented or inaccessible in the current privilege mode. Also fires when executing a `wfi` or `h3.block` in U-mode when `<<reg-mstatus>>.tw` = `1`.
+| 2 | Illegal instruction: fires when executing an instruction bit pattern that is not supported on this Hazard3 implementation, or when accessing a CSR that is unimplemented or inaccessible in the current privilege mode. Also fires when executing a `wfi`, `h3.block` or `h3.unblock` in U-mode when `<<reg-mstatus>>.tw` = `1`.
 | 3 | Breakpoint: fires when executing an `ebreak` instruction, or as a result of a trigger (see <<section-trigger-module>>) that targets M-mode (i.e. `<<reg-tdata1>>.action` = `0`).
 | 4 | Load address misaligned: fires when load address modulo load size is not equal to zero. Zilsd loads are treated as four bytes in size for alignment purposes, as they issue as pairs of 32-bit accesses.
 | 5 | Load access fault: fires when a load instruction encounters an AHB error response. Also fires when loading from an address that lacks PMP read permissions in the current privilege mode.
@@ -310,7 +324,7 @@ Each `pmpcfg` register divides into four identical 8-bit chunks, each correspond
 |Bits | Name | Description
 | 7   | `L` | Lock region, and additionally enforce its permissions on M-mode as well as U-mode.
 | 6:5 | -   | RES0
-| 4:3 | `A` | Address-matching mode. Values supported are 0 (OFF), 2 (NA4, naturally aligned 4-byte) and 3 (NAPOT, naturally aligned power-of-two). 1 (TOR, top of range) is not supported. Attempting to write an unsupported value will set the region to OFF.
+| 4:3 | `A` | Address-matching mode. Values supported depend on configuration. Value of 0 (OFF) is always supported. Value of 1 (TOR, top of range) is supported if <<param-PMP_MATCH_TOR>> = `1`. Values of `2` (NA4, naturally aligned 4-byte) and `3` (NAPOT, naturally aligned power-of-two) are supported if <<param-PMP_MATCH_NAPOT>> = `1`. Attempting to write an unsupported value will set the region to OFF.
 | 2    | `X` | Execute permission
 | 1    | `W` | Write permission
 | 0    | `R` | Read permission
@@ -329,6 +343,8 @@ The interpretation of the `pmpaddr` bits depends on the `A` mode configured in t
 
 * For NA4, the entire 30-bit PMP address is matched against the 30 MSBs of the checked address.
 * For NAPOT, `pmpaddr` bits up to and including the least-significant zero bit are ignored, and the remaining bits are matched against the MSBs of the checked address.
+* For TOR, the region matches all addresses greater than or equal to the next-lower-numbered `pmpaddr` register, and less than this `pmpaddr` register.
+** As a special case, region 0 matches up from address `0`.
 
 === Standard M-mode Performance Counters
 
@@ -492,7 +508,7 @@ See <<section-icount-trigger>> for more information about this trigger's behavio
 [cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
-| 24 | `hit` | Hardwired to zero; this feature is not implemented
+| 26 | `hit` | Hardwired to zero; this feature is not implemented
 | 9 | `m` | Write 1 to enable matching during M-mode execution, if <<reg-tcontrol>>.`mte` is also set.
 | 6 | `u` | Write 1 to enable matching during U-mode execution. Hardwired to zero if <<param-U_MODE>> = `0`.
 | 5:0 | `action` | Hardwired to `1`; this trigger only supports breaking to Debug Mode (as an M-mode breakpoint exception triggered immediately after M-mode interrupt entry would be unrecoverable).
@@ -508,7 +524,7 @@ See <<section-interrupt-trigger>> for more information about this trigger's beha
 [cols="10h,20,~", options="header"]
 |===
 | Bits | Name | Description
-| 24 | `hit` | Hardwired to zero; this feature is not implemented
+| 26 | `hit` | Hardwired to zero; this feature is not implemented
 | 9 | `m` | Write 1 to enable matching during M-mode execution, if `tcontrol.mte` is also set.
 | 6 | `u` | Write 1 to enable matching during U-mode execution. Hardwired to zero if <<param-U_MODE>> = `0`.
 | 5:0 | `action` | Hardwired to `1`; this trigger only supports breaking to Debug Mode (as an M-mode breakpoint exception triggered immediately after M-mode interrupt entry would be unrecoverable).
@@ -783,7 +799,7 @@ When multiple interrupts of the same priority are both pending and enabled, the 
 * Interrupt priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt` are eligible for processing at the current interrupt nesting level. They appear in `h3.meinext` and do not cause the core to take an interrupt.
 * Interrupt priorities _p_ in the range `preempt` ≤ _p_ ≤ 15 (max priority) are eligible for processing at a higher interrupt nesting level, and will cause the core to take an interrupt if interrupts are enabled. They also appear in `h3.meinext`.
 
-One subtle detail is that, since the `h3.meinext.update` bit sets the `<<reg-h3.meicontext>>.preempt` level to the interrupt priority plus one, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via `<<reg-mstatus>>.mie` will _never_ cause the core to take the same interrupt that was just read from `h3.meinext`.
+One subtle detail is that, since the `h3.meinext.update` bit sets the `<<reg-h3.meicontext>>.preempt` level to the next level _above_ the sampled interrupt, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via `<<reg-mstatus>>.mie` will never cause the core to take the same interrupt that was just read from `h3.meinext`. This avoids an interrupt service routine interleaving with itself, which would probably surprise the programmer.
 
 A useful implication of this is that if the core takes some low-priority interrupt, and a higher-priority interrupt arrives while the interrupt dispatch routine is still saving registers to the stack, it is the _higher_-priority interrupt that will be processed first, and both interrupts are processed at the same level of nesting. This is sometimes referred to as _late arrival_.
 
@@ -818,9 +834,11 @@ The top entry of the priority stack, `preempt`, is used by hardware to ensure th
 
 IRQs of lower priority than `ppreempt` are not visible in `h3.meinext`, so that a preemptee is not re-taken in the preempting frame.
 | 23:21 | -           | RES0
-| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when when `h3.meinext.update` is written, or when hardware enters the external interrupt vector. Resets to `0`.
+| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when `h3.meinext.update` is written; when hardware enters the external interrupt vector (a _priority save_); or when executing an `mret` instruction with `h3.meicontext.mreteirq` = `1` (a _priority restore_). Resets to `0`.
 
 If an interrupt is present in `h3.meinext`, then `preempt` is set to one level greater than that interrupt's priority. Otherwise, `preempt` is set to one level greater than the maximum interrupt priority, disabling preemption.
+
+This field is one bit wider than `ppreempt`. When the MSB of this field is set, its value is higher than the highest possible IRQ priority, meaning preemption is disabled. Such large values are never saved to `ppreempt`, because priority save happens only on preemption.
 | 15    | `noirq`     | Not in interrupt (read/write). Set to 1 at reset. Set to `h3.meinext.noirq` when `h3.meinext.update` is written. No hardware effect.
 | 14:13  | -           | RES0
 | 12:4   | `irq`       | Current IRQ number (read/write). Set to `h3.meinext.irq` when `h3.meinext.update` is written. Resets to `0`.

@@ -8,6 +8,7 @@ Hazard3 is a configurable 3-stage RISC-V processor, implementing:
 * `C`: compressed instructions
 * `Zibi`: branch-with-immediate instructions (unratified)
 * `Zicsr`: CSR access
+* `Zifencei`: instruction fence
 * `Zilsd`: load/store pair
 * `Zba`: address generation
 * `Zbb`: basic bit manipulation

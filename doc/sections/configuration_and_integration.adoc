@@ -131,7 +131,7 @@ Also see <<section-memory-ordering>> for more information on Hazard3's memory mo
 
 The core waits for all in-progress bus accesses (load/store and instruction fetch) to complete before asserting this signal, and does not issue further instruction fetches for as long as this signal is asserted.
 
-Once `fetch_rdy` is seen high, the core flushes its prefetch buffer to order the fetch of younger instructions against the fence. It then resumes normal execution.
+Once `fence_rdy` is seen high, the core flushes its prefetch buffer to order the fetch of younger instructions against the fence. It then resumes normal execution.
 
 | 1          | Out | `fence_d_vld`                | Indicates the core is executing a non-instruction fence, such as `fence rw, rw`. Remains asserted until `fence_rdy` goes high. Never asserted at the same time as `fence_i_vld`.
 
@@ -152,7 +152,7 @@ All Debug Module signals should be connected to the signal with the matching nam
 | 1          | In  | `dbg_req_halt_on_reset`      | Debugger halt-on-reset request. Tie low if debug support is not configured.
 | 1          | In  | `dbg_req_resume`             | Debugger resume request. Tie low if debug support is not configured.
 | 1          | Out | `dbg_halted`                 | Debug halted status. Asserts when the processor is halted in Debug mode. Disconnect if debug support is not configured.
-| 1          | Out | `dbg_running`                | Debug halted status. Asserts when the processor is not halted and not transitioning between halted/running states. Disconnect if debug support is not configured.
+| 1          | Out | `dbg_running`                | Debug running status. Asserts when the processor is not halted and not transitioning between halted/running states. Disconnect if debug support is not configured.
 | 32         | In  | `dbg_data0_rdata`            | Read data bus for mapping Debug Module `dmdata0` register as a CSR. Tie to zeroes if debug support is not configured.
 | 32         | Out | `dbg_data0_wdata`            | Write data bus for mapping Debug Module `dmdata0` register as a CSR. Disconnect if debug support is not configured.
 | 1          | Out | `dbg_data0_wen`              | Write data strobe for mapping Debug Module `dmdata0` register as a CSR. Disconnect if debug support is not configured.
@@ -284,7 +284,7 @@ Bit `0` is tied to `0` to indicate instruction fetch.
 | 3  | Out | `d_hburst`     | Tied off to `0` (`SINGLE`). Hazard3 does not issue bursts.
 | 4  | Out | `d_hprot`      | Bits `3:2` are always `0` to indicate nonbufferable and noncacheable access.
 
-Bit `1` (privileged) is `0` for U-mode access, and `1` for M-mode access.
+Bit `1` (privileged) is `0` for U-mode access, and `1` for M-mode and Debug-mode access.
 
 Bit `0` is tied to `1` to indicate data access (load/store or SBA).
 | 1  | Out | `d_hmastlock`  | Hazard3 does not use legacy bus locking, so this bit is tied to 0.
@@ -802,9 +802,9 @@ If `1`, the `rst_n` input resets all general purpose registers to all-zeroes. If
 bits in the register file, so the reset can be disabled to permit
 block RAM and LUT RAM inference on FPGA, or to reduce flop area on ASIC.
 
-Outside of the register file, all other flops in Hazard3 are always reset by the `rst_n` input, no matter the value of this parameter.
+This parameter only controls the register file reset. The majority of flops in Hazard3 are always reset, regardless whether this parameter is set. The only exception besides the register file is the datapath flops in the fast multiplier (<<param-MUL_FAST>> = `1` and <<param-MUL_FASTER>> = `0`), which are never reset, to improve FPGA DSP inference compatibility.
 
-Default value: `1`
+Default value: `0`
 
 [[param-BRANCH_PREDICTOR]]
 ===== BRANCH_PREDICTOR

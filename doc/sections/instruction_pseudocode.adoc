@@ -904,7 +904,7 @@ Rotate right, immediate.
 
 Syntax:
 
-    ror rd, rs1, imm
+    rori rd, rs1, imm
 
 Operation:
 
@@ -1034,7 +1034,7 @@ Syntax:
 
 Operation:
 
-    rd = clmul_result[32:1];
+    rd = clmul_result[62:31];
 
 
 === Zbs: Bit manipulation (single-bit)

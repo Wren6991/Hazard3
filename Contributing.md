@@ -30,7 +30,7 @@ I do not merge pull requests which modify hardware sources in the `hdl/` directo
 
 The contents of the `hdl/` directory have a single author. I will not expose people taping out Hazard3 to the possibility of your employer chasing you for your contribution by harassing them legally. A contribution agreement does not solve this, because you may sign it without the legal capability to do so, and **what is taped out cannot be taped back in.**
 
-If you are reading this as a software engineer, please understand that the ASIC industry is more hostile to open-source projects than the software industry is, and I am trying my hardest to build a core that other people can safely use.
+Please understand that the ASIC industry is more hostile to open-source projects than the software industry is, and I am trying my hardest to build a core that other people can safely use.
 
 (I am not trying to be obstructive; if a community fork of Hazard3 gets traction I am happy to contribute and help out with issues and questions. However, the core RTL in this repository will remain single-author.)
 
