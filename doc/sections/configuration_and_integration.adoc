@@ -571,7 +571,7 @@ Default value: `0`
 This is the _G_ parameter in the privileged spec, which defines the
 granularity of PMP regions. Minimum PMP region size is 1 << (_G_ + 2) bytes. For example, _G_ = `3` means 32-byte protection granularity.
 
-If _G_ > 0, `pmcfg.a` cannot be set to NA4; attempting to do so will set the region to OFF instead. The _G_ LSBs of each `pmpaddr` register read back as all-zeroes when `pmpcfg.a` is set to TOR or OFF.
+If _G_ > 0, `pmpcfg.a` cannot be set to NA4; attempting to do so will set the region to OFF instead. The _G_ LSBs of each `pmpaddr` register read back as all-zeroes when `pmpcfg.a` is set to TOR or OFF.
 
 If _G_ > 1, the _G_ - 1 LSBs of pmpaddr are read-only-1 when `pmpcfg.a` is
 NAPOT.
@@ -802,7 +802,7 @@ If `1`, the `rst_n` input resets all general purpose registers to all-zeroes. If
 bits in the register file, so the reset can be disabled to permit
 block RAM and LUT RAM inference on FPGA, or to reduce flop area on ASIC.
 
-This parameter only controls the register file reset. The majority of flops in Hazard3 are always reset, regardless whether this parameter is set. The only exception besides the register file is the datapath flops in the fast multiplier (<<param-MUL_FAST>> = `1` and <<param-MUL_FASTER>> = `0`), which are never reset, to improve FPGA DSP inference compatibility.
+This parameter only controls the register file reset. The majority of flops in Hazard3 are always reset, regardless of whether this parameter is set. The only exception besides the register file is the datapath flops in the fast multiplier (<<param-MUL_FAST>> = `1` and <<param-MUL_FASTER>> = `0`), which are never reset, to improve FPGA DSP inference compatibility.
 
 Default value: `0`
 

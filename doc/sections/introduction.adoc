@@ -64,7 +64,7 @@ The three stages are:
 ** Compares data-phase fetch address with breakpoint addresses
 ** Looks up data-phase fetch address against PMP regions
 * `X`: Execute
-** Decodes and execute instructions
+** Decodes and executes instructions
 ** Looks up load/store/AMO addresses against PMP regions
 ** Drives the address phase for load/store/AMO
 ** Generates jump/branch addresses

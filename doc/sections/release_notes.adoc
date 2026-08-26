@@ -41,7 +41,7 @@ Other changes:
 
 * Improve riscv-formal coverage for AHB5 exclusives and the A extension.
 
-See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.1.1[here].
+See the GitHub release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.1.1[here].
 
 === Version 1.1
 
@@ -68,14 +68,14 @@ New features:
 ** These triggers are present whenever debug support is enabled by <<param-DEBUG_SUPPORT>>.
 * Implement the RV32E base extension, enabled by <<param-EXTENSION_E>>.
 * Implement new custom extension: <<extension-xh3misa-section>>, for detecting processor ISA support at finer granularity than the standard `misa` register. Enabled by `CSR_M_MANDATORY`, so it is reliably present.
-* Add `hazard3_xilinx7_jtag_dtm` for tunneling RISC-V debug through Xilinx 7-series FPGA TAPs.
+* Add `hazard3_xilinx7_jtag_dtm` for tunnelling RISC-V debug through Xilinx 7-series FPGA TAPs.
 
 Fixed errata:
 
 * Fix `fence.i` only ordering against the address phase of a preceding store (a multi-manager AHB fabric may reorder address phases, so order against the data phase instead).
 * Fix local monitor flag being cleared by trap entry as well as trap exit (only `xRET` should clear it).
 ** This behaviour continues to not affect entry/exit to Debug Mode, so LR/SC sequences can be single-stepped.
-* Fix the Debug Module PROGBUF1 register being writable when an abstract command is executing, and not setting `abstracts.cmderr` to `busy` when written.
+* Fix the Debug Module PROGBUF1 register being writable when an abstract command is executing, and not setting `abstractcs.cmderr` to `busy` when written.
 * Fix spurious dependency of CSR instructions on `rs2`, causing read-after-write stall.
 * Fix processor lockup on AMOs that fail PMP checks.
 * Fix Debug Mode loads and stores during Program Buffer execution being subject to PMP checks on M-mode-enforced (locked) regions.
@@ -97,7 +97,7 @@ General improvements:
 * Relax PMP X permission checking to allow instructions to straddle two PMP regions which both have the necessary permissions.
 * RTL is now lint-clean with Verilator v5.038.
 * Add Verilator testbench, command-line-compatible with existing CXXRTL testbench.
-* Update to latest versions of `riscv-arch-test`, `riscv-test`  and `riscv-formal`.
+* Update to latest versions of `riscv-arch-test`, `riscv-tests`  and `riscv-formal`.
 * Enable `riscv-formal` checks for B extension and other bit manipulation extensions.
 * Update `hazard3_rvfi_monitor` to support running existing `riscv-formal` checks with the A, Zcmp, Zilsd and Zclsd extensions enabled.
 * Allow synthesising the processor with the RVFI trace monitor included by defining the `HAZARD3_RVFI_STANDALONE` macro.
@@ -113,20 +113,20 @@ Other changes:
 * Writes to `minstret`/`minstreth` or `mcycle`/`mcycleh` now inhibit the increment of the entire underlying 64-bit counter.
 ** The spec wording was recently changed to clarify this issue: see https://github.com/riscv/riscv-isa-manual/issues/1255[here].
 
-See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.1[here].
+See the GitHub release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.1[here].
 
 === Version 1.0.2
 
 * Coding style change in `hazard3_frontend` for Verilator compatibility
 
-See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.0.2[here].
+See the GitHub release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.0.2[here].
 
 === Version 1.0.1
 
 * Fix: abstract access commands initiated via `abstractauto` access the wrong core GPR
 
-See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.0.1[here].
+See the GitHub release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.0.1[here].
 
 === Version 1.0
 
-This is the first stable version of Hazard3. See the Github release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.0[here].
+This is the first stable version of Hazard3. See the GitHub release notes https://github.com/Wren6991/Hazard3/releases/tag/v1.0[here].

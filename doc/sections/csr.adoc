@@ -56,11 +56,11 @@ Implementation identifier. Most of this register is hardwired to indicate the re
 | 3:0    | -          | RES0
 |===
 
-This should match the version of the Github release of the processor's source code. For example, version https://github.com/Wren6991/Hazard3/releases/tag/v1.0.2[1.0.2] would have a `major` of 1, `minor` of 0 and `patch` of 2.
+This should match the version of the GitHub release of the processor's source code. For example, version https://github.com/Wren6991/Hazard3/releases/tag/v1.0.2[1.0.2] would have a `major` of 1, `minor` of 0 and `patch` of 2.
 
 `eco` is connected to the `eco_version` input port at Hazard3 top level; the implementer may connect this to metal tie cells in their integration so that they can increment the ECO (engineering change order) number with metal revisions that affect the processor, or may simply tie it to 0. See <<identification-signals>>.
 
-NOTE: Versions of Hazard3 older than v1.1 allowed the implementer to set the `mimpid` contents arbitrarily, with a recommendation to set it to the git hash. The hashes of released versions are: `86fc4e3f` (RP2350, v1.0-rc1), `918aaee10` (v1.0), `82729101` (v1.0.1) and `787da131a` (v1.0.2).
+NOTE: Versions of Hazard3 older than v1.1 allowed the implementer to set the `mimpid` contents arbitrarily, with a recommendation to set it to the git hash. The hashes of released versions are: `86fc4e3f` (RP2350, v1.0-rc1), `918aaee1` (v1.0), `82729101` (v1.0.1) and `787da131` (v1.0.2).
 
 [[reg-mhartid]]
 ==== mhartid
@@ -184,7 +184,7 @@ The table below lists the fields which are _not_ hardwired to 0:
 [cols="10h,20,~", options="header"]
 |===
 |Bits | Name | Description
-| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in `<<reg-h3.meipa>>`) and enabled in `<<reg-h3.meiea>>`.
+| 11 | `meip` | External interrupt pending. When 1, indicates there is at least one interrupt which is asserted (hence pending in `<<reg-h3.meipa>>`), enabled in `<<reg-h3.meiea>>`, and of priority greater than or equal to `<<reg-h3.meicontext>>.preempt`.
 | 7 | `mtip` | Timer interrupt pending. Level-sensitive interrupt signal from outside the core. Connected to a standard, external RISC-V 64-bit timer.
 | 3 | `msip` | Software interrupt pending. In spite of the name, this is not triggered by an instruction on this core, rather it is wired to an external memory-mapped register to provide a cross-hart level-sensitive doorbell interrupt.
 |===
@@ -335,7 +335,7 @@ Each `pmpcfg` register divides into four identical 8-bit chunks, each correspond
 
 Address: `0x3b0` through `0x3bf`
 
-Address registers for up to 16 physical memory protection regions. Only present if PMP support is configured. If so, all 16 registers are present, but some may fully/partially hardwired.
+Address registers for up to 16 physical memory protection regions. Only present if PMP support is configured. If so, all 16 registers are present, but some may be fully or partially hardwired.
 
 `pmpaddr` registers express addresses in units of 4 bytes, so on Hazard3 (a 32-bit processor with no virtual address support) only the lower 30 bits of each address register are implemented.
 
@@ -527,7 +527,7 @@ See <<section-interrupt-trigger>> for more information about this trigger's beha
 | 26 | `hit` | Hardwired to zero; this feature is not implemented
 | 9 | `m` | Write 1 to enable matching during M-mode execution, if `tcontrol.mte` is also set.
 | 6 | `u` | Write 1 to enable matching during U-mode execution. Hardwired to zero if <<param-U_MODE>> = `0`.
-| 5:0 | `action` | Hardwired to `1`; this trigger only supports breaking to Debug Mode (as an M-mode breakpoint exception triggered immediately after M-mode interrupt entry would be unrecoverable).
+| 5:0 | `action` | Hardwired to `1`; this trigger only supports breaking to Debug Mode (as an M-mode breakpoint exception triggered immediately after M-mode exception entry would be unrecoverable).
 |===
 
 See <<section-exception-trigger>> for more information about this trigger's behaviour on Hazard3.
@@ -713,7 +713,7 @@ External interrupt pending array. Contains a read-only bit for each external int
 
 A `1` bit indicates that interrupt is currently asserted. The value is the OR of each external IRQ signal with the corresponding force bit from `<<reg-h3.meifa>>`. IRQs are assumed to be level-sensitive, and in normal use the relevant `h3.meipa` bit is cleared by servicing the requester so that it deasserts its interrupt request. The interrupt force applied by `h3.meifa` clears automatically when the corresponding IRQ index is read from `<<reg-h3.meinext>>`, so the `h3.meipa` bit _also_ clears automatically if it was forced high by `h3.meifa`.
 
-When any interrupt of sufficient priority is both set in `h3.meipa` and enabled in `h3.meiea`, the standard RISC-V external interrupt pending bit `mip.meip` is asserted. In other words, `h3.meipa` is filtered by `h3.meiea` to generate the standard `mip.meip` flag.
+When any interrupt of sufficient priority is both set in `h3.meipa` and enabled in `h3.meiea`, the standard RISC-V external interrupt pending bit `mip.meip` is asserted. In other words, `h3.meipa` is filtered by `h3.meiea` (and preemption priority) to generate the standard `mip.meip` flag.
 
 An external interrupt is taken when _all_ of the following are true:
 
@@ -789,7 +789,7 @@ Get next interrupt. Contains the index of the highest-priority external interrup
 
 * Is pending in `h3.meipa`.
 * Is enabled in `h3.meiea`.
-* Has priority greater than or equal to `<<reg-h3.meicontext>>.ppreempt`, the previous pre-emption level.
+* Has priority greater than or equal to `<<reg-h3.meicontext>>.ppreempt`, the previous preemption level.
 
 The returned interrupt index is left-shifted by 2 so that it can be used to index an array of 32-bit function pointers. If there is no such interrupt, the MSB is set, which can be checked efficiently using a `bltz` instruction.
 
@@ -799,7 +799,7 @@ When multiple interrupts of the same priority are both pending and enabled, the 
 * Interrupt priorities _p_ in the range `ppreempt` ≤ _p_ < `preempt` are eligible for processing at the current interrupt nesting level. They appear in `h3.meinext` and do not cause the core to take an interrupt.
 * Interrupt priorities _p_ in the range `preempt` ≤ _p_ ≤ 15 (max priority) are eligible for processing at a higher interrupt nesting level, and will cause the core to take an interrupt if interrupts are enabled. They also appear in `h3.meinext`.
 
-One subtle detail is that, since the `h3.meinext.update` bit sets the `<<reg-h3.meicontext>>.preempt` level to the next level _above_ the sampled interrupt, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via `<<reg-mstatus>>.mie` will never cause the core to take the same interrupt that was just read from `h3.meinext`. This avoids an interrupt service routine interleaving with itself, which would probably surprise the programmer.
+Since the `h3.meinext.update` bit sets the `<<reg-h3.meicontext>>.preempt` level to the next level _above_ the sampled interrupt, reading an interrupt from `h3.meinext` (with `update` set) and then re-enabling interrupts via `<<reg-mstatus>>.mie` will never cause the core to take the same interrupt that was just read from `h3.meinext`. This avoids an interrupt service routine interleaving with itself, which would probably surprise the programmer.
 
 A useful implication of this is that if the core takes some low-priority interrupt, and a higher-priority interrupt arrives while the interrupt dispatch routine is still saving registers to the stack, it is the _higher_-priority interrupt that will be processed first, and both interrupts are processed at the same level of nesting. This is sometimes referred to as _late arrival_.
 
@@ -830,11 +830,11 @@ The top entry of the priority stack, `preempt`, is used by hardware to ensure th
 |===
 | Bits  | Name        | Description
 | 31:28 | `pppreempt` | Previous `ppreempt`. Set to `ppreempt` on priority save, set to zero on priority restore.  Has no hardware effect, but ensures that when `h3.meicontext` is saved/restored correctly, `preempt` and `ppreempt` stack correctly through arbitrarily many preemption frames. Resets to `0`.
-| 27:24 | `ppreempt`  | Previous `preempt`. Set to `preempt` on priority save, restored to to `pppreempt` on priority restore. Resets to `0`.
+| 27:24 | `ppreempt`  | Previous `preempt`. Set to `preempt` on priority save, restored to `pppreempt` on priority restore. Resets to `0`.
 
 IRQs of lower priority than `ppreempt` are not visible in `h3.meinext`, so that a preemptee is not re-taken in the preempting frame.
 | 23:21 | -           | RES0
-| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current interrupt. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when `h3.meinext.update` is written; when hardware enters the external interrupt vector (a _priority save_); or when executing an `mret` instruction with `h3.meicontext.mreteirq` = `1` (a _priority restore_). Resets to `0`.
+| 20:16 | `preempt`   | Minimum interrupt priority to preempt the current context. Interrupts with lower priority than `preempt` do not cause the core to transfer to an interrupt handler. Updated by hardware when `h3.meinext.update` is written; when hardware enters the external interrupt vector (a _priority save_); or when executing an `mret` instruction with `h3.meicontext.mreteirq` = `1` (a _priority restore_). Resets to `0`.
 
 If an interrupt is present in `h3.meinext`, then `preempt` is set to one level greater than that interrupt's priority. Otherwise, `preempt` is set to one level greater than the maximum interrupt priority, disabling preemption.
 

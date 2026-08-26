@@ -122,9 +122,14 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 | `csrrwi rd, csr, imm` | 1footnote:csr_fetch_ordering[] |
 | `csrrci rd, csr, imm` | 1footnote:csr_fetch_ordering[] |
 | `csrrsi rd, csr, imm` | 1footnote:csr_fetch_ordering[] |
-3+| Trap Request
-| `ecall` | 3 | Time given is for jumping to `mtvec`
-| `ebreak` | 3 | Time given is for jumping to `mtvec`
+3+| Traps and Interrupts
+| `ecall` | 3 | Time given is for jumping to `mtvec`.
+| `ebreak` | 3 | Time given is for jumping to `mtvec`.
+| `mret` | 3 |
+| `wfi` | 2+ | No upper limit.
+3+| Memory Ordering
+| `fence` | 1+ | Longer if preceded by load/store, or if `fence_rdy` is low.
+| `fence.i` | 3+ | Longer if preceded by load/store, or if `fence_rdy` is low.
 |===
 
 [[section-timings-zibi]]
@@ -133,8 +138,8 @@ A consequence of the C extension is that 32-bit instructions can be non-naturall
 [%autowidth.stretch, options="header"]
 |===
 | Instruction | Cycles | Note
-| `beqi rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
-| `bnei rs1, rs2, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `beqi rs1, imm, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
+| `bnei rs1, imm, label`| 1 or 2footnote:unaligned_branch[] | 1 if correctly predicted, 2 if mispredicted.
 |===
 
 [[section-timings-zilsd]]

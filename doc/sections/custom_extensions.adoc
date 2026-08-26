@@ -190,7 +190,7 @@ Encoding (R-type):
 | Bits  | Name          | Value      | Description
 | 31:29 | `funct7[6:4]` | `0b000`    | RES0
 | 28:26 | `size`        | -          | Number of ones in mask, values 0->7 encode 1->8 bits.
-| 25    | `funct7[0]`   | `0b0`      | RES0, because aligns with `shamt[5]` of potential RV64 version of `h3.bextmi`
+| 25    | `funct7[0]`   | `0b0`      | RES0, aligns with `shamt[5]` of potential RV64 version of `h3.bextmi`
 | 24:20 | `rs2`         | -          | Source register 2 (shift amount)
 | 19:15 | `rs1`         | -          | Source register 1
 | 14:12 | `funct3`      | `0b000`    | `h3.bextm`
@@ -980,7 +980,7 @@ NOTE: The function names in this section follow the conventions for https://gcc.
 
 ===== Single-precision Add and Subtract
 
-The `h3.fcheck2e.s` instruction and the accompanying branch eliminates any NaN, infinity and (potentially unflushed) zero inputs from the main path. The remainder of the function only needs to deal with normal inputs.
+The `h3.fcheck2e.s` instruction and accompanying branch eliminate any NaN, infinity and (potentially unflushed) zero inputs from the main path. The remainder of the function only needs to deal with normal inputs.
 
 The first `h3.ssrasticky` serves to align the lower-exponent number against the higher-exponent number. The higher-exponent number remains normalised to Q3.29.
 
@@ -1063,7 +1063,7 @@ __mulsf_special_exponent:
 
 ===== Convert Single-precision to Half-precision
 
-Most cases are correctly handled by simply unpacking single-precision to Q3.29, adjusting the exponent bias, and re-packing as half-precision. The one troublesome case is a signaling NaN input may have its payload rounded to all-zeroes, producing an infinity. This requires a special case to promote all input NaNs to a canonical quiet NaN.
+Most cases are correctly handled by simply unpacking single-precision to Q3.29, adjusting the exponent bias, and re-packing as half-precision. The one troublesome case is that a signalling NaN input may have its payload rounded to all-zeroes, producing an infinity. This requires a special case to promote all input NaNs to a canonical quiet NaN.
 
 ----
 .global __truncsfhf2
