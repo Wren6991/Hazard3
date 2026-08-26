@@ -161,8 +161,8 @@ localparam MENVCFGH       = 12'h31a;
 localparam PMPCFGM0       = 12'hbd0; // Make PMP regions M-mode without locking
 //                              bd1  // (reserved for >32 regions)
 
-localparam MEIEA          = 12'hbe0; // External interrupt pending array
-localparam MEIPA          = 12'hbe1; // External interrupt enable array
+localparam MEIEA          = 12'hbe0; // External interrupt enable array
+localparam MEIPA          = 12'hbe1; // External interrupt pending array
 localparam MEIFA          = 12'hbe2; // External interrupt force array
 localparam MEIPRA         = 12'hbe3; // External interrupt priority array
 localparam MEINEXT        = 12'hbe4; // Next external interrupt
