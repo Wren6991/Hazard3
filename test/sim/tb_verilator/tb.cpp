@@ -105,7 +105,6 @@ void tb_verilator_top::step(const tb_cli_args &args, mem_io_state &memio) {
 		req_d.addr = top->d_haddr;
 		req_d.excl = top->d_hexcl;
 	}
-	bool d_first_of_dphase = top->d_hready;
 	if (top->i_hready) {
 		req_i_vld = top->i_htrans >> 1;
 		req_i.write = top->i_hwrite;
@@ -113,7 +112,6 @@ void tb_verilator_top::step(const tb_cli_args &args, mem_io_state &memio) {
 		req_i.addr = top->i_haddr;
 		req_i.excl = top->i_hexcl;
 	}
-	bool i_first_of_dphase = top->i_hready;
 
 	top->clk = true;
 	top->eval();

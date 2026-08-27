@@ -96,46 +96,8 @@ void tb_cxxrtl_top::step(const tb_cli_args &args, mem_io_state &memio) {
 #ifdef CXXRTL_DEBUG_AGENT
 	agent.advance(1_us);
 #endif
-	top.p_clk.set<bool>(true);
-	STEP();
-	STEP(); // workaround for github.com/YosysHQ/yosys/issues/2780
 
-	// The two bus ports are handled identically. This enables swapping out of
-	// various `tb.v` hardware integration files containing:
-	//
-	// - A single, dual-ported processor (instruction fetch, load/store ports)
-	// - A single, single-ported processor (instruction fetch + load/store muxed internally)
-	// - A pair of single-ported processors, for dual-core debug tests
-
-	if (top.p_d__hready.get<bool>()) {
-		// Clear bus error by default
-		top.p_d__hresp.set<bool>(false);
-
-		// Handle current data phase
-		req_d.wdata = top.p_d__hwdata.get<uint32_t>();
-		bus_response resp;
-		if (req_d_vld)
-			resp = mem_callback_d(*this, memio, req_d);
-		else
-			resp.exokay = !memio.monitor_enabled;
-		if (resp.err) {
-			// Phase 1 of error response
-			top.p_d__hready.set<bool>(false);
-			top.p_d__hresp.set<bool>(true);
-		}
-		if (req_d_vld && !req_d.write) {
-			top.p_d__hrdata.set<uint32_t>(resp.rdata);
-		} else {
-			top.p_d__hrdata.set<uint32_t>(rand());
-		}
-		top.p_d__hexokay.set<bool>(resp.exokay);
-	} else {
-		// hready=0. Currently this only happens when we're in the first
-		// phase of an error response, so go to phase 2.
-		top.p_d__hready.set<bool>(true);
-	}
-
-	req_d_vld = false;
+	// Progress address phase to data phase on posedge when HREADY asserted:
 	if (top.p_d__hready.get<bool>()) {
 		// Progress current address phase to data phase
 		req_d_vld = top.p_d__htrans.get<uint8_t>() >> 1;
@@ -144,34 +106,6 @@ void tb_cxxrtl_top::step(const tb_cli_args &args, mem_io_state &memio) {
 		req_d.addr = top.p_d__haddr.get<uint32_t>();
 		req_d.excl = top.p_d__hexcl.get<bool>();
 	}
-
-	if (top.p_i__hready.get<bool>()) {
-		top.p_i__hresp.set<bool>(false);
-
-		req_i.wdata = top.p_i__hwdata.get<uint32_t>();
-		bus_response resp;
-		if (req_i_vld)
-			resp = mem_callback_i(*this, memio, req_i);
-		else
-			resp.exokay = !memio.monitor_enabled;
-		if (resp.err) {
-			// Phase 1 of error response
-			top.p_i__hready.set<bool>(false);
-			top.p_i__hresp.set<bool>(true);
-		}
-		if (req_i_vld && !req_i.write) {
-			top.p_i__hrdata.set<uint32_t>(resp.rdata);
-		} else {
-			top.p_i__hrdata.set<uint32_t>(rand());
-		}
-		top.p_i__hexokay.set<bool>(resp.exokay);
-	} else {
-		// hready=0. Currently this only happens when we're in the first
-		// phase of an error response, so go to phase 2.
-		top.p_i__hready.set<bool>(true);
-	}
-
-	req_i_vld = false;
 	if (top.p_i__hready.get<bool>()) {
 		// Progress current address phase to data phase
 		req_i_vld = top.p_i__htrans.get<uint8_t>() >> 1;
@@ -179,6 +113,82 @@ void tb_cxxrtl_top::step(const tb_cli_args &args, mem_io_state &memio) {
 		req_i.size = (bus_size_t)top.p_i__hsize.get<uint8_t>();
 		req_i.addr = top.p_i__haddr.get<uint32_t>();
 		req_i.excl = top.p_i__hexcl.get<bool>();
+	}
+
+	top.p_clk.set<bool>(true);
+	STEP();
+	STEP(); // workaround for github.com/YosysHQ/yosys/issues/2780
+
+	// I and D ports are handled identically, to support dual-core single-port tb
+
+	if (top.p_d__hresp.get<bool>() && !top.p_d__hready.get<bool>()) {
+		// ERROR ph0 -> ph1
+		top.p_d__hready.set<bool>(true);
+	} else if (!req_d_vld) {
+		// IDLE -> OKAY
+		top.p_d__hready.set<bool>(true);
+		top.p_d__hresp.set<bool>(false);
+	} else {
+		top.p_d__hresp.set<bool>(false);
+		bool stall = rand() < args.bus_stall_p;
+		top.p_d__hready.set<bool>(!stall);
+		if (stall) {
+			top.p_d__hrdata.set<uint32_t>(rand());
+		} else {
+			req_d.wdata = top.p_d__hwdata.get<uint32_t>();
+			bus_response resp = {};
+			if (req_d_vld) {
+				resp = mem_callback_d(*this, memio, req_d);
+			} else {
+				resp.exokay = !memio.monitor_enabled;
+			}
+			if (resp.err) {
+				// Phase 1 of error response
+				top.p_d__hready.set<bool>(false);
+				top.p_d__hresp.set<bool>(true);
+			}
+			if (req_d_vld && !req_d.write) {
+				top.p_d__hrdata.set<uint32_t>(resp.rdata);
+			} else {
+				top.p_d__hrdata.set<uint32_t>(rand());
+			}
+			top.p_d__hexokay.set<bool>(resp.exokay);
+		}
+	}
+
+	if (top.p_i__hresp.get<bool>() && !top.p_i__hready.get<bool>()) {
+		// ERROR ph0 -> ph1
+		top.p_i__hready.set<bool>(true);
+	} else if (!req_i_vld) {
+		// IDLE -> OKAY
+		top.p_i__hready.set<bool>(true);
+		top.p_i__hresp.set<bool>(false);
+	} else {
+		top.p_i__hresp.set<bool>(false);
+		bool stall = rand() < args.bus_stall_p;
+		top.p_i__hready.set<bool>(!stall);
+		if (stall) {
+			top.p_i__hrdata.set<uint32_t>(rand());
+		} else {
+			req_i.wdata = top.p_i__hwdata.get<uint32_t>();
+			bus_response resp = {};
+			if (req_i_vld) {
+				resp = mem_callback_d(*this, memio, req_i);
+			} else {
+				resp.exokay = !memio.monitor_enabled;
+			}
+			if (resp.err) {
+				// Phase 1 of error response
+				top.p_i__hready.set<bool>(false);
+				top.p_i__hresp.set<bool>(true);
+			}
+			if (req_i_vld && !req_i.write) {
+				top.p_i__hrdata.set<uint32_t>(resp.rdata);
+			} else {
+				top.p_i__hrdata.set<uint32_t>(rand());
+			}
+			top.p_i__hexokay.set<bool>(resp.exokay);
+		}
 	}
 
 	if (args.dump_waves) {
