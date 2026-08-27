@@ -20,6 +20,7 @@ struct tb_cli_args {
 	std::string log_path;
 	std::string sig_path;
 	std::string coverage_path;
+	uint32_t bus_stall_p;
 #ifdef CXXRTL_DEBUG_AGENT
 	bool run_agent;
 #endif
@@ -31,6 +32,7 @@ struct tb_cli_args {
 		port = 0;
 		dump_jtag = false;
 		replay_jtag = false;
+		bus_stall_p = 0;
 #ifdef CXXRTL_DEBUG_AGENT
 		run_agent = false;
 #endif

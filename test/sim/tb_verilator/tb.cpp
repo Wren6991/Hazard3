@@ -96,93 +96,101 @@ void tb_verilator_top::step(const tb_cli_args &args, mem_io_state &memio) {
 	if (vcd) {
 		vcd->dump(2ull * cycle);
 	}
-	top->clk = true;
-	top->eval();
-	if (vcd) {
-		vcd->dump(2ull * cycle + 1);
-	}
 
-	// The two bus ports are handled identically. This enables swapping out of
-	// various `tb.v` hardware integration files containing:
-	//
-	// - A single, dual-ported processor (instruction fetch, load/store ports)
-	// - A single, single-ported processor (instruction fetch + load/store muxed internally)
-	// - A pair of single-ported processors, for dual-core debug tests
-
+	// Progress address phase to data phase on posedge when HREADY asserted:
 	if (top->d_hready) {
-		// Clear bus error by default
-		top->d_hresp = false;
-
-		// Handle current data phase
-		req_d.wdata = top->d_hwdata;
-		bus_response resp;
-		if (req_d_vld)
-			resp = mem_callback_d(*this, memio, req_d);
-		else
-			resp.exokay = !memio.monitor_enabled;
-		if (resp.err) {
-			// Phase 1 of error response
-			top->d_hready = false;
-			top->d_hresp = true;
-		}
-		if (req_d_vld && !req_d.write) {
-			top->d_hrdata = resp.rdata;
-		} else {
-			top->d_hrdata = rand();
-		}
-		top->d_hexokay = resp.exokay;
-	} else {
-		// hready=0. Currently this only happens when we're in the first
-		// phase of an error response, so go to phase 2.
-		top->d_hready = true;
-	}
-
-	req_d_vld = false;
-	if (top->d_hready) {
-		// Progress current address phase to data phase
 		req_d_vld = top->d_htrans >> 1;
 		req_d.write = top->d_hwrite;
 		req_d.size = (bus_size_t)top->d_hsize;
 		req_d.addr = top->d_haddr;
 		req_d.excl = top->d_hexcl;
 	}
-
+	bool d_first_of_dphase = top->d_hready;
 	if (top->i_hready) {
-		top->i_hresp = false;
-
-		req_i.wdata = top->i_hwdata;
-		bus_response resp;
-		if (req_i_vld)
-			resp = mem_callback_i(*this, memio, req_i);
-		else
-			resp.exokay = !memio.monitor_enabled;
-		if (resp.err) {
-			// Phase 1 of error response
-			top->i_hready = false;
-			top->i_hresp = true;
-		}
-		if (req_i_vld && !req_i.write) {
-			top->i_hrdata = resp.rdata;
-		} else {
-			top->i_hrdata = rand();
-		}
-		top->i_hexokay = resp.exokay;
-	} else {
-		// hready=0. Currently this only happens when we're in the first
-		// phase of an error response, so go to phase 2.
-		top->i_hready = true;
-	}
-
-	req_i_vld = false;
-	if (top->i_hready) {
-		// Progress current address phase to data phase
 		req_i_vld = top->i_htrans >> 1;
 		req_i.write = top->i_hwrite;
 		req_i.size = (bus_size_t)top->i_hsize;
 		req_i.addr = top->i_haddr;
 		req_i.excl = top->i_hexcl;
 	}
+	bool i_first_of_dphase = top->i_hready;
 
+	top->clk = true;
+	top->eval();
+
+	// I and D ports are handled identically, to support dual-core single-port tb
+
+	if (top->d_hresp && !top->d_hready) {
+		// ERROR ph0 -> ph1
+		top->d_hready = true;
+	} else if (!req_d_vld) {
+		// IDLE -> OKAY
+		top->d_hready = true;
+		top->d_hresp = false;
+	} else {
+		top->d_hresp = false;
+		bool stall = rand() < args.bus_stall_p;
+		top->d_hready = !stall;
+		if (stall) {
+			top->d_hrdata = rand();
+		} else {
+			req_d.wdata = top->d_hwdata;
+			bus_response resp = {};
+			if (req_d_vld) {
+				resp = mem_callback_d(*this, memio, req_d);
+			} else {
+				resp.exokay = !memio.monitor_enabled;
+			}
+			if (resp.err) {
+				top->d_hready = false;
+				top->d_hresp = true;
+			}
+			if (req_d_vld && !req_d.write) {
+				top->d_hrdata = resp.rdata;
+			} else {
+				top->d_hrdata = rand();
+			}
+			top->d_hexokay = resp.exokay;
+		}
+	}
+
+	if (top->i_hresp && !top->i_hready) {
+		// ERROR ph0 -> ph1
+		top->i_hready = true;
+	} else if (!req_i_vld) {
+		// IDLE -> OKAY
+		top->i_hready = true;
+		top->i_hresp = false;
+	} else {
+		top->i_hresp = false;
+		bool stall = rand() < args.bus_stall_p;
+		top->i_hready = !stall;
+		if (stall) {
+			top->i_hrdata = rand();
+		} else {
+			req_i.wdata = top->i_hwdata;
+			bus_response resp = {};
+			if (req_i_vld) {
+				resp = mem_callback_d(*this, memio, req_i);
+			} else {
+				resp.exokay = !memio.monitor_enabled;
+			}
+			if (resp.err) {
+				top->i_hready = false;
+				top->i_hresp = true;
+			}
+			if (req_i_vld && !req_i.write) {
+				top->i_hrdata = resp.rdata;
+			} else {
+				top->i_hrdata = rand();
+			}
+			top->i_hexokay = resp.exokay;
+		}
+	}
+
+	if (vcd) {
+		vcd->dump(2ull * cycle + 1ull);
+	}
 	++cycle;
 }
 

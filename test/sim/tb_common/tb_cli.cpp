@@ -19,6 +19,7 @@ static const char *help_str =
 "    --jtagdump       : Dump OpenOCD JTAG bitbang commands to a file so they\n"
 "                       can be replayed. (Lower perf impact than VCD dumping)\n"
 "    --jtagreplay     : Play back some dumped OpenOCD JTAG bitbang commands\n"
+"    --bus-stall-p    : Generate bus stalls with probability p (float 0..1)\n"
 "    --logfile path   : File to write testbench stdout\n"
 "    --sigfile path   : File to write only the data from --dump commands\n"
 "                       (hex, 32 bits per line, same as riscv-arch-test)\n"
@@ -84,6 +85,16 @@ void tb_parse_args(int argc, char **argv, tb_cli_args &args) {
 				exit_help("Option --jtagreplay requires an argument\n");
 			args.replay_jtag = true;
 			args.jtag_replay_path = argv[i + 1];
+			i += 1;
+		} else if (s == "--bus-stall-p") {
+			if (argc - i < 2)
+				exit_help("Option --bus-stall-p requires an argument\n");
+			float p = atof(argv[i + 1]);
+			if (p < 0.f || p > 1.f) {
+				std::cerr << "--bus-stall-p requires a float between 0 and 1.\n";
+				exit(-1);
+			}
+			args.bus_stall_p = (uint32_t)(p * (uint32_t)-1u);
 			i += 1;
 		} else if (s == "--dump") {
 			if (argc - i < 3)
