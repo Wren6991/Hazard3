@@ -66,9 +66,10 @@ end else begin: have_pmp
 // ----------------------------------------------------------------------------
 // Config registers and read/write interface
 
-// Whether a region's configuration is writable; this is non-trivial when TOR
-// is supported because locking region i + 1 can also lock region i.
-wire [PMP_REGIONS-1:0] region_locked;
+// Locking rules are different for pmpaddr vs pmpcfg: locking a TOR region
+// locks the next-lower pmpaddr, but doesn't affect the next-lower pmpcfg.
+wire [PMP_REGIONS-1:0] pmpaddr_locked;
+wire [PMP_REGIONS-1:0] pmpcfg_locked;
 
 reg  [PMP_REGIONS-1:0] pmpcfg_l;
 reg  [1:0]             pmpcfg_a [0:PMP_REGIONS-1];
@@ -102,7 +103,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 		pmpcfg_m <= {PMP_REGIONS{1'b0}};
 	end else if (cfg_wen) begin
 		for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-			if (cfg_addr == PMPCFG0 + i[13:2] && !region_locked[i]) begin
+			if (cfg_addr == PMPCFG0 + i[13:2] && !pmpcfg_locked[i]) begin
 				if (PMP_HARDWIRED[i]) begin
 					// Keep tied to hardwired value (but still make the "register" sensitive to clk)
 					pmpcfg_l[i] <= PMP_HARDWIRED_CFG[8 * i + 7];
@@ -121,7 +122,7 @@ always @ (posedge clk or negedge rst_n) begin: cfg_update
 						cfg_wdata[i % 4 * 8 + 3 +: 2] : PMP_A_OFF;
 				end
 			end
-			if (cfg_addr == PMPADDR0 + i[11:0] && !region_locked[i]) begin
+			if (cfg_addr == PMPADDR0 + i[11:0] && !pmpaddr_locked[i]) begin
 				// This implements one bit too many when G > 0 and only
 				// PMP_MATCH_TOR is enabled, however that bit is ignored for
 				// both rdata and address matching, so should be trimmed.
@@ -180,7 +181,8 @@ always @ (*) begin: check_region_is_tor
 	end
 end
 
-assign region_locked = pmpcfg_l | ((pmpcfg_l & pmp_region_is_tor) >> 1);
+assign pmpaddr_locked = pmpcfg_l | ((pmpcfg_l & pmp_region_is_tor) >> 1);
+assign pmpcfg_locked  = pmpcfg_l;
 
 // ----------------------------------------------------------------------------
 // Match addresses against regions
