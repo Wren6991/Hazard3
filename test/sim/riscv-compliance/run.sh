@@ -15,11 +15,13 @@ for arg in "$@"; do
 	esac
 done
 
-echo "Rebuilding simulator..."
+echo "Rebuilding simulators..."
 make -C ../tb_verilator CONFIG=archtest -j $(nproc)
+make -C ../tb_verilator CONFIG=min -j $(nproc)
 if [[ ${CLEAN} == 1 ]]; then
 	echo "Cleaning..."
 	make -C riscv-arch-test clean
 fi
 echo "Starting..."
 make -C riscv-arch-test hazard3
+make -C riscv-arch-test hazard3-min
