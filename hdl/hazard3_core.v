@@ -405,6 +405,8 @@ reg                  xm_sleep_wfi;
 reg                  xm_sleep_block;
 reg                  xm_delay_irq_entry_on_ls_stagex;
 
+reg                  mw_local_exclusive_reserved;
+
 // ----------------------------------------------------------------------------
 // Stall logic
 
@@ -615,10 +617,10 @@ wire x_unaligned_addr = d_memop != MEMOP_NONE && (
 	bus_hsize_d == HSIZE_HWORD && bus_haddr_d[0]
 );
 
-reg mw_local_exclusive_reserved;
-
+// Careful with sc.w: even when !mw_local_exclusive_reserved (i.e. local
+// monitor fail) we still assert x_memop_vld so that PMP failures generate
+// traps. We *do* mask the accesss on a local monitor fail; it's done later.
 wire x_memop_vld = d_memop != MEMOP_NONE && !(
-	|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved ||
 	|EXTENSION_A && d_memop_is_amo && x_amo_phase != 3'h0 && x_amo_phase != 3'h2
 );
 
@@ -794,6 +796,7 @@ always @ (*) begin
 		x_trig_break ||
 		x_unaligned_addr ||
 		m_trap_enter_soon ||
+		(|EXTENSION_A && d_memop == MEMOP_SC_W && !mw_local_exclusive_reserved) ||
 		((xm_sleep_wfi || xm_sleep_block) && !m_sleep_stall_release)
 	);
 end
