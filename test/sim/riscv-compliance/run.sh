@@ -49,10 +49,16 @@ if [[ ${COVERAGE} == 1 ]]; then
 	mkdir -p "${COV_DIR}"
 	COV_FILES=$(find riscv-arch-test/work -name '*.cov' -print)
 	verilator_coverage --write "${COV_DIR}/merged.dat" ${COV_FILES}
-	verilator_coverage --report summary "${COV_DIR}/merged.dat"
+	verilator_coverage --report summary "${COV_DIR}/merged.dat" | tee "${COV_DIR}/summary.txt"
+	verilator_coverage --report hier    "${COV_DIR}/merged.dat" | tee "${COV_DIR}/hier.txt"
 	verilator_coverage --write-info "${COV_DIR}/merged.info" "${COV_DIR}/merged.dat"
 	genhtml "${COV_DIR}/merged.info" -o "${COV_DIR}/html"
-	echo "Coverage report written to ${COV_DIR}/html/index.html"
+	verilator_coverage --annotate-points --annotate "${COV_DIR}/annotated" "${COV_DIR}/merged.dat"
+	echo "Coverage reports written to ${COV_DIR}:"
+	echo "  html/index.html  line+branch HTML report"
+	echo "  summary.txt      aggregate line/toggle/branch/expr/fsm"
+	echo "  hier.txt         per-module hierarchy breakdown"
+	echo "  annotated/       per-point source annotation"
 fi
 
 exit ${RUN_STATUS}

@@ -94,7 +94,7 @@ void tb_parse_args(int argc, char **argv, tb_cli_args &args) {
 				std::cerr << "--bus-stall-p requires a float between 0 and 1.\n";
 				exit(-1);
 			}
-			args.bus_stall_p = (uint32_t)(p * (uint32_t)-1u);
+			args.bus_stall_p = (uint32_t)(p * (float)(uint32_t)-1u);
 			i += 1;
 		} else if (s == "--dump") {
 			if (argc - i < 3)

@@ -129,7 +129,7 @@ bus_response tb_mem_access(tb_top &tb, mem_io_state &memio, bus_request req) {
 			resp.err = true;
 		}
 	} else {
-		if (req.addr == (memio.poison_addr & -4u)) {
+		if ((req.addr & -4u) == memio.poison_addr) {
 			resp.err = true;
 		} else if (req.addr >= MEM_BASE && req.addr <= MEM_BASE + MEM_SIZE - (1u << (int)req.size)) {
 			req.addr &= ~0x3u;
