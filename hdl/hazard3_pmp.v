@@ -173,12 +173,14 @@ end
 // ----------------------------------------------------------------------------
 // Region locking rules
 
-reg [PMP_REGIONS-1:0] pmp_region_is_tor;
-always @ (*) begin: check_region_is_tor
-	integer i;
-	for (i = 0; i < PMP_REGIONS; i = i + 1) begin
-		pmp_region_is_tor[i] = PMP_MATCH_TOR && pmpcfg_a[i] == PMP_A_TOR;
-	end
+// Continuous assignments rather than an always @ (*) loop: with
+// PMP_MATCH_TOR=0 the loop body constant-folds to have no inputs, and some
+// simulators (e.g. Icarus) never evaluate an @* block with no sensitivities,
+// leaving this vector X.
+wire [PMP_REGIONS-1:0] pmp_region_is_tor;
+genvar g_tor;
+for (g_tor = 0; g_tor < PMP_REGIONS; g_tor = g_tor + 1) begin: check_region_is_tor
+	assign pmp_region_is_tor[g_tor] = PMP_MATCH_TOR && pmpcfg_a[g_tor] == PMP_A_TOR;
 end
 
 assign pmpaddr_locked = pmpcfg_l | ((pmpcfg_l & pmp_region_is_tor) >> 1);
